@@ -3,59 +3,51 @@
 ## 1. Project Overview & Current Phase
 
 - **Project**: VEIL (Privacy-First Messenger with Multi-Space Cryptographic Architecture)
-- **Current Phase**: **PHASE 0: Architecture, Threat Model, Technology Selection, Design System & AI Continuity Infrastructure**
-- **Status**: Complete & Verified
-- **Current Branch**: `main`
+- **Current Phase**: **PHASE 1: Cryptographic Space Prototype & Envelope Storage**
+- **Status**: Complete & Verified (46/46 tests passing)
+- **Current Branch**: `master`
 
 ---
 
 ## 2. Verified Repository Reality
 
-- **AI Continuity Suite**: Established and fully populated:
-  - [`AGENTS.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/AGENTS.md)
-  - [`docs/ai/PROJECT_CONTEXT.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/PROJECT_CONTEXT.md)
-  - [`docs/ai/CURRENT_STATE.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/CURRENT_STATE.md)
-  - [`docs/ai/ACTIVE_TASK.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/ACTIVE_TASK.md)
-  - [`docs/ai/DECISIONS.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/DECISIONS.md) (ADR-001 to ADR-006)
-  - [`docs/ai/SECURITY_RULES.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/SECURITY_RULES.md)
-  - [`docs/ai/CHANGELOG.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/CHANGELOG.md)
-  - [`docs/ai/HANDOFF.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ai/HANDOFF.md)
-- **Core Architecture & Technical Specifications**: Fully written in `docs/`:
-  - [`docs/ARCHITECTURE.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/ARCHITECTURE.md)
-  - [`docs/THREAT_MODEL.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/THREAT_MODEL.md)
-  - [`docs/CRYPTOGRAPHY.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/CRYPTOGRAPHY.md)
-  - [`docs/KEY_HIERARCHY.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/KEY_HIERARCHY.md)
-  - [`docs/SPACE_MODEL.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/SPACE_MODEL.md)
-  - [`docs/IDENTITY_MODEL.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/IDENTITY_MODEL.md)
-  - [`docs/METADATA_MODEL.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/METADATA_MODEL.md)
-  - [`docs/PRIVACY.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/PRIVACY.md)
-  - [`docs/SECURITY.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/SECURITY.md)
-  - [`docs/KNOWN_LIMITATIONS.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/docs/KNOWN_LIMITATIONS.md)
-- **Phase Prompts Suite**: Fully written in `prompts/`:
-  - [`prompts/MASTER_PROMPT.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/MASTER_PROMPT.md)
-  - [`prompts/PHASE_00.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_00.md) through [`prompts/PHASE_10.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_10.md)
-- **Source Code Baseline**:
-  - `src/types/index.ts` (Core type definitions)
-  - `src/crypto/memory.ts` (Memory zeroization & safe buffers)
-  - `src/crypto/utils.ts` (CSPRNG, Base64, Hex, constant-time equality)
-  - `src/styles/veil-design-system.css` (Vanilla CSS design system)
-  - `tests/phase0-baseline.test.ts` (Unit & negative tests)
+- **Cryptographic Implementation**:
+  - `src/crypto/kdf.ts`: Argon2id KDF (`@noble/hashes` v1.7.0).
+  - `src/crypto/aead.ts`: XChaCha20-Poly1305 AEAD (`@noble/ciphers` v2.3.0).
+  - `src/crypto/hkdf.ts`: Domain-separated HKDF-SHA256 (`@noble/hashes` v1.7.0).
+  - `src/crypto/memory.ts`: Best-effort zeroization & secure buffer wrappers.
+  - `src/crypto/utils.ts`: CSPRNG, Base64/Hex conversion, constant-time equality.
+- **Space Layer**:
+  - `src/spaces/envelope.ts`: `SpaceHeaderEnvelope` (version: 1) validator/serializer.
+  - `src/spaces/session.ts`: `SpaceSession` managing active volatile keys and memory destruction.
+  - `src/spaces/vault.ts`: `SpaceVaultManager` with credential-selected unlocking, password change, and deletion.
+  - `src/storage/spaceStore.ts`: `EncryptedSpaceStore` with partitioned AEAD key-value storage.
+- **Test Status**:
+  - `tests/phase0-baseline.test.ts` (12 tests) — PASS
+  - `tests/security-logging.test.ts` (1 test) — PASS
+  - `tests/crypto-primitives.test.ts` (13 tests) — PASS
+  - `tests/tampering-corruption.test.ts` (7 tests) — PASS
+  - `tests/space-vault.test.ts` (8 tests) — PASS
+  - `tests/space-isolation.test.ts` (5 tests, including 100-Space test) — PASS
+  - **Total**: 46/46 passed (100% passing)
 
 ---
 
 ## 3. Invariants the Next Agent Must NOT Break
 
-1. **NEVER INVENT CRYPTOGRAPHY**: Use only audited primitives (Argon2id, XChaCha20-Poly1305, AES-256-GCM, Ed25519, X25519, Double Ratchet).
-2. **ZERO PAID SERVICES**: Keep all dependencies open-source and locally runnable.
-3. **ISOLATION BY DEFAULT**: Space A must never access Space B plaintext or keys.
-4. **MEMORY HYGIENE**: Zeroize all sensitive key buffers when disposing sessions.
-5. **TESTS MANDATORY**: All security features require negative tests.
+1. **NEVER INVENT CRYPTOGRAPHY**: Use only mature, selected libraries (`@noble/hashes`, `@noble/ciphers`, `@noble/curves`, WebCrypto).
+2. **PASSWORD IS NOT THE SPACE MASTER KEY**: Passwords derive KEK via Argon2id; KEK unseals random 256-bit SMK.
+3. **ISOLATION BY DEFAULT**: Space A and Space B share ZERO key material. Space A cannot decrypt Space B database records.
+4. **DOMAIN SEPARATION**: All subkeys derive via HKDF-SHA256 with distinct domain tags (`"veil-v1-storage-key"`, `"veil-v1-identity-seed"`, etc.).
+5. **ZERO SENSITIVE LOGGING**: No passwords, SMKs, or plaintexts in logs or error traces.
+6. **MANDATORY ATTACK TESTS**: All security features must maintain negative/tampering tests.
 
 ---
 
 ## 4. Exact Next Action for Incoming Agent
 
-Proceed to **Phase 1: Cryptographic Space Prototype & Envelope Storage** ([`prompts/PHASE_01.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_01.md)).
+Proceed to **Phase 2: Independent Space Cryptographic Identities** ([`prompts/PHASE_02.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_02.md)).
 1. Read `AGENTS.md` and `docs/ai/PROJECT_CONTEXT.md`.
-2. Update `docs/ai/ACTIVE_TASK.md` for Phase 1.
-3. Implement `SpaceVaultManager` with Argon2id envelope creation, credential-selected unlocking, and cross-space negative attack tests.
+2. Update `docs/ai/ACTIVE_TASK.md` for Phase 2.
+3. Implement `SpaceIdentityManager` using `@noble/curves/ed25519` for signing and X25519 for key exchange, derived deterministically from each Space's `IdentitySeed`.
+4. Implement contact card formatting (`veil://contact?...`), QR serialization, safety numbers, and cross-space identity independence tests.

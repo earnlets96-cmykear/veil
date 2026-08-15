@@ -1,41 +1,34 @@
 # ACTIVE_TASK.md — Current Work Tracker
 
 ## Task
-**VEIL Phase 0: AI Continuity, Threat Model, Architecture Specifications, and Baseline Scaffolding**
+**VEIL Phase 1: Cryptographic Space Prototype & Envelope Storage**
 
 ## Objective
-Establish the permanent AI-agent continuity infrastructure, define the comprehensive cryptographic and architectural blueprints, create the UX design system, and bootstrap the local development and test environment so that all future phases can proceed with full architectural clarity.
+Implement and validate the core multi-space cryptographic isolation model, Argon2id KDF, XChaCha20-Poly1305 AEAD envelope wrapping, credential-selected unlocking, partitioned storage encryption, and comprehensive negative/adversarial testing.
 
 ## Requirements
-- [x] Repository assessment and Git initialization.
-- [x] Create root `AGENTS.md` and full `docs/ai/` continuity files (`PROJECT_CONTEXT.md`, `SECURITY_RULES.md`, `DECISIONS.md`, `ACTIVE_TASK.md`, `CURRENT_STATE.md`, `CHANGELOG.md`, `HANDOFF.md`).
-- [x] Create root `README.md` and complete documentation index.
-- [x] Produce comprehensive architecture specifications in `docs/`:
-  - `docs/ARCHITECTURE.md` (System topology & component layering)
-  - `docs/THREAT_MODEL.md` (Adversary capabilities, STRIDE analysis, security invariants)
-  - `docs/CRYPTOGRAPHY.md` (Audited cryptographic specifications)
-  - `docs/KEY_HIERARCHY.md` (KDF, SMK, subkey derivation, memory lifecycle)
-  - `docs/SPACE_MODEL.md` (Multi-space cryptographic envelope scheme & isolation)
-  - `docs/IDENTITY_MODEL.md` (Ed25519/X25519 identity pairs, safety numbers)
-  - `docs/METADATA_MODEL.md` (Blind mailbox tokens & traffic privacy)
-  - `docs/PRIVACY.md` (5-layer privacy model)
-  - `docs/SECURITY.md` (Security policies & memory hygiene)
-  - `docs/KNOWN_LIMITATIONS.md` (Honest documentation of threat boundaries)
-- [x] Create complete Phase Prompts suite in `prompts/`:
-  - `prompts/MASTER_PROMPT.md`
-  - `prompts/PHASE_00.md` through `prompts/PHASE_10.md`
-- [x] Bootstrap clean TypeScript project with package manifest, Vitest configuration, and baseline test suite.
-- [x] Run test runner to verify 100% passing baseline (12/12 passing).
-- [ ] Commit initial Phase 0 milestone to Git.
+- [x] Independent Phase 0 takeover verification and cryptographic audit.
+- [ ] Implement `src/crypto/kdf.ts` (Argon2id password KDF via `@noble/hashes/argon2.js`).
+- [ ] Implement `src/crypto/aead.ts` (XChaCha20-Poly1305 AEAD via `@noble/ciphers/chacha.js`).
+- [ ] Implement `src/crypto/hkdf.ts` (HKDF-SHA256 subkey expansion via `@noble/hashes/hkdf.js`).
+- [ ] Implement `src/spaces/envelope.ts` (Versioned SpaceHeaderEnvelope serializer/validator).
+- [ ] Implement `src/spaces/session.ts` (Active in-memory SpaceSession with memory zeroization).
+- [ ] Implement `src/spaces/vault.ts` (SpaceVaultManager with credential-selected unlocking).
+- [ ] Implement `src/storage/spaceStore.ts` (Partitioned EncryptedSpaceStore).
+- [ ] Implement full test suites (`crypto-primitives`, `space-vault`, `space-isolation`, `tampering-corruption`, `security-logging`).
+- [ ] Update documentation and ADRs with refined terminology and runtime limitations.
+- [ ] Run full test suite and verify 100% passing tests.
+- [ ] Create Phase 1 Git commit.
 
 ## Acceptance Criteria
-1. Every file specified in the Canonical Structure is created with thorough, production-ready depth.
-2. Architecture documents explicitly detail cryptographic parameters, algorithms, payload formats, and negative test conditions.
-3. Test suite runs cleanly with zero failures.
-4. Git working tree is clean with an atomic Phase 0 commit.
+1. Unlocking Main Space yields `SMK_Main` which cannot decrypt Private Space ($SMK_{Main} \neq SMK_{Private}$).
+2. Locked Space cannot be read.
+3. Tampered ciphertexts, salts, nonces, or tags fail safely.
+4. 100-Space independence test passes.
+5. All tests pass with zero failures.
 
 ## Current Status
-Phase 0 Complete — Ready for Git commit.
+In Progress — Implementing cryptographic core modules.
 
 ## Next Action
-Stage and commit Phase 0 milestone to Git repository.
+Author `src/crypto/kdf.ts`, `src/crypto/aead.ts`, and `src/crypto/hkdf.ts`.

@@ -43,13 +43,10 @@ This document records all architectural decisions made across the VEIL project l
 - **Decision**:
   - **Language**: TypeScript 5.x (Strict mode)
   - **Frontend Client**: React 19 + Vite + Vanilla CSS Custom Design System
-  - **Cryptography**: `@noble/curves`, `@noble/hashes`, and audited WebCrypto / libsodium bindings
+  - **Cryptography**: `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, and WebCrypto API
   - **Backend / Relay**: Node.js + WebSocket (ws) + Express / lightweight microservice
   - **Testing**: Vitest for fast, isolated unit, negative, and cryptographic tests
 - **Reason**: Full TypeScript consistency across client, crypto core, and relay server simplifies protocol definitions, ensures type safety, and eliminates external hosting costs.
-- **Alternatives Considered**:
-  - *Electron/C++*: Heavier footprint for early prototyping; TypeScript web core can be seamlessly wrapped in Tauri or Electron later.
-  - *TailwindCSS*: Rejected per project specifications to maintain complete control over custom design tokens and lightweight footprint.
 - **Consequences**: Fast local build cycles, zero paid API dependencies, and high auditability.
 
 ---
@@ -64,8 +61,6 @@ This document records all architectural decisions made across the VEIL project l
   - Messages are addressed using rotating blind mailbox tokens (`HMAC-SHA256(RecipientPublicPrekey, EphemeralSessionToken)`).
   - The relay stores and forwards encrypted ciphertext blobs without indexing by real identity public keys or user account tables.
 - **Reason**: Prevents the relay server from constructing communication social graphs or correlating sender/recipient pairs.
-- **Alternatives Considered**:
-  - *Centralized User ID Routing (e.g. standard REST `/messages?to=user123`)*: Rejected because the server learns the entire social graph.
 - **Consequences**: Higher metadata privacy even if the relay server is seized or compromised.
 
 ---
@@ -93,3 +88,36 @@ This document records all architectural decisions made across the VEIL project l
   - A Panic Lock shortcut instantly zeros volatile memory keys and drops back to the locked state.
 - **Reason**: Security honesty is paramount. Never advertise impossible anti-forensic guarantees while still providing practical coercion mitigation.
 - **Consequences**: Users gain useful protection while remaining fully informed of threat model limitations.
+
+---
+
+## ADR-007: Argon2id Implementation Selection and Tuning
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: A memory-hard password KDF is required for Space envelope security. We need a pure TypeScript/JS compatible, standards-compliant Argon2id implementation.
+- **Decision**: Selected `@noble/hashes/argon2.js` (v1.7.0). Production parameters configured at $m = 65536\text{ KiB}$ ($64\text{ MiB}$), $t = 3\text{ iterations}$, $p = 1\text{ thread}$, with 32-byte salts.
+- **Reason**: Zero binary native addons required; cross-platform compatibility across Node.js, Electron, and browsers.
+- **Consequences**: Robust brute-force resistance while remaining responsive on modern client devices.
+
+---
+
+## ADR-008: XChaCha20-Poly1305 for Envelope and Partition AEAD
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Need an authenticated symmetric encryption cipher for sealing Space Master Keys and encrypting local storage records.
+- **Decision**: Selected XChaCha20-Poly1305 from `@noble/ciphers/chacha.js` (v2.3.0) with 192-bit (24-byte) nonces and 128-bit (16-byte) Poly1305 tags.
+- **Reason**: 192-bit extended nonces eliminate birthday-bound nonce collision risks when nonces are generated via CSPRNG.
+- **Consequences**: Safe, collision-free encryption across unlimited Space creations and record writes.
+
+---
+
+## ADR-009: Domain-Separated HKDF-SHA256 Subkey Architecture
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: The Space Master Key (SMK) must securely derive independent subkeys for storage encryption, identity signing, ratchet prekeys, and media storage.
+- **Decision**: Implemented HKDF-SHA256 (RFC 5869) with explicit domain tags (`"veil-v1-storage-key"`, `"veil-v1-identity-seed"`, `"veil-v1-prekey-seed"`, `"veil-v1-media-key"`).
+- **Reason**: Strict cryptographic domain separation guarantees that compromise of a subkey does not compromise the master key or other sibling subkeys.
+- **Consequences**: Clean separation of cryptographic responsibilities across subsystems.
