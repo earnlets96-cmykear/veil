@@ -18,6 +18,7 @@ describe('VEIL Phase 8: Timing Privacy & Jitter Scheduling Tests', () => {
       mailboxId: 'mb_01',
       version: 1,
       payload: 'dummy_payload',
+      sizeClass: 'SMALL',
       createdAt: Date.now(),
       expiresAt: Date.now() + 60000,
     };
@@ -45,9 +46,11 @@ describe('VEIL Phase 8: Timing Privacy & Jitter Scheduling Tests', () => {
       mailboxId: 'mb_02',
       version: 1,
       payload: 'dummy_payload',
+      sizeClass: 'SMALL',
       createdAt: Date.now(),
       expiresAt: Date.now() + 60000,
     };
+
 
     let dispatched = false;
     const { scheduledDelayMs, immediate } = shaper.enqueue(dummyEnv, () => {

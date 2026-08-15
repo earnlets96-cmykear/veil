@@ -4,7 +4,31 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v1.0.0-rc.1] - 2026-08-15 (Phase 10)
+
+### Added
+- **Release Candidate Packaging, Production Hardening & Operational Readiness**:
+  - `tests/e2e-release-lifecycle.test.ts`: Complete end-to-end full system lifecycle integration test covering space creation, credential-selected unlocking, blind mailboxes, 1-to-1 Double Ratchet, group SenderKey messaging, 64 KiB encrypted media, multi-device SAS enrollment, BIP-39 recovery, Panic Lock, and space deletion.
+  - `SECURITY.md`: Security policy and responsible vulnerability disclosure SLAs.
+  - `docs/SECURITY_GUIDE.md`: Comprehensive technical security architecture guide.
+  - `docs/USER_PRIVACY_GUIDE.md`: Plain-language privacy guide for end users.
+  - `docs/DEVELOPMENT.md`: Developer onboarding, build, and contribution standards.
+  - `docs/DEPLOYMENT.md`: Production server hardening, reverse proxy TLS, and container security.
+  - `docs/OPERATIONS.md`: Production operations, monitoring, health checks, and key rotation.
+  - `docs/INCIDENT_RESPONSE.md`: 10-step incident response workflow and key compromise containment.
+  - `docs/ABUSE_MODEL.md`: Abuse containment and resource defense model.
+  - `docs/RELEASE_CHECKLIST.md`: Formal production readiness verification matrix.
+  - `RELEASE_NOTES.md`: Official `v1.0.0-rc.1` release candidate notes.
+  - `docs/RELEASE_CANDIDATE_REPORT.md`: Release candidate certification report.
+  - `THIRD_PARTY_NOTICES.md`: Complete open source license attributions.
+  - `.env.example`: Standardized environment variable template.
+  - Enforced Post-RC Security Freeze governance rule in `AGENTS.md`.
+  - Documented `ADR-049` (End-to-End Lifecycle Verification), `ADR-050` (Post-RC Freeze), `ADR-051` (Vulnerability Disclosure), `ADR-052` (Zero-Knowledge Deployment), `ADR-053` (v1.0.0-rc.1 Tagging).
+
+---
+
 ## [Phase 9] - 2026-08-15
+
 
 ### Added
 - **Adversarial Security Audit, Red-Team Review & Release Hardening**:

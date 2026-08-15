@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { MessagePadding } from '../src/privacy/padding.ts';
 import { validateTransportEnvelope } from '../src/transport/envelope.ts';
 import { RecoveryVault } from '../src/recovery/recoveryVault.ts';
-import { getRandomBytes } from '../src/crypto/utils.ts';
+import { SpaceVaultManager } from '../src/spaces/vault.ts';
+import { getRandomBytes, bytesToBase64 } from '../src/crypto/utils.ts';
+
 
 describe('VEIL Phase 9 Red-Team Audit: Hostile Parser Fuzzing', () => {
   it('FUZZING MESSAGE PADDING: Handles 500 malformed, random, and edge-case buffers without crashing', () => {
@@ -32,9 +34,11 @@ describe('VEIL Phase 9 Red-Team Audit: Hostile Parser Fuzzing', () => {
   });
 
   it('FUZZING BACKUP PARSER: Rejects random byte blobs cleanly', () => {
+    const vault = new SpaceVaultManager();
     for (let i = 0; i < 50; i++) {
-      const randomBuf = getRandomBytes(128);
-      expect(() => RecoveryVault.importEncryptedBackupFile(randomBuf, 'pass')).toThrow();
+      const randomStr = bytesToBase64(getRandomBytes(128));
+      expect(() => RecoveryVault.importFromRecoveryFile(randomStr, 'pass', 'newPass', vault)).toThrow();
     }
   });
+
 });

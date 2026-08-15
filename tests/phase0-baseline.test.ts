@@ -132,12 +132,11 @@ describe('VEIL Phase 0: Cryptographic Foundation & Memory Hygiene', () => {
       const identity: SpaceIdentity = {
         spaceId: 'space-test-uuid-2',
         identityKeyPub: bytesToBase64(randomBytes(32)),
-        identityKeyPriv: bytesToBase64(randomBytes(32)),
         signingKeyPub: bytesToBase64(randomBytes(32)),
-        signingKeyPriv: bytesToBase64(randomBytes(32)),
         displayName: 'Alice',
         createdAt: Date.now(),
       };
+
 
       expect(identity.displayName).toBe('Alice');
       expect(identity.spaceId).toBe('space-test-uuid-2');

@@ -81,3 +81,17 @@ A task or feature is complete ONLY when:
 - [ ] No secrets or sensitive data leak to logs or server payloads.
 - [ ] `docs/ai/CURRENT_STATE.md` and `docs/ai/CHANGELOG.md` are updated.
 - [ ] A clean, descriptive git commit is created.
+
+---
+
+## 5. POST-RC SECURITY FREEZE & GOVERNANCE
+
+> **MANDATORY POST-RC SECURITY FREEZE**:
+> Any change to cryptographic protocols, identity management, Space isolation boundaries, authentication, metadata defenses, recovery vaults, device trust, or message/group protocols is **STRICTLY FROZEN** after Phase 10.
+> 
+> Any future modification to security-sensitive components requires:
+> 1. A documented threat model review.
+> 2. A formal Architecture Decision Record (ADR) in `docs/ai/DECISIONS.md`.
+> 3. Adversarial regression test suites with positive and negative attack vectors.
+> 4. Explicit dual-signoff and independent security audit prior to deployment.
+

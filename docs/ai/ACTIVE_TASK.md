@@ -1,28 +1,29 @@
 # ACTIVE_TASK.md — Current Work Tracker
 
 ## Task
-**VEIL Phase 9: Adversarial Security Audit, Red-Team Review & Release Hardening**
+**VEIL Phase 10: Release Candidate, Production Packaging, Hardening & Deployment Preparation**
 
 ## Status: COMPLETE
 
 ## Deliverables
-- [x] Comprehensive asset inventory & threat boundary analysis (`docs/SECURITY_AUDIT.md`)
-- [x] Exhaustive adversarial security audit report (`docs/SECURITY_AUDIT_REPORT.md`)
-- [x] Cryptographic security property matrix (`docs/SECURITY_PROPERTIES.md`)
-- [x] Subsystem security scorecard (`docs/SECURITY_SCORECARD.md`)
-- [x] Release readiness checklist & blocker resolution (`docs/RELEASE_BLOCKERS.md`)
-- [x] Accepted risks & security debt roadmap (`docs/SECURITY_DEBT.md`)
-- [x] 8 new adversarial red-team test suites (15 new tests, 229 total across 90 test files) — 100% PASSING:
-  - `tests/audit-crypto-invariants.test.ts`
-  - `tests/audit-cross-space-attacks.test.ts`
-  - `tests/audit-protocol-state-machine.test.ts`
-  - `tests/audit-media-pipeline.test.ts`
-  - `tests/audit-device-recovery.test.ts`
-  - `tests/audit-transport-server-boundary.test.ts`
-  - `tests/audit-panic-race-conditions.test.ts`
-  - `tests/audit-fuzz-parsers.test.ts`
-- [x] Documented ADR-044 through ADR-048 in `docs/ai/DECISIONS.md`
-- [x] Official classification: **`RELEASE CANDIDATE`**
+- [x] Full end-to-end integration lifecycle test suite (`tests/e2e-release-lifecycle.test.ts`)
+- [x] Vulnerability disclosure policy & SLA specification (`SECURITY.md`)
+- [x] Deep technical security architecture guide (`docs/SECURITY_GUIDE.md`)
+- [x] Plain-language user privacy guide (`docs/USER_PRIVACY_GUIDE.md`)
+- [x] Developer onboarding & setup guide (`docs/DEVELOPMENT.md`)
+- [x] Production server deployment & reverse proxy hardening guide (`docs/DEPLOYMENT.md`)
+- [x] Production operations and maintenance manual (`docs/OPERATIONS.md`)
+- [x] 10-step incident containment & key compromise protocols (`docs/INCIDENT_RESPONSE.md`)
+- [x] Abuse containment & resource defense model (`docs/ABUSE_MODEL.md`)
+- [x] Release readiness checklist (`docs/RELEASE_CHECKLIST.md`)
+- [x] Official `v1.0.0-rc.1` release notes (`RELEASE_NOTES.md`)
+- [x] Release Candidate certification report (`docs/RELEASE_CANDIDATE_REPORT.md`)
+- [x] Third-party open source license attribution (`THIRD_PARTY_NOTICES.md`)
+- [x] Production environment configuration template (`.env.example`)
+- [x] Post-RC Security Freeze rule added to `AGENTS.md`
+- [x] Documented ADR-049 through ADR-053 in `docs/ai/DECISIONS.md`
+- [x] Full test pass: 91 test files, 230 tests (100% clean pass)
+- [x] Clean build validation: `npm run build` succeeds
 
-## Next Task
-Phase 10: Release Candidate, Production Packaging, Clean Build & Final Distribution (`prompts/PHASE_10.md`)
+## Next Milestone
+Post-Phase-10 Independent Third-Party Security Audit & Production Operations

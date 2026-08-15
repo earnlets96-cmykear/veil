@@ -3,7 +3,8 @@ import { SpaceVaultManager } from '../src/spaces/vault.ts';
 import { parseEnvelope, serializeEnvelope, validateSpaceEnvelope } from '../src/spaces/envelope.ts';
 import { FAST_TEST_KDF_PARAMS } from '../src/crypto/kdf.ts';
 import { bytesToBase64, base64ToBytes, randomBytes } from '../src/crypto/utils.ts';
-import type { SpaceHeaderEnvelope } from '../types/index.ts';
+import type { SpaceHeaderEnvelope } from '../src/types/index.ts';
+
 
 describe('VEIL Phase 1: Tampering, Corruption & AAD Adversarial Tests', () => {
   let vault: SpaceVaultManager;

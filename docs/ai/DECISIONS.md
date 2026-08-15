@@ -508,6 +508,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Ensures high standards of quality, transparency, and accountability before Phase 10 packaging.
 - **Consequences**: The project is formally verified and ready for Phase 10 release packaging.
 
+---
+
+## ADR-049: End-to-End Release Candidate Integration Test Verification
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Isolated unit tests must be supplemented by a unified lifecycle integration suite ensuring that all 11 phases interoperate without state leaks or race conditions.
+- **Decision**: Create `tests/e2e-release-lifecycle.test.ts` executing a sequential journey: Space creation -> Credential-selected unlocking -> Identity generation -> Blind mailboxes -> Double Ratchet -> Groups -> 64 KiB media -> Device SAS enrollment -> BIP-39 recovery -> Panic lock -> Space deletion.
+- **Reason**: Proves complete end-to-end coherence and regression-free cross-phase integration.
+- **Consequences**: 100% full-system lifecycle pass rate.
+
+---
+
+## ADR-050: Mandatory Post-RC Security Freeze & Architectural Governance
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Uncontrolled feature additions by future AI agents or contributors can casually compromise cryptographic boundaries or leak metadata.
+- **Decision**: Enforce a strict Post-RC Security Freeze in `AGENTS.md`. No modification to cryptography, identity, space isolation, transport, or recovery is permitted without a formal threat model review, an ADR, and comprehensive regression test suites.
+- **Reason**: Preserves verified security properties and prevents scope creep from undermining the architecture.
+- **Consequences**: Future work is structured into separate tracks (independent audit, UI polish, deployment, performance).
+
+---
+
+## ADR-051: Responsible Vulnerability Disclosure Policy and PGP Channel Standards
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Security researchers need a clear, confidential mechanism to report vulnerabilities with defined response SLAs.
+- **Decision**: Publish `SECURITY.md` defining reporting protocols, encrypted PGP communication keys, 24-hour response SLAs, and strict triage timelines (7 days for Critical, 14 days for High).
+- **Reason**: Fosters responsible community collaboration and prompt vulnerability remediation.
+- **Consequences**: Standardized disclosure workflow ready for external audit.
+
+---
+
+## ADR-052: Zero-Knowledge Operational Deployment and Reverse Proxy Hardening
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Production deployment configuration must match the zero-knowledge threat model without leaking client IP addresses or payloads to server disks.
+- **Decision**: Provide `DEPLOYMENT.md`, `OPERATIONS.md`, `.env.example`, and Docker/container hardening guidance enforcing unprivileged execution, short envelope TTLs (max 14 days), IP-based rate limiting, and zero-payload logging.
+- **Reason**: Ensures server operators cannot inadvertently log sensitive metadata.
+- **Consequences**: Standardized, secure operational environment.
+
+---
+
+## ADR-053: Release Candidate v1.0.0-rc.1 Tagging and Distribution Packaging
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Finalizing Phase 10 requires formal versioning and packaging without premature claims of a final `v1.0.0` before external audit.
+- **Decision**: Designate and tag the release as **`v1.0.0-rc.1`**, accompanied by `RELEASE_NOTES.md`, `RELEASE_CANDIDATE_REPORT.md`, `THIRD_PARTY_NOTICES.md`, and complete developer/user guides.
+- **Reason**: Transparently communicates that VEIL is an audited release candidate prepared for independent security review.
+- **Consequences**: Clean, reproducible release candidate ready for deployment and external evaluation.
+
+
 
 
 

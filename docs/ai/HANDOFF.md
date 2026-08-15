@@ -1,64 +1,48 @@
 # HANDOFF.md — AI Agent Session Handoff
 
-## 1. Project Overview & Current Phase
+## 1. Project Overview & Release Candidate Status
 
 - **Project**: VEIL (Privacy-First Messenger with Multi-Space Cryptographic Architecture)
-- **Current Phase**: **PHASE 9: Adversarial Security Audit, Red-Team Review & Release Hardening** — Complete
-- **Status**: 229/229 tests passing across 90 test files (100% clean pass)
-- **Official Verdict**: **`RELEASE CANDIDATE`**
-- **Current Branch**: `master`
+- **Current Milestone**: **PHASE 10: Release Candidate & Production Packaging** — Complete
+- **Release Candidate Version**: **`v1.0.0-rc.1`**
+- **Test Suite Results**: 230 / 230 tests passing across 91 test files (100% clean pass)
+- **Build Status**: Production build verified (`npm run build` succeeds)
+- **Official Classification**: **`RELEASE CANDIDATE`**
+- **Post-RC Governance**: **MANDATORY POST-RC SECURITY FREEZE ACTIVE** ([`AGENTS.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/AGENTS.md))
 
 ---
 
-## 2. Phase 9 Audit Summary
+## 2. Complete Engineering Phases Summary (Phases 0–10)
 
-### Audited & Verified Assets
-1. **Cryptographic Core & Nonce Uniqueness** (`tests/audit-crypto-invariants.test.ts`):
-   - 10,000 sequential 24-byte CSPRNG nonces exhibit zero collisions.
-   - HKDF subkey domain separation verified across all keys.
-   - Volatile memory zeroization verified on sensitive buffers.
-2. **Cross-Space Isolation & Attacks** (`tests/audit-cross-space-attacks.test.ts`):
-   - In-memory and on-disk cross-space partition injection attacks verified and rejected.
-   - Credential oracle rejection throws generic unlock errors with zero Space disclosure.
-3. **Protocol State Machine & Epoch Security** (`tests/audit-protocol-state-machine.test.ts`):
-   - Double Ratchet and Group SenderKey epoch rollback attempts are rejected.
-   - Removed member forward secrecy verified.
-4. **Media Pipeline & Chunk Tampering** (`tests/audit-media-pipeline.test.ts`):
-   - Cross-media chunk swapping and corrupted AAD chunks are cryptographically rejected.
-5. **Device Linking & Recovery** (`tests/audit-device-recovery.test.ts`):
-   - BIP-39 checksum corruption detected and rejected.
-   - Corrupted `.veilbackup` encrypted files safely rejected.
-6. **Transport & Server Zero-Knowledge Boundaries** (`tests/audit-transport-server-boundary.test.ts`):
-   - IDOR mailbox access attempts using foreign capabilities are rejected.
-7. **Panic Lock Concurrency** (`tests/audit-panic-race-conditions.test.ts`):
-   - Immediate session destruction and storage access rejection during concurrent panic lock.
-8. **Hostile Parser Fuzzing** (`tests/audit-fuzz-parsers.test.ts`):
-   - 500+ iterations of malformed, random, and oversized buffers handled without unhandled crashes.
-
-### Audit Documentation Complete
-- `docs/SECURITY_AUDIT.md`: Asset inventory, trust boundaries, threat actor matrix.
-- `docs/SECURITY_AUDIT_REPORT.md`: Comprehensive audit findings, mitigations, and release verdict (`RELEASE CANDIDATE`).
-- `docs/SECURITY_PROPERTIES.md`: Formal security property matrix.
-- `docs/SECURITY_SCORECARD.md`: Subsystem scorecard.
-- `docs/RELEASE_BLOCKERS.md`: Release blocker resolution verification.
-- `docs/SECURITY_DEBT.md`: Transparent accepted risks and hardening roadmap.
+1. **Phase 0**: Architecture, Threat Model, Technology Selection, Design System, AI Continuity
+2. **Phase 1**: Cryptographic Spaces, Argon2id KDF & Encrypted Local Storage
+3. **Phase 2**: Independent Space Cryptographic Identities & Ed25519 Documents
+4. **Phase 3**: Privacy-Preserving Untrusted Transport & Blind Mailboxes
+5. **Phase 4**: End-to-End Encrypted 1-to-1 Messaging (Double Ratchet & X3DH)
+6. **Phase 5**: Multi-Party Groups (Sender Keys) & 64 KiB Chunked Encrypted Media
+7. **Phase 6**: Multi-Device Synchronization (SAS) & 24-Word BIP-39 Recovery
+8. **Phase 7**: Privacy UX, Quick Lock, Panic Lock, Decoy Spaces & Disclosure Guard
+9. **Phase 8**: Metadata Minimization, Size Bucket Padding (512B–64KB) & Timing Jitter
+10. **Phase 9**: Adversarial Security Audit, Parser Fuzzing & Red-Team Verification
+11. **Phase 10**: Release Candidate Packaging, Operational Hardening, Deployment Guides & Post-RC Security Freeze
 
 ---
 
-## 3. Invariants the Next Agent Must NOT Break
+## 3. Mandatory Governance & Invariants
 
-1. **NEVER INVENT CRYPTOGRAPHY**: Use established primitives (`@noble/curves`, `@noble/hashes`, `@noble/ciphers`).
+1. **POST-RC SECURITY FREEZE**:
+   - Any modification to cryptographic primitives, key derivation, space isolation, Double Ratchet, group Sender Keys, media chunking, recovery vaults, or transport protocols is **STRICTLY FROZEN**.
+   - Any proposed change requires a formal threat model review, an ADR in `docs/ai/DECISIONS.md`, and adversarial regression test suites with positive and negative attack vectors.
 2. **ZERO UNENCRYPTED SENSITIVE DATA**: Never leak plaintexts, passwords, SMKs, media keys, or private keys to logs or server payloads.
-3. **CROSS-SPACE ISOLATION**: Space A cannot decrypt Space B's conversations, group states, media items, or search indexes.
-4. **NO MISLEADING SECURITY CLAIMS**: No "military-grade", "unhackable", or "100% anonymous" claims in documentation or code.
-5. **HONEST METADATA BOUNDARIES**: Acknowledge that global passive adversaries can perform statistical correlation and that direct TLS reveals source IP addresses to the relay server.
+3. **ZERO CUSTOM CRYPTOGRAPHY**: Strictly use mature `@noble` libraries.
+4. **HONEST SECURITY & PRIVACY CLAIMS**: No "unhackable", "military-grade", or "100% anonymous" claims without technical qualification.
 
 ---
 
-## 4. Exact Next Action for Incoming Agent
+## 4. Post-Phase-10 Recommended Tracks
 
-Proceed to **Phase 10: Release Candidate, Production Packaging, Clean Build & Final Distribution** ([`prompts/PHASE_10.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_10.md)).
-1. Read `AGENTS.md` and `docs/ai/PROJECT_CONTEXT.md`.
-2. Inspect `prompts/PHASE_10.md`.
-3. Create the `implementation_plan.md` artifact and obtain user approval before modifying code.
-4. Prepare production packaging, verify clean checkout builds, finalize user documentation, and package release candidate artifacts.
+VEIL has completed all 11 planned engineering development phases. Future work should be organized into separate operational tracks:
+- **Track A**: Independent External Security & Cryptographic Audit
+- **Track B**: Pilot Deployment & Beta Testing Feedback
+- **Track C**: Native Transport Adapters (Tor Onion Services, Nym Mixnet)
+- **Track D**: Performance Benchmarking & Platform Porting (Electron/Mobile)

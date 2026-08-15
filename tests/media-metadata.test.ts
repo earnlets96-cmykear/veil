@@ -10,10 +10,10 @@ describe('VEIL Phase 8: Media Metadata & Chunk Privacy Tests', () => {
       rawImage,
       {
         mimeType: 'image/jpeg',
-        fileName: 'photo_secret.jpg',
-        size: rawImage.length,
-        checksum: 'dummy_hash',
+        filename: 'photo_secret.jpg',
+        sizeBytes: rawImage.length,
       }
+
     );
 
     // 1. mediaId is opaque and non-semantic
