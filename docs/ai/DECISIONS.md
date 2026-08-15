@@ -343,6 +343,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Mathematical guarantee of zero-trust and anti-surveillance architecture.
 - **Consequences**: Loss of both password and recovery phrase results in permanent cryptographic lockout (no backdoors).
 
+---
+
+## ADR-034: Two-Tier Lock Model (Quick Lock vs. Panic Lock)
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Users need both a regular lock for daily use and an aggressive containment action for high-risk or coercive situations.
+- **Decision**: Implement two explicit lock tiers: `quickLock(spaceId)` for locking the active Space and clearing its immediate UI state, and `panicLock()` which destroys ALL active Space sessions, wipes all volatile session keys from memory, and clears all UI state across all Spaces. Neither lock deletes on-disk encrypted Space envelopes or revokes enrolled devices.
+- **Reason**: Balances everyday usability with emergency containment without risking accidental data loss.
+- **Consequences**: Users can trigger an instant wipe of in-memory data without destroying their account or devices.
+
+---
+
+## ADR-035: Granular Notification Privacy Tiers and Locked-State Notification Purge
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: OS-level notifications often leak sender names, conversation topics, and sensitive plaintexts onto lock screens.
+- **Decision**: Provide three per-Space notification tiers (High, Balanced, Convenient). When a Space is locked, all incoming notifications automatically collapse to High Privacy (`"VEIL: New message"`). Locking a Space immediately purges its active notification records.
+- **Reason**: Prevents lock-screen reconnaissance and cross-space notification leakage.
+- **Consequences**: Plaintext messages and sensitive sender names never appear in notifications unless explicitly configured and unlocked.
+
+---
+
+## ADR-036: Complete UI State Purge and Isolated Search Caching upon Space Locking
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: UI memory caches, drafts, thumbnail previews, search indexes, and clipboard items can linger after a Space is locked.
+- **Decision**: Centralize UI state tracking in `UIStateManager`. When a Space locks, all its associated messages, drafts, media previews, clipboard tracking, and search indexes are wiped immediately.
+- **Reason**: Guarantees that locking a Space leaves zero residual plaintexts in active UI layers.
+- **Consequences**: Prevents app-switcher snooping, memory inspection of cached UI nodes, and cross-space search index leakage.
+
+---
+
+## ADR-037: Genuine Decoy Spaces with Cryptographic Independence and Anti-Disclosure
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Coercive adversaries demanding device access require plausible deniability without fragile fake-UI simulations.
+- **Decision**: Decoy Spaces are implemented as authentic encrypted Spaces with independent SMKs, storage partitions, identities, and real messaging capabilities. Unlock screens and error messages never disclose whether other Spaces exist or which password maps to which Space.
+- **Reason**: Decoy Spaces function indistinguishably from normal Spaces while maintaining absolute cryptographic isolation.
+- **Consequences**: Opening a decoy under coercion exposes a real, working messenger without revealing primary Spaces.
+
+---
+
+## ADR-038: Human-Centered Security Indicators and Anti-Theater Marketing Guard
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Technical cryptographic details (epochs, ratchets, HKDF labels) overwhelm users, while misleading marketing ("military-grade", "unhackable") creates false confidence.
+- **Decision**: Abstract security status into simple, actionable indicators (`Verified ✓`, `Unverified`, `Security Changed ⚠`). Enforce `DisclosureGuard` to reject prohibited marketing terms in user-facing text and collapse all authentication errors to `"Unable to unlock."`
+- **Reason**: Promotes usability and transparent, honest privacy engineering.
+- **Consequences**: Users easily understand their security state without security theater or misleading promises.
+
+
 
 
 

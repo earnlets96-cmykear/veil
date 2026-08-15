@@ -80,4 +80,8 @@ export * from '../device/types.ts';
 // Recovery Types
 export * from '../recovery/recoveryVault.ts';
 
+// Privacy Types
+export * from '../privacy/types.ts';
+
+
 

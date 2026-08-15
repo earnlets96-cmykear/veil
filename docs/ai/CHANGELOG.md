@@ -4,7 +4,37 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 7] - 2026-08-15
+
+### Added
+- **Privacy UX, Panic Lock, Decoy Spaces & Human-Centered Security**:
+  - `src/privacy/types.ts`: Privacy levels (`high`, `balanced`, `convenient`), auto-lock intervals, notification privacy tiers, sensitive content types, and security indicator structures.
+  - `src/privacy/privacyManager.ts`: Per-Space privacy settings manager with presets.
+  - `src/privacy/lockManager.ts`: `LockManager` implementing Quick Lock (single-space), Panic Lock (multi-space instant wipe), and configurable Auto-Lock inactivity countdowns.
+  - `src/privacy/notificationManager.ts`: `NotificationManager` implementing privacy-preserving notification tiers and locked-state notification purging.
+  - `src/privacy/uiStateManager.ts`: `UIStateManager` for dynamic tracking and complete wiping of sensitive UI plaintexts, drafts, previews, and search caches upon lock.
+  - `src/privacy/securityIndicators.ts`: `SecurityIndicators` providing human-readable status (`Verified ✓`, `Unverified`, `Security Changed ⚠`) and identity change alerts.
+  - `src/privacy/decoyEnforcement.ts`: `DecoyEnforcement` validating authentic decoy space independence and strict anti-disclosure.
+  - `src/privacy/disclosureGuard.ts`: `DisclosureGuard` enforcing generic `"Unable to unlock."` errors and filtering prohibited security marketing claims.
+- **Documentation**:
+  - `docs/PRIVACY_UX.md`: Comprehensive specification of VEIL's privacy UX model.
+  - `docs/KNOWN_LIMITATIONS.md`: Concrete and honest security boundaries and limitation analysis.
+  - Documented `ADR-034` (Two-Tier Lock Model), `ADR-035` (Granular Notification Privacy), `ADR-036` (Complete UI State Purge), `ADR-037` (Genuine Decoy Spaces), `ADR-038` (Human-Centered Security Indicators).
+- **Test Suites (9 new suites, 15 new tests, 199 total across 70 files)**:
+  - `tests/panic-lock.test.ts`: Instant multi-space session destruction and UI purge.
+  - `tests/quick-lock.test.ts`: Single-space lock isolation.
+  - `tests/decoy-space.test.ts`: Independent decoy SMK and zero cross-space disclosure.
+  - `tests/notification-privacy.test.ts`: High/Balanced/Convenient tiers and locked-state fallback.
+  - `tests/locked-state.test.ts`: UI element and search cache purging on lock.
+  - `tests/privacy-settings.test.ts`: Per-Space privacy settings persistence and presets.
+  - `tests/error-disclosure.test.ts`: Error sanitization and prohibited term enforcement.
+  - `tests/security-indicators.test.ts`: Human-readable status badges and identity change warnings.
+  - `tests/auto-lock.test.ts`: Inactivity timer countdowns, activity resets, background events.
+
+---
+
 ## [Phase 6] - 2026-08-15
+
 
 ### Added
 - **Multi-Device Synchronization & Zero-Knowledge Cryptographic Recovery**:
