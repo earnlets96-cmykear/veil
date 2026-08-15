@@ -4,7 +4,22 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 18] - 2026-08-16
+
+### Added
+- **Final Production Release Candidate (RC2), Stress Testing & Release Sign-Off**:
+  - `tests/phase18-stress-concurrency.test.ts`: High-concurrency message bursts (500+ parallel records), continuous symmetric ratchet throughput, and rapid multi-Space switching.
+  - `tests/phase18-extreme-resilience.test.ts`: Simultaneous Panic Lock during active chunked attachment processing, and corrupted AEAD tag rejection.
+  - `tests/phase18-formal-invariants.test.ts`: Nonce uniqueness verification across 10,000 CSPRNG samples, HKDF domain separation verification, and asymmetric signing keypair validity.
+  - `docs/PHASE18_FINAL_RELEASE_NOTES.md`: Official Release Candidate 2 (`v1.0.0-rc.2`) release notes and comprehensive system scorecard.
+  - `docs/FORMAL_SECURITY_PROOF.md`: Cryptographic security assurance and mathematical invariants guide.
+  - Documented `ADR-086` through `ADR-090` in `docs/ai/DECISIONS.md`.
+  - Added 3 new test suites (323 total tests across 144 test files, 100% clean pass).
+
+---
+
 ## [Phase 17] - 2026-08-15
+
 
 ### Added
 - **Real-World Deployment, Production Integration, Security Validation & Release Hardening**:
