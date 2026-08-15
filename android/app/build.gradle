@@ -23,8 +23,25 @@ android {
     }
 }
 
+repositories {
+    google()
+    mavenCentral()
+    flatDir {
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.core:core-ktx:1.12.0'
+    implementation project(':capacitor-android')
+}
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception ignored) {
 }
