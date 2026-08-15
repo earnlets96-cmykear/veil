@@ -4,7 +4,40 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 14] - 2026-08-15
+
+### Added
+- **Production Application Shell, Real Messaging UI & Client Integration**:
+  - `src/ui/app/types.ts`: Defined UI view models, conversation models, message timeline models, and modal types.
+  - `src/ui/app/sessionController.ts`: Application session coordinator managing credential-selected Space unlocking, Space switching total state purge, inactivity auto-lock timers, and instantaneous panic lock.
+  - `src/ui/app/AppState.tsx`: React 19 Context provider integrating underlying services (`SpaceVaultManager`, `EncryptedSpaceStore`, `ConversationManager`, `GroupManager`, `NetworkManager`, `SpaceIdentityManager`).
+  - `src/ui/components/LockScreen.tsx`: Neutral login interface with passphrase entry, persistent Space envelope count, and emergency panic lock trigger.
+  - `src/ui/components/CreateSpaceModal.tsx`: Dialog to create an isolated Space with Argon2id parameters and automatic IndexedDB persistence.
+  - `src/ui/components/Sidebar.tsx`: Multi-space selector, search bar, category filter, 1-to-1 conversation list, group list, and modal triggers.
+  - `src/ui/components/ConversationView.tsx`: Main chat header, real-time message timeline with animated bubbles, timestamps, delivery status indicators (`QUEUED`, `SENDING`, `SENT_TO_RELAY`, `DELIVERED_TO_RECIPIENT`), and attachment previews.
+  - `src/ui/components/MessageComposer.tsx`: Input area with Enter to send, Shift+Enter for multiline, and offline indicator.
+  - `src/ui/components/NewChatModal.tsx`: Direct E2EE session initiation via peer Identity Document exchange.
+  - `src/ui/components/NewGroupModal.tsx`: Group creation modal with initial member configuration.
+  - `src/ui/components/GroupDetailsModal.tsx`: Group member management, member invitation, removal, and forward-secrecy epoch updates.
+  - `src/ui/components/ContactDetailsModal.tsx`: Safety number verification (12-digit grouped fingerprint comparison).
+  - `src/ui/components/SettingsModal.tsx`: Space settings, auto-lock interval selection, notification privacy levels, and emergency panic lock trigger.
+  - `src/ui/App.tsx`: Root React application component.
+  - `src/main.tsx`: React 19 entrypoint mounting `AppProvider` into DOM `#root`.
+  - `src/styles/veil-design-system.css`: Complete tokenized styling for responsive desktop, tablet, and mobile layouts.
+  - `docs/UI_ARCHITECTURE.md`: Component hierarchy, state flow, and security boundaries.
+  - `docs/UX_SECURITY.md`: User experience privacy guidelines, neutral lock screen design, safety number workflows, and panic lock ergonomics.
+  - Documented `ADR-067` through `ADR-071` in `docs/ai/DECISIONS.md`.
+  - Added 5 new automated test suites (276 total tests across 117 test files, 100% clean pass):
+    - `tests/ui-session-controller.test.ts`: Unlocking, Space switching state wipe, auto-lock, and panic lock.
+    - `tests/ui-conversation-flow.test.ts`: E2EE message sending/receiving, status transitions, and timeline rendering.
+    - `tests/ui-group-flow.test.ts`: Group creation, messaging, and epoch updates.
+    - `tests/ui-privacy-security.test.ts`: Neutral credential rejection, zero-plaintext persistence protection.
+    - `tests/ui-offline-network.test.ts`: Offline status indicator, outbound queue display, and reconnect sync.
+
+---
+
 ## [Phase 13] - 2026-08-15
+
 
 ### Added
 - **Client Networking & Relay Integration**:

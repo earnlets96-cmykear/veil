@@ -700,8 +700,61 @@ This document records all architectural decisions made across the VEIL project l
 - **Status**: Accepted
 - **Context**: Real-time push requires low-latency WebSockets with resilient reconnection behavior and strict transport security.
 - **Decision**: Implement `WebSocketTransport` (`src/network/websocketTransport.ts`) with connection lifecycle state machine, capability authentication, periodic heartbeats, and exponential backoff with jitter (1s to 30s). In production (`enforceTls: true`), non-TLS URLs (`http://`, `ws://`) are rejected with `TlsRequiredError`.
-- **Reason**: Protects against CPU/battery exhaustion from tight reconnect loops and enforces transport encryption.
-- **Consequences**: High-reliability real-time delivery with fail-closed security.
+---
+
+## ADR-067: React 19 Client Presentation Architecture and State Decoupling
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Building a modern, responsive, and accessible messaging interface without undermining security boundaries requires a clear separation between presentation state and cryptographic key storage.
+- **Decision**: Implement a componentized React 19 + TypeScript application shell (`src/ui/App.tsx`, `Sidebar.tsx`, `ConversationView.tsx`, `MessageComposer.tsx`) styled via tokenized Vanilla CSS (`src/styles/veil-design-system.css`). Decrypted message bodies exist only in reactive state while the Space is unlocked.
+- **Reason**: Delivers an elegant, fast, and responsive user experience while keeping presentation separate from low-level crypto services.
+- **Consequences**: Complete, production-grade client messaging UI.
+
+---
+
+## ADR-068: Neutral Lock Screen UX and Zero-Disclosure Authentication
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Displaying a list of available Spaces on the initial screen would reveal hidden or sensitive Space names (e.g. "Decoy", "Whistleblowing") to shoulder-surfers or forensic observers.
+- **Decision**: Implement a neutral credential entry screen (`src/ui/components/LockScreen.tsx`) without disclosing Space names, IDs, or counts. Unlocking evaluates the submitted credential against all stored `SpaceHeaderEnvelope` records on-the-fly.
+- **Reason**: Preserves plausible deniability and multi-space isolation at the visual presentation layer.
+- **Consequences**: Zero metadata leakage prior to successful authentication.
+
+---
+
+## ADR-069: Instant Multi-Space Switching and Total In-Memory UI State Purge
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Switching between Spaces must not leave lingering conversation previews, message bodies, or network channels visible or accessible in memory.
+- **Decision**: In `SessionController.switchSpace()`, immediately halt network listeners, zeroize active session keys, clear all React conversation and message state arrays, and unlock the new Space from scratch.
+- **Reason**: Enforces cryptographic and visual isolation across distinct personas.
+- **Consequences**: Complete data separation when switching Spaces.
+
+---
+
+## ADR-070: Immediate Panic Lock Architecture and Memory Sanitization
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Under duress, a user must be able to lock the application and erase volatile state instantaneously without being hindered by confirmation modals or transition animations.
+- **Decision**: The Panic Lock button triggers `sessionController.panicLock()` synchronously, immediately destroying the active `SpaceSession`, wiping in-memory decrypted messages, aborting open network sockets, and rendering the neutral lock screen.
+- **Reason**: Provides immediate, fail-safe defense against physical coercion and shoulder-surfing.
+- **Consequences**: Reliable emergency security mechanism with zero delay.
+
+---
+
+## ADR-071: Human-Readable Verification of Cryptographic Safety Numbers
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Users need an intuitive way to verify peer cryptographic identities without parsing 64-character hexadecimal hashes or raw base64 public keys.
+- **Decision**: Format 256-bit identity key fingerprints into 12-digit grouped safety numbers (e.g., `482 193 771 402`) in `ContactDetailsModal.tsx`, accompanied by a visual verification toggle.
+- **Reason**: Simplifies out-of-band MITM verification for non-technical users while preserving full cryptographic rigor.
+- **Consequences**: Clear, accessible identity verification UX.
+
 
 
 

@@ -1,5 +1,6 @@
 /**
  * VEIL Design System — Tokenized Vanilla CSS Architecture
+ * Production Application Shell & Messaging UI Styling
  */
 
 :root {
@@ -7,6 +8,7 @@
   --veil-bg-base: #090c13;
   --veil-bg-surface: #101622;
   --veil-bg-surface-elevated: #182233;
+  --veil-bg-surface-active: #202d44;
   --veil-bg-glass: rgba(16, 22, 34, 0.85);
   --veil-border: rgba(255, 255, 255, 0.08);
   --veil-border-subtle: rgba(255, 255, 255, 0.04);
@@ -80,6 +82,13 @@ body {
   width: 100vw;
 }
 
+#root {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  overflow: hidden;
+}
+
 /* Reusable UI Components */
 
 .veil-card {
@@ -98,49 +107,116 @@ body {
   border-radius: var(--veil-radius-lg);
 }
 
-.veil-button-primary {
-  background: linear-gradient(135deg, var(--veil-accent-primary), var(--veil-accent-primary-hover));
-  color: #ffffff;
-  border: none;
+/* Buttons */
+.veil-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--veil-font-sans);
+  font-size: var(--veil-text-sm);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
   border-radius: var(--veil-radius-md);
-  padding: 0.75rem 1.25rem;
-  font-weight: 600;
-  font-size: var(--veil-text-base);
+  border: 1px solid transparent;
   cursor: pointer;
-  box-shadow: 0 4px 14px var(--veil-accent-glow);
   transition: all 0.15s ease-in-out;
+  outline: none;
+  user-select: none;
 }
 
-.veil-button-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px var(--veil-accent-glow);
+.veil-btn-primary {
+  background-color: var(--veil-accent-primary);
+  color: #ffffff;
 }
 
-.veil-button-primary:active {
-  transform: translateY(0);
+.veil-btn-primary:hover:not(:disabled) {
+  background-color: var(--veil-accent-primary-hover);
+  box-shadow: 0 0 12px var(--veil-accent-glow);
 }
 
-.veil-button-panic {
-  background: linear-gradient(135deg, #b91c1c, #7f1d1d);
-  color: #fee2e2;
-  border: 1px solid #ef4444;
-  border-radius: var(--veil-radius-md);
-  padding: 0.6rem 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s ease;
+.veil-btn-secondary {
+  background-color: var(--veil-bg-surface-elevated);
+  color: var(--veil-text-primary);
+  border-color: var(--veil-border);
 }
 
+.veil-btn-secondary:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.veil-btn-danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--veil-danger);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.veil-btn-danger:hover:not(:disabled) {
+  background-color: var(--veil-danger);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.veil-btn-panic {
+  background-color: var(--veil-panic-bg);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  font-weight: 600;
+}
+
+.veil-btn-panic:hover:not(:disabled) {
+  background-color: var(--veil-danger);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
+}
+
+.veil-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Badges & Indicators */
+.veil-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--veil-text-xs);
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--veil-radius-full);
+}
+
+.veil-badge-secure {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: var(--veil-success);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.veil-badge-warning {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: var(--veil-warning);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.veil-badge-danger {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: var(--veil-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Form Controls */
 .veil-input {
   width: 100%;
+  font-family: var(--veil-font-sans);
+  font-size: var(--veil-text-base);
+  color: var(--veil-text-primary);
   background-color: var(--veil-bg-surface-elevated);
   border: 1px solid var(--veil-border);
   border-radius: var(--veil-radius-md);
-  padding: 0.75rem 1rem;
-  color: var(--veil-text-primary);
-  font-size: var(--veil-text-base);
+  padding: 0.65rem 0.9rem;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: all 0.15s ease-in-out;
 }
 
 .veil-input:focus {
@@ -148,14 +224,342 @@ body {
   box-shadow: 0 0 0 3px var(--veil-accent-glow-subtle);
 }
 
-.veil-space-badge {
-  display: inline-flex;
+.veil-input::placeholder {
+  color: var(--veil-text-muted);
+}
+
+/* =========================================================================
+   APPLICATION LAYOUT
+   ========================================================================= */
+
+.veil-app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: var(--veil-bg-base);
+}
+
+/* Sidebar */
+.veil-sidebar {
+  width: 340px;
+  min-width: 300px;
+  max-width: 400px;
+  height: 100%;
+  background-color: var(--veil-bg-surface);
+  border-right: 1px solid var(--veil-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.veil-sidebar-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--veil-border);
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--veil-radius-full);
-  font-size: var(--veil-text-xs);
+}
+
+.veil-space-status-box {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.veil-space-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--veil-radius-md);
+  background: linear-gradient(135deg, var(--veil-accent-primary), #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #ffffff;
+}
+
+.veil-sidebar-search {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--veil-border-subtle);
+}
+
+.veil-sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--veil-border-subtle);
+  padding: 0 1rem;
+}
+
+.veil-tab-btn {
+  flex: 1;
+  padding: 0.6rem 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--veil-text-secondary);
   font-weight: 600;
-  background: var(--veil-bg-surface-elevated);
+  font-size: var(--veil-text-xs);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.15s;
+}
+
+.veil-tab-btn.active {
+  color: var(--veil-accent-primary);
+  border-bottom-color: var(--veil-accent-primary);
+}
+
+.veil-conversation-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.veil-conversation-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--veil-radius-md);
+  cursor: pointer;
+  transition: background-color 0.15s;
+  user-select: none;
+}
+
+.veil-conversation-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.veil-conversation-item.active {
+  background-color: var(--veil-bg-surface-active);
+  border-left: 3px solid var(--veil-accent-primary);
+}
+
+.veil-conversation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.veil-conversation-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.2rem;
+}
+
+.veil-conversation-name {
+  font-weight: 600;
+  font-size: var(--veil-text-sm);
+  color: var(--veil-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.veil-conversation-time {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-muted);
+}
+
+.veil-conversation-preview {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.veil-sidebar-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--veil-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--veil-bg-surface-elevated);
+}
+
+/* Chat Main View */
+.veil-chat-main {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--veil-bg-base);
+}
+
+.veil-chat-header {
+  height: 64px;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--veil-border);
+  background-color: var(--veil-bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.veil-chat-peer-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.veil-chat-timeline {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.veil-message-row {
+  display: flex;
+  width: 100%;
+}
+
+.veil-message-row.outgoing {
+  justify-content: flex-end;
+}
+
+.veil-message-row.incoming {
+  justify-content: flex-start;
+}
+
+.veil-message-bubble {
+  max-width: 65%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--veil-radius-lg);
+  font-size: var(--veil-text-sm);
+  line-height: 1.4;
+  position: relative;
+  word-break: break-word;
+}
+
+.veil-message-row.outgoing .veil-message-bubble {
+  background-color: var(--veil-accent-primary);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+}
+
+.veil-message-row.incoming .veil-message-bubble {
+  background-color: var(--veil-bg-surface-elevated);
+  color: var(--veil-text-primary);
   border: 1px solid var(--veil-border);
+  border-bottom-left-radius: 4px;
+}
+
+.veil-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  margin-top: 0.3rem;
+  opacity: 0.8;
+}
+
+/* Message Composer */
+.veil-composer {
+  padding: 0.85rem 1.25rem;
+  background-color: var(--veil-bg-surface);
+  border-top: 1px solid var(--veil-border);
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.veil-composer-input {
+  flex: 1;
+  min-height: 42px;
+  max-height: 140px;
+  resize: none;
+  font-family: var(--veil-font-sans);
+  font-size: var(--veil-text-sm);
+  color: var(--veil-text-primary);
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md);
+  padding: 0.65rem 0.85rem;
+  outline: none;
+}
+
+.veil-composer-input:focus {
+  border-color: var(--veil-accent-primary);
+}
+
+/* Modals & Dialogs */
+.veil-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: var(--veil-glass-blur);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 1rem;
+}
+
+.veil-modal-card {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--veil-bg-surface);
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-lg);
+  box-shadow: var(--veil-shadow-lg);
+  overflow: hidden;
+}
+
+.veil-modal-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--veil-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.veil-modal-body {
+  padding: 1.25rem;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.veil-modal-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--veil-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background-color: var(--veil-bg-surface-elevated);
+}
+
+/* Empty State */
+.veil-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--veil-text-secondary);
+}
+
+.veil-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+/* Responsive Rules */
+@media (max-width: 768px) {
+  .veil-sidebar {
+    width: 100%;
+    max-width: none;
+  }
+  .veil-app-layout.has-active-chat .veil-sidebar {
+    display: none;
+  }
+  .veil-app-layout:not(.has-active-chat) .veil-chat-main {
+    display: none;
+  }
 }
