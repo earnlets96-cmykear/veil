@@ -1,50 +1,29 @@
-# CURRENT_STATE.md — Verified Ground Truth of VEIL
+# CURRENT_STATE.md — Verified System State for VEIL
 
-## 1. Project Phase & Milestone
+## 1. Verified Phase Completion Status
 
-- **Current Phase**: **PHASE 12: Standalone Production Relay Server & Transport Protocol**
-- **Status**: Complete, Hardened & Verified
-- **Release Version**: `v1.0.0-rc.1` (Phase 12 update)
-- **Test Suite Results**: 256 / 256 tests passing across 102 test files (100% clean pass)
-- **Production Build Status**: Clean Vite + TypeScript production build (`dist/` generated)
-- **Current Branch**: `master`
-
----
-
-## 2. Completed Phases Summary (Phases 0 through 12)
-
-- [x] **Phase 0**: Architecture, Threat Model, Technology Selection, Design System & AI Continuity
-- [x] **Phase 1**: Cryptographic Spaces, Argon2id KDF & Encrypted Local Storage
-- [x] **Phase 2**: Independent Space Cryptographic Identities & Ed25519 Documents
-- [x] **Phase 3**: Privacy-Preserving Untrusted Transport & Blind Mailboxes
-- [x] **Phase 4**: End-to-End Encrypted 1-to-1 Messaging (Double Ratchet & X3DH)
-- [x] **Phase 5**: Multi-Party Groups (Sender Keys) & 64 KiB Chunked Encrypted Media
-- [x] **Phase 6**: Multi-Device Synchronization (SAS) & 24-Word BIP-39 Recovery
-- [x] **Phase 7**: Privacy UX, Quick Lock, Panic Lock, Decoy Spaces & Disclosure Guard
-- [x] **Phase 8**: Metadata Minimization, Size Bucket Padding (512B–64KB) & Timing Jitter
-- [x] **Phase 9**: Adversarial Security Audit, Parser Fuzzing & Red-Team Gate
-- [x] **Phase 10**: Release Candidate Packaging, Operational Guides & Post-RC Security Freeze
-- [x] **Phase 11**: Persistent Encrypted Local Storage (IndexedDB), Schema Migrations & Restart Persistence
-- [x] **Phase 12**: Standalone Production Relay Server (HTTP/WebSocket) & Blind Mailbox Transport Protocol v1
+| Phase | Description | Status | Verification Reference |
+| :--- | :--- | :--- | :--- |
+| **Phase 0** | Architecture, Threat Model, Technology Selection, Continuity | **COMPLETED** | Verified via core documentation & ADRs |
+| **Phase 1** | Cryptographic Space Prototype & Multi-Space Isolation | **COMPLETED** | 100-Space test, zero SMK persistence |
+| **Phase 2** | Independent Space Cryptographic Identities | **COMPLETED** | Ed25519 / X25519 deterministic derivation |
+| **Phase 3** | Privacy-Preserving Untrusted Transport Interface | **COMPLETED** | Blind mailboxes, size-padding classes |
+| **Phase 4** | End-to-End Encrypted 1-to-1 Messaging | **COMPLETED** | Double Ratchet + X3DH authenticated prekeys |
+| **Phase 5** | Encrypted Group Messaging & 64 KiB Encrypted Media | **COMPLETED** | Group Tree Ratchet, forward secrecy |
+| **Phase 6** | Multi-Device Synchronization & Recovery Vaults | **COMPLETED** | SAS SAS-MITM verification, BIP-39 mnemonic |
+| **Phase 7** | Privacy UX, Decoy Space, Panic Lock & Notifications | **COMPLETED** | Panic lock zeroization, decoy Space isolation |
+| **Phase 8** | Metadata Minimization & Traffic Obfuscation | **COMPLETED** | Timing perturbation, size quantization |
+| **Phase 9** | Adversarial Security Audit & Penetration Testing | **COMPLETED** | Red-team penetration test suites |
+| **Phase 10** | Release Candidate & Production Packaging | **COMPLETED** | `v1.0.0-rc.1` tagging, build verified |
+| **Phase 11** | Persistent Encrypted Local Storage (IndexedDB) | **COMPLETED** | Transactional migrations, restart tests |
+| **Phase 12** | Standalone Production Relay Server & Protocol v1 | **COMPLETED** | Blind mailbox HTTP/WS server, SHA-256 capability hash |
+| **Phase 13** | Client Networking & Relay Integration | **COMPLETED** | `NetworkManager`, offline queuing, ACK-after-persistence |
 
 ---
 
-## 3. Relay Subsystem Verified Ground Truth
+## 2. Quantitative Verification Metrics
 
-- **Relay Protocol**: Protocol v1 (`docs/RELAY_PROTOCOL.md`) over HTTP REST and WebSocket.
-- **Blind Mailbox Model**: Opaque 256-bit random mailbox routing identifiers. Zero central user accounts.
-- **One-Way Capability Authorization**: Server stores only SHA-256 hashes of client capability tokens.
-- **Zero Plaintext Access**: Server handles opaque ciphertext payloads ($\le 64$ KiB); no decryption keys or logic exist on server.
-- **At-Least-Once Delivery**: Envelopes remain queued until explicit capability-authenticated client ACK.
-- **Rate Limiting & Abuse Defense**: Bounded memory, sliding-window IP limits (120 req/min), max 1,000 envelopes/mailbox.
-- **Privacy-Preserving Logging**: Automatic redaction of credentials, capability tokens, and payloads in `PrivacyLogger`.
-
----
-
-## 4. Test Status
-
-- **Test Framework**: Vitest (v3.0.5)
-- **Total Test Files**: 102 / 102 passed
-- **Total Tests**: 256 / 256 passed (100% pass rate)
-- **Failing Tests**: 0
-- **Duration**: ~10.5s
+- **Total Test Files**: **112 / 112 passed (100% pass rate)**
+- **Total Tests**: **268 / 268 passed (0 failures, 0 skipped)**
+- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in 446ms)
+- **Git Status**: Phase 13 ready for commit.

@@ -2,39 +2,39 @@
 
 ## 1. Current Verified State
 
-- **Phase Completed**: **PHASE 12: Standalone Production Relay Server & Blind Mailbox Transport Protocol**
-- **Release Version**: `v1.0.0-rc.1` (Phase 12 update)
-- **Test Results**: **256/256 tests passing across 102 test files (100% clean pass)**
-- **Build Status**: Clean Vite + TypeScript build (`tsc && vite build`)
-- **Git Status**: Phase 12 implemented and committed.
+- **Phase Completed**: **PHASE 13: Client Networking & Relay Integration**
+- **Release Version**: `v1.0.0-rc.1` (Phase 13 update)
+- **Test Results**: **268/268 tests passing across 112 test files (100% clean pass)**
+- **Build Status**: Clean Vite + TypeScript build (`tsc && vite build` in 446ms)
+- **Git Status**: Phase 13 implemented and ready for commit.
 
 ---
 
-## 2. Phase 12 Work Accomplished
+## 2. Phase 13 Work Accomplished
 
-1. **Relay Protocol Specification**:
-   - Published `docs/RELAY_PROTOCOL.md` (Protocol v1).
-2. **Server Architecture & Threat Model**:
-   - Published `docs/RELAY_ARCHITECTURE.md`, `docs/RELAY_SECURITY.md`, `docs/RELAY_PRIVACY.md`.
-3. **Standalone Relay Server**:
-   - `src/server/relayServer.ts`: HTTP endpoints (`/healthz`, `/readyz`, `/v1/mailboxes`, `/v1/envelopes`, `/v1/envelopes/fetch`, `/v1/envelopes/ack`).
-   - `src/server/wsHandler.ts`: WebSocket real-time envelope push, capability authentication, heartbeats, and backpressure.
-   - `src/server/storage/relayStore.ts` & `memoryRelayStore.ts`: Storage abstraction with queue bounds and TTL sweep.
-   - `src/server/rateLimiter.ts`: Sliding-window rate limiter.
-   - `src/server/logger.ts`: Privacy-preserving structured logger with credential redaction.
-4. **Security & Privacy Invariants**:
-   - Zero Plaintext Access: Relay processes opaque ciphertext payloads ($\le 64$ KiB).
-   - One-Way Capability Storage: Stores only `SHA-256(capabilityToken)`.
-   - At-Least-Once Delivery: Envelopes remain queued until explicit client ACK.
-5. **Architecture Decisions**:
-   - Documented `ADR-057` through `ADR-061` in `docs/ai/DECISIONS.md`.
-6. **Automated Verification Suites**:
-   - 8 new test suites covering protocol endpoints, capability authorization, delivery semantics, WebSocket push, abuse defense, privacy logging, graceful shutdown, and 2-client transport integration.
+1. **Client Networking Subsystem (`src/network/`)**:
+   - `src/network/types.ts`: Protocol types, network states, delivery statuses, queue records, configuration models.
+   - `src/network/errors.ts`: Typed client network errors.
+   - `src/network/httpTransport.ts`: Typed REST client interfacing with Phase 12 Relay Server endpoints with request timeouts, HTTP error mapping, and TLS enforcement.
+   - `src/network/websocketTransport.ts`: Real-time WebSocket transport client with connection lifecycle, mailbox capability authentication, heartbeats, and exponential backoff with jitter.
+   - `src/network/envelopeQueue.ts`: Persistent encrypted outbound/inbound queues via `EncryptedSpaceStore` (IndexedDB) with **ACK-after-persistence** semantics and duplicate delivery reconciliation.
+   - `src/network/networkManager.ts`: Client networking coordinator managing per-Space mailbox bindings, automatic queue draining, offline message persistence, and E2EE payload routing.
+   - `src/network/index.ts`: Module exports.
+2. **Architecture Documentation (`docs/`)**:
+   - `docs/NETWORK_ARCHITECTURE.md`: Client networking architecture and subsystem design.
+   - `docs/CLIENT_RELAY_INTEGRATION.md`: Integration guide connecting client E2EE engines to the relay server.
+   - `docs/OFFLINE_DELIVERY.md`: Offline messaging, persistent queuing, restart recovery, and deduplication.
+   - `docs/NETWORK_SECURITY.md`: Network threat model, per-Space isolation boundaries, and TLS fail-closed rules.
+3. **Architecture Decisions**:
+   - Documented `ADR-062` through `ADR-066` in `docs/ai/DECISIONS.md`.
+4. **Automated Verification Suites (10 New Test Suites)**:
+   - 10 new test suites covering HTTP/WS client transport, mailbox binding, envelope send/receive, real-time WebSocket push, reconnect backoff, offline persistence recovery, duplicate handling, 10-space isolation, security enforcement, and complete end-to-end E2EE message lifecycle over relay.
+   - Total verified tests: **268/268 passing across 112 test files**.
 
 ---
 
 ## 3. Next Milestone
 
-**PHASE 13 — CLIENT NETWORKING & RELAY INTEGRATION**
+**PHASE 14 — APPLICATION & USER INTERFACE INTEGRATION (REACT / TAILWIND UI)**
 
-*(Do not start Phase 13 until explicitly directed).*
+*(Do not begin Phase 14 until explicitly instructed).*

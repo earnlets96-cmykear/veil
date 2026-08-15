@@ -4,7 +4,37 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 13] - 2026-08-15
+
+### Added
+- **Client Networking & Relay Integration**:
+  - `src/network/types.ts`: Defined `NetworkState`, `DeliveryStatus`, `NetworkConfig`, `QueuedOutboundEnvelope`, `QueuedInboundEnvelope`, and `SpaceMailboxBinding`.
+  - `src/network/errors.ts`: Typed client network errors (`NetworkError`, `RelayUnavailableError`, `MailboxRevokedError`, `ProtocolVersionMismatchError`, `TlsRequiredError`, `EnvelopePayloadTooLargeError`, `UnauthorizedMailboxError`).
+  - `src/network/httpTransport.ts`: Typed REST client interfacing with Phase 12 Relay Server endpoints with request timeouts, HTTP error mapping, and TLS enforcement.
+  - `src/network/websocketTransport.ts`: Real-time WebSocket transport client with connection lifecycle states, mailbox capability authentication, ping/pong heartbeats, and exponential backoff with jitter.
+  - `src/network/envelopeQueue.ts`: Persistent encrypted outbound and inbound queues backed by `EncryptedSpaceStore` (IndexedDB) with **ACK-after-persistence** semantics and duplicate delivery reconciliation.
+  - `src/network/networkManager.ts`: Central client networking coordinator managing per-Space mailbox bindings, automatic queue draining, offline message persistence, and E2EE payload routing.
+  - `docs/NETWORK_ARCHITECTURE.md`: Client networking architecture and subsystem design.
+  - `docs/CLIENT_RELAY_INTEGRATION.md`: Integration guide connecting client E2EE engines to the relay server.
+  - `docs/OFFLINE_DELIVERY.md`: Offline messaging, persistent queuing, restart recovery, and deduplication.
+  - `docs/NETWORK_SECURITY.md`: Network threat model, per-Space isolation boundaries, and TLS fail-closed rules.
+  - Documented `ADR-062` through `ADR-066` in `docs/ai/DECISIONS.md`.
+  - Added 10 new automated test suites (268 total tests across 112 test files, 100% clean pass):
+    - `tests/network-relay-client.test.ts`: HTTP transport and health/mailbox/envelope endpoints.
+    - `tests/network-mailbox.test.ts`: Per-Space mailbox allocation and encrypted capability storage.
+    - `tests/network-send-receive.test.ts`: Outbound and inbound pipeline over relay with ACK-after-persistence.
+    - `tests/network-websocket.test.ts`: Real-time WebSocket envelope push and connection handling.
+    - `tests/network-reconnect-backoff.test.ts`: Reconnection state transitions and exponential backoff.
+    - `tests/network-offline-persistence.test.ts`: Offline queuing and application restart persistence recovery.
+    - `tests/network-duplicates.test.ts`: Duplicate envelope suppression and deduplication registry.
+    - `tests/network-multispace.test.ts`: 10-Space strict network, mailbox, and queue isolation.
+    - `tests/network-security.test.ts`: TLS enforcement, locked session defense, and error handling.
+    - `tests/network-integration-e2ee.test.ts`: Full end-to-end E2EE lifecycle over relay (Alice encrypts -> Relay transports -> Bob receives -> Bob decrypts -> Bob ACKs -> Bob replies).
+
+---
+
 ## [Phase 12] - 2026-08-15
+
 
 ### Added
 - **Standalone Production Relay Server & Blind Mailbox Transport Protocol v1**:

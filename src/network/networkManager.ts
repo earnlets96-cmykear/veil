@@ -1,0 +1,331 @@
+/**
+ * Top-Level Client Network Manager for VEIL.
+ *
+ * Coordinates HTTP and WebSocket transports, per-Space mailbox bindings,
+ * offline persistent queuing, ACK-after-persistence delivery, and E2EE payload routing.
+ *
+ * CRITICAL INVARIANT:
+ * - Untrusted Blind Relay: Sends and receives opaque ciphertext payloads only.
+ * - Strict Per-Space Isolation: Distinct mailbox capabilities and queues per Space.
+ */
+
+import { SpaceSession } from '../spaces/session.ts';
+import { EncryptedSpaceStore } from '../storage/spaceStore.ts';
+import { HttpTransport } from './httpTransport.ts';
+import { WebSocketTransport } from './websocketTransport.ts';
+import { EnvelopeQueue } from './envelopeQueue.ts';
+import {
+  NetworkConfig,
+  DEFAULT_NETWORK_CONFIG,
+  SpaceMailboxBinding,
+  QueuedOutboundEnvelope,
+  QueuedInboundEnvelope,
+  NetworkState,
+} from './types.ts';
+import { randomBytes, bytesToHex } from '../crypto/utils.ts';
+import { RelayEnvelope } from '../server/types.ts';
+
+const KEY_MAILBOX_BINDING = 'net_mailbox_binding';
+
+export class NetworkManager {
+  private config: NetworkConfig;
+  private store: EncryptedSpaceStore;
+  private queue: EnvelopeQueue;
+  private http: HttpTransport;
+
+  // Active WebSocket transports keyed by spaceId
+  private activeWsTransports = new Map<string, WebSocketTransport>();
+  private messageHandlers = new Map<string, (payload: string) => Promise<void>>();
+
+  constructor(store: EncryptedSpaceStore, config: Partial<NetworkConfig> = {}) {
+    this.store = store;
+    this.config = { ...DEFAULT_NETWORK_CONFIG, ...config };
+    this.queue = new EnvelopeQueue(store);
+    this.http = new HttpTransport(this.config);
+  }
+
+  public getHttp(): HttpTransport {
+    return this.http;
+  }
+
+  public getQueue(): EnvelopeQueue {
+    return this.queue;
+  }
+
+  public getConfig(): NetworkConfig {
+    return this.config;
+  }
+
+  // ===========================================================================
+  // MAILBOX BINDING MANAGEMENT
+  // ===========================================================================
+
+  /**
+   * Retrieves the persisted mailbox binding for an active Space, or creates a new one on the relay.
+   */
+  public async getOrCreateMailbox(session: SpaceSession): Promise<SpaceMailboxBinding> {
+    this.assertSession(session);
+
+    let binding = await this.store.getAsync<SpaceMailboxBinding>(session, KEY_MAILBOX_BINDING);
+    if (binding && binding.expiresAt > Date.now()) {
+      return binding;
+    }
+
+    // Allocate new blind mailbox on relay
+    const res = await this.http.createMailbox();
+    binding = {
+      spaceId: session.spaceId,
+      mailboxId: res.mailboxId,
+      capabilityToken: res.capabilityToken,
+      expiresAt: res.expiresAt,
+      lastSyncAt: Date.now(),
+    };
+
+    // Save encrypted under Space StorageKey
+    await this.store.setAsync(session, KEY_MAILBOX_BINDING, binding);
+    return binding;
+  }
+
+  public async getMailboxBinding(session: SpaceSession): Promise<SpaceMailboxBinding | null> {
+    this.assertSession(session);
+    return this.store.getAsync<SpaceMailboxBinding>(session, KEY_MAILBOX_BINDING);
+  }
+
+  // ===========================================================================
+  // OUTBOUND MESSAGING PIPELINE
+  // ===========================================================================
+
+  /**
+   * Submits an opaque ciphertext envelope to a target mailbox.
+   * If online, sends immediately to relay. If offline, enqueues persistently.
+   */
+  public async sendEnvelope(
+    session: SpaceSession,
+    targetMailboxId: string,
+    payload: string,
+    ttlSeconds?: number
+  ): Promise<QueuedOutboundEnvelope> {
+    this.assertSession(session);
+
+    const queueId = bytesToHex(randomBytes(16));
+    const item: QueuedOutboundEnvelope = {
+      queueId,
+      spaceId: session.spaceId,
+      mailboxId: targetMailboxId,
+      payload,
+      ttlSeconds,
+      status: 'QUEUED',
+      createdAt: Date.now(),
+      retryCount: 0,
+    };
+
+    // 1. Always persist to encrypted outbound queue first (crash safety)
+    await this.queue.enqueueOutbound(session, item);
+
+    // 2. Attempt immediate dispatch over HTTP
+    try {
+      await this.queue.updateOutboundStatus(session, queueId, 'SENDING');
+      await this.http.sendEnvelope(targetMailboxId, payload, ttlSeconds);
+      
+      // Successfully accepted by relay -> remove from outbound queue
+      await this.queue.removeOutbound(session, queueId);
+      item.status = 'SENT_TO_RELAY';
+    } catch (err: any) {
+      // Keep in queue for automatic drain upon reconnect
+      await this.queue.updateOutboundStatus(session, queueId, 'QUEUED', err.message);
+    }
+
+    return item;
+  }
+
+  /**
+   * Flushes all pending outbound envelopes in the Space's encrypted queue.
+   */
+  public async flushOutboundQueue(session: SpaceSession): Promise<number> {
+    this.assertSession(session);
+
+    const pending = await this.queue.listOutbound(session);
+    let flushedCount = 0;
+
+    for (const item of pending) {
+      try {
+        await this.queue.updateOutboundStatus(session, item.queueId, 'SENDING');
+        await this.http.sendEnvelope(item.mailboxId, item.payload, item.ttlSeconds);
+        await this.queue.removeOutbound(session, item.queueId);
+        flushedCount++;
+      } catch (err: any) {
+        await this.queue.updateOutboundStatus(session, item.queueId, 'QUEUED', err.message);
+        break; // Stop draining on connection failure
+      }
+    }
+
+    return flushedCount;
+  }
+
+  // ===========================================================================
+  // INBOUND MESSAGING & WEBSOCKET LISTENER
+  // ===========================================================================
+
+  /**
+   * Connects WebSocket real-time delivery channel and performs initial HTTP fetch sync.
+   */
+  public async startListening(
+    session: SpaceSession,
+    onMessageReceived?: (payload: string) => Promise<void>
+  ): Promise<void> {
+    this.assertSession(session);
+
+    const binding = await this.getOrCreateMailbox(session);
+    if (onMessageReceived) {
+      this.messageHandlers.set(session.spaceId, onMessageReceived);
+    }
+
+    let wsTransport = this.activeWsTransports.get(session.spaceId);
+    if (!wsTransport) {
+      wsTransport = new WebSocketTransport(this.config);
+      this.activeWsTransports.set(session.spaceId, wsTransport);
+
+      // Handle incoming push envelopes
+      wsTransport.onEnvelope(async (envelope) => {
+        await this.processInboundEnvelope(session, envelope, wsTransport);
+      });
+    }
+
+    // Connect & authenticate WebSocket
+    try {
+      await wsTransport.connect(binding.mailboxId, binding.capabilityToken);
+    } catch (_err) {
+      // Falls back to HTTP polling if WebSocket is temporarily unavailable
+    }
+
+    // Perform initial catch-up synchronization over HTTP
+    await this.syncMailbox(session, onMessageReceived);
+  }
+
+  /**
+   * Disconnects WebSocket and halts networking for the Space.
+   */
+  public stopListening(session: SpaceSession): void {
+    const wsTransport = this.activeWsTransports.get(session.spaceId);
+    if (wsTransport) {
+      wsTransport.disconnect();
+      this.activeWsTransports.delete(session.spaceId);
+    }
+    this.messageHandlers.delete(session.spaceId);
+  }
+
+  /**
+   * Manually fetches pending envelopes from relay over HTTP and processes them.
+   */
+  public async syncMailbox(
+    session: SpaceSession,
+    onMessageReceived?: (payload: string) => Promise<void>
+  ): Promise<number> {
+    this.assertSession(session);
+
+    const binding = await this.getMailboxBinding(session);
+    if (!binding) return 0;
+
+    const handler = onMessageReceived || this.messageHandlers.get(session.spaceId);
+    let totalProcessed = 0;
+
+    try {
+      const fetchRes = await this.http.fetchEnvelopes(binding.mailboxId, binding.capabilityToken);
+      if (fetchRes.envelopes.length === 0) return 0;
+
+      const ackIds: string[] = [];
+
+      for (const env of fetchRes.envelopes) {
+        const queueId = bytesToHex(randomBytes(16));
+        const inbound: QueuedInboundEnvelope = {
+          queueId,
+          spaceId: session.spaceId,
+          mailboxId: env.mailboxId,
+          envelopeId: env.envelopeId,
+          payload: env.payload,
+          status: 'QUEUED',
+          receivedAt: Date.now(),
+        };
+
+        // 1. Enqueue inbound locally with deduplication
+        const isNew = await this.queue.enqueueInbound(session, inbound);
+        if (isNew && handler) {
+          try {
+            // 2. Deliver to E2EE decryptor
+            await handler(env.payload);
+            await this.queue.markInboundProcessed(session, queueId);
+            totalProcessed++;
+          } catch (err) {
+            console.error('[NetworkManager] Error decrypting inbound envelope:', err);
+          }
+        }
+
+        ackIds.push(env.envelopeId);
+      }
+
+      // 3. ACK-after-persistence: Acknowledge processed envelopes to relay
+      if (ackIds.length > 0) {
+        await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, ackIds);
+      }
+
+      // Flush any queued outbound envelopes
+      await this.flushOutboundQueue(session);
+    } catch (_err) {
+      // Catch network sync failures gracefully
+    }
+
+    return totalProcessed;
+  }
+
+  private async processInboundEnvelope(
+    session: SpaceSession,
+    envelope: RelayEnvelope,
+    wsTransport?: WebSocketTransport
+  ): Promise<void> {
+    const queueId = bytesToHex(randomBytes(16));
+    const inbound: QueuedInboundEnvelope = {
+      queueId,
+      spaceId: session.spaceId,
+      mailboxId: envelope.mailboxId,
+      envelopeId: envelope.envelopeId,
+      payload: envelope.payload,
+      status: 'QUEUED',
+      receivedAt: Date.now(),
+    };
+
+    // 1. Persist to local queue (deduplicating)
+    const isNew = await this.queue.enqueueInbound(session, inbound);
+    if (!isNew) {
+      // Already processed duplicate -> ACK immediately to purge relay
+      wsTransport?.sendAck([envelope.envelopeId]);
+      return;
+    }
+
+    const handler = this.messageHandlers.get(session.spaceId);
+    if (handler) {
+      try {
+        // 2. Process through E2EE cryptographic layer
+        await handler(envelope.payload);
+        await this.queue.markInboundProcessed(session, queueId);
+
+        // 3. ACK to relay ONLY after safe local processing
+        const ackedViaWs = wsTransport?.sendAck([envelope.envelopeId]);
+        if (!ackedViaWs) {
+          const binding = await this.getMailboxBinding(session);
+          if (binding) {
+            await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, [envelope.envelopeId]);
+          }
+        }
+        await this.queue.markInboundAcknowledged(session, queueId);
+      } catch (err) {
+        console.error('[NetworkManager] Failed to process inbound envelope:', err);
+      }
+    }
+  }
+
+  private assertSession(session: SpaceSession): void {
+    if (!session || !session.isActive()) {
+      throw new Error('NetworkManager cannot operate on locked or destroyed SpaceSession');
+    }
+  }
+}

@@ -648,8 +648,61 @@ This document records all architectural decisions made across the VEIL project l
 - **Status**: Accepted
 - **Context**: Server logs must not leak capability tokens, passwords, private keys, or encrypted payloads.
 - **Decision**: Implement `PrivacyLogger` (`src/server/logger.ts`) with automatic recursive key sanitization, replacing sensitive fields with `[REDACTED]`.
-- **Reason**: Prevents accidental metadata or credential exposure in system monitoring logs.
-- **Consequences**: Safe operational logging suitable for production deployment.
+---
+
+## ADR-062: Client Network Abstraction & Transport Layer Decoupling
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: The client messaging layer requires a dedicated networking coordinator without exposing low-level socket or HTTP state to higher-level application logic.
+- **Decision**: Implement `NetworkManager` (`src/network/networkManager.ts`) coordinating `HttpTransport`, `WebSocketTransport`, and `EnvelopeQueue`. The client converts higher-level E2EE messages (`ConversationManager` / `GroupManager`) into opaque transport payloads before dispatching to the relay.
+- **Reason**: Maintains strict separation of concerns between cryptographic protocols and network transport.
+- **Consequences**: Enables clean, testable integration between local E2EE engines and remote relays.
+
+---
+
+## ADR-063: Strict Mailbox-Per-Space Isolation and Encrypted Capability Storage
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Multiple Spaces must not share mailboxes, capability tokens, network queues, or transport sessions.
+- **Decision**: Each Space allocates an independent blind mailbox on the relay. The `SpaceMailboxBinding` (including secret `capabilityToken`) is stored encrypted in `EncryptedSpaceStore` under the Space's derived `StorageKey`. When a Space is locked, all active network sessions and in-memory capability tokens are immediately terminated and wiped.
+- **Reason**: Prevents cross-space traffic correlation and guarantees that unlocking one Space provides zero access to other Spaces' network channels.
+- **Consequences**: Complete multi-space cryptographic network isolation.
+
+---
+
+## ADR-064: Persistent Encrypted Outbound Queues & Offline-First Delivery
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Outgoing messages sent while offline, degraded, or during network transitions must survive application crashes and restarts without leaking plaintext.
+- **Decision**: All outbound envelopes are encrypted locally via Double Ratchet and persisted into the active Space's `EnvelopeQueue` prior to network transmission. When connectivity is restored, `NetworkManager.flushOutboundQueue()` drains pending envelopes with bounded rate control.
+- **Reason**: Guarantees zero message loss across offline periods and application restarts without keeping plaintexts in volatile memory.
+- **Consequences**: Robust offline-first messaging with crash-safe persistence.
+
+---
+
+## ADR-065: Inbound ACK-After-Persistence and Duplicate Delivery Reconciliation
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Relays use at-least-once delivery; envelopes must not be acknowledged or deleted on the server until the client has safely persisted them, and network retransmissions must not produce duplicate messages.
+- **Decision**: Implement the **ACK-after-persistence** invariant: inbound envelopes are enqueued to `EnvelopeQueue`, processed by Double Ratchet, and committed to local history before an ACK is dispatched to the relay. A rolling cache of processed envelope IDs deduplicates retransmissions.
+- **Reason**: Prevents message loss from client crashes during receipt and ensures clean user experience under duplicate delivery.
+- **Consequences**: Fault-tolerant message reception and state consistency.
+
+---
+
+## ADR-066: Real-Time WebSocket Delivery with Bounded Exponential Backoff and TLS Fail-Closed Protection
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Real-time push requires low-latency WebSockets with resilient reconnection behavior and strict transport security.
+- **Decision**: Implement `WebSocketTransport` (`src/network/websocketTransport.ts`) with connection lifecycle state machine, capability authentication, periodic heartbeats, and exponential backoff with jitter (1s to 30s). In production (`enforceTls: true`), non-TLS URLs (`http://`, `ws://`) are rejected with `TlsRequiredError`.
+- **Reason**: Protects against CPU/battery exhaustion from tight reconnect loops and enforces transport encryption.
+- **Consequences**: High-reliability real-time delivery with fail-closed security.
+
 
 
 
