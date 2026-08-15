@@ -1,18 +1,19 @@
 {
   "name": "veil",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "VEIL: Privacy-First Messenger with Multi-Space Cryptographic Architecture",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:release": "node scripts/release-build.mjs",
+    "verify:release": "npm test && npm run build && node scripts/release-build.mjs",
     "preview": "vite preview",
     "relay": "node --import tsx/esm src/server/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-
   "dependencies": {
     "@noble/ciphers": "^2.3.0",
     "@noble/curves": "^1.8.0",

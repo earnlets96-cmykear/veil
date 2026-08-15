@@ -4,7 +4,37 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] - 2026-08-16 - GENERAL AVAILABILITY (GA)
+
+### Added
+- **Final Release Engineering & General Availability (v1.0.0 GA)**:
+  - Canonical `1.0.0` version alignment across repository and metadata.
+  - Release manifest generator (`scripts/release-build.mjs`) creating `release/v1.0.0/manifest.json` and `release/v1.0.0/checksums.sha256`.
+  - Added release test gates:
+    - `tests/release-version.test.ts`
+    - `tests/release-integrity.test.ts`
+    - `tests/release-artifact-security.test.ts`
+    - `tests/phase19-crypto-regression.test.ts`
+    - `tests/phase19-multispace-final.test.ts` (20-Space simultaneous scale test)
+    - `tests/phase19-ui-security-final.test.ts`
+    - `tests/privacy-network-egress.test.ts`
+    - `tests/upgrade-compatibility.test.ts`
+  - Created operational & compliance documentation:
+    - `THIRD_PARTY_NOTICES.md`
+    - `docs/DEPENDENCY_SECURITY.md`
+    - `docs/RELEASE_V1.0.0.md`
+    - `docs/GA_RELEASE_CHECKLIST.md`
+    - `docs/GA_RELEASE_SCORECARD.md`
+    - `docs/BROWSER_COMPATIBILITY.md`
+    - `docs/OPERATIONS_BACKUP_RESTORE.md`
+    - `docs/SECURITY_CLAIMS.md`
+  - Documented `ADR-091` through `ADR-095` in `docs/ai/DECISIONS.md`.
+  - 152 total test files with 332 tests passed 100%.
+
+---
+
 ## [Phase 18] - 2026-08-16
+
 
 ### Added
 - **Final Production Release Candidate (RC2), Stress Testing & Release Sign-Off**:

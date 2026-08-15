@@ -964,6 +964,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Prepares VEIL for public release and independent security audits.
 - **Consequences**: Fully certified, production-ready codebase.
 
+---
+
+## ADR-091: Canonical Version 1.0.0 General Availability (GA) Alignment
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Release engineering requires unified version declaration across `package.json`, release manifests, and user-facing documentation.
+- **Decision**: Update canonical version from `0.1.0` / `1.0.0-rc.2` to `1.0.0` across all metadata sources.
+- **Reason**: Establishes official v1.0.0 GA semver milestone.
+- **Consequences**: Consistent, auditable release versioning.
+
+---
+
+## ADR-092: Cryptographic Release Manifest and SHA-256 Checksum Verification
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: End users and self-hosters need verifiable proof of production artifact integrity.
+- **Decision**: Generate automated `manifest.json` and `checksums.sha256` in `release/v1.0.0/` during release build.
+- **Reason**: Guarantees tamper-evident distribution of compiled production assets.
+- **Consequences**: Fully verifiable release artifacts.
+
+---
+
+## ADR-093: Automated Production Bundle Secret Scanner Gate
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Compiling TypeScript / Vite bundles must never inadvertently bake private test keys or development tokens into client distribution files.
+- **Decision**: Introduce `tests/release-artifact-security.test.ts` scanning `dist/` for private key headers, test credentials, and dev secrets.
+- **Reason**: Prevents accidental credential leakage into public static assets.
+- **Consequences**: Automated build safety guarantee.
+
+---
+
+## ADR-094: Strict Zero-Egress Network Privacy Policy
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Third-party tracking and analytics domains could exfiltrate user metadata without explicit user knowledge.
+- **Decision**: Formally test and enforce zero network egress to third-party domains in `tests/privacy-network-egress.test.ts`.
+- **Reason**: Preserves uncompromising privacy promises.
+- **Consequences**: Complete absence of third-party telemetry.
+
+---
+
+## ADR-095: Production v1.0.0 GA Sign-Off and Repository Freeze
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: All 19 phases of VEIL development, hardening, verification, and release packaging are complete.
+- **Decision**: Sign off on v1.0.0 General Availability (GA), tag git commit as `v1.0.0`, and enter stable maintenance mode.
+- **Reason**: Delivers the complete, fully tested, privacy-first multi-space messenger.
+- **Consequences**: VEIL v1.0.0 GA is officially certified and ready for deployment.
+
+
 
 
 
