@@ -18,6 +18,7 @@ export interface CreateSpaceOptions {
   isDecoy?: boolean;
   kdfParams?: Partial<KdfParameters>;
   spaceId?: string; // Optional custom ID (used for testing or deterministic seeding)
+  masterKey?: Uint8Array; // Optional master key (used for recovery/import)
 }
 
 export class SpaceVaultManager {
@@ -52,7 +53,7 @@ export class SpaceVaultManager {
    * and registers the envelope.
    */
   public createSpace(options: CreateSpaceOptions): SpaceHeaderEnvelope {
-    const { name, password, isDecoy = false, kdfParams, spaceId = crypto.randomUUID() } = options;
+    const { name, password, isDecoy = false, kdfParams, spaceId = crypto.randomUUID(), masterKey } = options;
 
     if (!password || password.length === 0) {
       throw new Error('Password must not be empty');
@@ -61,7 +62,7 @@ export class SpaceVaultManager {
       throw new Error('Space name must not be empty');
     }
 
-    // 1. Generate independent 32-byte salt and 32-byte random Space Master Key (SMK)
+    // 1. Generate independent 32-byte salt and 32-byte Space Master Key (SMK)
     const saltBytes = randomBytes(32);
     const saltBase64 = bytesToBase64(saltBytes);
 
@@ -74,8 +75,9 @@ export class SpaceVaultManager {
       keyLength: 32,
     };
 
-    // 2. Generate random 256-bit Space Master Key (SMK)
-    const smk = randomBytes(32);
+    // 2. Use supplied masterKey or generate random 256-bit Space Master Key (SMK)
+    const smk = masterKey ? new Uint8Array(masterKey) : randomBytes(32);
+
 
     let kek: Uint8Array | null = null;
     try {

@@ -3,38 +3,40 @@
 ## 1. Project Overview & Current Phase
 
 - **Project**: VEIL (Privacy-First Messenger with Multi-Space Cryptographic Architecture)
-- **Current Phase**: **PHASE 5: Encrypted Group Messaging & Encrypted Media** — Complete
-- **Status**: 175/175 tests passing across 54 test files
+- **Current Phase**: **PHASE 6: Multi-Device Synchronization & Cryptographic Recovery** — Complete
+- **Status**: 184/184 tests passing across 61 test files
 - **Current Branch**: `master`
 
 ---
 
-## 2. Phase 5 Implementation Summary
+## 2. Phase 6 Implementation Summary
 
 ### What Was Implemented
-1. **Group Protocol & Sender Keys** (`src/group/senderKey.ts`, `src/group/groupKdf.ts`, `docs/GROUP_PROTOCOL.md`):
-   - Scalable $O(1)$ group message encryption using the Sender Keys protocol (Signal / Megolm group ratcheting).
-   - Symmetric chain key stepping via `HMAC-SHA256` (`kdfSenderChainStep`).
-   - Ed25519 signature verification on all group messages and `SenderKeyDistributionMessage` payloads.
-   - AAD context binding on group headers (`groupId`, `epoch`, `senderIdentityId`, `sequenceNum`).
-   - Bounded out-of-order skipped key cache (`MAX_GROUP_SKIPPED_KEYS = 500`) with immediate single-use key zeroization.
-2. **Authenticated Group State & Anti-Rollback Epochs** (`src/group/groupState.ts`, `src/group/groupManager.ts`):
-   - Role hierarchy (`CREATOR` > `ADMIN` > `MEMBER`) cryptographically verified with Ed25519 signatures.
-   - Strictly monotonic epoch progression preventing rollback attacks.
-   - Encrypted group metadata (name, description, avatar) encrypted at rest with epoch-derived metadata keys.
-3. **Forward Secrecy on Member Departure**:
-   - Removing a member increments the group Epoch ($Epoch_{k+1}$), forces all remaining members to reset their outbound Sender Keys, and distributes new Sender Keys exclusively to remaining members over 1-to-1 Double Ratchet channels.
-   - The removed member never learns $Epoch_{k+1}$ keys and cannot decrypt future messages.
-4. **Encrypted Media Vault & Untrusted Blob Transport** (`src/media/mediaEncryptor.ts`, `src/media/mediaStorage.ts`, `src/media/mediaVault.ts`, `docs/MEDIA_SECURITY.md`):
-   - Unique, cryptographically random 32-byte symmetric keys generated per media object.
-   - 64 KiB chunked streaming encryption using `XChaCha20-Poly1305` with AAD binding (`mediaId`, `chunkIndex`, `totalChunks`, `isLastChunk`).
-   - SHA-256 integrity digest verification upon reassembly.
-   - Decryption keys travel strictly inside end-to-end encrypted messages; never exposed in URLs or server payloads.
-   - Space-partitioned local cache in `EncryptedSpaceStore`; zero leakage to public OS device galleries.
+1. **Ephemeral Device Linking Protocol** (`src/device/enrollment.ts`):
+   - Ephemeral X25519 Diffie-Hellman key agreement between Primary and Secondary devices.
+   - 6-digit Short Authentication String (SAS) derivation via `HKDF-SHA256(ikm=sharedSecret, salt=pubP||pubS, info="veil-v1-device-sas", length=4)` for MITM prevention.
+   - Encrypted credential tunnel using `XChaCha20-Poly1305` keyed from the ephemeral DH shared secret.
+   - Ed25519-signed device authorization records binding secondary device identity to Space identity.
+2. **Selective Space Synchronization** (`src/device/enrollment.ts`):
+   - User explicitly selects which Space(s) to transfer during enrollment.
+   - Unselected Spaces produce zero key material, zero envelopes, and zero metadata in the tunnel payload.
+3. **Device Registry & Revocation** (`src/device/deviceManager.ts`):
+   - `DeviceRegistry` tracking all enrolled devices per Space with `ACTIVE` / `REVOKED` status.
+   - Signed `DeviceRevocationRecord` tombstones using the Space's Ed25519 identity key.
+   - Revoked devices are permanently blocked from re-registration.
+4. **BIP-39 Mnemonic Recovery** (`src/recovery/bip39.ts`, `src/recovery/wordlist.ts`):
+   - Standard 24-word English mnemonic phrase encoding of the 256-bit Space Master Key (SMK).
+   - 8-bit SHA-256 checksum validation.
+   - Deterministic Space and identity restoration from mnemonic phrase alone.
+5. **Encrypted Emergency Recovery File** (`src/recovery/recoveryVault.ts`):
+   - Standalone `.veilbackup` file format (`VEIL-RECOVERY-v1`) protected by Argon2id + XChaCha20-Poly1305.
+   - Import with wrong passphrase correctly rejected.
+6. **Space Vault Master Key Import** (`src/spaces/vault.ts`):
+   - `CreateSpaceOptions.masterKey` field enables deterministic Space creation from recovered/imported keys.
 
-### Verified Invariants (175/175 Tests Passing)
-- **Phases 0-4**: Space Vaults, Argon2id KDF, XChaCha20-Poly1305 AEAD, independent Ed25519/X25519 identities, blind mailboxes, Double Ratchet 1-to-1 E2EE, X3DH key agreement.
-- **Phase 5**: Group creation, membership hierarchy, member addition/removal, forward secrecy on removal, epoch advancement, group replay prevention, out-of-order group delivery, malicious server resistance, cross-group/cross-space isolation, media encryption/decryption across MIME types, chunk reordering/duplication/substitution detection, capability-based blob authorization, and full E2EE group+media integration.
+### Verified Invariants (184/184 Tests Passing)
+- **Phases 0-5**: All previous invariants maintained (Space Vaults, identities, Double Ratchet, groups, media).
+- **Phase 6**: Device enrollment SAS handshake, MITM detection, selective sync isolation, device revocation, BIP-39 mnemonic generation/restoration, encrypted backup file export/import, anti-backdoor enforcement.
 
 ---
 
@@ -45,14 +47,13 @@
 3. **THE SERVER IS UNTRUSTED**: The relay server receives only opaque transport envelopes, blind mailbox tokens, and opaque ciphertext media chunks; never message plaintexts, prekey private keys, group secrets, or media encryption keys.
 4. **CROSS-SPACE ISOLATION**: Space A cannot decrypt Space B's conversations, group states, or media items.
 5. **ZERO SENSITIVE LOGGING**: No plaintexts, passwords, SMKs, media keys, or private keys in logs.
+6. **ZERO SERVER RECOVERY**: Server has zero ability to reset passwords, escrow keys, or bypass Argon2id envelopes.
 
 ---
 
 ## 4. Exact Next Action for Incoming Agent
 
-Proceed to **Phase 6: Multi-Device Synchronization, Device Linking & Cryptographic Recovery** ([`prompts/PHASE_06.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_06.md)).
+Proceed to **Phase 7: Privacy UX, App Lock, Notifications, Panic Lock, Decoy Space** ([`prompts/PHASE_07.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_07.md)).
 1. Read `AGENTS.md` and `docs/ai/PROJECT_CONTEXT.md`.
-2. Update `docs/ai/ACTIVE_TASK.md` for Phase 6.
-3. Implement QR-code/ephemeral-channel device linking for linking secondary devices to a Space.
-4. Implement per-device cryptographic identity sub-keys and pairwise multi-device Double Ratchet fan-out.
-5. Implement zero-knowledge cryptographic space recovery and passphrase backup export.
+2. Update `docs/ai/ACTIVE_TASK.md` for Phase 7.
+3. Implement app-lock biometric/PIN screen, notification privacy controls, panic lock (instant wipe), and enhanced Decoy Space UX.

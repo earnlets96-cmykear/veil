@@ -287,5 +287,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Upholds multi-space cryptographic isolation and prevents media leaks to OS-level apps or photo sync services.
 - **Consequences**: Locking a Space locks all associated media; deleting a Space wipes all associated media cache.
 
+---
+
+## ADR-029: Ephemeral Out-of-Band Key Agreement with 6-Digit SAS for Device Enrollment
+
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Secondary devices must be enrolled into a Space securely without trusting intermediate networks or QR relay channels.
+- **Decision**: Perform an ephemeral X25519 Diffie-Hellman handshake between Primary and Secondary devices. Derive a 6-digit Short Authentication String (SAS) using `HKDF-SHA256(ikm=sharedSecret, salt=concat(pubP, pubS), info="veil-v1-device-sas", length=4)`. Transmit Space credentials only after mutual visual SAS confirmation over an `XChaCha20-Poly1305` encrypted tunnel.
+- **Reason**: Prevents active Man-in-the-Middle (MITM) attacks during device linking.
+- **Consequences**: Key substitution by an attacker produces distinct 6-digit codes and aborts the handshake before any Space secrets are sent.
+
+---
+
+## ADR-030: Selective Space Synchronization and Multi-Space Boundary Preservation
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Users may want to link a work laptop to "Work Space" while keeping "Private Space" strictly on their personal phone.
+- **Decision**: The user explicitly chooses which Space(s) to synchronize during enrollment. Unselected Spaces are completely excluded from the enrollment payload.
+- **Reason**: Maintains absolute multi-space cryptographic isolation across physical devices.
+- **Consequences**: A secondary device has zero knowledge, keys, or envelopes for unselected Spaces.
+
+---
+
+## ADR-031: Cryptographically Signed Device Revocation and Authorization Registry
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Lost or compromised secondary devices must be revocable by the primary device.
+- **Decision**: Maintain a `DeviceRegistry` per Space. Revocation creates a signed `DeviceRevocationRecord` using the Space's Ed25519 identity key, marking the device `REVOKED` and excluding it from future multi-device routing and prekey rotations.
+- **Reason**: Ensures authoritative, verifiable revocation without centralized servers.
+- **Consequences**: Revoked devices are permanently blocked from re-registering or accessing future state.
+
+---
+
+## ADR-032: Zero-Knowledge BIP-39 24-Word Mnemonic Space Recovery
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Users must be able to restore a Space on a brand new device if all enrolled devices are lost, without server assistance.
+- **Decision**: Encode the 256-bit permanent Space Master Key (SMK) into a standard 24-word BIP-39 mnemonic phrase with an 8-bit SHA-256 checksum. Recovery directly reconstructs the SMK and all deterministic subkeys (`IdentitySeed`, `StorageKey`, etc.).
+- **Reason**: Industry-standard, human-writable, offline zero-knowledge recovery mechanism.
+- **Consequences**: Users can restore their full Space and identity deterministically from paper backups.
+
+---
+
+## ADR-033: Anti-Escrow and Zero Server Password Reset Enforcements
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Relay servers and backend infrastructure must never possess key recovery capabilities.
+- **Decision**: Enforce that the server has zero recovery endpoints, zero master key escrow, and zero ability to reset passwords or bypass Argon2id KDF envelopes.
+- **Reason**: Mathematical guarantee of zero-trust and anti-surveillance architecture.
+- **Consequences**: Loss of both password and recovery phrase results in permanent cryptographic lockout (no backdoors).
+
+
 
 

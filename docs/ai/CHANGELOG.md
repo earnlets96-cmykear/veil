@@ -4,7 +4,34 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 6] - 2026-08-15
+
+### Added
+- **Multi-Device Synchronization & Zero-Knowledge Cryptographic Recovery**:
+  - `src/device/types.ts`: `DeviceRecord`, `DeviceEnrollmentSession`, `EnrollmentTicket`, `EnrollmentPayload`, `SpaceSyncEnvelope`, `DeviceRevocationRecord`, `DeviceRegistry`.
+  - `src/device/enrollment.ts`: `DeviceEnrollmentManager` implementing ephemeral X25519 Diffie-Hellman key agreement, 6-digit visual SAS confirmation code derivation via HKDF-SHA256, and XChaCha20-Poly1305 encrypted credential tunnels.
+  - `src/device/deviceManager.ts`: `DeviceManager` with signed `DeviceRevocationRecord` tombstones, authorization verification, and active device enumeration.
+  - `src/recovery/bip39.ts`: BIP-39 mnemonic encoder/decoder supporting 24-word standard English recovery phrases with 8-bit SHA-256 checksums.
+  - `src/recovery/wordlist.ts`: Standard 2048-word BIP-39 English wordlist.
+  - `src/recovery/recoveryVault.ts`: `RecoveryVault` handling zero-knowledge Space recovery from 24-word mnemonics and standalone encrypted `.veilbackup` emergency files.
+  - `src/spaces/vault.ts`: Extended `createSpace` to support importing custom/recovered `masterKey`.
+- **Documentation**:
+  - `docs/MULTI_DEVICE.md`: Comprehensive multi-device enrollment and selective synchronization specification.
+  - `docs/RECOVERY.md`: Comprehensive zero-knowledge recovery specification.
+  - Documented `ADR-029` (Ephemeral QR Key Agreement with SAS), `ADR-030` (Selective Space Sync), `ADR-031` (Signed Device Revocation), `ADR-032` (BIP-39 Mnemonic Recovery), `ADR-033` (Anti-Escrow and Zero Server Password Reset).
+- **Test Suites (7 new suites, 9 new tests, 184 total across 61 files)**:
+  - `tests/device-enrollment.test.ts`: QR ticket generation, ephemeral key exchange, SAS calculation & confirmation.
+  - `tests/device-sas-mitm.test.ts`: MITM attack detection via SAS code mismatch.
+  - `tests/device-selective-sync.test.ts`: Selective Space sync and complete isolation of unselected Spaces.
+  - `tests/device-revocation.test.ts`: Device revocation, signed tombstones, re-registration prevention.
+  - `tests/bip39-recovery.test.ts`: 24-word BIP-39 mnemonic generation, checksum validation, deterministic identity restoration.
+  - `tests/recovery-file.test.ts`: Encrypted emergency backup file export and import with wrong password rejection.
+  - `tests/no-server-backdoor.test.ts`: Anti-backdoor and zero-knowledge enforcement tests.
+
+---
+
 ## [Phase 5] - 2026-08-15
+
 
 ### Added
 - **Encrypted Group Messaging & Encrypted Media Vault**:

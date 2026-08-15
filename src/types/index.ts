@@ -74,3 +74,10 @@ export * from '../group/types.ts';
 // Media Types
 export * from '../media/types.ts';
 
+// Device Types
+export * from '../device/types.ts';
+
+// Recovery Types
+export * from '../recovery/recoveryVault.ts';
+
+

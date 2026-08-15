@@ -1,24 +1,22 @@
 # ACTIVE_TASK.md — Current Work Tracker
 
 ## Task
-**VEIL Phase 5: Encrypted Group Messaging & Encrypted Media**
+**VEIL Phase 6: Multi-Device Synchronization & Cryptographic Recovery**
 
 ## Status: COMPLETE
 
 ## Deliverables
-- [x] Group Protocol specification documented (`docs/GROUP_PROTOCOL.md`)
-- [x] Media Security specification documented (`docs/MEDIA_SECURITY.md`)
-- [x] Group Messaging data models & types (`src/group/types.ts`)
-- [x] Group KDFs & canonicalizers (`src/group/groupKdf.ts`)
-- [x] SenderKey state machine with bounded out-of-order buffering (`src/group/senderKey.ts`)
-- [x] Authenticated GroupStateManager with role enforcement & Ed25519 signatures (`src/group/groupState.ts`)
-- [x] GroupManager coordinator with epoch key rotation on member removal (`src/group/groupManager.ts`)
-- [x] Client-side chunked symmetric MediaEncryptor with AAD & SHA-256 digests (`src/media/mediaEncryptor.ts`)
-- [x] Untrusted blob storage adapter (`src/media/mediaStorage.ts`)
-- [x] Space-isolated MediaVault with local gallery isolation (`src/media/mediaVault.ts`)
-- [x] 20 Phase 5 test suites (28 new tests, 175 total across 54 files) — 100% PASSING
-- [x] ADR-023 through ADR-028 documented
+- [x] Multi-Device architecture specification documented (`docs/MULTI_DEVICE.md`)
+- [x] Zero-Knowledge recovery specification documented (`docs/RECOVERY.md`)
+- [x] Multi-Device data structures & types (`src/device/types.ts`)
+- [x] Ephemeral QR linking protocol with 6-digit SAS verification (`src/device/enrollment.ts`)
+- [x] Device registry & signed device revocation tombstones (`src/device/deviceManager.ts`)
+- [x] BIP-39 mnemonic phrase encoder/decoder with checksum verification (`src/recovery/bip39.ts`, `src/recovery/wordlist.ts`)
+- [x] Zero-Knowledge RecoveryVault for mnemonic & encrypted `.veilbackup` files (`src/recovery/recoveryVault.ts`)
+- [x] `SpaceVaultManager.createSpace` extended to support custom/recovered `masterKey`
+- [x] 7 Phase 6 test suites (9 new tests, 184 total across 61 files) — 100% PASSING
+- [x] ADR-029 through ADR-033 documented
 - [x] Architecture & AI continuity docs updated
 
 ## Next Task
-Phase 6: Multi-Device Synchronization, Device Linking & Cryptographic Recovery
+Phase 7: Privacy UX, App Lock, Notifications, Panic Lock, Decoy Space
