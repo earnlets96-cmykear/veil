@@ -832,6 +832,29 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Prevents rogue device enrollment and guarantees permanent revocation enforcement.
 - **Consequences**: Cryptographically robust multi-device management.
 
+---
+
+## ADR-079: System Performance Thresholds and Computational Resource Budgeting
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Privacy and encryption algorithms must operate within strict latency bounds to prevent user experience degradation on commodity hardware.
+- **Decision**: Define and verify hard operational performance metrics: Argon2id derivation (< 100ms in test, ~1s in prod), AEAD encryption/decryption (> 1,000 ops/sec), Attachment pipeline (> 10 MiB/sec), and Local Search (< 10ms for 1,000 items).
+- **Reason**: Ensures high responsiveness and smooth UI performance across all devices.
+- **Consequences**: Predictable computational overhead and validated performance targets.
+
+---
+
+## ADR-080: Standalone Production Relay CLI and Local Self-Hosting Packaging
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Self-hosters need a single command to launch a persistent blind relay without complex deployment orchestrators.
+- **Decision**: Implement `src/server/cli.ts` executable via `npm run relay` with environment variables for port, host, storage directory, and TLS.
+- **Reason**: Enables trivial zero-cost self-hosting for individuals and organizations.
+- **Consequences**: Turnkey self-hosted relay deployment.
+
+
 
 
 

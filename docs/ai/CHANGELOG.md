@@ -4,7 +4,22 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 16] - 2026-08-15
+
+### Added
+- **Final Production Validation, Performance Benchmarking & System Packaging**:
+  - `src/server/cli.ts`: Standalone Relay Server CLI entrypoint supporting configurable port, host, storage directory, and graceful shutdown (`npm run relay`).
+  - `tests/performance-benchmarks.test.ts`: Performance benchmarking suite measuring Argon2id latency, AEAD throughput (> 1,000 ops/sec), attachment throughput (> 10 MiB/sec), and in-memory search latency (< 10ms for 1,000 records).
+  - `tests/system-e2e-orchestration.test.ts`: Full cross-subsystem orchestration test verifying multi-Space creation, credential-selected unlocking, signed invitation onboarding, Double Ratchet messaging, chunked attachment transfers, local search, and emergency Panic Lock.
+  - `docs/SYSTEM_SUMMARY.md`: Comprehensive technical specification synthesizing all 16 phases.
+  - `README.md`: Complete documentation rewrite with feature matrix, quickstart guide, self-hosting guide, cryptographic specifications table, and documentation links.
+  - Documented `ADR-079` and `ADR-080` in `docs/ai/DECISIONS.md`.
+  - Added 2 new automated test suites (299 total tests across 131 test files, 100% clean pass).
+
+---
+
 ## [Phase 15] - 2026-08-15
+
 
 ### Added
 - **Production Integration, Real-World Messaging & Application Hardening**:
