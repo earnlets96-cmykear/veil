@@ -1,23 +1,28 @@
 # ACTIVE_TASK.md — Current Work Tracker
 
 ## Task
-**VEIL Phase 8: Metadata Minimization & Traffic Obfuscation**
+**VEIL Phase 9: Adversarial Security Audit, Red-Team Review & Release Hardening**
 
 ## Status: COMPLETE
 
 ## Deliverables
-- [x] System-wide metadata audit (`docs/METADATA_AUDIT.md`)
-- [x] API metadata minimization audit (`docs/API_METADATA_AUDIT.md`)
-- [x] Server logging, retention, and access policy (`docs/SERVER_PRIVACY.md`)
-- [x] Anonymity networks & transport analysis (`docs/ANONYMITY_NETWORKS.md`)
-- [x] Residual metadata leakage catalog (`docs/METADATA_REMAINING_LEAKAGE.md`)
-- [x] Size bucket padding module (`src/privacy/padding.ts`)
-- [x] Presence, typing rate-limiting & read receipt manager (`src/privacy/presencePrivacy.ts`)
-- [x] Traffic shaper with timing jitter & batching queues (`src/transport/trafficShaper.ts`)
-- [x] Mailbox capability epoch rotation engine (`src/transport/mailboxRotation.ts`)
-- [x] 12 Phase 8 test suites (15 new tests, 214 total across 82 files) — 100% PASSING
-- [x] ADR-039 through ADR-043 documented
-- [x] `docs/METADATA_MODEL.md` updated
+- [x] Comprehensive asset inventory & threat boundary analysis (`docs/SECURITY_AUDIT.md`)
+- [x] Exhaustive adversarial security audit report (`docs/SECURITY_AUDIT_REPORT.md`)
+- [x] Cryptographic security property matrix (`docs/SECURITY_PROPERTIES.md`)
+- [x] Subsystem security scorecard (`docs/SECURITY_SCORECARD.md`)
+- [x] Release readiness checklist & blocker resolution (`docs/RELEASE_BLOCKERS.md`)
+- [x] Accepted risks & security debt roadmap (`docs/SECURITY_DEBT.md`)
+- [x] 8 new adversarial red-team test suites (15 new tests, 229 total across 90 test files) — 100% PASSING:
+  - `tests/audit-crypto-invariants.test.ts`
+  - `tests/audit-cross-space-attacks.test.ts`
+  - `tests/audit-protocol-state-machine.test.ts`
+  - `tests/audit-media-pipeline.test.ts`
+  - `tests/audit-device-recovery.test.ts`
+  - `tests/audit-transport-server-boundary.test.ts`
+  - `tests/audit-panic-race-conditions.test.ts`
+  - `tests/audit-fuzz-parsers.test.ts`
+- [x] Documented ADR-044 through ADR-048 in `docs/ai/DECISIONS.md`
+- [x] Official classification: **`RELEASE CANDIDATE`**
 
 ## Next Task
-Phase 9: Adversarial Security Audit, Protocol Review & Threat Model Validation (`prompts/PHASE_09.md`)
+Phase 10: Release Candidate, Production Packaging, Clean Build & Final Distribution (`prompts/PHASE_10.md`)

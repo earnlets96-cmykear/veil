@@ -4,7 +4,31 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 9] - 2026-08-15
+
+### Added
+- **Adversarial Security Audit, Red-Team Review & Release Hardening**:
+  - `docs/SECURITY_AUDIT.md`: Complete security asset inventory, trust boundaries, and threat actor matrix.
+  - `docs/SECURITY_AUDIT_REPORT.md`: Comprehensive adversarial red-team audit report and release candidate classification.
+  - `docs/SECURITY_PROPERTIES.md`: Cryptographic security property matrix mapping claims to tests and boundary limitations.
+  - `docs/SECURITY_SCORECARD.md`: Subsystem-by-subsystem evaluation (`PASS` / `PASS WITH LIMITATIONS`).
+  - `docs/RELEASE_BLOCKERS.md`: Mandatory release blocker resolution verification.
+  - `docs/SECURITY_DEBT.md`: Transparent accepted risks and post-release technical hardening roadmap.
+  - Documented `ADR-044` (Adversarial Verification), `ADR-045` (Hostile Parser Fuzzing), `ADR-046` (Cryptographic Invariants & Nonces), `ADR-047` (Real-Time Panic Lock Session Invalidation), `ADR-048` (Release Candidate Designation).
+- **Adversarial Red-Team Test Suites (8 new suites, 15 new tests, 229 total across 90 test files)**:
+  - `tests/audit-crypto-invariants.test.ts`: Nonce collision verification across 10,000 CSPRNG samples, HKDF subkey domain separation, and buffer zeroization.
+  - `tests/audit-cross-space-attacks.test.ts`: In-memory and local storage cross-space partition injection attacks, credential oracle rejection.
+  - `tests/audit-protocol-state-machine.test.ts`: Double Ratchet and Group SenderKey epoch rollback rejection.
+  - `tests/audit-media-pipeline.test.ts`: Media chunk swapping attacks and corrupted chunk AAD validation.
+  - `tests/audit-device-recovery.test.ts`: BIP-39 mnemonic checksum corruption detection and corrupted backup file rejection.
+  - `tests/audit-transport-server-boundary.test.ts`: IDOR capability access attempts across blind mailboxes.
+  - `tests/audit-panic-race-conditions.test.ts`: Instant session destruction and in-flight storage operation rejection during panic lock.
+  - `tests/audit-fuzz-parsers.test.ts`: Hostile fuzz testing of padding unpadding, transport envelopes, and backup deserializers with 500+ random/malformed buffers.
+
+---
+
 ## [Phase 8] - 2026-08-15
+
 
 ### Added
 - **Metadata Minimization, Traffic Analysis Resistance & Privacy-Preserving Network Behavior**:

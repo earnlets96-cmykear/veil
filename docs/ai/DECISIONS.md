@@ -453,6 +453,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Gives users transparent, measurable privacy controls without confusing or misleading marketing slogans.
 - **Consequences**: High-threat users can choose stronger obfuscation, while standard users experience zero latency overhead.
 
+---
+
+## ADR-044: Adversarial Red-Team Verification and Security Property Matrix Enforcement
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Relying solely on standard unit tests risks overlooking subtle cryptographic misuse, boundary violations, or parser edge cases.
+- **Decision**: Introduce explicit adversarial red-team test suites that attempt actual attacks (1-bit AEAD tampering, cross-space database injections, epoch rollbacks, media chunk swapping, BIP-39 word tampering, mailbox IDORs, and panic lock race conditions). Document all security properties in `docs/SECURITY_PROPERTIES.md`.
+- **Reason**: Proves that the implementation actively rejects malformed or malicious inputs under hostile conditions.
+- **Consequences**: Validates core cryptographic invariants with zero reliance on security through obscurity.
+
+---
+
+## ADR-045: Comprehensive Hostile Parser Fuzzing and Input Bounding
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Parsers processing untrusted network data or local backup files can be vectors for memory exhaustion, unhandled exceptions, or denial-of-service.
+- **Decision**: Subject `MessagePadding`, `validateTransportEnvelope`, `MediaEncryptor`, and `RecoveryVault` to 500+ iterations of random, malformed, empty, and oversized byte inputs (`audit-fuzz-parsers.test.ts`). Enforce hard length checks prior to memory allocation.
+- **Reason**: Guarantees parser stability and graceful error handling across all entry points.
+- **Consequences**: Prevents unhandled crashes and unbounded memory consumption.
+
+---
+
+## ADR-046: Cryptographic Invariant Integrity and Nonce Space Verification
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Nonce collisions in AEAD schemes (such as Poly1305) can result in catastrophic plaintext and key recovery.
+- **Decision**: Audit and verify all nonce generation paths (`audit-crypto-invariants.test.ts`), confirming that 10,000+ sequential 24-byte CSPRNG nonces exhibit zero collisions, and enforce strict domain separation across all HKDF subkey derivations (`deriveStorageKey`, `deriveIdentitySeed`, `deriveSigningKeyMaterial`, `deriveKeyAgreementMaterial`).
+- **Reason**: Eliminates nonce reuse risks and guarantees key material independence.
+- **Consequences**: Mathematical assurance of cryptographic correctness.
+
+---
+
+## ADR-047: Real-Time Panic Lock Session Invalidation Across Concurrent Operations
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: In a panic situation, pending asynchronous network or storage operations might attempt to continue using session keys after lock invocation.
+- **Decision**: Ensure that `SpaceSession.destroy()` and `LockManager.panicLock()` immediately invalidate session active flags and zeroize volatile key buffers before returning, causing any in-flight asynchronous operations attempting storage access to throw immediately.
+- **Reason**: Guarantees instantaneous session termination and zero stale key persistence.
+- **Consequences**: Prevents race conditions during emergency lock triggers.
+
+---
+
+## ADR-048: Release Readiness Gate and Release Candidate Designation
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Transitioning from development to release requires a formal, non-negotiable security gate.
+- **Decision**: Define mandatory blocker criteria in `docs/RELEASE_BLOCKERS.md` and complete a full scorecard in `docs/SECURITY_SCORECARD.md`. Designate VEIL as a **`RELEASE CANDIDATE`** only after 100% test pass across all 90 test suites with zero unresolved blockers.
+- **Reason**: Ensures high standards of quality, transparency, and accountability before Phase 10 packaging.
+- **Consequences**: The project is formally verified and ready for Phase 10 release packaging.
+
+
 
 
 
