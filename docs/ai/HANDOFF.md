@@ -3,57 +3,52 @@
 ## 1. Project Overview & Current Phase
 
 - **Project**: VEIL (Privacy-First Messenger with Multi-Space Cryptographic Architecture)
-- **Current Phase**: **PHASE 7: Privacy UX, Panic Lock, Decoy Spaces & Human-Centered Security** — Complete
-- **Status**: 199/199 tests passing across 70 test files (100% clean pass)
+- **Current Phase**: **PHASE 8: Metadata Minimization & Traffic Obfuscation** — Complete
+- **Status**: 214/214 tests passing across 82 test files (100% clean pass)
 - **Current Branch**: `master`
 
 ---
 
-## 2. Phase 7 Implementation Summary
+## 2. Phase 8 Implementation Summary
 
 ### What Was Implemented
-1. **Privacy Settings Management** (`src/privacy/privacyManager.ts`):
-   - Per-Space privacy settings stored in `EncryptedSpaceStore`.
-   - `High`, `Balanced` (default), and `Convenient` presets.
-2. **Lock Manager (Quick Lock, Panic Lock, Auto-Lock)** (`src/privacy/lockManager.ts`):
-   - `quickLock(spaceId)`: Single-space session destruction and UI purge.
-   - `panicLock()`: Multi-space instant lock, volatile key zeroization, and complete sensitive UI purge.
-   - Configurable inactivity timers (1m, 5m, 15m, 30m) and app-background lock triggers.
-3. **Notification Privacy Tiers** (`src/privacy/notificationManager.ts`):
-   - High (no sender/content), Balanced (sender only), Convenient (previews).
-   - Automatic collapse to High Privacy when Space is locked.
-   - Automatic notification purging upon locking.
-4. **UI State & Search Cache Isolation** (`src/privacy/uiStateManager.ts`):
-   - Dynamic tracking and immediate wiping of messages, drafts, previews, and search caches on lock.
-   - Zero cross-space search leakage.
-5. **Decoy Space Enforcement & Anti-Disclosure** (`src/privacy/decoyEnforcement.ts`):
-   - Real encrypted Spaces with independent SMKs and identities.
-   - Zero disclosure of other Space names or counts on unlock screens.
-6. **Security Indicators & Marketing Guard** (`src/privacy/securityIndicators.ts`, `src/privacy/disclosureGuard.ts`):
-   - Simple indicators (`Verified ✓`, `Unverified`, `Security Changed ⚠`).
-   - Generic `"Unable to unlock."` error enforcement.
-   - Filter against misleading security theater ("military-grade", "unhackable").
+1. **Standardized Size Bucket Quantization** (`src/privacy/padding.ts`):
+   - Discrete power-of-two size classes (512B, 2KB, 8KB, 32KB, 64KB).
+   - Length-prefixed CSPRNG random padding applied before application-layer encryption.
+   - Hard bounds (`MAX_MESSAGE_SIZE = 64KB`, `MAX_PADDED_SIZE = 128KB`) protecting against memory exhaustion.
+2. **Timing Obfuscation & Jitter Scheduling** (`src/transport/trafficShaper.ts`):
+   - `TrafficShaper` providing bounded random delay jitter (20ms–400ms).
+   - Configurable traffic privacy levels (`Standard`, `Balanced`, `High`).
+3. **Transport Envelope Batching** (`src/transport/trafficShaper.ts`):
+   - Multi-envelope queue aggregation (up to 5 envelopes per dispatch in High mode).
+4. **Mailbox Capability Epoch Rotation** (`src/transport/mailboxRotation.ts`):
+   - Epoch-based capability secret rotation with overlapping 1-epoch grace periods for zero-downtime retrieval.
+5. **Presence & Interaction Privacy** (`src/privacy/presencePrivacy.ts`):
+   - 3-second rate-limiting on typing events to prevent keystroke timing analysis.
+   - Opt-in read receipts with opaque IDs and configurable last-seen status.
+6. **Comprehensive Audits & Limitations**:
+   - `docs/METADATA_AUDIT.md`, `docs/API_METADATA_AUDIT.md`, `docs/SERVER_PRIVACY.md`, `docs/ANONYMITY_NETWORKS.md`, `docs/METADATA_REMAINING_LEAKAGE.md`.
 
-### Verified Invariants (199/199 Tests Passing)
-- **Phases 0-6**: All previous invariants maintained (Spaces, identities, blind mailboxes, Double Ratchet, group Sender Keys, encrypted media, multi-device, recovery).
-- **Phase 7**: Panic lock instant wipe, quick lock isolation, decoy space independence, notification privacy tiers, locked-state UI purge, privacy settings persistence, error disclosure sanitization, security indicators, and auto-lock inactivity countdowns.
+### Verified Invariants (214/214 Tests Passing)
+- **Phases 0-7**: All previous invariants maintained (Spaces, identities, Double Ratchet, groups, media, multi-device, recovery, privacy UX, panic lock).
+- **Phase 8**: Size bucket quantization, DoS resource limits, timing jitter, identifier randomness, push privacy, presence rate-limiting, batching queues, media metadata minimization, server metadata boundaries, cross-space traffic indistinguishability, and mailbox capability rotation grace periods.
 
 ---
 
 ## 3. Invariants the Next Agent Must NOT Break
 
 1. **NEVER INVENT CRYPTOGRAPHY**: Use established primitives (`@noble/curves`, `@noble/hashes`, `@noble/ciphers`).
-2. **ZERO UNENCRYPTED SENSITIVE DATA**: Never leak plaintexts, passwords, SMKs, media keys, or private keys to logs, UI after lock, or server payloads.
+2. **ZERO UNENCRYPTED SENSITIVE DATA**: Never leak plaintexts, passwords, SMKs, media keys, or private keys to logs or server payloads.
 3. **CROSS-SPACE ISOLATION**: Space A cannot decrypt Space B's conversations, group states, media items, or search indexes.
 4. **NO MISLEADING SECURITY CLAIMS**: No "military-grade", "unhackable", or "100% anonymous" claims in documentation or code.
-5. **HONEST LIMITATIONS**: Acknowledge that decoy spaces and panic lock do not provide immunity against full physical forensic memory/disk acquisition on a compromised host OS.
+5. **HONEST METADATA BOUNDARIES**: Acknowledge that global passive adversaries can perform statistical correlation and that direct TLS reveals source IP addresses to the relay server.
 
 ---
 
 ## 4. Exact Next Action for Incoming Agent
 
-Proceed to **Phase 8: Metadata Minimization & Traffic Obfuscation** ([`prompts/PHASE_08.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_08.md)).
+Proceed to **Phase 9: Adversarial Security Audit, Protocol Review, Threat Model Validation & Penetration Testing** ([`prompts/PHASE_09.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_09.md)).
 1. Read `AGENTS.md` and `docs/ai/PROJECT_CONTEXT.md`.
-2. Inspect `prompts/PHASE_08.md`.
+2. Inspect `prompts/PHASE_09.md`.
 3. Create the `implementation_plan.md` artifact and obtain user approval before modifying code.
-4. Implement metadata minimization, constant-size payload bucket padding, decoy traffic / heartbeat traffic generation, and transport timing obfuscation.
+4. Perform comprehensive fuzzing, protocol state-machine auditing, cryptographic primitive regression verification, and penetration testing across all subsystems.

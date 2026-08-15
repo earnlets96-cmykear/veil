@@ -82,6 +82,13 @@ export * from '../recovery/recoveryVault.ts';
 
 // Privacy Types
 export * from '../privacy/types.ts';
+export * from '../privacy/padding.ts';
+export * from '../privacy/presencePrivacy.ts';
+
+// Transport Obfuscation & Rotation Types
+export * from '../transport/trafficShaper.ts';
+export * from '../transport/mailboxRotation.ts';
+
 
 
 

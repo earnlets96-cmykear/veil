@@ -398,6 +398,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Promotes usability and transparent, honest privacy engineering.
 - **Consequences**: Users easily understand their security state without security theater or misleading promises.
 
+---
+
+## ADR-039: Standardized Size Bucket Quantization for Message Envelopes
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Message character counts leak communication intent and language patterns over network wiretaps.
+- **Decision**: Pad all application payloads into discrete power-of-two size buckets (512B, 2KB, 8KB, 32KB, 64KB) using CSPRNG random bytes before encryption. Enforce hard bounds (`MAX_MESSAGE_SIZE = 64KB`, `MAX_PADDED_SIZE = 128KB`).
+- **Reason**: Prevents passive wiretaps and ISPs from correlating message length distributions.
+- **Consequences**: Slightly increases bandwidth usage for short messages in exchange for high size-correlation resistance.
+
+---
+
+## ADR-040: Bounded Timing Jitter and Transport Envelope Batching
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Immediate packet dispatch upon keystrokes or send actions allows network observers to infer interactive chatting.
+- **Decision**: Introduce `TrafficShaper` with configurable random jitter (20ms–400ms) and envelope batching queues (up to 5 envelopes per dispatch in High mode).
+- **Reason**: Disconnects the physical user send event from the wire transmission timestamp.
+- **Consequences**: Adds minor, bounded latency to outgoing packets while significantly complicating traffic timing correlation.
+
+---
+
+## ADR-041: Mailbox Capability Epoch Rotation with Overlapping Grace Periods
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Static mailbox authorization tokens create long-term correlation risks on untrusted servers.
+- **Decision**: Rotate mailbox capability secrets on an epoch schedule (`MailboxRotationManager`), storing only SHA-256 verifiers on the server. Accept capabilities from both the current epoch and the immediate previous epoch (grace period) to guarantee in-flight delivery.
+- **Reason**: Provides forward-secrecy properties for mailbox access without disrupting offline message retrieval.
+- **Consequences**: A leaked old capability secret cannot be used to read future messages.
+
+---
+
+## ADR-042: Rate-Limited Presence and Minimal Interaction Signals
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Fine-grained typing indicators and instant read receipts reveal active user presence, reading habits, and typing speeds.
+- **Decision**: Typing indicators and read receipts are disabled by default. When enabled, typing signals are rate-limited to a minimum 3-second interval, and read receipts use opaque identifiers. Last-seen status defaults to `'nobody'`.
+- **Reason**: Minimizes behavioral profiling and side-channel timing analysis.
+- **Consequences**: Users retain full control over interaction signals without leaking keystroke rhythms.
+
+---
+
+## ADR-043: Three-Tier Traffic Privacy Configuration (Standard, Balanced, High)
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Different threat models require different trade-offs between battery/latency efficiency and traffic analysis resistance.
+- **Decision**: Provide `Standard` (immediate, minimal overhead), `Balanced` (default: 20-120ms jitter, 3-envelope batching), and `High` (100-400ms jitter, 5-envelope batching) modes with documented operational parameters.
+- **Reason**: Gives users transparent, measurable privacy controls without confusing or misleading marketing slogans.
+- **Consequences**: High-threat users can choose stronger obfuscation, while standard users experience zero latency overhead.
+
+
 
 
 

@@ -35,6 +35,17 @@ export function generateMailboxCapability(): MailboxCapability {
 }
 
 /**
+ * Generates a capability secret and its server verifier.
+ */
+export function generateCapability(): { capability: string; verifier: string } {
+  const secretBytes = randomBytes(32);
+  const capability = bytesToBase64(secretBytes);
+  const verifier = deriveCapabilityVerifier(capability);
+  return { capability, verifier };
+}
+
+
+/**
  * Derives a server-side capability verifier from a client capability secret.
  * Verifier = Base64(SHA-256(capabilityBytes || "veil-v1-mailbox-auth"))
  *

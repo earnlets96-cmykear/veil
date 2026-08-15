@@ -4,7 +4,39 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 8] - 2026-08-15
+
+### Added
+- **Metadata Minimization, Traffic Analysis Resistance & Privacy-Preserving Network Behavior**:
+  - `src/privacy/padding.ts`: `MessagePadding` implementing discrete size bucket quantization (512B, 2KB, 8KB, 32KB, 64KB), length-prefixed CSPRNG random padding, and hard bounds (`MAX_MESSAGE_SIZE = 64KB`, `MAX_PADDED_SIZE = 128KB`).
+  - `src/transport/trafficShaper.ts`: `TrafficShaper` providing bounded random delay jitter (20ms–400ms), envelope batching queues (up to 5 envelopes), and three traffic privacy levels (`Standard`, `Balanced`, `High`).
+  - `src/transport/mailboxRotation.ts`: `MailboxRotationManager` with epoch-based capability rotation and overlapping grace periods.
+  - `src/privacy/presencePrivacy.ts`: `PresencePrivacyManager` providing typing indicator rate-limiting (3s threshold), opt-in read receipts with opaque IDs, and configurable last-seen status.
+- **Documentation & Audits**:
+  - `docs/METADATA_AUDIT.md`: System-wide metadata vector catalog and classifications.
+  - `docs/API_METADATA_AUDIT.md`: Endpoint-by-endpoint inspection and minimization analysis.
+  - `docs/SERVER_PRIVACY.md`: Server logging, retention, and access control policies.
+  - `docs/ANONYMITY_NETWORKS.md`: Architectural analysis of Tor, mixnets, VPNs, and proxies.
+  - `docs/METADATA_REMAINING_LEAKAGE.md`: Transparent documentation of residual traffic signals.
+  - Documented `ADR-039` (Size Bucket Quantization), `ADR-040` (Timing Jitter & Batching), `ADR-041` (Mailbox Capability Rotation), `ADR-042` (Rate-Limited Presence), `ADR-043` (Traffic Privacy Levels).
+- **Test Suites (12 new suites, 15 new tests, 214 total across 82 files)**:
+  - `tests/message-padding.test.ts`: Bucket quantization and unpadding exactness.
+  - `tests/resource-limit.test.ts`: Payload size bounds and memory exhaustion defenses.
+  - `tests/timing-privacy.test.ts`: Jitter scheduling and bounded random delays.
+  - `tests/identifier-privacy.test.ts`: Cryptographically random, non-sequential IDs.
+  - `tests/push-privacy.test.ts`: Opaque wakeups without content or Space leakage.
+  - `tests/presence-privacy.test.ts`: Typing rate-limiting and receipt privacy controls.
+  - `tests/transport-privacy.test.ts`: Batch queue thresholds and immediate dispatch.
+  - `tests/media-metadata.test.ts`: 64 KiB chunk standardization and encrypted metadata.
+  - `tests/server-metadata.test.ts`: Honest-but-curious server database audit.
+  - `tests/cross-space-metadata.test.ts`: Indistinguishable traffic across Main, Private, and Decoy Spaces.
+  - `tests/privacy-levels.test.ts`: Standard, Balanced, and High traffic privacy configuration.
+  - `tests/metadata-analysis.test.ts`: Traffic analysis test harness and mailbox rotation grace periods.
+
+---
+
 ## [Phase 7] - 2026-08-15
+
 
 ### Added
 - **Privacy UX, Panic Lock, Decoy Spaces & Human-Centered Security**:
