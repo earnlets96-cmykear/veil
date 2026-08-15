@@ -2,39 +2,36 @@
 
 ## 1. Project Phase & Milestone
 
-- **Current Phase**: **PHASE 2: Independent Space Cryptographic Identities**
-- **Status**: Complete & Verified (101/101 automated tests passing)
+- **Current Phase**: **PHASE 3: Privacy-Preserving Untrusted Transport Interface**
+- **Status**: Complete & Verified (132/132 automated tests passing across 24 suites)
 - **Current Branch**: `master`
 
 ---
 
-## 2. Completed Deliverables (Phase 2)
+## 2. Completed Deliverables (Phase 3)
 
-- [x] Two-tier HKDF identity derivation: `SMK → identitySeed → {signingKeyMaterial, keyAgreementMaterial}`.
-- [x] Ed25519 signing identity (`src/identity/signing.ts`) using `@noble/curves/ed25519.js` (v1.8.0).
-- [x] X25519 key agreement identity (`src/identity/keyAgreement.ts`) using `@noble/curves/ed25519.js` (exports `x25519`).
-- [x] Self-signed identity document (`src/identity/document.ts`) with canonical serialization and Ed25519 self-signature binding.
-- [x] Canonical serialization (`src/identity/canonical.ts`) with deterministic field ordering.
-- [x] SHA-256 fingerprint (`src/identity/fingerprint.ts`) formatted as 12 groups of 5 digits (60 digits).
-- [x] Identity ID: `hex(SHA-256(signingPub || kaPub))`.
-- [x] `SpaceIdentityManager` (`src/identity/manager.ts`) with create, load, sign, verify, shared secret, and lifecycle management.
-- [x] `SpaceSession.getMasterKey()` for internal identity derivation.
-- [x] Private identity keys encrypted at rest via `EncryptedSpaceStore`.
-- [x] All Phase 1 tests continue passing (49/49).
-- [x] 8 new Phase 2 test suites (52 tests) all passing.
+- [x] **Blind Mailbox Model**: Opaque 32-byte hex `mailboxId` unlinked from user identities or public keys.
+- [x] **Capability Authorization**: 256-bit client capability secrets verified against server-stored `SHA-256(capability || "veil-v1-mailbox-auth")` verifiers.
+- [x] **Size Classes & Padding**: Fixed size normalization (`SMALL`: 512B, `MEDIUM`: 2048B, `LARGE`: 8192B, `XLARGE`: 32768B) using length-prefixed CSPRNG padding.
+- [x] **Versioned Transport Envelope**: Structural packaging with `envelopeId`, `mailboxId`, `payload`, `sizeClass`, `createdAt`, `expiresAt`.
+- [x] **Phase 3 Transport Protection**: Temporary AEAD payload protection with padding.
+- [x] **Encrypted Local Outbox & Inbox**: Outbox queue and deduplicated inbox partitioned per Space in `EncryptedSpaceStore`.
+- [x] **Mock Transport Server & Client**: Local in-memory untrusted server with TTL auto-purge, failure simulation, database dump audit, and client retry manager.
+- [x] **Comprehensive Verification**: 10 new Phase 3 test suites (31 new tests, 132 total) passing with 100% success.
+- [x] **ADRs & Documentation**: Added ADR-015 through ADR-018; updated `METADATA_MODEL.md`, `PRIVACY.md`, `THREAT_MODEL.md`, `KNOWN_LIMITATIONS.md`.
 
 ---
 
 ## 3. Test Status
 
 - **Test Framework**: Vitest (v3.2.7)
-- **Total Test Files**: 14/14 passed
-- **Total Tests**: 101/101 passed (100% pass rate)
+- **Total Test Files**: 24/24 passed
+- **Total Tests**: 132/132 passed (100% pass rate)
 - **Failing Tests**: 0
-- **Duration**: ~4.87s
+- **Duration**: ~10.89s
 
 ---
 
 ## 4. Next Recommended Task
 
-Proceed to **Phase 3: Privacy-Preserving Untrusted Transport Interface** ([`prompts/PHASE_03.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_03.md)).
+Proceed to **Phase 4: End-to-End Encrypted 1-to-1 Messaging & Double Ratchet** ([`prompts/PHASE_04.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_04.md)).

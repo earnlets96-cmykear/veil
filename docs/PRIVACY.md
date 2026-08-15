@@ -35,15 +35,18 @@ graph TD
 - **Guarantee**: All local databases and keys are sealed inside Argon2id-derived encrypted envelopes. When locked, data is unreadable ciphertext. Memory buffers are zeroized upon lock or panic trigger.
 
 ### Layer 4: Metadata Privacy
-- **Protection Scope**: Communication social graphs, traffic frequency, and packet sizes.
-- **Guarantee**: Messages route through blind mailbox tokens (`HMAC-SHA256`). Plaintexts are padded to fixed-size blocks to prevent traffic analysis.
+- **Protection Scope**: Communication social graphs and payload sizes.
+- **Guarantee**: Messages route through opaque blind mailboxes (`mailboxId`). Envelopes are size-normalized into standard classes (512B, 2KB, 8KB, 32KB) with random padding. The server maintains zero social graph or user registry.
 
-### Layer 5: Network Privacy
-- **Protection Scope**: IP addresses, ISP tracking, network routing paths.
-- **Guarantee**: Transport logic is abstracted through `ITransportAdapter`. The client can route traffic over TLS WebSockets, Tor onion services, or mixnet proxies without changing the application core.
+### Layer 5: Network Privacy & Transport Decoupling
+- **Protection Scope**: Network routing paths and network address decoupling.
+- **Guarantee**: Transport logic is decoupled through `ITransportAdapter`. In direct TLS mode, the server observes the client's network address (IP); transport over onion routing or privacy proxies is supported via adapter configuration.
 
 ---
 
-## 3. Privacy Claims & Honesty
+## 3. Cryptographic Honesty & Explicit Limitations
 
-VEIL strictly avoids misleading marketing slogans such as "100% untraceable" or "military-grade absolute anonymity." All privacy guarantees are explicitly tied to verifiable cryptographic primitives and their documented threat boundaries.
+VEIL strictly avoids misleading marketing slogans such as "100% untraceable", "metadata-free", or "absolute anonymity."
+- **Content Encryption**: Protects message content from the transport infrastructure.
+- **IP Address Exposure**: Direct client-to-server TLS connections inherently expose the client's IP address to the server.
+- **Timing & Volume**: While size classes conceal exact message lengths, communication timing and message frequency remain observable to network observers without additional mixnet/delay layers.

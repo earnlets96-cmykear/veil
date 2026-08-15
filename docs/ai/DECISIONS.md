@@ -126,3 +126,47 @@ This document records all architectural decisions made across the VEIL project l
 - **Decision**: Document this as a known Phase 2 limitation. Multi-device identity management and clone detection belong to Phase 6.
 - **Reason**: Deterministic derivation is required for password-change identity preservation. Clone detection requires additional protocol mechanisms not yet designed.
 - **Consequences**: Two devices could impersonate the same identity. Phase 6 must address this with device-binding or identity versioning.
+
+---
+
+## ADR-015: Blind Mailbox Model with Server-Held SHA-256 Capability Verifiers
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: In Phase 3, we require a transport relay routing mechanism that does not maintain user accounts, user profiles, or social graphs on the server.
+- **Decision**: Mailboxes are identified by random 32-byte hex strings (`mailboxId`). Access is authorized via a 256-bit client-held capability secret. The server stores only `SHA-256(capability || "veil-v1-mailbox-auth")`.
+- **Reason**: The server cannot correlate mailboxes with user identities. A server database breach does not yield valid capability tokens to unauthorized parties.
+- **Consequences**: Clients must safeguard their capability tokens. Mailboxes are unlisted and impossible to enumerate.
+
+---
+
+## ADR-016: Standard Size Classes & Deterministic Length-Prefixed Padding
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Variable payload lengths reveal message types and conversation activity to network observers.
+- **Decision**: Enforce standard size classes (`SMALL`: 512B, `MEDIUM`: 2048B, `LARGE`: 8192B, `XLARGE`: 32768B) using 4-byte length-prefixed random padding before application-layer encryption.
+- **Reason**: Obscures message size and reduces traffic analysis signature.
+- **Consequences**: Slight bandwidth overhead for short messages; maximum single transport payload capped at 32,764 bytes (large files must be chunked in Phase 5).
+
+---
+
+## ADR-017: Encrypted Local Outbox and Deduplicated Inbox Partitioned per Space
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Network failures and retries must not result in lost messages or duplicate processing across Spaces.
+- **Decision**: Implement `EncryptedOutbox` and `EncryptedInbox` partitioned per Space in `EncryptedSpaceStore`. Envelopes carry a random `envelopeId` which the inbox registers in an encrypted `processed_ids` list.
+- **Reason**: Provides offline queueing and idempotent delivery while preserving strict cross-space cryptographic isolation.
+- **Consequences**: Space A cannot observe Space B's pending outbox or received inbox items.
+
+---
+
+## ADR-018: Decoupled Transport Adapter Pattern (ITransportAdapter)
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: We need a transport interface that supports local unit testing without cloud dependencies, while being extensible to WebSockets, HTTP, or privacy networks.
+- **Decision**: Define `ITransportAdapter` with concrete implementations `MockTransportServer` (for in-memory local testing) and future network adapters.
+- **Reason**: Decouples application logic from specific transport protocols. Zero paid cloud dependencies.
+

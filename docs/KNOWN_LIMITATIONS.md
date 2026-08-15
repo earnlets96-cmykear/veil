@@ -48,3 +48,17 @@ VEIL is committed to absolute engineering honesty. We document what VEIL does **
 
 - **Permanent Identity Binding**: A Space's identity is permanently bound to its SMK. There is currently no mechanism to rotate or revoke an identity key while preserving the Space. Identity rotation would require generating a new SMK and re-encrypting all Space data, which is not supported in Phase 2.
 - **Key Compromise**: If a Space's private signing or key agreement key is compromised, the only remediation is to create a new Space with a new identity and re-establish contacts.
+
+---
+
+## 8. Network Address (IP) Disclosure in Direct Connection Mode (Phase 3)
+
+- **Direct Socket Visibility**: When connecting directly to a VEIL relay server over standard HTTPS/TLS, the client's public IP address is visible to the relay server and intermediate network transit providers.
+- **No Inherent Anonymity**: VEIL application-layer encryption does not hide IP addresses unless routed through an external privacy network (e.g. Tor or I2P), which is an extensible adapter option but not the default direct transport.
+
+---
+
+## 9. Server-Side Deletion & TTL Retention Caveats (Phase 3)
+
+- **TTL Expiration vs Physical Server Deletion**: VEIL supports server-side envelope expiration (`expiresAt` TTL) and envelope deletion acknowledgments (`DELETE /envelopes/{id}`). However, VEIL cannot physically guarantee that a rogue, compromised, or subpoenaed server operator has not logged, snapshot, or backed up encrypted envelope blobs prior to expiration.
+- **Defense in Depth**: Because payload blobs are encrypted at the application layer before reaching the server, retained server ciphertext cannot be decrypted without client keys.

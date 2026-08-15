@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Phase 3] - 2026-08-15
+
+### Added
+- **Privacy-Preserving Untrusted Transport Interface**:
+  - `src/transport/types.ts`: Size classes (`SMALL`, `MEDIUM`, `LARGE`, `XLARGE`), `TransportEnvelope`, `MailboxCapability`, `ServerMailboxRecord`, `ITransportAdapter`.
+  - `src/transport/padding.ts`: Length-prefixed deterministic padding and safe unpadding.
+  - `src/transport/capability.ts`: Opaque `mailboxId` generation, 256-bit capability secrets, and `SHA-256(capability || tag)` verifier derivation.
+  - `src/transport/protection.ts`: Temporary Phase 3 authenticated transport protection.
+  - `src/transport/envelope.ts`: Version 1 transport envelope packaging, TTL calculation, and validation.
+  - `src/transport/outbox.ts`: `EncryptedOutbox` partitioned per Space in `EncryptedSpaceStore` with retry state.
+  - `src/transport/inbox.ts`: `EncryptedInbox` partitioned per Space with encrypted processed ID deduplication registry.
+  - `src/transport/server.ts`: `MockTransportServer` with capability verifier checks, TTL auto-purge, failure simulation, and database dump inspection.
+  - `src/transport/client.ts`: `TransportClient` coordinating outbox/inbox queues, retries, and offline mode.
+- **Architecture Decisions**: Documented `ADR-015` (blind mailbox model), `ADR-016` (size classes and padding), `ADR-017` (encrypted outbox/inbox), `ADR-018` (transport adapter pattern).
+- **Test Suites (10 new suites, 31 new tests, 132 total)**:
+  - `tests/transport-mailbox.test.ts`: Mailbox lifecycle, status queries, deletion.
+  - `tests/transport-authentication.test.ts`: Capability verification, wrong token rejection, verifier one-way hashing.
+  - `tests/transport-isolation.test.ts`: Main vs Private vs Decoy space transport isolation.
+  - `tests/transport-tampering.test.ts`: Payload ciphertext tampering, nonce tampering, malformed envelope rejection.
+  - `tests/transport-replay.test.ts`: Envelope replay detection, duplicate retry rejection, lock/unlock persistence.
+  - `tests/transport-padding.test.ts`: Size classes (512B, 2KB, 8KB, 32KB), boundary sizes, safe corruption handling.
+  - `tests/transport-expiration.test.ts`: Envelope TTL expiration, fetch auto-purge, global purge.
+  - `tests/transport-failure.test.ts`: Offline mode queueing, timeout resilience, recovery on reconnection.
+  - `tests/malicious-server.test.ts`: Corrupted server payload handling, truncated response handling.
+  - `tests/metadata-exposure.test.ts`: Server database dump audit (zero passwords, SMKs, private keys, or plaintexts).
+
+---
+
 ## [Phase 2] - 2026-08-15
 
 ### Added

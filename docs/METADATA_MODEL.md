@@ -2,45 +2,79 @@
 
 ## 1. The Metadata Problem
 
-In standard messaging platforms, even when message plaintexts are end-to-end encrypted, relay servers log vast amounts of sensitive communication metadata:
-- Who is speaking with whom (Social Graph)
+In standard centralized messaging platforms, even when message plaintexts are end-to-end encrypted, relay servers log vast amounts of sensitive communication metadata:
+- Who is speaking with whom (Social Graph / Contact Map)
 - Exact timestamps and frequency of messages
-- Message sizes and media attachment types
+- Exact message sizes and payload signatures
 - User IP addresses and physical device identifiers
 
-**VEIL is engineered to minimize all forms of communication metadata.**
+**VEIL is engineered to minimize all forms of communication metadata exposed to transport infrastructure.**
 
 ---
 
-## 2. Blind Mailbox Routing Scheme
+## 2. Server Knowledge Matrix (Phase 3 Verified Reality)
+
+The following table documents exactly what the transport server can and cannot observe in VEIL's Phase 3 implementation:
+
+| Data Field | Server Sees? | Required for Operation? | Reason / Mitigation |
+| :--- | :--- | :--- | :--- |
+| **Client IP Address** | **Yes** *(in direct mode)* | Yes (TCP/TLS transport) | Inherent to direct TCP connections. Privacy relays / mixnets deferred to future phases. |
+| **Connection Timestamp** | **Yes** | Yes (Transport) | Transport timing observable on TCP connect. |
+| **Destination Mailbox ID** | **Yes** | Yes (Blind delivery) | Opaque 32-byte hex ID. Unlinked to user identities, usernames, or public keys. |
+| **Capability Verifier** | **Yes** *(SHA-256 hash)* | Yes (Access control) | Server holds `SHA-256(cap || tag)`, never the client-held capability secret. |
+| **Payload Ciphertext** | **Yes** *(Opaque blob)* | Yes (Storage & routing) | Ciphertext encrypted at application layer. Server cannot decrypt. |
+| **Exact Message Size** | **No** *(Padded)* | No | Padded to fixed size classes (512B, 2KB, 8KB, 32KB). |
+| **Message Plaintext** | **NO** | Never | Application-layer encryption protects all content. |
+| **User Passwords / PINs** | **NO** | Never | Never transmitted over the wire. |
+| **Space Master Key (SMK)** | **NO** | Never | Remains sealed in volatile memory on device only. |
+| **Private Identity Keys** | **NO** | Never | Ed25519/X25519 private keys never leave the client. |
+| **Space Names / Types** | **NO** | Never | Local vault metadata only. |
+| **Contact Social Graph** | **NO** | Never | Server maintains no user accounts or contact relationships. |
+
+---
+
+## 3. Blind Mailbox Routing Scheme
 
 VEIL eliminates centralized user identifiers and user-indexed routing tables on the relay server.
 
 ```mermaid
 graph TD
-    Alice["Alice (Sender)"]
+    Alice["Alice (Sender Space)"]
     Relay["Untrusted VEIL Relay Server"]
-    Bob["Bob (Receiver)"]
+    Bob["Bob (Receiver Space)"]
     
-    Alice -->|"POST /messages/send<br/>{ mailboxToken, encryptedEnvelope }"| Relay
-    Relay -->|"WebSocket Deliver<br/>(matched mailboxToken)"| Bob
+    Alice -->|"POST /envelopes<br/>{ mailboxId, envelopeId, payload, sizeClass, TTL }"| Relay
+    Bob -->|"FETCH /envelopes<br/>(authenticated via Capability)"| Relay
+    Relay -->|"Deliver Opaque Envelopes"| Bob
+    Bob -->|"ACK /envelopes/{id}"| Relay
     
-    note["Relay Database contains:<br/>• Blind Mailbox Token (HMAC)<br/>• Encrypted Ciphertext Blob<br/>• Zero User IDs • Zero Social Graph"]
+    note["Relay Database contains:<br/>• Opaque Mailbox ID (32-byte Hex)<br/>• Capability Verifier (SHA-256)<br/>• Opaque Encrypted Blobs<br/>• ZERO User Accounts • ZERO Social Graph"]
     Relay --- note
 ```
 
-### Protocol Details
-1. **Rotating Mailbox Tokens**: A message is not sent to "Bob"; it is addressed to an ephemeral `mailboxToken` derived using HMAC over Bob's public prekey:
-   $$\text{MailboxToken} = \text{HMAC-SHA256}(\text{BobPrekeyPub}, \text{RatchetStepID})$$
-2. **Blind Storage**: The server stores messages indexed strictly by `mailboxToken`.
-3. **Zero Social Graph**: The server cannot correlate which `mailboxToken` belongs to which user or determine whether two mailboxes represent communication between the same pair of people.
+### Protocol Mechanics
+1. **Opaque Mailbox Identifiers**: Mailboxes are identified by random 32-byte hex strings (`mailboxId`). They are generated randomly using CSPRNG and are unlinked to email, phone numbers, or identity public keys.
+2. **Capability-Based Authentication**: Access to fetch or delete envelopes from a mailbox requires a 256-bit random capability secret. The server stores only `SHA-256(capability || "veil-v1-mailbox-auth")`.
+3. **Blind Storage**: The server stores messages indexed strictly by `mailboxId`.
+4. **Zero Social Graph**: The server cannot correlate which `mailboxId` belongs to which user or determine whether two mailboxes represent communication between the same pair of people.
 
 ---
 
-## 3. Packet Padding & Traffic Analysis Mitigation
+## 4. Size Normalization & Traffic Analysis Mitigation
 
-To prevent network observers and ISPs from deducing message types or conversation patterns from packet sizes:
+To prevent network observers and ISPs from deducing message types or conversation patterns from packet sizes, VEIL enforces **Standard Size Classes**:
 
-1. **Fixed-Size Message Padding**: All message plaintexts are padded to standard block increments (e.g. 128 bytes, 512 bytes, 2048 bytes) using PKCS#7 or ISO/IEC 7816-4 padding before encryption.
-2. **Uniform Media Blobs**: Encrypted media files are uploaded in chunked fixed-size blocks.
-3. **Transport Decoupling**: The transport layer (`ITransportAdapter`) allows traffic to flow over standard TLS WebSockets, Tor hidden services, or mixnet proxies without modifying application logic.
+| Size Class | Total Capacity | Typical Usage |
+| :--- | :--- | :--- |
+| `SMALL` | **512 bytes** | Text messages, short ACKs, typing heartbeats |
+| `MEDIUM` | **2,048 bytes** (2 KiB) | Longer text messages, small metadata envelopes |
+| `LARGE` | **8,192 bytes** (8 KiB) | Structured documents, prekey exchange bundles |
+| `XLARGE` | **32,768 bytes** (32 KiB) | Encrypted attachment thumbnails, chunks |
+
+All payloads are padded using deterministic length-prefixed random padding before transmission.
+
+---
+
+## 5. Replay Resistance & Deduplication
+
+Every transport envelope carries a random 16-byte `envelopeId`. Local client inboxes maintain an encrypted deduplication registry (`processed_ids`) to reject duplicate transmissions from network retries.
