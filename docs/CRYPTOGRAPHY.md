@@ -17,9 +17,11 @@ VEIL uses **selected established cryptographic primitives** from mature, widely 
 | **Password KDF** | **Argon2id** | `@noble/hashes` (v1.7.0) | RFC 9106 | Derives Space Key Encryption Key (KEK) from user password |
 | **Symmetric AEAD** | **XChaCha20-Poly1305** | `@noble/ciphers` (v2.3.0) | IETF draft-irtf-cfrg-xchacha | Encrypts and authenticates Space Master Key envelopes and partition store |
 | **Key Expansion** | **HKDF-SHA256** | `@noble/hashes` (v1.7.0) | RFC 5869 | Expands Space Master Key into domain-separated storage subkeys |
-| **Digital Signatures** | **Ed25519** | `@noble/curves` (v1.8.0) | RFC 8032 | Identity authentication, document self-signatures, and contact verification |
-| **Key Agreement (DH)**| **X25519** | `@noble/curves` (v1.8.0) | RFC 7748 | Ephemeral and long-term Diffie-Hellman key exchange |
-| **CSPRNG** | **WebCrypto API** | Native `crypto.getRandomValues` | W3C WebCrypto | Generates salts, nonces, and random Space Master Keys |
+| **Digital Signatures** | **Ed25519** | `@noble/curves` (v1.8.0) | RFC 8032 | Identity authentication, document self-signatures, SPK signing |
+| **Key Agreement (DH)**| **X25519** | `@noble/curves` (v1.8.0) | RFC 7748 | Ephemeral and long-term Diffie-Hellman, X3DH, DH ratchet steps |
+| **Double Ratchet KDF** | **HKDF-SHA256 & HMAC-SHA256** | `@noble/hashes` (v1.7.0) | Signal Double Ratchet Spec / RFC 5869 | Root key & symmetric chain key ratcheting for per-message keys |
+| **Initial Key Agreement** | **X3DH** | `@noble/curves` + `@noble/hashes` | Signal X3DH Specification | Asynchronous mutual authentication and session establishment |
+| **CSPRNG** | **WebCrypto API** | Native `crypto.getRandomValues` | W3C WebCrypto | Generates salts, nonces, ephemeral prekeys, and random SMKs |
 
 ---
 

@@ -2,36 +2,36 @@
 
 ## 1. Project Phase & Milestone
 
-- **Current Phase**: **PHASE 3: Privacy-Preserving Untrusted Transport Interface**
-- **Status**: Complete & Verified (132/132 automated tests passing across 24 suites)
+- **Current Phase**: **PHASE 4: End-to-End Encrypted 1-to-1 Messaging (Double Ratchet & X3DH)**
+- **Status**: Complete & Verified (147/147 automated tests passing across 34 suites)
 - **Current Branch**: `master`
 
 ---
 
-## 2. Completed Deliverables (Phase 3)
+## 2. Completed Deliverables (Phase 4)
 
-- [x] **Blind Mailbox Model**: Opaque 32-byte hex `mailboxId` unlinked from user identities or public keys.
-- [x] **Capability Authorization**: 256-bit client capability secrets verified against server-stored `SHA-256(capability || "veil-v1-mailbox-auth")` verifiers.
-- [x] **Size Classes & Padding**: Fixed size normalization (`SMALL`: 512B, `MEDIUM`: 2048B, `LARGE`: 8192B, `XLARGE`: 32768B) using length-prefixed CSPRNG padding.
-- [x] **Versioned Transport Envelope**: Structural packaging with `envelopeId`, `mailboxId`, `payload`, `sizeClass`, `createdAt`, `expiresAt`.
-- [x] **Phase 3 Transport Protection**: Temporary AEAD payload protection with padding.
-- [x] **Encrypted Local Outbox & Inbox**: Outbox queue and deduplicated inbox partitioned per Space in `EncryptedSpaceStore`.
-- [x] **Mock Transport Server & Client**: Local in-memory untrusted server with TTL auto-purge, failure simulation, database dump audit, and client retry manager.
-- [x] **Comprehensive Verification**: 10 new Phase 3 test suites (31 new tests, 132 total) passing with 100% success.
-- [x] **ADRs & Documentation**: Added ADR-015 through ADR-018; updated `METADATA_MODEL.md`, `PRIVACY.md`, `THREAT_MODEL.md`, `KNOWN_LIMITATIONS.md`.
+- [x] **Prekey Architecture**: Signed Prekeys (`SPK` signed by Ed25519 identity key) and One-Time Prekey (`OPK`) pools stored encrypted in `EncryptedSpaceStore`.
+- [x] **X3DH Asynchronous Key Agreement**: Extended Triple Diffie-Hellman handshake deriving 32-byte initial root secrets.
+- [x] **Double Ratchet State Machine**: Full Signal-compliant implementation with asymmetric X25519 DH ratchets and symmetric HMAC-SHA256 sending/receiving chains.
+- [x] **Out-of-Order & Skipped Message Handling**: Bounded skipped message key store (`MAX_SKIPPED_KEYS = 500`) with immediate single-use key zeroization and erasure.
+- [x] **Authenticated Message Headers**: AAD context binding on headers (`dhRatchetPub`, `sequenceNum`, `prevChainLength`, `x3dhHeader`).
+- [x] **Encrypted Session & Message Persistence**: `RatchetSessionStore` and `ConversationManager` encrypting session state and local message histories in `EncryptedSpaceStore`.
+- [x] **Full 1-to-1 Conversation Integration**: Seamless integration across Space Vault -> Identity -> X3DH -> Double Ratchet -> Outbox/Inbox -> Mock Transport Server -> Recipient Space.
+- [x] **Adversarial & Attack Verification**: 10 new Phase 4 test suites (15 new tests, 147 total) passing with 100% success.
+- [x] **ADRs & Documentation**: Added ADR-019 through ADR-022; updated `CRYPTOGRAPHY.md` and `KEY_HIERARCHY.md`.
 
 ---
 
 ## 3. Test Status
 
 - **Test Framework**: Vitest (v3.2.7)
-- **Total Test Files**: 24/24 passed
-- **Total Tests**: 132/132 passed (100% pass rate)
+- **Total Test Files**: 34/34 passed
+- **Total Tests**: 147/147 passed (100% pass rate)
 - **Failing Tests**: 0
-- **Duration**: ~10.89s
+- **Duration**: ~6.13s
 
 ---
 
 ## 4. Next Recommended Task
 
-Proceed to **Phase 4: End-to-End Encrypted 1-to-1 Messaging & Double Ratchet** ([`prompts/PHASE_04.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_04.md)).
+Proceed to **Phase 5: Encrypted Group Messaging & Encrypted Media** ([`prompts/PHASE_05.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_05.md)).

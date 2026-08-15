@@ -170,3 +170,55 @@ This document records all architectural decisions made across the VEIL project l
 - **Decision**: Define `ITransportAdapter` with concrete implementations `MockTransportServer` (for in-memory local testing) and future network adapters.
 - **Reason**: Decouples application logic from specific transport protocols. Zero paid cloud dependencies.
 
+---
+
+## ADR-019: X3DH Asynchronous Initial Key Agreement with Signed Prekeys
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: In Phase 4, we need an asynchronous, authenticated initial key agreement mechanism so that Alice can establish an encrypted session with Bob even if Bob is offline.
+- **Decision**: Implement the Extended Triple Diffie-Hellman (X3DH) protocol:
+  - Bob publishes a `PrekeyBundle` containing his `IdentityDocument`, an X25519 `SignedPrekey` (signed with his Ed25519 identity key), and optional `OneTimePrekeys`.
+  - Alice verifies the Signed Prekey signature and computes $DH_1 \parallel DH_2 \parallel DH_3 \ [\parallel DH_4]$ using an ephemeral keypair.
+  - Initial Double Ratchet root key is derived via `HKDF-SHA256(IKM, "veil-v1-x3dh-master")`.
+- **Reason**: Standard, mathematically proven asynchronous authenticated key exchange preventing MITM attacks.
+- **Consequences**: Bob can receive messages sent while offline; Signed Prekeys provide forward secrecy against long-term identity compromise.
+
+---
+
+## ADR-020: Standard Double Ratchet Protocol Implementation
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: 1-to-1 conversations require Forward Secrecy and Post-Compromise Security.
+- **Decision**: Implement the full Signal Double Ratchet specification:
+  - Asymmetric X25519 DH Ratchet with KDF-RK (`HKDF-SHA256(RK, DH, "veil-v1-ratchet-root")`).
+  - Symmetric Sending/Receiving chains with KDF-CK (`HMAC-SHA256`).
+  - Single-use ephemeral message keys zeroized immediately after encryption/decryption.
+  - AAD authentication binding message headers (`dhRatchetPub`, `sequenceNum`, `prevChainLength`) to ciphertext via XChaCha20-Poly1305.
+- **Reason**: Guarantees that past messages cannot be decrypted if current keys are compromised (Forward Secrecy), and future messages regain secrecy after a subsequent DH ratchet step (Break-in Recovery).
+- **Consequences**: Every message consumes a fresh message key. Replay attacks are cryptographically rejected.
+
+---
+
+## ADR-021: Bounded Skipped-Message-Key Store with Single-Use Key Erasure
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Out-of-order and delayed network packets must be decryptable without unbounded memory growth or denial-of-service risks.
+- **Decision**: Maintain a bounded skipped-message-key store (`MAX_SKIPPED_KEYS = 500`) indexed by `"dhRatchetPub:sequenceNum"`. When a skipped message arrives, it is decrypted and its key is immediately zeroized and permanently deleted from storage.
+- **Reason**: Supports out-of-order delivery while bounding RAM/storage and preventing message key reuse.
+- **Consequences**: Messages delayed beyond 500 skipped intervals or excessively old keys will fail to decrypt (fails safely).
+
+---
+
+## ADR-022: Encrypted Local Session and Message Persistence per Space
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Double Ratchet session states and message histories must survive application restarts and Space lock/unlock cycles.
+- **Decision**: Ratchet sessions (`RatchetSessionStore`) and message histories (`ConversationManager`) are encrypted at rest inside `EncryptedSpaceStore` under the active Space's `StorageKey`.
+- **Reason**: Preserves complete cryptographic isolation between Spaces on the same device.
+- **Consequences**: Space A cannot observe Space B's active conversations or message histories. When a Space locks, session keys are wiped from volatile memory.
+
+
