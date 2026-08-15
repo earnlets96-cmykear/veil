@@ -4,7 +4,39 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 20] - 2026-08-16
+
+### Added
+- **Live Production Deployment, Android Client & Cross-Platform Real-Device Validation**:
+  - Android native packaging with Capacitor configuration (`capacitor.config.ts`).
+  - Android application manifest (`android/app/src/main/AndroidManifest.xml`) with `allowBackup="false"`, `usesCleartextTraffic="false"`, and invitation deep links (`veil://invite/...`).
+  - Network security config (`android/app/src/main/res/xml/network_security_config.xml`) enforcing TLS 1.3.
+  - Live diagnostic tools:
+    - `scripts/live-health-check.mjs`: Live HTTP & WSS connectivity probe.
+    - `scripts/live-e2e-check.mjs`: Live 2-client E2EE messaging test.
+    - `scripts/android-release-check.mjs`: Android APK & Manifest security scanner.
+  - Operational & platform documentation:
+    - `docs/ANDROID_ARCHITECTURE.md`
+    - `docs/ANDROID_STORAGE.md`
+    - `docs/ANDROID_NETWORKING.md`
+    - `docs/ANDROID_LIFECYCLE.md`
+    - `docs/ANDROID_RELEASE.md`
+    - `docs/CROSS_PLATFORM_COMPATIBILITY.md`
+    - `docs/LIVE_DEPLOYMENT.md`
+    - `docs/REAL_DEVICE_TESTING.md`
+    - `docs/PHASE20_VALIDATION.md`
+  - Automated test suites:
+    - `tests/phase20-android-adapter.test.ts`
+    - `tests/phase20-cross-platform-protocol.test.ts`
+    - `tests/phase20-live-relay-smoke.test.ts`
+    - `tests/phase20-android-security.test.ts`
+  - Documented `ADR-096` through `ADR-100` in `docs/ai/DECISIONS.md`.
+  - 156 total test files with 338 tests passed 100%.
+
+---
+
 ## [1.0.0] - 2026-08-16 - GENERAL AVAILABILITY (GA)
+
 
 ### Added
 - **Final Release Engineering & General Availability (v1.0.0 GA)**:
