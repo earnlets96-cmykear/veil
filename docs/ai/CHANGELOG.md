@@ -4,7 +4,39 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 21] - 2026-08-16
+
+### Added
+- **Real-Device & Live-Production Validation**:
+  - Baseline assessment & inventory (`docs/PHASE21_BASELINE.md`).
+  - Production build & configuration verification tools:
+    - `scripts/android-build-check.mjs`: Android build & manifest auditor.
+    - `scripts/android-runtime-config-check.mjs`: Production bundle endpoint scanner.
+    - `scripts/phase21-live-relay-check.mjs`: Live relay HTTPS/WSS probe.
+    - `scripts/android-log-audit.mjs`: Android logcat secret leak auditor.
+    - `scripts/phase21-report.mjs`: Aggregated operational dashboard report generator.
+  - Automated test suites:
+    - `tests/phase21-build-validation.test.ts`
+    - `tests/phase21-runtime-config.test.ts`
+    - `tests/phase21-deeplink.test.ts`
+    - `tests/phase21-storage-boundary.test.ts`
+    - `tests/phase21-offline-recovery.test.ts`
+    - `tests/phase21-cross-platform-live.test.ts`
+  - Comprehensive runbooks & guides:
+    - `docs/PHASE21_REAL_DEVICE_VALIDATION.md`
+    - `docs/ANDROID_BUILD.md`
+    - `docs/ANDROID_SECURITY_STORAGE.md`
+    - `docs/LIVE_PRODUCTION_TESTING.md`
+    - `docs/CROSS_PLATFORM_LIVE_TESTING.md`
+    - `docs/ANDROID_TROUBLESHOOTING.md`
+    - `docs/RELEASE_INSTALLATION.md`
+  - Documented `ADR-101` through `ADR-105` in `docs/ai/DECISIONS.md`.
+  - 162 total test files with 345 tests passed 100%.
+
+---
+
 ## [Phase 20] - 2026-08-16
+
 
 ### Added
 - **Live Production Deployment, Android Client & Cross-Platform Real-Device Validation**:

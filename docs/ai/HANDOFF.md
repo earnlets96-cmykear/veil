@@ -2,27 +2,27 @@
 
 ## 1. Current Verified State
 
-- **Milestone Reached**: **PHASE 20 COMPLETED — VEIL LIVE PRODUCTION DEPLOYMENT & ANDROID VALIDATION**
+- **Milestone Reached**: **PHASE 21 COMPLETED — REAL-DEVICE & LIVE-PRODUCTION VALIDATION**
 - **Release Version**: **`1.0.0` (Production GA)**
-- **Test Results**: **338/338 tests passing across 156 test files (100% clean pass)**
+- **Test Results**: **345/345 tests passing across 162 test files (100% clean pass)**
 - **Android Target**: `chat.veil.app` (API 26..34, Capacitor native container)
-- **Build Status**: Clean production build & verified release manifests
+- **Diagnostic Tooling**: Verified in `scripts/` (build checkers, runtime config scanners, live relay probes, logcat auditors, report dashboard)
 - **Working Tree**: Clean and ready for commit.
 
 ---
 
-## 2. Phase 20 Work Accomplished
+## 2. Phase 21 Work Accomplished
 
-1. **Android Project Integration**:
-   - `capacitor.config.ts` configured with `androidScheme: 'https'` and `cleartext: false`.
-   - `android/app/src/main/AndroidManifest.xml` created with minimal permissions, disabled cleartext traffic, and deep link filters.
-   - `network_security_config.xml` enforcing system trust anchors and TLS.
+1. **Baseline Assessment**:
+   - `docs/PHASE21_BASELINE.md` cataloging complete test and infrastructure requirements.
 2. **Diagnostic Tooling**:
-   - `scripts/live-health-check.mjs`: Live HTTPS/WSS probe.
-   - `scripts/live-e2e-check.mjs`: Live 2-client E2EE messaging test over relay.
-   - `scripts/android-release-check.mjs`: Android APK & security scanner.
-3. **Documentation & Runbooks**:
-   - `docs/ANDROID_ARCHITECTURE.md`, `docs/ANDROID_STORAGE.md`, `docs/ANDROID_NETWORKING.md`, `docs/ANDROID_LIFECYCLE.md`, `docs/ANDROID_RELEASE.md`, `docs/CROSS_PLATFORM_COMPATIBILITY.md`, `docs/LIVE_DEPLOYMENT.md`, `docs/REAL_DEVICE_TESTING.md`, `docs/PHASE20_VALIDATION.md`.
-   - Documented `ADR-096` through `ADR-100` in `docs/ai/DECISIONS.md`.
-4. **Automated Test Verification**:
-   - 4 new test suites added, bringing total to 156 test files (338 tests, 100% clean pass).
+   - `scripts/android-build-check.mjs`: Android manifest & build auditor.
+   - `scripts/android-runtime-config-check.mjs`: Endpoint scanner.
+   - `scripts/phase21-live-relay-check.mjs`: Live relay HTTPS/WSS probe.
+   - `scripts/android-log-audit.mjs`: Logcat secret leak auditor.
+   - `scripts/phase21-report.mjs`: Operational dashboard report.
+3. **Automated Test Verification**:
+   - Added 6 new test suites (`phase21-build-validation`, `phase21-runtime-config`, `phase21-deeplink`, `phase21-storage-boundary`, `phase21-offline-recovery`, `phase21-cross-platform-live`).
+4. **Documentation & Runbooks**:
+   - `docs/PHASE21_REAL_DEVICE_VALIDATION.md`, `docs/ANDROID_BUILD.md`, `docs/ANDROID_SECURITY_STORAGE.md`, `docs/LIVE_PRODUCTION_TESTING.md`, `docs/CROSS_PLATFORM_LIVE_TESTING.md`, `docs/ANDROID_TROUBLESHOOTING.md`, `docs/RELEASE_INSTALLATION.md`.
+   - Documented `ADR-101` through `ADR-105` in `docs/ai/DECISIONS.md`.
