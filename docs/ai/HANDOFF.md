@@ -2,41 +2,41 @@
 
 ## 1. Current Verified State
 
-- **Phase Completed**: **PHASE 16: Final Production Validation, Performance Benchmarking & System Packaging**
-- **Project Status**: **ALL 16 PHASES (Phases 0 through 16) COMPLETE & VERIFIED**
-- **Release Version**: `v1.0.0-rc.1`
-- **Test Results**: **299/299 tests passing across 131 test files (100% clean pass)**
-- **Build Status**: Clean Vite + TypeScript build (`tsc && vite build` in 1.00s)
-- **Git Status**: Phase 16 implemented and ready for commit.
+- **Phase Completed**: **PHASE 17: Real-World Deployment, Production Integration, Security Validation & Release Hardening**
+- **Project Status**: **ALL 17 PHASES (Phases 0 through 17) FULLY COMPLETED & VERIFIED**
+- **Release Version**: `v1.0.0-rc.1` (Production Hardened)
+- **Test Results**: **315/315 tests passing across 141 test files (100% clean pass)**
+- **Build Status**: Clean Vite + TypeScript build (`tsc && vite build` in 1.05s)
+- **Deployment Templates**: Caddy, Nginx, Systemd, and Docker Compose configurations in `deployment/`
+- **Git Status**: Phase 17 ready for commit.
 
 ---
 
-## 2. Phase 16 Work Accomplished
+## 2. Phase 17 Work Accomplished
 
-1. **Standalone Relay Server CLI (`src/server/cli.ts`)**:
-   - Production runner with persistent storage directory configuration and graceful shutdown hooks (`npm run relay`).
-2. **Performance Benchmarking Suite (`tests/performance-benchmarks.test.ts`)**:
-   - Verified Argon2id key derivation, AEAD encryption/decryption throughput (> 1,000 ops/sec), chunked attachment throughput (> 10 MiB/sec), and in-memory local search latency (< 10ms for 1,000 items).
-3. **Comprehensive System E2E Orchestration (`tests/system-e2e-orchestration.test.ts`)**:
-   - Verified end-to-end integration across multi-Space isolation, credential-selected unlocking, signed invitation onboarding, Double Ratchet messaging, chunked attachment transfers, local search, and emergency Panic Lock.
-4. **Final Architecture Documentation**:
-   - `docs/SYSTEM_SUMMARY.md`: Technical specification covering all 16 phases.
-   - `README.md`: User guide, quickstart, self-hosting guide, cryptographic specifications, and architecture diagrams.
-   - Documented `ADR-079` and `ADR-080` in `docs/ai/DECISIONS.md`.
+1. **Self-Hosting & Deployment Packaging (`deployment/`)**:
+   - `Caddyfile.example`, `nginx/veil.conf.example`, `systemd/veil-relay.service.example`, `docker/Dockerfile`, `docker/docker-compose.yml`, `.env.example`, `README.md`.
+2. **10 Automated Test Suites (`tests/`)**:
+   - `tests/phase17-production-config.test.ts`
+   - `tests/phase17-real-relay-e2e.test.ts`
+   - `tests/phase17-restart-recovery.test.ts`
+   - `tests/phase17-failure-injection.test.ts`
+   - `tests/phase17-multispace-adversarial.test.ts`
+   - `tests/phase17-security-audit.test.ts`
+   - `tests/phase17-dependency-audit.test.ts`
+   - `tests/phase17-performance-realistic.test.ts`
+   - `tests/phase17-privacy-regression.test.ts`
+   - `tests/phase17-release-artifacts.test.ts`
+3. **Comprehensive Documentation (`docs/`)**:
+   - 10 operational and architectural documentation files created.
+   - `ADR-081` through `ADR-085` documented in `docs/ai/DECISIONS.md`.
+4. **Verified Quantitative Invariants**:
+   - 315 / 315 passing automated tests (100% pass rate).
+   - Zero plaintext leaks to logs or storage.
+   - 10-Space adversarial partition verified.
 
 ---
 
-## 3. Full Project Summary
+## 3. Project Status
 
-VEIL is a complete, production-grade, privacy-first messaging application featuring:
-- Multi-space cryptographic isolation & credential-selected unlocking
-- Plausible deniability with functional decoy Spaces
-- Signal-compliant Double Ratchet + X3DH 1-to-1 messaging
-- Group Tree Ratchet with post-compromise forward secrecy
-- Untrusted blind relay server with persistent mailbox storage
-- Client networking with offline encrypted queues and ACK-after-persistence
-- Ephemeral encrypted media attachments
-- In-memory local search and notification privacy modes
-- Instant Emergency Panic Lock
-- Complete React 19 UI styled with tokenized Vanilla CSS
-- 299 automated test suites with 100% pass rate.
+VEIL is a complete, production-hardened, self-hostable, multi-space cryptographic messaging application.

@@ -1,0 +1,33 @@
+[Unit]
+Description=VEIL Blind Relay Server Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=veil
+Group=veil
+WorkingDirectory=/opt/veil
+Environment=NODE_ENV=production
+Environment=RELAY_HOST=127.0.0.1
+Environment=RELAY_PORT=8787
+Environment=RELAY_STORAGE_DIR=/var/lib/veil/storage
+ExecStart=/usr/bin/npm run relay
+Restart=on-failure
+RestartSec=5s
+
+# Security Hardening & Sandboxing
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/veil/storage
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+MemoryDenyWriteExecute=true
+
+# Resource Limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

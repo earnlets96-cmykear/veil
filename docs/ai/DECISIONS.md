@@ -854,6 +854,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Enables trivial zero-cost self-hosting for individuals and organizations.
 - **Consequences**: Turnkey self-hosted relay deployment.
 
+---
+
+## ADR-081: Fail-Closed Production TLS and Runtime Environment Security Policy
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Inadvertent production configurations using plain HTTP or WS could expose blind mailboxes to network sniffers.
+- **Decision**: In `ConfigManager`, enforce fail-closed runtime validation throwing errors whenever unencrypted `http://` or `ws://` endpoints are provided in `production` environment mode.
+- **Reason**: Guarantees zero unencrypted transit traffic in production deployments.
+- **Consequences**: Strict, non-bypassable transport security.
+
+---
+
+## ADR-082: Upstream TLS Reverse Proxy Termination and Trust Boundary
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Running TLS termination directly inside Node.js introduces certificate management complexity and potential CPU overhead.
+- **Decision**: Recommend terminating TLS 1.3 upstream via Caddy or Nginx reverse proxies, running the relay server on `127.0.0.1:8787` behind strict firewall rules.
+- **Reason**: Standardizes enterprise-grade automatic TLS certificate renewal, rate-limiting, and hardened HTTP headers.
+- **Consequences**: Clean separation between transport layer security and blind relay logic.
+
+---
+
+## ADR-083: End-to-End Delivery Acknowledgment Only After Persistent Storage Commit
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Acknowledging relay envelopes before they are safely written to local encrypted IndexedDB could cause permanent message loss if the client crashes mid-delivery.
+- **Decision**: In `NetworkManager`, only transmit the `ack` command to the relay server *after* the received message envelope has been successfully written to `EncryptedSpaceStore`.
+- **Reason**: Guarantees zero message loss during unexpected client terminations or power outages.
+- **Consequences**: Bulletproof message delivery reliability.
+
+---
+
+## ADR-084: 10-Space Adversarial Cryptographic Independence Invariant
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Multi-space isolation must remain absolute even when a user creates dozens of Spaces on a single device.
+- **Decision**: Formally verify and require that all 10+ concurrent Spaces possess mathematically distinct salts, KEKs, SMKs, StorageKeys, and Ed25519/X25519 keypairs derived deterministically via unique Argon2id salts.
+- **Reason**: Prevents any mathematical correlation or cross-decryption across distinct user personas.
+- **Consequences**: Complete cryptographic partition across all Spaces.
+
+---
+
+## ADR-085: Zero-Telemetry and Zero-Third-Party Supply Chain Policy
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Third-party telemetry SDKs and analytics scripts are a major source of metadata leaks and supply-chain vulnerabilities in messaging apps.
+- **Decision**: Strictly prohibit all third-party telemetry, tracking, analytics, and closed-source dependencies in the VEIL codebase and production bundles.
+- **Reason**: Protects user privacy and eliminates supply-chain exfiltration vectors.
+- **Consequences**: Verifiable, 100% open-source, private application runtime.
+
+
 
 
 

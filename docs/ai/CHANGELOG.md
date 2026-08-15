@@ -4,7 +4,43 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 17] - 2026-08-15
+
+### Added
+- **Real-World Deployment, Production Integration, Security Validation & Release Hardening**:
+  - `deployment/Caddyfile.example`: Caddy reverse proxy template with automatic TLS 1.3 and WebSocket support.
+  - `deployment/nginx/veil.conf.example`: Nginx configuration with TLS 1.3, rate-limiting, and WebSocket upgrade.
+  - `deployment/systemd/veil-relay.service.example`: Sandboxed systemd service file with OS-level restrictions.
+  - `deployment/docker/Dockerfile` & `deployment/docker/docker-compose.yml`: Reproducible containerized relay packaging.
+  - `deployment/.env.example` & `deployment/README.md`: Exhaustive deployment variables and operations manual.
+  - Architecture and Operations Documentation:
+    - `docs/PHASE17_PRODUCTION_VALIDATION.md`
+    - `docs/DEPLOYMENT.md`
+    - `docs/SELF_HOSTING.md`
+    - `docs/SECURITY_AUDIT.md`
+    - `docs/FAILURE_MODES.md`
+    - `docs/COMPATIBILITY.md`
+    - `docs/PERFORMANCE.md`
+    - `docs/BACKUP_RECOVERY.md`
+    - `docs/PRIVACY_DATA_FLOW.md`
+    - `docs/RELEASE.md`
+  - Documented `ADR-081` through `ADR-085` in `docs/ai/DECISIONS.md`.
+  - 10 new test suites (315 total tests across 141 test files, 100% clean pass):
+    - `tests/phase17-production-config.test.ts`
+    - `tests/phase17-real-relay-e2e.test.ts`
+    - `tests/phase17-restart-recovery.test.ts`
+    - `tests/phase17-failure-injection.test.ts`
+    - `tests/phase17-multispace-adversarial.test.ts`
+    - `tests/phase17-security-audit.test.ts`
+    - `tests/phase17-dependency-audit.test.ts`
+    - `tests/phase17-performance-realistic.test.ts`
+    - `tests/phase17-privacy-regression.test.ts`
+    - `tests/phase17-release-artifacts.test.ts`
+
+---
+
 ## [Phase 16] - 2026-08-15
+
 
 ### Added
 - **Final Production Validation, Performance Benchmarking & System Packaging**:

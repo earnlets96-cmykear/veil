@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  veil-relay:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+    container_name: veil-relay
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      - NODE_ENV=production
+      - RELAY_HOST=0.0.0.0
+      - RELAY_PORT=8787
+      - RELAY_STORAGE_DIR=/data/relay
+      - RELAY_LOG_LEVEL=info
+    volumes:
+      - veil-relay-data:/data/relay
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  veil-relay-data:
+    driver: local
