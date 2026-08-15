@@ -5,7 +5,7 @@ import { FAST_TEST_KDF_PARAMS } from '../src/crypto/kdf.ts';
 import { bytesToBase64, base64ToBytes, randomBytes } from '../src/crypto/utils.ts';
 import type { SpaceHeaderEnvelope } from '../types/index.ts';
 
-describe('VEIL Phase 1: Tampering & Corruption Adversarial Tests', () => {
+describe('VEIL Phase 1: Tampering, Corruption & AAD Adversarial Tests', () => {
   let vault: SpaceVaultManager;
 
   beforeEach(() => {
@@ -61,6 +61,58 @@ describe('VEIL Phase 1: Tampering & Corruption Adversarial Tests', () => {
     });
   });
 
+  describe('AAD Context Binding & Transplantation Attack Tests', () => {
+    it('AAD ATTACK: Transplanting encryptedMasterKey from Space A into Space B envelope must fail due to AAD mismatch', () => {
+      const envA = vault.createSpace({
+        name: 'Space A',
+        password: 'IdenticalPassword123',
+        kdfParams: FAST_TEST_KDF_PARAMS,
+      });
+
+      const envB = vault.createSpace({
+        name: 'Space B',
+        password: 'IdenticalPassword123',
+        kdfParams: FAST_TEST_KDF_PARAMS,
+      });
+
+      // Transplant Space A's ciphertext into Space B's envelope (same password, but different spaceId & salt in AAD)
+      const transplantedEnv: SpaceHeaderEnvelope = {
+        ...envB,
+        encryptedMasterKey: {
+          ...envA.encryptedMasterKey,
+        },
+      };
+
+      const attackVault = new SpaceVaultManager();
+      attackVault.registerEnvelope(transplantedEnv);
+
+      // Attempt unlock -> MUST FAIL because AAD bound to Space A's ID and salt does not match Space B
+      expect(() => attackVault.unlockSpace('IdenticalPassword123')).toThrow(
+        'Unable to unlock Space: invalid credentials or corrupted envelope'
+      );
+    });
+
+    it('AAD ATTACK: Altering spaceId in an otherwise valid envelope fails AAD verification', () => {
+      const env = vault.createSpace({
+        name: 'Space Original',
+        password: 'Password123',
+        kdfParams: FAST_TEST_KDF_PARAMS,
+      });
+
+      const alteredEnv: SpaceHeaderEnvelope = {
+        ...env,
+        spaceId: 'different-uuid-space-999',
+      };
+
+      const attackVault = new SpaceVaultManager();
+      attackVault.registerEnvelope(alteredEnv);
+
+      expect(() => attackVault.unlockSpace('Password123')).toThrow(
+        'Unable to unlock Space: invalid credentials or corrupted envelope'
+      );
+    });
+  });
+
   describe('Cryptographic Envelope Tampering Tests', () => {
     let validEnv: SpaceHeaderEnvelope;
 
@@ -112,7 +164,7 @@ describe('VEIL Phase 1: Tampering & Corruption Adversarial Tests', () => {
       );
     });
 
-    it('TAMPER TEST: Modifying salt causes KDF derivation mismatch and unlock rejection', () => {
+    it('TAMPER TEST: Modifying salt causes KDF derivation and AAD mismatch', () => {
       const saltBytes = base64ToBytes(validEnv.kdfParams.salt);
       saltBytes[5] ^= 0xaa; // Corrupt salt
 

@@ -1,5 +1,5 @@
 /**
- * Space Header Envelope Serializer and Validator for VEIL.
+ * Space Header Envelope Serializer, Validator, and AAD Binder for VEIL.
  */
 
 import type { SpaceHeaderEnvelope } from '../types/index.ts';
@@ -7,6 +7,27 @@ import { base64ToBytes } from '../crypto/utils.ts';
 import { XCHACHA20_NONCE_LENGTH, POLY1305_TAG_LENGTH } from '../crypto/aead.ts';
 
 export const CURRENT_ENVELOPE_VERSION = 1;
+export const PROTOCOL_IDENTIFIER = 'VEIL-v1';
+
+/**
+ * Computes canonical Authenticated Associated Data (AAD) for a Space Header Envelope.
+ * Cryptographically binds the envelope context to prevent ciphertext transplantation attacks.
+ *
+ * @param spaceId Space UUID identifier
+ * @param version Format version (number)
+ * @param algorithm Encryption algorithm string (e.g. 'XChaCha20-Poly1305')
+ * @param salt Base64 encoded KDF salt
+ * @returns Canonical AAD byte array
+ */
+export function computeEnvelopeAad(
+  spaceId: string,
+  version: number,
+  algorithm: string,
+  salt: string
+): Uint8Array {
+  const aadString = `${PROTOCOL_IDENTIFIER}|version:${version}|spaceId:${spaceId}|alg:${algorithm}|salt:${salt}`;
+  return new TextEncoder().encode(aadString);
+}
 
 /**
  * Validates the schema and structure of a SpaceHeaderEnvelope.

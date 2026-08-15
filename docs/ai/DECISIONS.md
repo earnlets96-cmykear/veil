@@ -9,11 +9,8 @@ This document records all architectural decisions made across the VEIL project l
 - **Date**: 2026-08-15
 - **Status**: Accepted
 - **Context**: VEIL allows users to operate multiple Spaces (e.g. Main Space, Work Space, Private Space) within a single client application. We must decide whether Spaces share a single root identity with multiple UI profiles or maintain independent cryptographic identities.
-- **Decision**: Each Space generates and maintains completely independent Ed25519 (signing) and X25519 (Diffie-Hellman) keypairs. A Space's public identity is mathematically unrelated to any other Space's public identity.
+- **Decision**: Each Space generates and maintains completely independent Ed25519 (signing) and X25519 (Diffie-Hellman) keypairs (Phase 2). A Space's public identity is mathematically unrelated to any other Space's public identity.
 - **Reason**: Sharing a single root identity or master key between Spaces would allow network observers or compromised relays to correlate contacts and activities across Spaces.
-- **Alternatives Considered**:
-  - *Single Root Identity with Sub-keys*: Rejected because an attacker with access to the root key or server metadata could correlate all sub-identities.
-  - *UI-only profile switching*: Rejected as it provides zero cryptographic isolation.
 - **Consequences**: Adding a contact or sending a message in Space A exposes only Identity A. Identity B remains completely hidden.
 
 ---
@@ -28,9 +25,6 @@ This document records all architectural decisions made across the VEIL project l
   - The SMK is sealed inside an encrypted envelope using XChaCha20-Poly1305 with a Key Encryption Key (KEK) derived via Argon2id (`timeCost: 3, memoryCost: 65536 KiB, parallelism: 1`) using a unique, random 32-byte salt per Space.
   - At unlock time, the entered password derives candidate KEKs against each Space salt. Only the envelope with matching authentication tag decrypts and loads the SMK into volatile memory.
 - **Reason**: Argon2id provides state-of-the-art resistance against GPU/ASIC cracking. Envelope encryption allows changing passwords or rotating keys without re-encrypting the entire Space database.
-- **Alternatives Considered**:
-  - *PBKDF2/scrypt*: Rejected because Argon2id has superior resistance against memory-hard side-channel and ASIC attacks.
-  - *Direct password-derived storage key*: Rejected because changing a password would require re-encrypting gigabytes of messages and media.
 - **Consequences**: Unlocking Space A has zero mathematical ability to decrypt Space B's envelope. If a wrong password is typed or a decoy password is entered, only the corresponding Space (or Decoy Space) opens.
 
 ---
@@ -117,7 +111,30 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: The Space Master Key (SMK) must securely derive independent subkeys for storage encryption, identity signing, ratchet prekeys, and media storage.
-- **Decision**: Implemented HKDF-SHA256 (RFC 5869) with explicit domain tags (`"veil-v1-storage-key"`, `"veil-v1-identity-seed"`, `"veil-v1-prekey-seed"`, `"veil-v1-media-key"`).
+- **Context**: The Space Master Key (SMK) must securely derive subkeys for storage encryption, and future ratchet/identity subkeys.
+- **Decision**: Implemented HKDF-SHA256 (RFC 5869) with explicit domain tags (`"veil-v1-storage-key"`). Identity keys are strictly deferred to Phase 2.
 - **Reason**: Strict cryptographic domain separation guarantees that compromise of a subkey does not compromise the master key or other sibling subkeys.
 - **Consequences**: Clean separation of cryptographic responsibilities across subsystems.
+
+---
+
+## ADR-010: AEAD Authenticated Associated Data (AAD) Envelope Binding
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Prevent ciphertext transplantation attacks where an adversary moves valid SMK ciphertext into a different Space envelope or tampers with unencrypted envelope metadata (such as `spaceId`, `version`, or `salt`).
+- **Decision**: Formally bind envelope metadata via AEAD Associated Data during encryption and decryption:
+  `AAD = "VEIL-v1|version:1|spaceId:<id>|alg:XChaCha20-Poly1305|salt:<salt>"`
+- **Reason**: Guarantees that ciphertext cannot be reused in another Space or format context without triggering immediate authentication failure.
+- **Consequences**: Strong contextual binding for all stored envelopes.
+
+---
+
+## ADR-011: Phase 1 Space Discovery & Identifier Model
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Unlocking a Space can either target a known `spaceId` ($O(1)$) or scan candidate envelopes ($O(N)$ Argon2id operations).
+- **Decision**: Support both targeted unlock `unlockSpace(password, spaceId)` and discovery unlock `unlockSpace(password)`. Explicitly document that in Phase 1, the `spaceId` and Space names are local metadata and do not provide anonymous discovery guarantees.
+- **Reason**: Maximizes performance during standard app operations while maintaining prototype flexibility for multi-space credential selection.
+- **Consequences**: Clear performance predictability and explicit security limitation documentation.

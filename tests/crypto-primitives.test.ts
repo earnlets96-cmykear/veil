@@ -9,13 +9,10 @@ import {
 import {
   deriveSubkey,
   deriveStorageKey,
-  deriveIdentitySeed,
   DOMAIN_STORAGE,
-  DOMAIN_IDENTITY,
 } from '../src/crypto/hkdf.ts';
 import {
   randomBytes,
-  bytesToHex,
   constantTimeEquals,
 } from '../src/crypto/utils.ts';
 import { zeroize, withSecureBuffer } from '../src/crypto/memory.ts';
@@ -76,14 +73,14 @@ describe('VEIL Phase 1: Cryptographic Primitives Unit Tests', () => {
     it('should support authenticated associated data (AAD)', () => {
       const key = randomBytes(32);
       const message = 'Authenticated data payload';
-      const aad = new TextEncoder().encode('spaceId:space-12345');
+      const aad = new TextEncoder().encode('VEIL-v1|spaceId:space-12345');
 
       const { nonce, ciphertext } = encryptXChaCha20Poly1305(key, message, aad);
       const decrypted = decryptXChaCha20Poly1305(key, nonce, ciphertext, aad);
       expect(new TextDecoder().decode(decrypted)).toBe(message);
 
       // Decryption with mismatched AAD must fail
-      const wrongAad = new TextEncoder().encode('spaceId:space-wrong');
+      const wrongAad = new TextEncoder().encode('VEIL-v1|spaceId:space-wrong');
       expect(() => decryptXChaCha20Poly1305(key, nonce, ciphertext, wrongAad)).toThrow(
         'Decryption failed: corrupted ciphertext or authentication tag mismatch'
       );
@@ -130,16 +127,11 @@ describe('VEIL Phase 1: Cryptographic Primitives Unit Tests', () => {
       const smk = randomBytes(32);
 
       const storageKey = deriveStorageKey(smk);
-      const identitySeed = deriveIdentitySeed(smk);
       const customSubkey = deriveSubkey(smk, 'veil-v1-custom-domain');
 
       expect(storageKey.length).toBe(32);
-      expect(identitySeed.length).toBe(32);
       expect(customSubkey.length).toBe(32);
-
-      expect(constantTimeEquals(storageKey, identitySeed)).toBe(false);
       expect(constantTimeEquals(storageKey, customSubkey)).toBe(false);
-      expect(constantTimeEquals(identitySeed, customSubkey)).toBe(false);
     });
 
     it('should produce identical subkeys for identical master key and domain info', () => {

@@ -37,12 +37,8 @@ describe('VEIL Phase 1: Multi-Space Cryptographic Isolation & Cross-Space Attack
       const mainStorageKey = mainSession.getStorageKey();
       const privateStorageKey = privateSession.getStorageKey();
 
-      const mainIdentitySeed = mainSession.getIdentitySeed();
-      const privateIdentitySeed = privateSession.getIdentitySeed();
-
-      // Storage keys and identity seeds must be mathematically distinct
+      // Storage keys must be mathematically distinct
       expect(constantTimeEquals(mainStorageKey, privateStorageKey)).toBe(false);
-      expect(constantTimeEquals(mainIdentitySeed, privateIdentitySeed)).toBe(false);
     });
   });
 

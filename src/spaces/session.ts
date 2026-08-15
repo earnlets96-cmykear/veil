@@ -4,7 +4,7 @@
  */
 
 import { zeroize } from '../crypto/memory.ts';
-import { deriveStorageKey, deriveIdentitySeed } from '../crypto/hkdf.ts';
+import { deriveStorageKey } from '../crypto/hkdf.ts';
 
 export class SpaceSession {
   public readonly spaceId: string;
@@ -13,7 +13,6 @@ export class SpaceSession {
 
   private masterKey: Uint8Array | null;
   private storageKey: Uint8Array | null;
-  private identitySeed: Uint8Array | null;
   private active = true;
 
   constructor(spaceId: string, name: string, isDecoy: boolean, masterKey: Uint8Array) {
@@ -28,7 +27,6 @@ export class SpaceSession {
     // Clone master key into session-scoped buffer
     this.masterKey = new Uint8Array(masterKey);
     this.storageKey = deriveStorageKey(this.masterKey);
-    this.identitySeed = deriveIdentitySeed(this.masterKey);
   }
 
   /**
@@ -48,15 +46,6 @@ export class SpaceSession {
   }
 
   /**
-   * Returns a reference to the active identity seed.
-   * Throws if the session has been locked or destroyed.
-   */
-  public getIdentitySeed(): Uint8Array {
-    this.assertActive();
-    return this.identitySeed!;
-  }
-
-  /**
    * Closes the session and wipes all key material from memory.
    */
   public destroy(): void {
@@ -67,10 +56,6 @@ export class SpaceSession {
     if (this.storageKey) {
       zeroize(this.storageKey);
       this.storageKey = null;
-    }
-    if (this.identitySeed) {
-      zeroize(this.identitySeed);
-      this.identitySeed = null;
     }
     this.active = false;
   }

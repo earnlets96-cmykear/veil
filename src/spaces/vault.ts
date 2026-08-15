@@ -1,15 +1,15 @@
 /**
  * Space Vault Manager for VEIL.
  * Implements Multi-Space management, credential-selected unlocking,
- * envelope wrapping, and cryptographic isolation.
+ * authenticated envelope wrapping (with AAD binding), and cryptographic isolation.
  */
 
 import { randomBytes, bytesToBase64, base64ToBytes } from '../crypto/utils.ts';
-import { zeroize, withSecureBuffer } from '../crypto/memory.ts';
+import { zeroize } from '../crypto/memory.ts';
 import { deriveKeyArgon2id, DEFAULT_KDF_PARAMS } from '../crypto/kdf.ts';
 import { encryptXChaCha20Poly1305, decryptXChaCha20Poly1305 } from '../crypto/aead.ts';
 import { SpaceSession } from './session.ts';
-import { validateSpaceEnvelope, CURRENT_ENVELOPE_VERSION } from './envelope.ts';
+import { validateSpaceEnvelope, computeEnvelopeAad, CURRENT_ENVELOPE_VERSION } from './envelope.ts';
 import type { SpaceHeaderEnvelope, KdfParameters } from '../types/index.ts';
 
 export interface CreateSpaceOptions {
@@ -48,7 +48,8 @@ export class SpaceVaultManager {
 
   /**
    * Creates a new Space, generates an independent random Space Master Key (SMK),
-   * derives an Argon2id KEK, seals the SMK inside an encrypted envelope, and registers it.
+   * derives an Argon2id KEK, seals the SMK inside an encrypted envelope with AAD metadata binding,
+   * and registers the envelope.
    */
   public createSpace(options: CreateSpaceOptions): SpaceHeaderEnvelope {
     const { name, password, isDecoy = false, kdfParams, spaceId = crypto.randomUUID() } = options;
@@ -81,8 +82,16 @@ export class SpaceVaultManager {
       // 3. Derive KEK via Argon2id
       kek = deriveKeyArgon2id(password, saltBytes, activeKdfParams);
 
-      // 4. Encrypt and authenticate SMK with KEK using XChaCha20-Poly1305
-      const { nonce, ciphertext } = encryptXChaCha20Poly1305(kek, smk);
+      // 4. Compute canonical AAD binding envelope context
+      const aad = computeEnvelopeAad(
+        spaceId,
+        CURRENT_ENVELOPE_VERSION,
+        'XChaCha20-Poly1305',
+        saltBase64
+      );
+
+      // 5. Encrypt and authenticate SMK with KEK using XChaCha20-Poly1305 + AAD
+      const { nonce, ciphertext } = encryptXChaCha20Poly1305(kek, smk, aad);
 
       const envelope: SpaceHeaderEnvelope = {
         spaceId,
@@ -110,19 +119,30 @@ export class SpaceVaultManager {
   }
 
   /**
-   * Unlocks a Space using credential-selected unlocking.
-   * Scans candidate envelopes, derives KEK for each salt, attempts AEAD decryption,
-   * and loads the matching Space into an active SpaceSession.
+   * Unlocks a Space.
+   * - If `spaceId` is provided: targeted single-envelope unlock (1 Argon2id derivation).
+   * - If `spaceId` is omitted: scans registered candidate envelopes (Phase 1 prototype discovery).
    *
+   * @param password The unlock credential
+   * @param targetSpaceId Optional spaceId to target specific envelope directly
+   * @returns Active unlocked SpaceSession
    * @throws Generic error on invalid password or missing matching envelope
    */
-  public unlockSpace(password: string): SpaceSession {
+  public unlockSpace(password: string, targetSpaceId?: string): SpaceSession {
     if (!password || password.length === 0) {
       throw new Error('Unable to unlock Space: empty password');
     }
 
+    const candidateEnvelopes = targetSpaceId
+      ? (this.envelopes.has(targetSpaceId) ? [this.envelopes.get(targetSpaceId)!] : [])
+      : Array.from(this.envelopes.values());
+
+    if (candidateEnvelopes.length === 0) {
+      throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
+    }
+
     // Try candidate envelopes
-    for (const envelope of this.envelopes.values()) {
+    for (const envelope of candidateEnvelopes) {
       let candidateKek: Uint8Array | null = null;
       let decryptedSmk: Uint8Array | null = null;
 
@@ -133,8 +153,16 @@ export class SpaceVaultManager {
         const nonceBytes = base64ToBytes(envelope.encryptedMasterKey.nonce);
         const ciphertextBytes = base64ToBytes(envelope.encryptedMasterKey.ciphertext);
 
-        // Attempt authenticated decryption
-        decryptedSmk = decryptXChaCha20Poly1305(candidateKek, nonceBytes, ciphertextBytes);
+        // Compute canonical AAD to verify context binding
+        const aad = computeEnvelopeAad(
+          envelope.spaceId,
+          envelope.version,
+          envelope.encryptedMasterKey.algorithm,
+          envelope.kdfParams.salt
+        );
+
+        // Attempt authenticated decryption with AAD
+        decryptedSmk = decryptXChaCha20Poly1305(candidateKek, nonceBytes, ciphertextBytes, aad);
 
         // Success: create active session
         const session = new SpaceSession(
@@ -192,8 +220,9 @@ export class SpaceVaultManager {
   }
 
   /**
-   * Changes the password for a Space without re-encrypting underlying database records.
-   * Unwraps the existing SMK with oldPassword and re-encrypts under newPassword with a fresh salt.
+   * Transactional, crash-safe password change.
+   * Unwraps the existing SMK with oldPassword and re-encrypts under newPassword with fresh salt and AAD.
+   * Atomically commits only after full validation. If any error occurs, existing envelope remains untouched.
    */
   public changePassword(
     spaceId: string,
@@ -210,18 +239,26 @@ export class SpaceVaultManager {
     let smk: Uint8Array | null = null;
     let newKek: Uint8Array | null = null;
     const newSaltBytes = randomBytes(32);
+    const newSaltBase64 = bytesToBase64(newSaltBytes);
 
     try {
-      // 1. Recover SMK using old password
+      // 1. Recover SMK using old password and old AAD
       oldKek = deriveKeyArgon2id(oldPassword, envelope.kdfParams.salt, envelope.kdfParams);
       const oldNonce = base64ToBytes(envelope.encryptedMasterKey.nonce);
       const oldCiphertext = base64ToBytes(envelope.encryptedMasterKey.ciphertext);
-      smk = decryptXChaCha20Poly1305(oldKek, oldNonce, oldCiphertext);
+      const oldAad = computeEnvelopeAad(
+        envelope.spaceId,
+        envelope.version,
+        envelope.encryptedMasterKey.algorithm,
+        envelope.kdfParams.salt
+      );
+
+      smk = decryptXChaCha20Poly1305(oldKek, oldNonce, oldCiphertext, oldAad);
 
       // 2. Derive new KEK with fresh salt
       const updatedKdfParams: KdfParameters = {
         algorithm: 'argon2id',
-        salt: bytesToBase64(newSaltBytes),
+        salt: newSaltBase64,
         timeCost: newKdfParams?.timeCost ?? envelope.kdfParams.timeCost,
         memoryCost: newKdfParams?.memoryCost ?? envelope.kdfParams.memoryCost,
         parallelism: newKdfParams?.parallelism ?? envelope.kdfParams.parallelism,
@@ -230,10 +267,18 @@ export class SpaceVaultManager {
 
       newKek = deriveKeyArgon2id(newPassword, newSaltBytes, updatedKdfParams);
 
-      // 3. Re-encrypt existing SMK with new KEK and fresh random nonce
-      const { nonce: newNonce, ciphertext: newCiphertext } = encryptXChaCha20Poly1305(newKek, smk);
+      // 3. Compute new canonical AAD
+      const newAad = computeEnvelopeAad(
+        envelope.spaceId,
+        envelope.version,
+        'XChaCha20-Poly1305',
+        newSaltBase64
+      );
 
-      const updatedEnvelope: SpaceHeaderEnvelope = {
+      // 4. Re-encrypt existing SMK with new KEK, fresh nonce, and new AAD
+      const { nonce: newNonce, ciphertext: newCiphertext } = encryptXChaCha20Poly1305(newKek, smk, newAad);
+
+      const candidateEnvelope: SpaceHeaderEnvelope = {
         ...envelope,
         kdfParams: updatedKdfParams,
         encryptedMasterKey: {
@@ -243,9 +288,12 @@ export class SpaceVaultManager {
         },
       };
 
-      validateSpaceEnvelope(updatedEnvelope);
-      this.envelopes.set(spaceId, updatedEnvelope);
-      return updatedEnvelope;
+      // 5. Pre-validate candidate envelope before committing
+      validateSpaceEnvelope(candidateEnvelope);
+
+      // 6. Atomic commit
+      this.envelopes.set(spaceId, candidateEnvelope);
+      return candidateEnvelope;
     } catch (_err) {
       throw new Error('Failed to change password: invalid current credentials');
     } finally {

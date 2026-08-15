@@ -11,7 +11,7 @@ describe('VEIL Phase 1: SpaceVaultManager Lifecycle Tests', () => {
   });
 
   describe('Space Creation & Credential-Selected Unlocking', () => {
-    it('should create and unlock multiple distinct Spaces with different passwords', () => {
+    it('should create and unlock multiple distinct Spaces with different passwords (discovery & targeted)', () => {
       const mainEnv = vault.createSpace({
         name: 'Main Space',
         password: 'MainPassword123!',
@@ -33,20 +33,20 @@ describe('VEIL Phase 1: SpaceVaultManager Lifecycle Tests', () => {
 
       expect(vault.listEnvelopes().length).toBe(3);
 
-      // 1. Unlock Main Space
+      // 1. Discovery Unlock Main Space (omitting spaceId)
       const mainSession = vault.unlockSpace('MainPassword123!');
       expect(mainSession.spaceId).toBe(mainEnv.spaceId);
       expect(mainSession.name).toBe('Main Space');
       expect(mainSession.isDecoy).toBe(false);
       expect(mainSession.isActive()).toBe(true);
 
-      // 2. Unlock Private Space
-      const privateSession = vault.unlockSpace('PrivatePassword456!');
+      // 2. Targeted Unlock Private Space (providing spaceId for O(1) derivation)
+      const privateSession = vault.unlockSpace('PrivatePassword456!', privateEnv.spaceId);
       expect(privateSession.spaceId).toBe(privateEnv.spaceId);
       expect(privateSession.name).toBe('Private Space');
 
-      // 3. Unlock Decoy Space
-      const decoySession = vault.unlockSpace('DecoyPassword789!');
+      // 3. Targeted Unlock Decoy Space
+      const decoySession = vault.unlockSpace('DecoyPassword789!', decoyEnv.spaceId);
       expect(decoySession.spaceId).toBe(decoyEnv.spaceId);
       expect(decoySession.name).toBe('Decoy Space');
       expect(decoySession.isDecoy).toBe(true);
@@ -60,6 +60,18 @@ describe('VEIL Phase 1: SpaceVaultManager Lifecycle Tests', () => {
       });
 
       expect(() => vault.unlockSpace('WrongPassword999!')).toThrow(
+        'Unable to unlock Space: invalid credentials or corrupted envelope'
+      );
+    });
+
+    it('should reject wrong password on targeted spaceId unlock', () => {
+      const env = vault.createSpace({
+        name: 'Target Space',
+        password: 'RightPassword',
+        kdfParams: FAST_TEST_KDF_PARAMS,
+      });
+
+      expect(() => vault.unlockSpace('WrongPassword', env.spaceId)).toThrow(
         'Unable to unlock Space: invalid credentials or corrupted envelope'
       );
     });
@@ -87,7 +99,6 @@ describe('VEIL Phase 1: SpaceVaultManager Lifecycle Tests', () => {
       expect(session.isActive()).toBe(false);
       expect(vault.getActiveSession(env.spaceId)).toBeUndefined();
       expect(() => session.getStorageKey()).toThrow(/locked or destroyed/);
-      expect(() => session.getIdentitySeed()).toThrow(/locked or destroyed/);
     });
 
     it('should lock all active sessions upon lockAll()', () => {
@@ -109,8 +120,8 @@ describe('VEIL Phase 1: SpaceVaultManager Lifecycle Tests', () => {
     });
   });
 
-  describe('Password Change Protocol', () => {
-    it('should rewrap SMK under new KEK with a fresh salt and reject old password', () => {
+  describe('Transactional, Crash-Safe Password Change', () => {
+    it('should rewrap SMK under new KEK with a fresh salt/AAD and reject old password', () => {
       const env = vault.createSpace({
         name: 'Secure Space',
         password: 'OriginalPassword123!',
@@ -144,16 +155,27 @@ describe('VEIL Phase 1: SpaceVaultManager Lifecycle Tests', () => {
       expect(constantTimeEquals(session2.getStorageKey(), originalStorageKey)).toBe(true);
     });
 
-    it('should fail password change if old password is wrong', () => {
+    it('CRASH-SAFE ROLLBACK: should leave original envelope intact if password change fails', () => {
       const env = vault.createSpace({
-        name: 'Space X',
-        password: 'CorrectPassword',
+        name: 'Rollback Space',
+        password: 'ValidInitialPassword',
         kdfParams: FAST_TEST_KDF_PARAMS,
       });
 
+      const initialEnvelopeSnapshot = JSON.stringify(vault.getEnvelope(env.spaceId));
+
+      // Attempt password change with wrong old password -> must throw
       expect(() =>
-        vault.changePassword(env.spaceId, 'IncorrectOldPassword', 'NewPassword', FAST_TEST_KDF_PARAMS)
+        vault.changePassword(env.spaceId, 'WrongCurrentPassword', 'NewPassword', FAST_TEST_KDF_PARAMS)
       ).toThrow('Failed to change password: invalid current credentials');
+
+      // Assert envelope was NOT corrupted, deleted, or partially modified
+      const currentEnvelopeSnapshot = JSON.stringify(vault.getEnvelope(env.spaceId));
+      expect(currentEnvelopeSnapshot).toBe(initialEnvelopeSnapshot);
+
+      // Original password still unlocks cleanly
+      const session = vault.unlockSpace('ValidInitialPassword');
+      expect(session.isActive()).toBe(true);
     });
   });
 

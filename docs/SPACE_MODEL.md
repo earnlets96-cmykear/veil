@@ -7,10 +7,9 @@ VEIL's signature capability is the **Multi-Space Model**.
 A single client device can contain multiple **Spaces** (e.g. Main Space, Work Space, Private Space, optional Decoy Space).
 
 Spaces are **not** mere UI profile switches. Each Space is a cryptographically isolated vault containing its own:
-- Cryptographic Identity (Ed25519 & X25519)
-- Encryption Keys & Ratchet States
-- Contact Lists
-- Conversation Histories & Groups
+- Encryption Keys & Storage Key (`StorageKey = HKDF(SMK, "veil-v1-storage-key")`)
+- Future Cryptographic Identity (Phase 2)
+- Contact Lists & Conversations
 - Cached Media & Attachments
 - Privacy & Notification Configurations
 
@@ -19,9 +18,9 @@ graph TD
     Device["Single VEIL Client Application"]
     
     subgraph SpacesContainer["Cryptographically Isolated Space Boundaries"]
-        Space1["Main Space<br/>• Identity A<br/>• Contacts A<br/>• Chats A"]
-        Space2["Work Space<br/>• Identity B<br/>• Contacts B<br/>• Chats B"]
-        Space3["Private Space<br/>• Identity C<br/>• Contacts C<br/>• Chats C"]
+        Space1["Main Space<br/>• SMK A<br/>• Storage Key A<br/>• Partition A"]
+        Space2["Work Space<br/>• SMK B<br/>• Storage Key B<br/>• Partition B"]
+        Space3["Private Space<br/>• SMK C<br/>• Storage Key C<br/>• Partition C"]
     end
     
     Device --> Space1
@@ -31,40 +30,45 @@ graph TD
 
 ---
 
-## 2. Credential-Selected Unlocking
+## 2. Space Discovery in Phase 1
 
-The user unlocks VEIL using a single password input. The specific password entered deterministically determines which Space is unlocked.
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant Client as VEIL Client UI
-    participant Vault as Space Vault Manager
-    participant Disk as Encrypted Local Storage
-
-    User->>Client: Enters Password
-    Client->>Vault: attemptUnlock(password)
-    Vault->>Disk: Load all candidate SpaceHeaderEnvelopes
-    loop For each candidate envelope
-        Vault->>Vault: candidateKEK = Argon2id(password, envelope.salt)
-        Vault->>Vault: AEAD_Decrypt(envelope.encryptedMasterKey, candidateKEK)
-    end
-    alt Match Found (Envelope X decrypts successfully)
-        Vault->>Vault: Load SpaceMasterKey_X into secure memory
-        Vault->>Vault: Expand subkeys (Storage, Identity, Ratchets)
-        Vault-->>Client: Returns Unlocked SpaceSession (Space X)
-        Client-->>User: Displays Space X Chats View
-    else No Match
-        Vault-->>Client: Generic "Invalid Credential" error
-        Client-->>User: Rejects unlock attempt
-    end
-```
+### Local Credential Discovery & Optimization
+- **Targeted Unlock**: When a user selects a specific Space from the local switcher or unlock prompt, VEIL performs targeted single-envelope unlock:
+  `vault.unlockSpace(password, spaceId)`
+  This runs exactly **1** Argon2id operation ($O(1)$).
+- **Candidate Scan Unlock**: `vault.unlockSpace(password)` allows scanning local envelopes.
+- **Phase 1 Limitation Disclosure**: In Phase 1, the `spaceId` and Space names in envelopes are stored as local metadata. This is a local prototype discovery mechanism and is **NOT** an anonymous discovery mechanism. Anonymous credential-blind discovery belongs to later phases.
 
 ---
 
-## 3. Cryptographic Space Isolation Guarantees
+## 3. Authenticated Envelope Context Binding (AAD)
 
-1. **No Shared Root Secret**: Unlocking Space A yields `SMK_A`. It provides zero mathematical ability to decrypt Space B or Space C.
-2. **Independent Databases**: Local database records are encrypted with `StorageKey = HKDF(SMK)`. Since `SMK_B` remains encrypted under Space B's KEK, Space B records cannot be read by Space A.
-3. **Decoy Space Coercion Resistance**: If an emergency decoy password is entered, VEIL unlocks the Decoy Space seamlessly without prompting or indicating the presence of other protected Spaces.
-4. **Panic Lock Memory Zeroing**: Triggering Panic Lock immediately wipes all active SMK and subkey memory buffers and returns to the locked screen.
+Every Space Master Key (SMK) is sealed with an explicit Authenticated Associated Data (AAD) string:
+$$\text{AAD} = \text{"VEIL-v1|version:1|spaceId:"} \parallel \text{spaceId} \parallel \text{"|alg:XChaCha20-Poly1305|salt:"} \parallel \text{salt}$$
+
+This guarantees that:
+1. Ciphertext cannot be moved to another Space.
+2. Space metadata (version, salt, spaceId) cannot be altered without failing authentication.
+
+---
+
+## 4. Transactional, Crash-Safe Password Change
+
+Password change in VEIL is crash-safe and transactional:
+1. Recovers existing SMK using old password and old AAD.
+2. Derives new KEK under new password with fresh random 32-byte salt.
+3. Encrypts existing SMK with new KEK, fresh nonce, and new AAD into a candidate envelope.
+4. Pre-validates candidate envelope structure.
+5. Atomically commits the new envelope to storage.
+6. If any step fails or is interrupted prior to atomic commit, the original envelope remains 100% intact and uncorrupted.
+
+---
+
+## 5. Space Deletion & Forensics
+
+`deleteSpace(spaceId)` executes:
+- Session destruction and key memory zeroization.
+- Removal of the encrypted envelope from local storage.
+- Purging of the encrypted storage partition.
+
+**Forensic Limitations**: Modern flash storage and solid-state drives employ wear-leveling controllers where erased blocks may physically retain residual data until trimmed or overwritten. VEIL relies on cryptographic destruction (unrecoverability of the KEK/SMK) rather than unrealistic physical storage erasure claims.

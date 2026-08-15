@@ -7,9 +7,6 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha256.js';
 
 export const DOMAIN_STORAGE = 'veil-v1-storage-key';
-export const DOMAIN_IDENTITY = 'veil-v1-identity-seed';
-export const DOMAIN_PREKEYS = 'veil-v1-prekey-seed';
-export const DOMAIN_MEDIA = 'veil-v1-media-key';
 
 /**
  * Expands a 256-bit Space Master Key into a domain-separated subkey.
@@ -39,11 +36,4 @@ export function deriveSubkey(
  */
 export function deriveStorageKey(masterKey: Uint8Array): Uint8Array {
   return deriveSubkey(masterKey, DOMAIN_STORAGE, 32);
-}
-
-/**
- * Convenience helper to derive the 256-bit identity generation seed.
- */
-export function deriveIdentitySeed(masterKey: Uint8Array): Uint8Array {
-  return deriveSubkey(masterKey, DOMAIN_IDENTITY, 32);
 }
