@@ -4,7 +4,37 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 12] - 2026-08-15
+
+### Added
+- **Standalone Production Relay Server & Blind Mailbox Transport Protocol v1**:
+  - `src/server/types.ts`: Defined Relay Protocol v1 types, opaque `RelayEnvelope` ($\le 64$ KiB), `MailboxRecord` with one-way SHA-256 capability hashing, and standardized error codes.
+  - `src/server/config.ts`: Centralized server limits, TTLs, and operational thresholds.
+  - `src/server/logger.ts`: Structured `PrivacyLogger` with automatic redaction of capability tokens, passwords, keys, and payloads.
+  - `src/server/rateLimiter.ts`: In-memory sliding-window rate limiter (120 req/min/IP) preventing request storms and mailbox flooding.
+  - `src/server/storage/relayStore.ts`: `IRelayStore` abstraction decoupling transport logic from database drivers.
+  - `src/server/storage/memoryRelayStore.ts`: In-memory transactional store with queue bounds and TTL sweep.
+  - `src/server/wsHandler.ts`: Real-time WebSocket delivery handler supporting capability auth, instant envelope push, ping/pong heartbeats, and backpressure.
+  - `src/server/relayServer.ts`: Standalone HTTP/WebSocket server implementing `/healthz`, `/readyz`, `/v1/mailboxes`, `/v1/envelopes`, `/v1/envelopes/fetch`, `/v1/envelopes/ack`, and `/v1/ws`.
+  - `docs/RELAY_PROTOCOL.md`: Formal specification of VEIL Relay Transport Protocol v1.
+  - `docs/RELAY_ARCHITECTURE.md`: Architecture guide, trust boundaries, and at-least-once delivery semantics.
+  - `docs/RELAY_SECURITY.md`: Security analysis, threat model, abuse prevention, and production deployment boundaries.
+  - `docs/RELAY_PRIVACY.md`: Metadata minimization, zero plaintext guarantee, and privacy logging rules.
+  - Documented `ADR-057` through `ADR-061` in `docs/ai/DECISIONS.md`.
+  - Added 8 new automated test suites (256 total tests across 102 test files, 100% clean pass):
+    - `tests/relay-protocol.test.ts`: HTTP endpoints and schema tests.
+    - `tests/relay-capabilities.test.ts`: Capability one-way SHA-256 verification and cross-mailbox isolation.
+    - `tests/relay-delivery.test.ts`: At-least-once delivery, queue bounds, and ACK deletion.
+    - `tests/relay-websocket.test.ts`: Real-time push, socket auth, and heartbeats.
+    - `tests/relay-abuse.test.ts`: 64 KiB size bounds, rate limiting, and malformed request defense.
+    - `tests/relay-privacy.test.ts`: Log sanitization and zero-decryption invariant.
+    - `tests/relay-shutdown.test.ts`: Graceful server stop and socket draining.
+    - `tests/relay-integration.test.ts`: 2-client end-to-end simulated transport lifecycle.
+
+---
+
 ## [Phase 11] - 2026-08-15
+
 
 ### Added
 - **Persistent Encrypted Local Storage (IndexedDB) & Required Storage Integration**:

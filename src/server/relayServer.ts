@@ -1,0 +1,423 @@
+/**
+ * Standalone Production Relay Server for VEIL.
+ *
+ * Implements HTTP control/data endpoints, WebSocket real-time delivery,
+ * blind capability mailboxes, TTL garbage collection, and bounded rate limiting.
+ *
+ * SECURITY & PRIVACY INVARIANTS:
+ * - Untrusted Blind Relay: Operates on opaque ciphertexts and random identifiers only.
+ * - Zero Plaintext Access: Never parses or decrypts client message payloads.
+ * - One-Way Capability Storage: Stores only SHA-256 hashes of client capability tokens.
+ * - Privacy Logging: Redacts capability tokens, passwords, keys, and payloads.
+ */
+
+import http, { IncomingMessage, ServerResponse, Server } from 'http';
+import { WebSocketServer } from 'ws';
+import { randomBytes, bytesToHex } from '../crypto/utils.ts';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { IRelayStore } from './storage/relayStore.ts';
+import { MemoryRelayStore } from './storage/memoryRelayStore.ts';
+import { WebSocketDeliveryHandler } from './wsHandler.ts';
+import { RateLimiter } from './rateLimiter.ts';
+import { PrivacyLogger } from './logger.ts';
+import { RelayServerConfig, DEFAULT_RELAY_CONFIG } from './config.ts';
+import {
+  RELAY_PROTOCOL_VERSION,
+  RelayEnvelope,
+  MailboxRecord,
+  CreateMailboxRequest,
+  CreateMailboxResponse,
+  SendEnvelopeRequest,
+  SendEnvelopeResponse,
+  FetchEnvelopesRequest,
+  FetchEnvelopesResponse,
+  AckEnvelopesRequest,
+  AckEnvelopesResponse,
+  RelayErrorCode,
+} from './types.ts';
+
+export class RelayServer {
+  private config: RelayServerConfig;
+  private store: IRelayStore;
+  private logger: PrivacyLogger;
+  private rateLimiter: RateLimiter;
+  private server: Server | null = null;
+  private wss: WebSocketServer | null = null;
+  private wsHandler: WebSocketDeliveryHandler | null = null;
+  private cleanupTimer?: NodeJS.Timeout;
+  private startTime: number = Date.now();
+  private isShuttingDown = false;
+
+  constructor(config: Partial<RelayServerConfig> = {}, store?: IRelayStore) {
+    this.config = { ...DEFAULT_RELAY_CONFIG, ...config };
+    this.store = store || new MemoryRelayStore();
+    this.logger = new PrivacyLogger(this.config.logLevel);
+    this.rateLimiter = new RateLimiter(this.config.rateLimitWindowMs, this.config.maxRequestsPerWindow);
+  }
+
+  /**
+   * Starts the HTTP and WebSocket relay server.
+   */
+  public async start(): Promise<{ port: number; host: string }> {
+    await this.store.init();
+
+    this.server = http.createServer((req, res) => this.handleHttpRequest(req, res));
+    this.wss = new WebSocketServer({ server: this.server, path: '/v1/ws' });
+    this.wsHandler = new WebSocketDeliveryHandler(this.wss, this.store, this.config, this.logger);
+
+    // Setup periodic TTL cleanup
+    this.cleanupTimer = setInterval(() => this.runTtlCleanup(), this.config.cleanupIntervalMs);
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
+    }
+
+    return new Promise((resolve, reject) => {
+      this.server!.listen(this.config.port, this.config.host, () => {
+        const addr = this.server!.address();
+        const actualPort = typeof addr === 'object' && addr ? addr.port : this.config.port;
+        this.logger.info(`VEIL Relay Server started on ${this.config.host}:${actualPort} [Protocol ${RELAY_PROTOCOL_VERSION}]`);
+        resolve({ port: actualPort, host: this.config.host });
+      });
+
+      this.server!.on('error', (err) => {
+        this.logger.error('HTTP server startup error', { message: err.message });
+        reject(err);
+      });
+    });
+  }
+
+  /**
+   * Gracefully shuts down the server, closing connections and releasing storage.
+   */
+  public async stop(): Promise<void> {
+    if (this.isShuttingDown) return;
+    this.isShuttingDown = true;
+    this.logger.info('Shutting down VEIL Relay Server...');
+
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+
+    this.rateLimiter.close();
+
+    if (this.wsHandler) {
+      this.wsHandler.closeAll();
+    }
+
+    if (this.wss) {
+      await new Promise<void>((resolve) => this.wss!.close(() => resolve()));
+      this.wss = null;
+    }
+
+    if (this.server) {
+      await new Promise<void>((resolve) => this.server!.close(() => resolve()));
+      this.server = null;
+    }
+
+    await this.store.close();
+    this.logger.info('VEIL Relay Server shutdown complete');
+  }
+
+  public getStore(): IRelayStore {
+    return this.store;
+  }
+
+  public getConfig(): RelayServerConfig {
+    return this.config;
+  }
+
+  private async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    // Add security and CORS headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
+    if (this.isShuttingDown) {
+      this.sendError(res, 'STORAGE_UNAVAILABLE', 'Server is shutting down', 503);
+      return;
+    }
+
+    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+
+    // Rate Limiting Check
+    if (!this.rateLimiter.isAllowed(ip)) {
+      this.sendError(res, 'RATE_LIMITED', 'Too many requests. Please retry later.', 429);
+      return;
+    }
+
+    const url = req.url?.split('?')[0] || '/';
+    const method = req.method;
+
+    try {
+      if (method === 'GET' && url === '/healthz') {
+        res.statusCode = 200;
+        res.end(JSON.stringify({
+          status: 'ok',
+          protocolVersion: RELAY_PROTOCOL_VERSION,
+          uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
+        }));
+        return;
+      }
+
+      if (method === 'GET' && url === '/readyz') {
+        res.statusCode = 200;
+        res.end(JSON.stringify({ status: 'ready', store: 'ok' }));
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/mailboxes') {
+        const body = await this.readJsonBody<CreateMailboxRequest>(req);
+        await this.handleCreateMailbox(body, res);
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/envelopes') {
+        const body = await this.readJsonBody<SendEnvelopeRequest>(req);
+        await this.handleSendEnvelope(body, res);
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/envelopes/fetch') {
+        const body = await this.readJsonBody<FetchEnvelopesRequest>(req);
+        await this.handleFetchEnvelopes(body, res);
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/envelopes/ack') {
+        const body = await this.readJsonBody<AckEnvelopesRequest>(req);
+        await this.handleAckEnvelopes(body, res);
+        return;
+      }
+
+      this.sendError(res, 'NOT_FOUND', `Cannot ${method} ${url}`, 404);
+    } catch (err: any) {
+      if (err.message === 'PAYLOAD_TOO_LARGE') {
+        this.sendError(res, 'PAYLOAD_TOO_LARGE', 'Request body exceeds maximum allowed size', 413);
+      } else if (err instanceof SyntaxError) {
+        this.sendError(res, 'BAD_REQUEST', 'Malformed JSON body', 400);
+      } else {
+        this.logger.error('Unhandled request error', { message: err.message });
+        this.sendError(res, 'INTERNAL_ERROR', 'An internal server error occurred', 500);
+      }
+    }
+  }
+
+  private async handleCreateMailbox(body: CreateMailboxRequest, res: ServerResponse): Promise<void> {
+    const now = Date.now();
+    const ttlMs = body?.ttlSeconds ? body.ttlSeconds * 1000 : this.config.defaultMailboxTtlMs;
+    const boundedTtl = Math.min(ttlMs, this.config.maxMailboxTtlMs);
+    const expiresAt = now + boundedTtl;
+
+    // Generate random 256-bit opaque mailbox identifier
+    const mailboxId = bytesToHex(randomBytes(32));
+    // Generate random 256-bit secret capability token
+    const capabilityToken = bytesToHex(randomBytes(32));
+    // Store only the one-way SHA-256 hash
+    const capabilityHash = bytesToHex(sha256(new TextEncoder().encode(capabilityToken)));
+
+    const record: MailboxRecord = {
+      mailboxId,
+      capabilityHash,
+      createdAt: now,
+      expiresAt,
+      lastActiveAt: now,
+    };
+
+    await this.store.createMailbox(record);
+
+    const response: CreateMailboxResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      mailboxId,
+      capabilityToken,
+      expiresAt,
+    };
+
+    res.statusCode = 201;
+    res.end(JSON.stringify(response));
+  }
+
+  private async handleSendEnvelope(body: SendEnvelopeRequest, res: ServerResponse): Promise<void> {
+    if (!body || !body.mailboxId || typeof body.payload !== 'string') {
+      this.sendError(res, 'BAD_REQUEST', 'Missing mailboxId or payload in request body', 400);
+      return;
+    }
+
+    const payloadBytes = Buffer.byteLength(body.payload, 'utf8');
+    if (payloadBytes > this.config.maxEnvelopeSizeBytes) {
+      this.sendError(res, 'PAYLOAD_TOO_LARGE', `Envelope payload (${payloadBytes} bytes) exceeds maximum of ${this.config.maxEnvelopeSizeBytes} bytes`, 413);
+      return;
+    }
+
+    const mailbox = await this.store.getMailbox(body.mailboxId);
+    if (!mailbox) {
+      this.sendError(res, 'NOT_FOUND', 'Target mailbox not found or expired', 404);
+      return;
+    }
+
+    const currentCount = await this.store.countEnvelopes(body.mailboxId);
+    if (currentCount >= this.config.maxMailboxEnvelopes) {
+      this.sendError(res, 'FORBIDDEN', 'Target mailbox queue is full', 403);
+      return;
+    }
+
+    const now = Date.now();
+    const requestedTtlMs = body.ttlSeconds ? body.ttlSeconds * 1000 : this.config.defaultEnvelopeTtlMs;
+    const boundedTtl = Math.min(requestedTtlMs, this.config.maxEnvelopeTtlMs);
+    const expiresAt = Math.min(now + boundedTtl, mailbox.expiresAt);
+
+    const envelope: RelayEnvelope = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      envelopeId: bytesToHex(randomBytes(16)),
+      mailboxId: body.mailboxId,
+      payload: body.payload,
+      createdAt: now,
+      expiresAt,
+      sizeBytes: payloadBytes,
+    };
+
+    await this.store.saveEnvelope(envelope);
+
+    // Notify active WebSocket subscribers for near-real-time delivery
+    if (this.wsHandler) {
+      this.wsHandler.pushEnvelope(envelope);
+    }
+
+    const response: SendEnvelopeResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      envelopeId: envelope.envelopeId,
+      mailboxId: envelope.mailboxId,
+      expiresAt: envelope.expiresAt,
+      sizeBytes: envelope.sizeBytes,
+    };
+
+    res.statusCode = 201;
+    res.end(JSON.stringify(response));
+  }
+
+  private async handleFetchEnvelopes(body: FetchEnvelopesRequest, res: ServerResponse): Promise<void> {
+    if (!body || !body.mailboxId || !body.capabilityToken) {
+      this.sendError(res, 'BAD_REQUEST', 'Missing mailboxId or capabilityToken in request body', 400);
+      return;
+    }
+
+    const mailbox = await this.store.getMailbox(body.mailboxId);
+    if (!mailbox) {
+      this.sendError(res, 'NOT_FOUND', 'Mailbox not found or expired', 404);
+      return;
+    }
+
+    // Verify capability token via one-way SHA-256 hash
+    const tokenHash = bytesToHex(sha256(new TextEncoder().encode(body.capabilityToken)));
+    if (tokenHash !== mailbox.capabilityHash) {
+      this.sendError(res, 'UNAUTHORIZED', 'Invalid capability token for requested mailbox', 401);
+      return;
+    }
+
+    const limit = Math.min(body.limit || this.config.maxEnvelopesPerFetch, this.config.maxEnvelopesPerFetch);
+    const envelopes = await this.store.listEnvelopes(body.mailboxId, limit);
+    const totalPending = await this.store.countEnvelopes(body.mailboxId);
+
+    const response: FetchEnvelopesResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      mailboxId: body.mailboxId,
+      envelopes,
+      hasMore: totalPending > envelopes.length,
+    };
+
+    res.statusCode = 200;
+    res.end(JSON.stringify(response));
+  }
+
+  private async handleAckEnvelopes(body: AckEnvelopesRequest, res: ServerResponse): Promise<void> {
+    if (!body || !body.mailboxId || !body.capabilityToken || !Array.isArray(body.envelopeIds)) {
+      this.sendError(res, 'BAD_REQUEST', 'Missing mailboxId, capabilityToken, or envelopeIds array', 400);
+      return;
+    }
+
+    const mailbox = await this.store.getMailbox(body.mailboxId);
+    if (!mailbox) {
+      this.sendError(res, 'NOT_FOUND', 'Mailbox not found', 404);
+      return;
+    }
+
+    // Verify capability token
+    const tokenHash = bytesToHex(sha256(new TextEncoder().encode(body.capabilityToken)));
+    if (tokenHash !== mailbox.capabilityHash) {
+      this.sendError(res, 'UNAUTHORIZED', 'Invalid capability token', 401);
+      return;
+    }
+
+    const count = await this.store.deleteEnvelopes(body.mailboxId, body.envelopeIds);
+
+    const response: AckEnvelopesResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      mailboxId: body.mailboxId,
+      acknowledgedCount: count,
+    };
+
+    res.statusCode = 200;
+    res.end(JSON.stringify(response));
+  }
+
+  private async runTtlCleanup(): Promise<void> {
+    try {
+      const now = Date.now();
+      const result = await this.store.sweepExpired(now);
+      if (result.expiredMailboxes > 0 || result.expiredEnvelopes > 0) {
+        this.logger.debug('Completed TTL expiration sweep', result as Record<string, unknown>);
+      }
+    } catch (err: any) {
+      this.logger.error('Error during TTL cleanup sweep', { message: err.message });
+    }
+  }
+
+  private readJsonBody<T>(req: IncomingMessage): Promise<T> {
+    return new Promise((resolve, reject) => {
+      let data = '';
+      let totalBytes = 0;
+      const maxLimit = this.config.maxEnvelopeSizeBytes * 2; // Maximum body size
+
+      req.on('data', (chunk: Buffer) => {
+        totalBytes += chunk.length;
+        if (totalBytes > maxLimit) {
+          reject(new Error('PAYLOAD_TOO_LARGE'));
+          req.destroy();
+          return;
+        }
+        data += chunk.toString('utf8');
+      });
+
+      req.on('end', () => {
+        if (!data) {
+          return resolve({} as T);
+        }
+        try {
+          resolve(JSON.parse(data) as T);
+        } catch (err) {
+          reject(err);
+        }
+      });
+
+      req.on('error', (err) => reject(err));
+    });
+  }
+
+  private sendError(res: ServerResponse, code: RelayErrorCode, message: string, status: number): void {
+    res.statusCode = status;
+    res.end(JSON.stringify({
+      error: {
+        code,
+        message,
+        status,
+      },
+    }));
+  }
+}

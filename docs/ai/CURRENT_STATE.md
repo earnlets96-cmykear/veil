@@ -2,16 +2,16 @@
 
 ## 1. Project Phase & Milestone
 
-- **Current Phase**: **PHASE 11: Persistent Encrypted Local Storage (IndexedDB)**
+- **Current Phase**: **PHASE 12: Standalone Production Relay Server & Transport Protocol**
 - **Status**: Complete, Hardened & Verified
-- **Release Version**: `v1.0.0-rc.1` (Phase 11 update)
-- **Test Suite Results**: 236 / 236 tests passing across 94 test files (100% clean pass)
+- **Release Version**: `v1.0.0-rc.1` (Phase 12 update)
+- **Test Suite Results**: 256 / 256 tests passing across 102 test files (100% clean pass)
 - **Production Build Status**: Clean Vite + TypeScript production build (`dist/` generated)
 - **Current Branch**: `master`
 
 ---
 
-## 2. Completed Phases Summary (Phases 0 through 11)
+## 2. Completed Phases Summary (Phases 0 through 12)
 
 - [x] **Phase 0**: Architecture, Threat Model, Technology Selection, Design System & AI Continuity
 - [x] **Phase 1**: Cryptographic Spaces, Argon2id KDF & Encrypted Local Storage
@@ -24,24 +24,27 @@
 - [x] **Phase 8**: Metadata Minimization, Size Bucket Padding (512B–64KB) & Timing Jitter
 - [x] **Phase 9**: Adversarial Security Audit, Parser Fuzzing & Red-Team Gate
 - [x] **Phase 10**: Release Candidate Packaging, Operational Guides & Post-RC Security Freeze
-- [x] **Phase 11**: Persistent Encrypted Local Storage (IndexedDB), Schema Migrations & Restart Persistence Integration
+- [x] **Phase 11**: Persistent Encrypted Local Storage (IndexedDB), Schema Migrations & Restart Persistence
+- [x] **Phase 12**: Standalone Production Relay Server (HTTP/WebSocket) & Blind Mailbox Transport Protocol v1
 
 ---
 
-## 3. Storage Subsystem Verified Ground Truth
+## 3. Relay Subsystem Verified Ground Truth
 
-- **Production Storage Driver**: `IndexedDBStorageAdapter` backing `EncryptedSpaceStore` and `SpaceVaultManager`.
-- **Database Schema**: Version 1 (`envelopes`, `records` with `by_spaceId` index, `meta`).
-- **Plaintext Persistence Protection**: All records written to IndexedDB are authenticated AEAD ciphertext (`XChaCha20-Poly1305`) keyed by active Space `StorageKey`. Zero plaintext passwords or master keys on disk.
-- **Fail-Closed Architecture**: Fails closed with `StorageUnavailableError` if IndexedDB is missing or fails initialization.
-- **Test-Only Adapter**: `MemoryStorageAdapter` is strictly isolated to non-persistent test suites.
+- **Relay Protocol**: Protocol v1 (`docs/RELAY_PROTOCOL.md`) over HTTP REST and WebSocket.
+- **Blind Mailbox Model**: Opaque 256-bit random mailbox routing identifiers. Zero central user accounts.
+- **One-Way Capability Authorization**: Server stores only SHA-256 hashes of client capability tokens.
+- **Zero Plaintext Access**: Server handles opaque ciphertext payloads ($\le 64$ KiB); no decryption keys or logic exist on server.
+- **At-Least-Once Delivery**: Envelopes remain queued until explicit capability-authenticated client ACK.
+- **Rate Limiting & Abuse Defense**: Bounded memory, sliding-window IP limits (120 req/min), max 1,000 envelopes/mailbox.
+- **Privacy-Preserving Logging**: Automatic redaction of credentials, capability tokens, and payloads in `PrivacyLogger`.
 
 ---
 
 ## 4. Test Status
 
-- **Test Framework**: Vitest (v3.2.7)
-- **Total Test Files**: 94 / 94 passed
-- **Total Tests**: 236 / 236 passed (100% pass rate)
+- **Test Framework**: Vitest (v3.0.5)
+- **Total Test Files**: 102 / 102 passed
+- **Total Tests**: 256 / 256 passed (100% pass rate)
 - **Failing Tests**: 0
-- **Duration**: ~15.7s
+- **Duration**: ~10.5s

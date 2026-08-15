@@ -596,6 +596,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Protects user data integrity and alerts the user explicitly rather than operating in a misleading temporary state.
 - **Consequences**: Prevents unrecoverable session desynchronization and data loss.
 
+---
+
+## ADR-057: VEIL Relay Transport Protocol v1 and Blind Mailbox Architecture
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Real network relaying requires a formally specified, privacy-preserving transport interface without introducing a centralized user database.
+- **Decision**: Define VEIL Relay Protocol v1 (`docs/RELAY_PROTOCOL.md`) using opaque 256-bit random `mailboxId` routing tokens and 64 KiB bounded encrypted payloads. The relay server has zero access to message plaintexts or user identities.
+- **Reason**: Decouples transport delivery from cryptographic trust boundaries.
+- **Consequences**: Enables untrusted multi-party network routing.
+
+---
+
+## ADR-058: One-Way Capability Hash Verification for Mailbox Access
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Clients must authorize fetching and acknowledging envelopes in their mailboxes without storing reusable plaintext secrets in the server database.
+- **Decision**: When creating a mailbox, return a 256-bit secret `capabilityToken` to the client, but store only `SHA-256(capabilityToken)` on the server. On fetch/ack requests, compute the SHA-256 hash of the client's submitted token and compare in constant-time.
+- **Reason**: Prevents server database compromise from leaking replayable mailbox capability tokens.
+- **Consequences**: Strong one-way authorization across all mailboxes.
+
+---
+
+## ADR-059: At-Least-Once Delivery Semantics with Client-Driven ACK Deletion
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Network drops and reconnections must not cause permanent message loss before the recipient client has decrypted and stored the message.
+- **Decision**: Adopt at-least-once delivery semantics: envelopes remain queued on the relay until the client explicitly submits a capability-authenticated `POST /v1/envelopes/ack` request or TTL expires. Client cryptographic layers (`ConversationManager` / `GroupManager`) handle deduplication.
+- **Reason**: Ensures reliable delivery over unstable mobile and desktop network connections.
+- **Consequences**: Safe, loss-resistant envelope transport.
+
+---
+
+## ADR-060: Bounded Relay Resource Limits and Sliding-Window Rate Limiting
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: The relay server must be resilient against denial-of-service, mailbox flooding, and memory exhaustion attacks.
+- **Decision**: Enforce hard limits: 64 KiB maximum envelope size, 1,000 maximum envelopes per mailbox, 14-day maximum TTL, sliding-window in-memory rate limiting (120 req/min/IP), and max 20 WebSocket connections per IP.
+- **Reason**: Bounds server memory consumption and protects operational availability.
+- **Consequences**: Predictable resource utilization under adversarial load.
+
+---
+
+## ADR-061: Privacy-Preserving Logging and Credential Redaction
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Server logs must not leak capability tokens, passwords, private keys, or encrypted payloads.
+- **Decision**: Implement `PrivacyLogger` (`src/server/logger.ts`) with automatic recursive key sanitization, replacing sensitive fields with `[REDACTED]`.
+- **Reason**: Prevents accidental metadata or credential exposure in system monitoring logs.
+- **Consequences**: Safe operational logging suitable for production deployment.
+
+
 
 
 
