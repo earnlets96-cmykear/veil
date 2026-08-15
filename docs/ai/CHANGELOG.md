@@ -4,7 +4,28 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 11] - 2026-08-15
+
+### Added
+- **Persistent Encrypted Local Storage (IndexedDB) & Required Storage Integration**:
+  - `src/storage/types.ts`: Defined `IStorageAdapter`, `StoredRecord`, `StorageMetadata`, `MigrationDefinition`, and custom storage errors (`StorageUnavailableError`, `StorageQuotaError`, `StorageCorruptionError`, `StorageMigrationError`).
+  - `src/storage/migrations.ts`: Transactional schema migration engine with Version 1 baseline establishing `envelopes`, `records` (index `by_spaceId`), and `meta` object stores.
+  - `src/storage/indexedDbAdapter.ts`: Production IndexedDB storage driver with fail-closed behavior when IndexedDB is unavailable or fails initialization.
+  - `src/storage/memoryAdapter.ts`: Test-only in-memory storage adapter for non-persistent environments.
+  - `src/storage/spaceStore.ts`: Integrated `EncryptedSpaceStore` with `IStorageAdapter` for async persistent record writes and partition loading while preserving synchronous caching.
+  - `src/spaces/vault.ts`: Added minimal persistence bridge methods (`loadEnvelopesFromStorage`, `saveEnvelopeToStorage`, `deleteSpaceWithStorage`).
+  - `src/main.ts`: Updated production app initialization to initialize `IndexedDBStorageAdapter` and fail closed on error.
+  - `docs/STORAGE_ARCHITECTURE.md`: Complete technical storage architecture guide with plaintext persistence protection framing and honest disk boundaries.
+  - Documented `ADR-054` (Persistent IndexedDB Storage Adapter), `ADR-055` (Transactional Schema Migration Engine), `ADR-056` (Fail-Closed Storage Architecture).
+  - Added 3 new test suites (236 total tests across 94 test files, 100% clean pass):
+    - `tests/storage-indexeddb-restart.test.ts`: 7-step real application restart persistence, cross-space isolation, zero-plaintext audit, and tampering detection test.
+    - `tests/storage-migrations.test.ts`: Baseline schema creation and migration execution tests.
+    - `tests/storage-concurrency-quota.test.ts`: Fail-closed and quota error containment tests.
+
+---
+
 ## [v1.0.0-rc.1] - 2026-08-15 (Phase 10)
+
 
 ### Added
 - **Release Candidate Packaging, Production Hardening & Operational Readiness**:

@@ -1,29 +1,25 @@
 # ACTIVE_TASK.md — Current Work Tracker
 
 ## Task
-**VEIL Phase 10: Release Candidate, Production Packaging, Hardening & Deployment Preparation**
+**VEIL Phase 11: Persistent Encrypted Local Storage (IndexedDB) & Required Storage Integration**
 
 ## Status: COMPLETE
 
 ## Deliverables
-- [x] Full end-to-end integration lifecycle test suite (`tests/e2e-release-lifecycle.test.ts`)
-- [x] Vulnerability disclosure policy & SLA specification (`SECURITY.md`)
-- [x] Deep technical security architecture guide (`docs/SECURITY_GUIDE.md`)
-- [x] Plain-language user privacy guide (`docs/USER_PRIVACY_GUIDE.md`)
-- [x] Developer onboarding & setup guide (`docs/DEVELOPMENT.md`)
-- [x] Production server deployment & reverse proxy hardening guide (`docs/DEPLOYMENT.md`)
-- [x] Production operations and maintenance manual (`docs/OPERATIONS.md`)
-- [x] 10-step incident containment & key compromise protocols (`docs/INCIDENT_RESPONSE.md`)
-- [x] Abuse containment & resource defense model (`docs/ABUSE_MODEL.md`)
-- [x] Release readiness checklist (`docs/RELEASE_CHECKLIST.md`)
-- [x] Official `v1.0.0-rc.1` release notes (`RELEASE_NOTES.md`)
-- [x] Release Candidate certification report (`docs/RELEASE_CANDIDATE_REPORT.md`)
-- [x] Third-party open source license attribution (`THIRD_PARTY_NOTICES.md`)
-- [x] Production environment configuration template (`.env.example`)
-- [x] Post-RC Security Freeze rule added to `AGENTS.md`
-- [x] Documented ADR-049 through ADR-053 in `docs/ai/DECISIONS.md`
-- [x] Full test pass: 91 test files, 230 tests (100% clean pass)
-- [x] Clean build validation: `npm run build` succeeds
+- [x] Storage interface abstraction `IStorageAdapter` (`src/storage/types.ts`)
+- [x] Production `IndexedDBStorageAdapter` with fail-closed error handling (`src/storage/indexedDbAdapter.ts`)
+- [x] Schema migration framework with Version 1 baseline (`src/storage/migrations.ts`)
+- [x] Test-only `MemoryStorageAdapter` (`src/storage/memoryAdapter.ts`)
+- [x] Integration with `EncryptedSpaceStore` for persistent encrypted records (`src/storage/spaceStore.ts`)
+- [x] Integration with `SpaceVaultManager` for persistent envelope discovery & saving (`src/spaces/vault.ts`)
+- [x] Production application entry point updated to initialize IndexedDB (`src/main.ts`)
+- [x] Technical storage architecture documentation (`docs/STORAGE_ARCHITECTURE.md`)
+- [x] Real browser persistence restart test suite (`tests/storage-indexeddb-restart.test.ts`)
+- [x] Schema migrations test suite (`tests/storage-migrations.test.ts`)
+- [x] Fail-closed & quota error containment test suite (`tests/storage-concurrency-quota.test.ts`)
+- [x] Documented ADR-054 through ADR-056 in `docs/ai/DECISIONS.md`
+- [x] 94/94 test suites passed (236/236 tests, 100% clean pass)
+- [x] Clean production build validated (`npm run build` succeeds)
 
 ## Next Milestone
-Post-Phase-10 Independent Third-Party Security Audit & Production Operations
+**PHASE 12: Production Relay Backend**

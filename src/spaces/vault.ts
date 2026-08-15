@@ -315,6 +315,46 @@ export class SpaceVaultManager {
   }
 
   /**
+   * Loads all persisted SpaceHeaderEnvelopes from an IStorageAdapter.
+   *
+   * @param adapter The persistent storage adapter (e.g. IndexedDBStorageAdapter)
+   * @returns Number of envelopes loaded into memory
+   */
+  public async loadEnvelopesFromStorage(adapter: { isInitialized(): boolean; init(): Promise<void>; listEnvelopes(): Promise<SpaceHeaderEnvelope[]> }): Promise<number> {
+    if (!adapter.isInitialized()) {
+      await adapter.init();
+    }
+    const persistedEnvelopes = await adapter.listEnvelopes();
+    for (const envelope of persistedEnvelopes) {
+      validateSpaceEnvelope(envelope);
+      this.envelopes.set(envelope.spaceId, envelope);
+    }
+    return persistedEnvelopes.length;
+  }
+
+  /**
+   * Persists a SpaceHeaderEnvelope to an IStorageAdapter.
+   */
+  public async saveEnvelopeToStorage(envelope: SpaceHeaderEnvelope, adapter: { isInitialized(): boolean; init(): Promise<void>; saveEnvelope(env: SpaceHeaderEnvelope): Promise<void> }): Promise<void> {
+    if (!adapter.isInitialized()) {
+      await adapter.init();
+    }
+    validateSpaceEnvelope(envelope);
+    await adapter.saveEnvelope(envelope);
+  }
+
+  /**
+   * Deletes a Space from memory and the persistent storage adapter.
+   */
+  public async deleteSpaceWithStorage(spaceId: string, adapter: { isInitialized(): boolean; init(): Promise<void>; deleteEnvelope(id: string): Promise<boolean> }): Promise<void> {
+    this.deleteSpace(spaceId);
+    if (!adapter.isInitialized()) {
+      await adapter.init();
+    }
+    await adapter.deleteEnvelope(spaceId);
+  }
+
+  /**
    * Clears all envelopes and active sessions.
    */
   public reset(): void {
@@ -322,3 +362,4 @@ export class SpaceVaultManager {
     this.envelopes.clear();
   }
 }
+

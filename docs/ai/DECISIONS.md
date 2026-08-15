@@ -563,6 +563,40 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Transparently communicates that VEIL is an audited release candidate prepared for independent security review.
 - **Consequences**: Clean, reproducible release candidate ready for deployment and external evaluation.
 
+---
+
+## ADR-054: Persistent IndexedDB Storage Adapter and Plaintext Persistence Protection
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: To survive browser tab restarts without relying on insecure localStorage or unencrypted persistence, local Spaces and encrypted records must be persisted safely.
+- **Decision**: Implement `IndexedDBStorageAdapter` backing `EncryptedSpaceStore` and `SpaceVaultManager`. Enforce that all records written to IndexedDB are authenticated AEAD ciphertext (`XChaCha20-Poly1305`) keyed by the active Space's `StorageKey`. Document boundaries as "plaintext persistence protection" rather than absolute zero-knowledge disk claims.
+- **Reason**: Guarantees offline at-rest protection and preserves cross-space partition isolation across application reboots.
+- **Consequences**: Local Space headers and application records persist reliably in browser environments.
+
+---
+
+## ADR-055: Transactional Schema Migration Engine for Persistent Vaults
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Database schemas evolve as features are introduced; upgrades must occur transactionally during `IDBOpenDBRequest.onupgradeneeded` without data corruption.
+- **Decision**: Create `src/storage/migrations.ts` defining ordered `MigrationDefinition` entries. Migration 1 establishes `envelopes`, `records`, and `meta` object stores with index `by_spaceId`.
+- **Reason**: Ensures crash-safe schema evolution and explicit version tracking.
+- **Consequences**: Future schema expansions can be added incrementally with backward-compatible migrations.
+
+---
+
+## ADR-056: Fail-Closed Storage Architecture in Production
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: If IndexedDB is blocked, unsupported, or quota-exhausted in a production environment, silently falling back to in-memory storage would cause silent data loss when the user closes the tab.
+- **Decision**: Enforce strict fail-closed behavior: `IndexedDBStorageAdapter` throws `StorageUnavailableError` when IndexedDB cannot be opened or initialized in production. `MemoryStorageAdapter` is strictly restricted to test harnesses.
+- **Reason**: Protects user data integrity and alerts the user explicitly rather than operating in a misleading temporary state.
+- **Consequences**: Prevents unrecoverable session desynchronization and data loss.
+
+
 
 
 
