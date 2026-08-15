@@ -3,51 +3,77 @@
 ## 1. Project Overview & Current Phase
 
 - **Project**: VEIL (Privacy-First Messenger with Multi-Space Cryptographic Architecture)
-- **Current Phase**: **PHASE 1: Cryptographic Space Prototype & Envelope Storage**
-- **Status**: Complete & Verified (46/46 tests passing)
+- **Current Phase**: **PHASE 2: Independent Space Cryptographic Identities** — Complete
+- **Status**: 101/101 tests passing
 - **Current Branch**: `master`
 
 ---
 
-## 2. Verified Repository Reality
+## 2. Phase 2 Implementation Summary
 
-- **Cryptographic Implementation**:
-  - `src/crypto/kdf.ts`: Argon2id KDF (`@noble/hashes` v1.7.0).
-  - `src/crypto/aead.ts`: XChaCha20-Poly1305 AEAD (`@noble/ciphers` v2.3.0).
-  - `src/crypto/hkdf.ts`: Domain-separated HKDF-SHA256 (`@noble/hashes` v1.7.0).
-  - `src/crypto/memory.ts`: Best-effort zeroization & secure buffer wrappers.
-  - `src/crypto/utils.ts`: CSPRNG, Base64/Hex conversion, constant-time equality.
-- **Space Layer**:
-  - `src/spaces/envelope.ts`: `SpaceHeaderEnvelope` (version: 1) validator/serializer.
-  - `src/spaces/session.ts`: `SpaceSession` managing active volatile keys and memory destruction.
-  - `src/spaces/vault.ts`: `SpaceVaultManager` with credential-selected unlocking, password change, and deletion.
-  - `src/storage/spaceStore.ts`: `EncryptedSpaceStore` with partitioned AEAD key-value storage.
-- **Test Status**:
-  - `tests/phase0-baseline.test.ts` (12 tests) — PASS
-  - `tests/security-logging.test.ts` (1 test) — PASS
-  - `tests/crypto-primitives.test.ts` (13 tests) — PASS
-  - `tests/tampering-corruption.test.ts` (7 tests) — PASS
-  - `tests/space-vault.test.ts` (8 tests) — PASS
-  - `tests/space-isolation.test.ts` (5 tests, including 100-Space test) — PASS
-  - **Total**: 46/46 passed (100% passing)
+### What Was Implemented
+1. **Two-Tier HKDF Identity Derivation** (`src/crypto/hkdf.ts`):
+   - `SMK → HKDF("veil-v1-identity-seed") → identitySeed`
+   - `identitySeed → HKDF("veil-v1-signing-key") → Ed25519 private key`
+   - `identitySeed → HKDF("veil-v1-key-agreement") → X25519 private key`
+
+2. **Ed25519 Signing** (`src/identity/signing.ts`): `@noble/curves/ed25519.js` v1.8.0.
+3. **X25519 Key Agreement** (`src/identity/keyAgreement.ts`): `@noble/curves/ed25519.js` (exports `x25519`).
+4. **Canonical Serialization** (`src/identity/canonical.ts`): Deterministic field ordering, no `JSON.stringify()` reliance.
+5. **Fingerprint** (`src/identity/fingerprint.ts`): `SHA-256(signingPub || kaPub)` → 12×5-digit human-readable format.
+6. **Self-Signed Identity Document** (`src/identity/document.ts`): Ed25519 self-signature over canonical bytes. Verification rejects tampered fields, unknown versions, substituted keys.
+7. **SpaceIdentityManager** (`src/identity/manager.ts`): Create, load, persist (encrypted), sign, verify, DH shared secret.
+8. **SpaceSession.getMasterKey()**: Exposes SMK for identity derivation within Space boundary.
+
+### Cryptographic Primitives
+| Primitive | Library | Version | Standard |
+|---|---|---|---|
+| Ed25519 | `@noble/curves/ed25519.js` | v1.8.0 | RFC 8032 |
+| X25519 | `@noble/curves/ed25519.js` | v1.8.0 | RFC 7748 |
+| HKDF-SHA256 | `@noble/hashes/hkdf.js` | v1.7.0 | RFC 5869 |
+| SHA-256 | `@noble/hashes/sha256.js` | v1.7.0 | FIPS 180-4 |
+
+### Test Results (101/101)
+| Suite | Tests | Status |
+|---|---|---|
+| `phase0-baseline` | 12 | PASS |
+| `security-logging` | 1 | PASS |
+| `crypto-primitives` | 13 | PASS |
+| `tampering-corruption` | 9 | PASS |
+| `space-vault` | 9 | PASS |
+| `space-isolation` | 5 | PASS |
+| `identity-generation` | 5 | PASS |
+| `identity-signatures` | 7 | PASS |
+| `key-agreement` | 5 | PASS |
+| `identity-isolation` | 4 | PASS |
+| `identity-document` | 9 | PASS |
+| `identity-fingerprint` | 9 | PASS |
+| `identity-tampering` | 7 | PASS |
+| `identity-lifecycle` | 6 | PASS |
 
 ---
 
 ## 3. Invariants the Next Agent Must NOT Break
 
-1. **NEVER INVENT CRYPTOGRAPHY**: Use only mature, selected libraries (`@noble/hashes`, `@noble/ciphers`, `@noble/curves`, WebCrypto).
-2. **PASSWORD IS NOT THE SPACE MASTER KEY**: Passwords derive KEK via Argon2id; KEK unseals random 256-bit SMK.
-3. **ISOLATION BY DEFAULT**: Space A and Space B share ZERO key material. Space A cannot decrypt Space B database records.
-4. **DOMAIN SEPARATION**: All subkeys derive via HKDF-SHA256 with distinct domain tags (`"veil-v1-storage-key"`, `"veil-v1-identity-seed"`, etc.).
-5. **ZERO SENSITIVE LOGGING**: No passwords, SMKs, or plaintexts in logs or error traces.
-6. **MANDATORY ATTACK TESTS**: All security features must maintain negative/tampering tests.
+1. **NEVER INVENT CRYPTOGRAPHY**.
+2. **PASSWORD ≠ SMK ≠ IDENTITY KEY**: Three distinct layers.
+3. **ISOLATION BY DEFAULT**: Space A identity ≠ Space B identity. Zero shared key material.
+4. **DOMAIN SEPARATION**: All subkeys via HKDF with distinct domain tags.
+5. **SELF-SIGNED BINDING**: Identity document keys are bound by Ed25519 self-signature.
+6. **DETERMINISTIC IDENTITY**: Same SMK → same identity. Password change preserves identity.
+7. **ZERO SENSITIVE LOGGING**: No private keys, SMKs, or passwords in logs.
+8. **MANDATORY ATTACK TESTS**: All security features must have negative/adversarial tests.
 
 ---
 
-## 4. Exact Next Action for Incoming Agent
+## 4. Known Limitations (Phase 2)
 
-Proceed to **Phase 2: Independent Space Cryptographic Identities** ([`prompts/PHASE_02.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_02.md)).
-1. Read `AGENTS.md` and `docs/ai/PROJECT_CONTEXT.md`.
-2. Update `docs/ai/ACTIVE_TASK.md` for Phase 2.
-3. Implement `SpaceIdentityManager` using `@noble/curves/ed25519` for signing and X25519 for key exchange, derived deterministically from each Space's `IdentitySeed`.
-4. Implement contact card formatting (`veil://contact?...`), QR serialization, safety numbers, and cross-space identity independence tests.
+- **Space Cloning**: A cloned Space has the same identity (ADR-014). Multi-device management deferred to Phase 6.
+- **V8 Memory**: Best-effort zeroization only; GC may leave remnants.
+- **No Identity Rotation**: Identity is permanently bound to SMK. Rotation would require new SMK and re-encryption.
+
+---
+
+## 5. Exact Next Action for Incoming Agent
+
+Proceed to **Phase 3: Privacy-Preserving Untrusted Transport Interface** ([`prompts/PHASE_03.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_03.md)).

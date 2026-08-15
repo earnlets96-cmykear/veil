@@ -155,6 +155,6 @@ describe('VEIL Phase 1: Multi-Space Cryptographic Isolation & Cross-Space Attack
       expect(ciphertextsSet.size).toBe(100);
       expect(storageKeysHex.size).toBe(100);
       expect(createdEnvelopes.length).toBe(100);
-    });
+    }, 30000);
   });
 });

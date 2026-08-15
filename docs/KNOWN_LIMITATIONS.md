@@ -34,3 +34,17 @@ VEIL is committed to absolute engineering honesty. We document what VEIL does **
 ## 5. Network Metadata under Global Passive Adversaries
 
 - While VEIL uses blind mailbox tokens and uniform message padding, an adversary capable of monitoring all global internet exchange points (e.g. state-level ISP wiretaps) can perform statistical traffic correlation if the client is connected directly via standard TCP/TLS without an onion routing or mixnet transport layer.
+
+---
+
+## 6. Space Cloning & Identity Duplication (Phase 2)
+
+- **Cloned Identity**: Because identity keys are deterministically derived from the Space Master Key via HKDF, copying the encrypted Space storage to another device and unlocking with the same password produces the **same cryptographic identity** on both devices. This means two devices could impersonate the same identity simultaneously.
+- **No Clone Detection**: Phase 2 does not implement any mechanism to detect or prevent identity cloning. Multi-device identity management and clone detection are deferred to Phase 6.
+
+---
+
+## 7. Identity Rotation
+
+- **Permanent Identity Binding**: A Space's identity is permanently bound to its SMK. There is currently no mechanism to rotate or revoke an identity key while preserving the Space. Identity rotation would require generating a new SMK and re-encrypting all Space data, which is not supported in Phase 2.
+- **Key Compromise**: If a Space's private signing or key agreement key is compromised, the only remediation is to create a new Space with a new identity and re-establish contacts.

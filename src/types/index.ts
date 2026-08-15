@@ -29,13 +29,21 @@ export interface SpaceHeaderEnvelope {
   createdAt: number;
 }
 
+export interface IdentityDocument {
+  version: 1;
+  identityId: string;              // hex(SHA-256(signingPub || kaPub))
+  signingPublicKey: string;         // Base64 Ed25519 public key
+  keyAgreementPublicKey: string;    // Base64 X25519 public key
+  fingerprint: string;             // 60-digit formatted fingerprint (12x5 digits)
+  createdAt: number;
+  signature: string;               // Base64 Ed25519 self-signature
+}
+
 export interface SpaceIdentity {
   spaceId: string;
   identityKeyPub: string;  // X25519 public key (Base64)
-  identityKeyPriv: string; // X25519 private key (Base64)
   signingKeyPub: string;   // Ed25519 public key (Base64)
-  signingKeyPriv: string;  // Ed25519 private key (Base64)
-  displayName: string;
+  displayName?: string;
   createdAt: number;
 }
 

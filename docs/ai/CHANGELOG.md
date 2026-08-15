@@ -6,36 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [Phase 2] - 2026-08-15
+
+### Added
+- **Cryptographic Identity Layer**:
+  - `src/crypto/hkdf.ts`: Extended with two-tier HKDF identity derivation domains (`veil-v1-identity-seed`, `veil-v1-signing-key`, `veil-v1-key-agreement`).
+  - `src/identity/signing.ts`: Ed25519 digital signature wrapper (`@noble/curves/ed25519.js`, v1.8.0).
+  - `src/identity/keyAgreement.ts`: X25519 key agreement wrapper (`@noble/curves/ed25519.js`, exports `x25519`).
+  - `src/identity/canonical.ts`: Deterministic canonical serialization with explicit field ordering.
+  - `src/identity/fingerprint.ts`: SHA-256 fingerprint (12 × 5-digit groups) and identity ID computation.
+  - `src/identity/document.ts`: Self-signed `IdentityDocument` with Ed25519 self-signature over canonical bytes.
+  - `src/identity/manager.ts`: `SpaceIdentityManager` managing creation, encrypted persistence, loading, signing, verification, and DH key agreement.
+- **SpaceSession Extension**: Added `getMasterKey()` for internal identity derivation within the Space boundary.
+- **Architecture Decisions**: Documented `ADR-012` (two-tier HKDF identity derivation), `ADR-013` (self-signed identity binding), `ADR-014` (Space cloning produces same identity).
+- **Test Suites (52 new tests, 101 total)**:
+  - `tests/identity-generation.test.ts`: Identity creation, determinism, Space independence.
+  - `tests/identity-signatures.test.ts`: Ed25519 sign/verify, tampered message, wrong key.
+  - `tests/key-agreement.test.ts`: X25519 DH commutativity, isolation.
+  - `tests/identity-isolation.test.ts`: Cross-Space identity independence, locked Space, signing attacks.
+  - `tests/identity-document.test.ts`: Self-signature verification, field tampering, unknown version.
+  - `tests/identity-fingerprint.test.ts`: Determinism, format, canonical round-trip.
+  - `tests/identity-tampering.test.ts`: Key substitution, bit flips, Frankenstein documents.
+  - `tests/identity-lifecycle.test.ts`: Persistence, lock/unlock, password change preserves identity, deletion.
+
+---
+
 ## [Phase 1] - 2026-08-15
 
 ### Added
 - **Cryptographic Space Vault Engine**:
-  - `src/crypto/kdf.ts`: Implemented Argon2id password key derivation using `@noble/hashes/argon2.js` (RFC 9106) with production parameters ($64\text{ MiB}, 3\text{ iterations}$).
-  - `src/crypto/aead.ts`: Implemented XChaCha20-Poly1305 authenticated symmetric encryption using `@noble/ciphers/chacha.js` with 192-bit random nonces and 128-bit Poly1305 tags.
-  - `src/crypto/hkdf.ts`: Implemented domain-separated HKDF-SHA256 key expansion (RFC 5869).
-  - `src/spaces/envelope.ts`: Versioned `SpaceHeaderEnvelope` validator and serializer.
-  - `src/spaces/session.ts`: `SpaceSession` managing active volatile memory keys with `destroy()` zeroization.
-  - `src/spaces/vault.ts`: `SpaceVaultManager` implementing Space creation, credential-selected unlocking, locking, password change (rewrapping SMK without storage re-encryption), and deletion.
-  - `src/storage/spaceStore.ts`: `EncryptedSpaceStore` providing partitioned AEAD key-value storage.
-- **Architecture Decisions**: Documented `ADR-007` (Argon2id selection), `ADR-008` (XChaCha20-Poly1305 selection), and `ADR-009` (HKDF subkey separation).
-- **Test Suites (46/46 passing)**:
-  - `tests/crypto-primitives.test.ts`: Verified KDF, AEAD, HKDF, CSPRNG, and memory zeroization.
-  - `tests/space-vault.test.ts`: Verified multi-space creation, unlocking, locking, password change, and deletion.
-  - `tests/space-isolation.test.ts`: Verified independent key material ($SMK_{Main} \neq SMK_{Private}$), cross-space attack failure, and 100-Space independence.
-  - `tests/tampering-corruption.test.ts`: Verified safe rejection of bit-flipped ciphertexts, modified nonces/salts, altered versions, and malformed JSON.
-  - `tests/security-logging.test.ts`: Verified zero sensitive passwords, keys, or plaintexts leak to console or error objects.
+  - `src/crypto/kdf.ts`: Argon2id password KDF (`@noble/hashes/argon2.js`, RFC 9106).
+  - `src/crypto/aead.ts`: XChaCha20-Poly1305 authenticated encryption (`@noble/ciphers/chacha.js`).
+  - `src/spaces/envelope.ts`: Versioned `SpaceHeaderEnvelope` with canonical AAD context binding.
+  - `src/spaces/session.ts`: `SpaceSession` with volatile key management and `destroy()`.
+  - `src/spaces/vault.ts`: `SpaceVaultManager` with AAD, targeted/discovery unlock, crash-safe password change.
+  - `src/storage/spaceStore.ts`: `EncryptedSpaceStore` with partitioned AEAD storage.
+
+### Fixed
+- Enforced AAD envelope metadata binding (`VEIL-v1|version:1|spaceId:<id>|alg:...|salt:...`).
+- Optimized credential-selected unlock with targeted `unlockSpace(password, spaceId)`.
+- Crash-safe transactional password change with atomic commit.
+- Corrected terminology to "selected established cryptographic primitives".
 
 ---
 
 ## [Phase 0] - 2026-08-15
 
 ### Added
-- **AI-Agent Continuity System**: Created root `AGENTS.md` operating contract and persistent `docs/ai/` tracking files (`PROJECT_CONTEXT.md`, `CURRENT_STATE.md`, `ACTIVE_TASK.md`, `DECISIONS.md`, `SECURITY_RULES.md`, `CHANGELOG.md`, `HANDOFF.md`).
-- **Core Architecture & Technical Specifications**: Created `docs/ARCHITECTURE.md`, `docs/THREAT_MODEL.md`, `docs/CRYPTOGRAPHY.md`, `docs/KEY_HIERARCHY.md`, `docs/SPACE_MODEL.md`, `docs/IDENTITY_MODEL.md`, `docs/METADATA_MODEL.md`, `docs/PRIVACY.md`, `docs/SECURITY.md`, `docs/KNOWN_LIMITATIONS.md`.
-- **Phase Prompts Suite**: Created `prompts/MASTER_PROMPT.md` and individual prompts `prompts/PHASE_00.md` through `prompts/PHASE_10.md`.
-- **Baseline Cryptographic Code & Design Tokens**:
-  - `src/types/index.ts`: Core type definitions for envelopes, spaces, and identities.
-  - `src/crypto/memory.ts`: Memory hygiene zeroization utility.
-  - `src/crypto/utils.ts`: CSPRNG, Base64/Hex encoding, and constant-time comparison.
-  - `src/styles/veil-design-system.css`: Vanilla CSS design system tokens and component styles.
-  - `tests/phase0-baseline.test.ts`: 12 automated unit and negative tests.
+- AI-Agent Continuity System, architecture documentation, phase prompts, baseline scaffolding.

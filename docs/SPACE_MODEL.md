@@ -8,8 +8,8 @@ A single client device can contain multiple **Spaces** (e.g. Main Space, Work Sp
 
 Spaces are **not** mere UI profile switches. Each Space is a cryptographically isolated vault containing its own:
 - Encryption Keys & Storage Key (`StorageKey = HKDF(SMK, "veil-v1-storage-key")`)
-- Future Cryptographic Identity (Phase 2)
-- Contact Lists & Conversations
+- Independent Cryptographic Identity (Ed25519 signing + X25519 key agreement)
+- Contact Lists & Conversations (Phase 4+)
 - Cached Media & Attachments
 - Privacy & Notification Configurations
 

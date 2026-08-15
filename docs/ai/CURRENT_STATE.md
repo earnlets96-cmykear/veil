@@ -2,39 +2,39 @@
 
 ## 1. Project Phase & Milestone
 
-- **Current Phase**: **PHASE 1: Cryptographic Space Prototype & Envelope Storage**
-- **Current Milestone**: Milestone 1.2 — Cryptographic Implementation Corrections & AAD Hardening Complete
-- **Overall Progress**: Phase 1 100% complete (49/49 automated tests passing)
+- **Current Phase**: **PHASE 2: Independent Space Cryptographic Identities**
+- **Status**: Complete & Verified (101/101 automated tests passing)
 - **Current Branch**: `master`
 
 ---
 
-## 2. Completed Deliverables (Phase 1 Corrections)
+## 2. Completed Deliverables (Phase 2)
 
-- [x] AEAD API verified: `encryptXChaCha20Poly1305` and `decryptXChaCha20Poly1305` returning ciphertext with integrated Poly1305 tags.
-- [x] Authenticated Associated Data (AAD) formally bound to all Space envelopes:
-  `AAD = "VEIL-v1|version:1|spaceId:<id>|alg:XChaCha20-Poly1305|salt:<salt>"`
-- [x] AAD context transplantation attack tests written and passing (modifying Space ID, salt, or version fails decryption).
-- [x] Space discovery optimized: supported targeted single-envelope unlock `unlockSpace(password, spaceId)` for $O(1)$ operations and discovery unlock `unlockSpace(password)`.
-- [x] Identity seed derivation deferred strictly to Phase 2.
-- [x] Crash-safe, transactional password change implemented and validated against rollback simulations.
-- [x] Space deletion implemented with clean memory zeroization, envelope removal, and storage purging.
-- [x] Cryptographic claims audited: updated all documentation to state "selected established cryptographic primitives".
-- [x] Recorded `ADR-007` through `ADR-011` in `docs/ai/DECISIONS.md`.
-- [x] 49/49 unit, negative, and adversarial attack tests passing.
+- [x] Two-tier HKDF identity derivation: `SMK → identitySeed → {signingKeyMaterial, keyAgreementMaterial}`.
+- [x] Ed25519 signing identity (`src/identity/signing.ts`) using `@noble/curves/ed25519.js` (v1.8.0).
+- [x] X25519 key agreement identity (`src/identity/keyAgreement.ts`) using `@noble/curves/ed25519.js` (exports `x25519`).
+- [x] Self-signed identity document (`src/identity/document.ts`) with canonical serialization and Ed25519 self-signature binding.
+- [x] Canonical serialization (`src/identity/canonical.ts`) with deterministic field ordering.
+- [x] SHA-256 fingerprint (`src/identity/fingerprint.ts`) formatted as 12 groups of 5 digits (60 digits).
+- [x] Identity ID: `hex(SHA-256(signingPub || kaPub))`.
+- [x] `SpaceIdentityManager` (`src/identity/manager.ts`) with create, load, sign, verify, shared secret, and lifecycle management.
+- [x] `SpaceSession.getMasterKey()` for internal identity derivation.
+- [x] Private identity keys encrypted at rest via `EncryptedSpaceStore`.
+- [x] All Phase 1 tests continue passing (49/49).
+- [x] 8 new Phase 2 test suites (52 tests) all passing.
 
 ---
 
 ## 3. Test Status
 
 - **Test Framework**: Vitest (v3.2.7)
-- **Total Test Files**: 6/6 passed
-- **Total Tests**: 49/49 passed (100% pass rate)
+- **Total Test Files**: 14/14 passed
+- **Total Tests**: 101/101 passed (100% pass rate)
 - **Failing Tests**: 0
-- **Duration**: ~6.09s
+- **Duration**: ~4.87s
 
 ---
 
 ## 4. Next Recommended Task
 
-Proceed to **Phase 2: Independent Space Cryptographic Identities** ([`prompts/PHASE_02.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_02.md)).
+Proceed to **Phase 3: Privacy-Preserving Untrusted Transport Interface** ([`prompts/PHASE_03.md`](file:///c:/Users/RTX%204060/Desktop/PROJECT/chat/prompts/PHASE_03.md)).

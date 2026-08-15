@@ -8,10 +8,8 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: VEIL allows users to operate multiple Spaces (e.g. Main Space, Work Space, Private Space) within a single client application. We must decide whether Spaces share a single root identity with multiple UI profiles or maintain independent cryptographic identities.
-- **Decision**: Each Space generates and maintains completely independent Ed25519 (signing) and X25519 (Diffie-Hellman) keypairs (Phase 2). A Space's public identity is mathematically unrelated to any other Space's public identity.
-- **Reason**: Sharing a single root identity or master key between Spaces would allow network observers or compromised relays to correlate contacts and activities across Spaces.
-- **Consequences**: Adding a contact or sending a message in Space A exposes only Identity A. Identity B remains completely hidden.
+- **Decision**: Each Space generates and maintains completely independent Ed25519 (signing) and X25519 (Diffie-Hellman) keypairs. A Space's public identity is mathematically unrelated to any other Space's public identity.
+- **Reason**: Sharing a single root identity between Spaces would allow network observers to correlate activities across Spaces.
 
 ---
 
@@ -19,13 +17,7 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: When the application is locked, Space data must remain protected against local physical extraction. We need an authentication and key derivation mechanism where entering a specific password selectively unlocks only the corresponding Space.
-- **Decision**: 
-  - Each Space has a randomly generated 256-bit Space Master Key (SMK).
-  - The SMK is sealed inside an encrypted envelope using XChaCha20-Poly1305 with a Key Encryption Key (KEK) derived via Argon2id (`timeCost: 3, memoryCost: 65536 KiB, parallelism: 1`) using a unique, random 32-byte salt per Space.
-  - At unlock time, the entered password derives candidate KEKs against each Space salt. Only the envelope with matching authentication tag decrypts and loads the SMK into volatile memory.
-- **Reason**: Argon2id provides state-of-the-art resistance against GPU/ASIC cracking. Envelope encryption allows changing passwords or rotating keys without re-encrypting the entire Space database.
-- **Consequences**: Unlocking Space A has zero mathematical ability to decrypt Space B's envelope. If a wrong password is typed or a decoy password is entered, only the corresponding Space (or Decoy Space) opens.
+- **Decision**: Each Space has a randomly generated 256-bit SMK sealed via XChaCha20-Poly1305 with an Argon2id-derived KEK and unique random 32-byte salt.
 
 ---
 
@@ -33,66 +25,39 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: VEIL requires a clean, cross-platform architecture that runs 100% locally with zero paid services, supports high-performance cryptography, modern responsive UI, and unit/integration testing.
-- **Decision**:
-  - **Language**: TypeScript 5.x (Strict mode)
-  - **Frontend Client**: React 19 + Vite + Vanilla CSS Custom Design System
-  - **Cryptography**: `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, and WebCrypto API
-  - **Backend / Relay**: Node.js + WebSocket (ws) + Express / lightweight microservice
-  - **Testing**: Vitest for fast, isolated unit, negative, and cryptographic tests
-- **Reason**: Full TypeScript consistency across client, crypto core, and relay server simplifies protocol definitions, ensures type safety, and eliminates external hosting costs.
-- **Consequences**: Fast local build cycles, zero paid API dependencies, and high auditability.
+- **Decision**: TypeScript 5.x, React 19, Vite, `@noble/curves` + `@noble/hashes` + `@noble/ciphers`, Vitest.
 
 ---
 
-## ADR-004: Untrusted Relay Transport Abstraction with Blind Mailboxes
+## ADR-004: Untrusted Relay Transport with Blind Mailboxes
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: The client must transport encrypted messages between Spaces across the network without trusting the relay server.
-- **Decision**:
-  - Transport interface is decoupled from specific networking protocols (`ITransportAdapter`).
-  - Messages are addressed using rotating blind mailbox tokens (`HMAC-SHA256(RecipientPublicPrekey, EphemeralSessionToken)`).
-  - The relay stores and forwards encrypted ciphertext blobs without indexing by real identity public keys or user account tables.
-- **Reason**: Prevents the relay server from constructing communication social graphs or correlating sender/recipient pairs.
-- **Consequences**: Higher metadata privacy even if the relay server is seized or compromised.
+- **Decision**: Transport uses rotating blind mailbox tokens. Relay stores opaque ciphertext blobs.
 
 ---
 
-## ADR-005: Vanilla CSS Design System with Zero External Paid UI Libraries
+## ADR-005: Vanilla CSS Design System
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: The VEIL interface must feel premium, modern, accessible, and fast, while maintaining a strict zero-paid-services rule and total styling independence.
-- **Decision**: Implement a custom, tokenized CSS Design System (`veil-design-system.css`) containing color tokens, dark mode palette, typography scales, glassmorphism, responsive grid, micro-animations, and reusable UI primitives.
-- **Reason**: Guarantees zero bloat, complete theme control, and instant performance across mobile and desktop viewports.
-- **Consequences**: Consistent, stunning visual aesthetics without relying on third-party UI framework vendor lock-in.
+- **Decision**: Custom tokenized CSS Design System with zero external paid UI libraries.
 
 ---
 
-## ADR-006: Decoy Space & Panic Lock Boundary Definition
+## ADR-006: Decoy Space & Panic Lock Boundary
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: Users facing coercion may require a Decoy Space or Panic Lock. We must clearly define the cryptographic and legal limits of this feature.
-- **Decision**:
-  - An optional Decoy Space can be configured with an alternative password.
-  - When unlocked with the decoy password, VEIL displays the Decoy Space without showing errors or indicating the presence of other Spaces.
-  - VEIL documentation and UI explicitly state that Decoy Space does **not** guarantee forensic deniability against hardware extraction or OS memory dumps.
-  - A Panic Lock shortcut instantly zeros volatile memory keys and drops back to the locked state.
-- **Reason**: Security honesty is paramount. Never advertise impossible anti-forensic guarantees while still providing practical coercion mitigation.
-- **Consequences**: Users gain useful protection while remaining fully informed of threat model limitations.
+- **Decision**: Optional Decoy Space with independent identity; Panic Lock zeros volatile memory. Does NOT guarantee forensic deniability.
 
 ---
 
-## ADR-007: Argon2id Implementation Selection and Tuning
+## ADR-007: Argon2id Implementation Selection
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: A memory-hard password KDF is required for Space envelope security. We need a pure TypeScript/JS compatible, standards-compliant Argon2id implementation.
-- **Decision**: Selected `@noble/hashes/argon2.js` (v1.7.0). Production parameters configured at $m = 65536\text{ KiB}$ ($64\text{ MiB}$), $t = 3\text{ iterations}$, $p = 1\text{ thread}$, with 32-byte salts.
-- **Reason**: Zero binary native addons required; cross-platform compatibility across Node.js, Electron, and browsers.
-- **Consequences**: Robust brute-force resistance while remaining responsive on modern client devices.
+- **Decision**: `@noble/hashes/argon2.js` (v1.7.0). Production: $m=65536$ KiB, $t=3$, $p=1$, 32-byte salts.
 
 ---
 
@@ -100,10 +65,7 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: Need an authenticated symmetric encryption cipher for sealing Space Master Keys and encrypting local storage records.
-- **Decision**: Selected XChaCha20-Poly1305 from `@noble/ciphers/chacha.js` (v2.3.0) with 192-bit (24-byte) nonces and 128-bit (16-byte) Poly1305 tags.
-- **Reason**: 192-bit extended nonces eliminate birthday-bound nonce collision risks when nonces are generated via CSPRNG.
-- **Consequences**: Safe, collision-free encryption across unlimited Space creations and record writes.
+- **Decision**: `@noble/ciphers/chacha.js` (v2.3.0). 192-bit nonces, 128-bit Poly1305 tags.
 
 ---
 
@@ -111,10 +73,7 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: The Space Master Key (SMK) must securely derive subkeys for storage encryption, and future ratchet/identity subkeys.
-- **Decision**: Implemented HKDF-SHA256 (RFC 5869) with explicit domain tags (`"veil-v1-storage-key"`). Identity keys are strictly deferred to Phase 2.
-- **Reason**: Strict cryptographic domain separation guarantees that compromise of a subkey does not compromise the master key or other sibling subkeys.
-- **Consequences**: Clean separation of cryptographic responsibilities across subsystems.
+- **Decision**: HKDF-SHA256 (RFC 5869) with explicit domain tags. Identity keys deferred to Phase 2, now implemented.
 
 ---
 
@@ -122,11 +81,7 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: Prevent ciphertext transplantation attacks where an adversary moves valid SMK ciphertext into a different Space envelope or tampers with unencrypted envelope metadata (such as `spaceId`, `version`, or `salt`).
-- **Decision**: Formally bind envelope metadata via AEAD Associated Data during encryption and decryption:
-  `AAD = "VEIL-v1|version:1|spaceId:<id>|alg:XChaCha20-Poly1305|salt:<salt>"`
-- **Reason**: Guarantees that ciphertext cannot be reused in another Space or format context without triggering immediate authentication failure.
-- **Consequences**: Strong contextual binding for all stored envelopes.
+- **Decision**: AAD = `"VEIL-v1|version:1|spaceId:<id>|alg:XChaCha20-Poly1305|salt:<salt>"` bound during AEAD encrypt/decrypt of SMK.
 
 ---
 
@@ -134,7 +89,40 @@ This document records all architectural decisions made across the VEIL project l
 
 - **Date**: 2026-08-15
 - **Status**: Accepted
-- **Context**: Unlocking a Space can either target a known `spaceId` ($O(1)$) or scan candidate envelopes ($O(N)$ Argon2id operations).
-- **Decision**: Support both targeted unlock `unlockSpace(password, spaceId)` and discovery unlock `unlockSpace(password)`. Explicitly document that in Phase 1, the `spaceId` and Space names are local metadata and do not provide anonymous discovery guarantees.
-- **Reason**: Maximizes performance during standard app operations while maintaining prototype flexibility for multi-space credential selection.
-- **Consequences**: Clear performance predictability and explicit security limitation documentation.
+- **Decision**: Targeted unlock `unlockSpace(password, spaceId)` for $O(1)$ and discovery scan for $O(N)$. Phase 1 spaceId is local metadata, not anonymous.
+
+---
+
+## ADR-012: Two-Tier HKDF Identity Derivation
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Phase 2 requires independent Ed25519 signing and X25519 key agreement keypairs per Space. The keypairs must be deterministically reproducible from the Space Master Key so that identity survives password changes.
+- **Decision**: Implement a two-tier HKDF derivation hierarchy:
+  - Tier 1: `identitySeed = HKDF(SMK, "veil-v1-identity-seed")`
+  - Tier 2a: `signingKeyMaterial = HKDF(identitySeed, "veil-v1-signing-key")`
+  - Tier 2b: `keyAgreementMaterial = HKDF(identitySeed, "veil-v1-key-agreement")`
+- **Reason**: Two-tier derivation provides domain separation between signing and key agreement while allowing future identity sub-derivations (e.g. prekeys) from the identity seed without touching the SMK directly.
+- **Consequences**: Identity is deterministic from SMK. Changing the password rewraps the same SMK, so identity is preserved. Compromising the signing key does not reveal the key agreement key (and vice versa).
+
+---
+
+## ADR-013: Self-Signed Identity Document Binding
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: An identity document contains both a signing public key and a key agreement public key. We need a cryptographic mechanism to prove these keys belong together.
+- **Decision**: The identity document is self-signed: the Ed25519 signing key signs the canonical serialization of the document (excluding the `signature` field). Canonical serialization uses explicit field ordering, not `JSON.stringify()`.
+- **Reason**: Self-signature proves the signing key owner authorized the binding of both public keys into a single identity. No external CA or server trust required.
+- **Consequences**: Tampering with any field (including `identityId`, `fingerprint`, `createdAt`, or either public key) invalidates the signature. Unknown versions are rejected.
+
+---
+
+## ADR-014: Space Cloning Produces Same Identity (Phase 2 Limitation)
+
+- **Date**: 2026-08-15
+- **Status**: Accepted (Known Limitation)
+- **Context**: Since identity keys are deterministically derived from the SMK, copying the encrypted Space storage to another device and unlocking with the same password produces the same cryptographic identity.
+- **Decision**: Document this as a known Phase 2 limitation. Multi-device identity management and clone detection belong to Phase 6.
+- **Reason**: Deterministic derivation is required for password-change identity preservation. Clone detection requires additional protocol mechanisms not yet designed.
+- **Consequences**: Two devices could impersonate the same identity. Phase 6 must address this with device-binding or identity versioning.

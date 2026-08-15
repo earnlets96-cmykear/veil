@@ -46,6 +46,16 @@ export class SpaceSession {
   }
 
   /**
+   * Returns a reference to the active Space Master Key.
+   * Used internally by SpaceIdentityManager to derive identity keys.
+   * Throws if the session has been locked or destroyed.
+   */
+  public getMasterKey(): Uint8Array {
+    this.assertActive();
+    return this.masterKey!;
+  }
+
+  /**
    * Closes the session and wipes all key material from memory.
    */
   public destroy(): void {
