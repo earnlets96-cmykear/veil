@@ -4,7 +4,49 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 15] - 2026-08-15
+
+### Added
+- **Production Integration, Real-World Messaging & Application Hardening**:
+  - `src/contacts/types.ts`: Defined Contact model, verification status, and signed `InvitationPayload`.
+  - `src/contacts/invitationManager.ts`: Cryptographic invitation manager with Ed25519 signatures, timestamp validity, replay protection, and 7-day expiration.
+  - `src/contacts/contactManager.ts`: Space-isolated contact storage in `EncryptedSpaceStore` with verification toggle.
+  - `src/attachments/types.ts`: Attachment metadata and chunking descriptors.
+  - `src/attachments/attachmentPipeline.ts`: 64 KiB chunking with XChaCha20-Poly1305, full-file SHA-256 integrity verification, on-demand decryption, and ephemeral Blob revocation.
+  - `src/notifications/types.ts` & `notificationDispatcher.ts`: Privacy policies (`HIDDEN`, `SENDER_ONLY`, `FULL_OBFUSCATED`) and locked-state suppression.
+  - `src/search/types.ts` & `searchEngine.ts`: High-speed volatile in-memory search engine strictly isolated per Space and wiped on lock/panic.
+  - `src/config/types.ts` & `appConfig.ts`: Typed environment configurations (dev, test, prod) with fail-closed TLS enforcement.
+  - `src/server/storage/persistentRelayStore.ts`: File-backed persistent relay store with atomic `.tmp` rename operations and TTL sweep garbage collection.
+  - Extended React 19 UI with instant search overlay, contacts tab, file attachment picker, device management, and exportable invitation generator (`src/ui/`).
+  - Architecture Documentation:
+    - `docs/CONTACT_ARCHITECTURE.md`
+    - `docs/INVITATION_PROTOCOL.md`
+    - `docs/MESSAGE_LIFECYCLE.md`
+    - `docs/ATTACHMENT_ARCHITECTURE.md`
+    - `docs/DEVICE_LINKING.md`
+    - `docs/DATABASE_ARCHITECTURE.md`
+    - `docs/NOTIFICATION_PRIVACY.md`
+    - `docs/PRODUCTION_CONFIGURATION.md`
+    - `docs/PRODUCTION_DEPLOYMENT.md`
+  - Documented `ADR-072` through `ADR-078` in `docs/ai/DECISIONS.md`.
+  - 12 new automated test suites (295 total tests across 129 test files, 100% clean pass):
+    - `tests/contact-onboarding.test.ts`
+    - `tests/invitation-protocol.test.ts`
+    - `tests/message-lifecycle-production.test.ts`
+    - `tests/group-production-lifecycle.test.ts`
+    - `tests/attachment-pipeline.test.ts`
+    - `tests/device-production-lifecycle.test.ts`
+    - `tests/notification-privacy-dispatcher.test.ts`
+    - `tests/search-privacy.test.ts`
+    - `tests/production-config.test.ts`
+    - `tests/relay-persistence-file.test.ts`
+    - `tests/e2e-realistic-flow.test.ts`
+    - `tests/accessibility-ui.test.ts`
+
+---
+
 ## [Phase 14] - 2026-08-15
+
 
 ### Added
 - **Production Application Shell, Real Messaging UI & Client Integration**:

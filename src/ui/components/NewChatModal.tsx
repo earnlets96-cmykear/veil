@@ -1,51 +1,62 @@
 /**
- * New Chat Modal Component for VEIL.
- *
- * Allows initiating a 1-to-1 conversation via peer Identity Document or Identity ID.
+ * New Chat / Import Invitation Modal Component for VEIL Phase 15.
  */
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { InvitationManager } from '../../contacts/invitationManager.ts';
 
 export const NewChatModal: React.FC = () => {
-  const { addDirectContact, closeModal } = useApp();
-  const [identityInput, setIdentityInput] = useState('');
+  const { addContactFromInvitation, addDirectContact, closeModal } = useApp();
+  const [inputVal, setInputVal] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleStartChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identityInput.trim()) return;
+    if (!inputVal.trim()) return;
 
     setError(null);
+    const raw = inputVal.trim();
+
     try {
-      let doc: any;
-      if (identityInput.trim().startsWith('{')) {
-        doc = JSON.parse(identityInput.trim());
+      if (raw.startsWith('veil://invite/') || (raw.startsWith('{') && raw.includes('"signature"'))) {
+        // Cryptographically signed invitation
+        const invitation = InvitationManager.verifyAndParseInvitation(raw);
+        await addContactFromInvitation(invitation);
+      } else if (raw.startsWith('{')) {
+        // Direct Identity Document
+        const doc = JSON.parse(raw);
+        await addDirectContact(doc);
       } else {
-        // Simple manual identity ID
-        doc = {
-          identityId: identityInput.trim(),
+        // Simple Identity ID fallback
+        const doc = {
+          version: 1 as const,
+          identityId: raw,
           signingPublicKey: 'dummy_sign_pub',
           keyAgreementPublicKey: 'dummy_ka_pub',
-          fingerprint: identityInput.trim().slice(0, 16).toUpperCase(),
+          fingerprint: raw.slice(0, 16).toUpperCase(),
+          createdAt: Date.now(),
+          signature: 'dummy_sig',
         };
-      }
+        await addDirectContact(doc);
 
-      await addDirectContact(doc);
+      }
     } catch (err: any) {
-      setError(err.message || 'Invalid identity document.');
+      setError(err.message || 'Invalid or tampered invitation.');
     }
   };
 
   return (
-    <div className="veil-modal-overlay">
+    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="new-chat-title">
       <div className="veil-modal-card">
         <div className="veil-modal-header">
-          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Start Direct E2EE Chat</h2>
+          <h2 id="new-chat-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Start Direct E2EE Chat</h2>
           <button
+            type="button"
             className="veil-btn veil-btn-secondary"
             style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
             onClick={closeModal}
+            aria-label="Close dialog"
           >
             ✕
           </button>
@@ -54,11 +65,12 @@ export const NewChatModal: React.FC = () => {
         <form onSubmit={handleStartChat}>
           <div className="veil-modal-body">
             <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1rem' }}>
-              Paste your peer's public Identity ID or Identity Document to initiate an end-to-end encrypted session.
+              Paste your peer's signed invitation link (<code>veil://invite/...</code>) or Identity Document.
             </p>
 
             <div style={{ marginBottom: '1rem' }}>
               <label
+                htmlFor="invitation-input"
                 style={{
                   display: 'block',
                   fontSize: 'var(--veil-text-xs)',
@@ -67,14 +79,15 @@ export const NewChatModal: React.FC = () => {
                   marginBottom: '0.4rem',
                 }}
               >
-                Peer Identity ID / Document
+                Signed Invitation Link / Identity Payload
               </label>
               <textarea
+                id="invitation-input"
                 className="veil-input"
                 style={{ minHeight: '100px', fontFamily: 'var(--veil-font-mono)', fontSize: 'var(--veil-text-xs)' }}
-                placeholder="e.g. 8f4b2a1c... or JSON Identity Document"
-                value={identityInput}
-                onChange={(e) => setIdentityInput(e.target.value)}
+                placeholder="veil://invite/eyJ2ZXJzaW9uIjox... or Identity ID"
+                value={inputVal}
+                onChange={(e) => setInputVal(e.target.value)}
                 required
                 autoFocus
               />
@@ -101,8 +114,8 @@ export const NewChatModal: React.FC = () => {
             <button type="button" className="veil-btn veil-btn-secondary" onClick={closeModal}>
               Cancel
             </button>
-            <button type="submit" className="veil-btn veil-btn-primary" disabled={!identityInput.trim()}>
-              Start Conversation
+            <button type="submit" className="veil-btn veil-btn-primary" disabled={!inputVal.trim()}>
+              Verify & Add Contact
             </button>
           </div>
         </form>

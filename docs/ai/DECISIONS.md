@@ -755,6 +755,84 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Simplifies out-of-band MITM verification for non-technical users while preserving full cryptographic rigor.
 - **Consequences**: Clear, accessible identity verification UX.
 
+---
+
+## ADR-072: Space-Isolated Contact Architecture and Signed Invitation Protocol
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Onboarding peers must not require centralized directory servers or leak address books across independent Spaces.
+- **Decision**: Contacts are persisted in `EncryptedSpaceStore` scoped strictly per Space. Peer onboarding is driven by tamper-evident signed invitations (`InvitationPayload`) bearing Ed25519 signatures, timestamps, and 7-day expiration.
+- **Reason**: Guarantees zero cross-Space contact leakage and prevents spoofed identity exchange.
+- **Consequences**: Safe, decentralized, peer-to-peer contact onboarding.
+
+---
+
+## ADR-073: Authenticated Chunking Attachment Pipeline and Ephemeral Memory Management
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: File transfers must be encrypted end-to-end with chunk-level integrity verification and zero persistent plaintext disk artifacts.
+- **Decision**: Implement `AttachmentPipeline` using 64 KiB chunking with XChaCha20-Poly1305 and full-file SHA-256 integrity validation. Decrypted files exist only as ephemeral browser `Blob` URLs, which are revoked upon Space lock or Panic Lock.
+- **Reason**: Ensures untrusted relays see only opaque ciphertext chunks while client memory is cleaned up reliably.
+- **Consequences**: Robust E2EE attachment handling with fail-safe memory hygiene.
+
+---
+
+## ADR-074: Privacy-Preserving Notification Dispatching and Locked-State Suppression
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: System notifications can leak sensitive plaintext or sender identities to OS notification centers and lock screens.
+- **Decision**: Implement `NotificationDispatcher` supporting `HIDDEN`, `SENDER_ONLY`, and `FULL_OBFUSCATED` privacy modes. When a Space is locked, all notification dispatching is suppressed.
+- **Reason**: Protects against shoulder-surfing and OS-level forensic logging.
+- **Consequences**: User-controllable notification privacy with fail-closed locking.
+
+---
+
+## ADR-075: Space-Scoped Volatile In-Memory Local Search
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Users need search capabilities without creating unencrypted persistent inverted indexes on disk.
+- **Decision**: Implement `LocalSearchEngine` indexing contacts, groups, and message snippets strictly in memory for the active unlocked Space. The index is cleared on Space lock, Space switch, or Panic Lock.
+- **Reason**: Prevents forensic indexing leakage while delivering fast search across active Space conversations.
+- **Consequences**: High-speed, privacy-preserving search with zero disk residue.
+
+---
+
+## ADR-076: Environment-Aware Typed Configuration Architecture
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Client applications need environment-specific endpoints (development, test, production) without baking private secrets or allowing insecure production transports.
+- **Decision**: Implement `ConfigManager` (`src/config/appConfig.ts`) with runtime validation enforcing TLS (`https://`, `wss://`) in production mode.
+- **Reason**: Prevents accidental plaintext transport downgrade and guarantees zero secret baking into public bundles.
+- **Consequences**: Reliable, secure deployment configuration.
+
+---
+
+## ADR-077: Persistent File-Backed Relay Storage with Atomic Write-Rename Semantics
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Production self-hosted relays require envelope persistence across server restarts without complex or costly database infrastructure.
+- **Decision**: Implement `PersistentFileRelayStore` (`src/server/storage/persistentRelayStore.ts`) storing opaque mailbox records and envelopes with `.tmp` write-rename atomic operations and TTL sweep garbage collection.
+- **Reason**: Provides a 100% free, self-hostable, crash-safe storage engine while maintaining blind relay guarantees.
+- **Consequences**: Loss-resistant relay server operations with zero third-party cloud lock-in.
+
+---
+
+## ADR-078: Multi-Device SAS Pairing and Cryptographic Revocation Enforcement
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Multi-device pairing must be protected against MITM attacks, and revoked devices must be permanently barred from decrypting future traffic.
+- **Decision**: Multi-device enrollment requires Short Authentication String (SAS) in-person verification. Device revocations generate signed tombstones recorded in the Space's `DeviceRegistry`.
+- **Reason**: Prevents rogue device enrollment and guarantees permanent revocation enforcement.
+- **Consequences**: Cryptographically robust multi-device management.
+
+
 
 
 
