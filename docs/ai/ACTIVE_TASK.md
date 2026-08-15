@@ -1,22 +1,24 @@
 # ACTIVE_TASK.md — Current Work Tracker
 
 ## Task
-**VEIL Phase 4: End-to-End Encrypted 1-to-1 Messaging (Double Ratchet & X3DH)**
+**VEIL Phase 5: Encrypted Group Messaging & Encrypted Media**
 
 ## Status: COMPLETE
 
 ## Deliverables
-- [x] Protocol types & prekey structures (`src/ratchet/types.ts`)
-- [x] Root & Chain KDFs (`src/ratchet/kdf.ts`)
-- [x] PrekeyManager & bundles (`src/ratchet/prekeys.ts`)
-- [x] X3DH initial key agreement (`src/ratchet/x3dh.ts`)
-- [x] Double Ratchet state machine (`src/ratchet/ratchet.ts`)
-- [x] Encrypted session store (`src/messaging/sessionStore.ts`)
-- [x] 1-to-1 Conversation manager (`src/messaging/conversationManager.ts`)
-- [x] 10 Phase 4 test suites (15 new tests, 147 total) — ALL PASSING
-- [x] ADR-019, ADR-020, ADR-021, ADR-022 documented
-- [x] AI continuity & architecture documentation updated
-- [x] Git commit created
+- [x] Group Protocol specification documented (`docs/GROUP_PROTOCOL.md`)
+- [x] Media Security specification documented (`docs/MEDIA_SECURITY.md`)
+- [x] Group Messaging data models & types (`src/group/types.ts`)
+- [x] Group KDFs & canonicalizers (`src/group/groupKdf.ts`)
+- [x] SenderKey state machine with bounded out-of-order buffering (`src/group/senderKey.ts`)
+- [x] Authenticated GroupStateManager with role enforcement & Ed25519 signatures (`src/group/groupState.ts`)
+- [x] GroupManager coordinator with epoch key rotation on member removal (`src/group/groupManager.ts`)
+- [x] Client-side chunked symmetric MediaEncryptor with AAD & SHA-256 digests (`src/media/mediaEncryptor.ts`)
+- [x] Untrusted blob storage adapter (`src/media/mediaStorage.ts`)
+- [x] Space-isolated MediaVault with local gallery isolation (`src/media/mediaVault.ts`)
+- [x] 20 Phase 5 test suites (28 new tests, 175 total across 54 files) — 100% PASSING
+- [x] ADR-023 through ADR-028 documented
+- [x] Architecture & AI continuity docs updated
 
 ## Next Task
-Phase 5: Encrypted Group Messaging & Encrypted Media
+Phase 6: Multi-Device Synchronization, Device Linking & Cryptographic Recovery

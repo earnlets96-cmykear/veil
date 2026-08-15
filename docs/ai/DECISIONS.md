@@ -221,4 +221,71 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Preserves complete cryptographic isolation between Spaces on the same device.
 - **Consequences**: Space A cannot observe Space B's active conversations or message histories. When a Space locks, session keys are wiped from volatile memory.
 
+---
+
+## ADR-023: Sender Keys with Epoch Ratcheting for Scalable Group E2EE
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Group messaging with $N$ members requires $O(1)$ computation and transmission complexity rather than $O(N)$ pairwise encryptions per broadcast.
+- **Decision**: Adopt the **Sender Keys** protocol (Signal / Megolm group ratcheting scheme). Each participant generates a symmetric Chain Key, ratchets it via `kdfSenderChainStep(chainKey)` on each sent message, and distributes `SenderKeyDistributionMessage` to group members over pairwise Double Ratchet 1-to-1 channels.
+- **Reason**: Proven cryptographic standard for asynchronous, multi-party end-to-end encryption.
+- **Consequences**: Senders encrypt broadcast messages once; recipients decrypt in $O(1)$ using their stored inbound sender key state.
+
+---
+
+## ADR-024: Cryptographically Signed Group Actions and Anti-Rollback Epochs
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Group state operations (creation, member additions, removals, role promotions) must be authenticated without trusting the relay server.
+- **Decision**: Model all group state transitions as `GroupAction` structures signed with the acting member's `Ed25519` identity key. Group state maintains a strictly monotonically increasing `epoch` counter. Any action or distribution message with `epoch < currentEpoch` is rejected.
+- **Reason**: Prevents forged admin actions, unauthorized role changes, and malicious server rollback attacks.
+- **Consequences**: The untrusted server cannot alter group membership or forge administrator actions.
+
+---
+
+## ADR-025: Forward Secrecy on Group Member Removal via Key Rotation
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: When a member leaves or is removed from a group, they must be prevented from decrypting subsequent messages.
+- **Decision**: Removing a member increments the group Epoch ($Epoch_{k+1}$), forces all remaining members to reset their outbound Sender Keys, and distributes new Sender Keys exclusively to active remaining members over pairwise Double Ratchet channels.
+- **Reason**: Guarantees forward secrecy against departed members.
+- **Consequences**: The removed member does not receive Epoch $k+1$ sender keys and cannot decrypt future conversation content or media.
+
+---
+
+## ADR-026: Single-Use Cryptographically Random Symmetric Keys per Media Object
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Media files (images, audio, video, documents) must be encrypted before upload to untrusted blob storage.
+- **Decision**: Generate an independent, cryptographically random 32-byte symmetric key (`mediaKey`) for every single media object. The media key is delivered exclusively inside end-to-end encrypted messages (`RatchetMessage` or `GroupMessagePayload`).
+- **Reason**: Prevents key reuse across media files, conversations, or Spaces. Decryption keys are never exposed in URLs, headers, or server databases.
+- **Consequences**: The untrusted relay server receives opaque ciphertext only and cannot decrypt media or correlate media objects.
+
+---
+
+## ADR-027: Streaming Chunk Authenticated Encryption with AAD Binding and SHA-256 Digest
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Large media files must be encrypted and transferred efficiently without unbounded RAM consumption or chunk substitution vulnerabilities.
+- **Decision**: Partition media into 64 KiB chunks and encrypt each with `XChaCha20-Poly1305`. Authenticate chunk sequence via canonical AAD (`mediaId`, `chunkIndex`, `totalChunks`, `isLastChunk`). Require SHA-256 plaintext digest verification upon reassembly.
+- **Reason**: Detects and rejects chunk reordering, missing chunks, chunk duplication, and cross-file chunk substitution attacks.
+- **Consequences**: Corrupted, truncated, or tampered media chunks fail AEAD decryption immediately.
+
+---
+
+## ADR-028: Untrusted Media Relay and Local Gallery Isolation per Space
+
+- **Date**: 2026-08-15
+- **Status**: Accepted
+- **Context**: Untrusted media storage and privacy UX boundary must be strictly enforced.
+- **Decision**: Media blobs on the relay are protected by blind capability tokens. Decrypted media files and thumbnails are stored exclusively inside the Space partition in `EncryptedSpaceStore` and never automatically exported to shared OS device galleries.
+- **Reason**: Upholds multi-space cryptographic isolation and prevents media leaks to OS-level apps or photo sync services.
+- **Consequences**: Locking a Space locks all associated media; deleting a Space wipes all associated media cache.
+
+
 

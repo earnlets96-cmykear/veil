@@ -20,8 +20,11 @@ VEIL uses **selected established cryptographic primitives** from mature, widely 
 | **Digital Signatures** | **Ed25519** | `@noble/curves` (v1.8.0) | RFC 8032 | Identity authentication, document self-signatures, SPK signing |
 | **Key Agreement (DH)**| **X25519** | `@noble/curves` (v1.8.0) | RFC 7748 | Ephemeral and long-term Diffie-Hellman, X3DH, DH ratchet steps |
 | **Double Ratchet KDF** | **HKDF-SHA256 & HMAC-SHA256** | `@noble/hashes` (v1.7.0) | Signal Double Ratchet Spec / RFC 5869 | Root key & symmetric chain key ratcheting for per-message keys |
+| **Group Messaging (Sender Keys)** | **HMAC-SHA256 & HKDF-SHA256** | `@noble/hashes` (v1.7.0) | Signal Sender Keys Protocol | Scalable $O(1)$ group message chain stepping & epoch key derivation |
 | **Initial Key Agreement** | **X3DH** | `@noble/curves` + `@noble/hashes` | Signal X3DH Specification | Asynchronous mutual authentication and session establishment |
-| **CSPRNG** | **WebCrypto API** | Native `crypto.getRandomValues` | W3C WebCrypto | Generates salts, nonces, ephemeral prekeys, and random SMKs |
+| **Encrypted Media Vault** | **XChaCha20-Poly1305 + SHA-256** | `@noble/ciphers` + `@noble/hashes` | IETF RFC 8439 / SHA-256 | Streaming chunk authenticated encryption and media integrity digests |
+| **CSPRNG** | **WebCrypto API** | Native `crypto.getRandomValues` | W3C WebCrypto | Generates salts, nonces, ephemeral prekeys, media keys, and random SMKs |
+
 
 ---
 

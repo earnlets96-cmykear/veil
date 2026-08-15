@@ -4,9 +4,49 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 5] - 2026-08-15
+
+### Added
+- **Encrypted Group Messaging & Encrypted Media Vault**:
+  - `src/group/types.ts`: Group messaging types, roles (`CREATOR`, `ADMIN`, `MEMBER`), `GroupEpoch`, `GroupMember`, `GroupAction`, `GroupState`, `SenderKeyDistributionMessage`, `GroupMessagePayload`.
+  - `src/group/groupKdf.ts`: Sender key symmetric chain stepping (`HMAC-SHA256`), epoch master derivation (`HKDF-SHA256`), metadata encryption keys, and canonical byte serializations for AAD authentication and Ed25519 signatures.
+  - `src/group/senderKey.ts`: `SenderKeySession` state machine with $O(1)$ group message encryption, bounded skipped key buffer (`MAX_GROUP_SKIPPED_KEYS = 500`), Ed25519 sender signature verification, and single-use message key zeroization.
+  - `src/group/groupState.ts`: `GroupStateManager` enforcing role hierarchy, Ed25519 signature checks, anti-rollback epoch validation, and encrypted group metadata.
+  - `src/group/groupManager.ts`: `GroupManager` coordinating group creation, pairwise distribution over 1-to-1 Double Ratchet channels, epoch advancement, key rotation upon member departure, and encrypted Space store persistence.
+  - `src/media/types.ts`: `MediaMetadata`, `EncryptedMediaChunk`, `EncryptedMediaPackage`, `EncryptedMediaAttachment`, `MediaUploadRequest`, `MediaDownloadResponse`.
+  - `src/media/mediaEncryptor.ts`: Symmetric client-side chunked encryption with `XChaCha20-Poly1305`, random 32-byte keys per media file, canonical AAD binding (`mediaId`, `chunkIndex`, `totalChunks`, `isLastChunk`), and SHA-256 integrity digests.
+  - `src/media/mediaStorage.ts`: `InMemoryMediaRelay` / `IMediaStorageAdapter` for untrusted blob transport with capability authorization and corruption testing.
+  - `src/media/mediaVault.ts`: `MediaVault` managing local space-isolated encrypted media caching and gallery isolation.
+- **Documentation**:
+  - `docs/GROUP_PROTOCOL.md`: Comprehensive group protocol specification.
+  - `docs/MEDIA_SECURITY.md`: Comprehensive media encryption and untrusted blob transport specification.
+  - Documented `ADR-023` (Sender Keys with Epoch Ratcheting), `ADR-024` (Signed Group Actions and Anti-Rollback Epochs), `ADR-025` (Forward Secrecy on Member Departure), `ADR-026` (Single-Use Media Keys), `ADR-027` (Streaming Chunk Authenticated Encryption), `ADR-028` (Untrusted Media Relay and Local Gallery Isolation).
+- **Test Suites (20 new suites, 28 new tests, 175 total across 54 files)**:
+  - `tests/group-protocol.test.ts`: KDF determinism, key lengths, canonicalization.
+  - `tests/group-creation.test.ts`: Random group IDs, creator role, initial epoch 1, signed genesis action.
+  - `tests/group-membership.test.ts`: Role hierarchy (`CREATOR` > `ADMIN` > `MEMBER`), permission checks.
+  - `tests/group-add-remove.test.ts`: Forward secrecy on member departure, epoch advancement, key rotation.
+  - `tests/group-epochs.test.ts`: Monotonic epoch progression, stale action rejection, anti-rollback.
+  - `tests/group-replay.test.ts`: Message replay detection and sequence tracking.
+  - `tests/group-ordering.test.ts`: Out-of-order message decryption (1, 3, 2) via skipped message keys.
+  - `tests/group-state.test.ts`: Signature validation on actions and anti-tampering.
+  - `tests/group-rollback.test.ts`: Outbound sender key rollback rejection.
+  - `tests/group-malicious-server.test.ts`: Bit-flipped ciphertext rejection, header sequence tampering rejection.
+  - `tests/group-isolation.test.ts`: Cross-group and cross-space cryptographic isolation.
+  - `tests/media-encryption.test.ts`: Image, audio, video, document encryption with unique keys.
+  - `tests/media-integrity.test.ts`: Corrupted chunks, wrong keys, truncated chunks, tampered digests rejected.
+  - `tests/media-chunking.test.ts`: Reordered, duplicated, and cross-file substituted chunks detected.
+  - `tests/media-authorization.test.ts`: Capability token authorization for upload, download, delete.
+  - `tests/media-replay.test.ts`: Duplicate upload idempotency.
+  - `tests/media-corruption.test.ts`: Bit-flip, truncated byte stream, modified nonce detection.
+  - `tests/group-media.test.ts`: Complete end-to-end flow: Alice, Bob, Charlie; media transfer; member removal blocks subsequent media.
+  - `tests/group-crash-recovery.test.ts`: Group state and sender key recovery across lock/unlock cycles.
+  - `tests/group-fuzz.test.ts`: Malformed payloads and descriptors fuzz testing.
+
 ---
 
 ## [Phase 4] - 2026-08-15
+
 
 ### Added
 - **End-to-End Encrypted 1-to-1 Messaging (Double Ratchet & X3DH)**:

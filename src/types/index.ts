@@ -67,3 +67,10 @@ export interface EncryptedMessagePayload {
   ciphertext: string;
   timestamp: number;
 }
+
+// Group Types
+export * from '../group/types.ts';
+
+// Media Types
+export * from '../media/types.ts';
+

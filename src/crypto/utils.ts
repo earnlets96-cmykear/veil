@@ -8,7 +8,11 @@
 export function randomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
+    const MAX_CHUNK = 65536;
+    for (let offset = 0; offset < length; offset += MAX_CHUNK) {
+      const chunk = bytes.subarray(offset, Math.min(offset + MAX_CHUNK, length));
+      crypto.getRandomValues(chunk);
+    }
   } else {
     // Fallback for Node environment if global crypto is accessed
     const nodeCrypto = require('crypto');
@@ -16,6 +20,10 @@ export function randomBytes(length: number): Uint8Array {
   }
   return bytes;
 }
+
+export const getRandomBytes = randomBytes;
+
+
 
 /**
  * Encodes Uint8Array to base64 string.
