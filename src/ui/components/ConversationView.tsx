@@ -68,8 +68,8 @@ export const ConversationView: React.FC = () => {
         <div className="veil-chat-peer-info">
           <button
             type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.3rem 0.5rem', display: 'none' }}
+            className="veil-btn veil-btn-secondary veil-back-btn"
+            style={{ padding: '0.3rem 0.5rem' }}
             onClick={() => selectConversation(null)}
             aria-label="Back to sidebar"
           >

@@ -13,6 +13,10 @@ export const Sidebar: React.FC = () => {
     activeSession,
     conversations,
     contacts,
+    contactRequests,
+    acceptContactRequest,
+    declineContactRequest,
+    blockUser,
     activeChatId,
     selectConversation,
     openModal,
@@ -27,6 +31,9 @@ export const Sidebar: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
   const [copiedInvite, setCopiedInvite] = useState(false);
+
+  const pendingIncoming = contactRequests.filter((r) => r.status === 'INCOMING_PENDING');
+  const pendingOutgoing = contactRequests.filter((r) => r.status === 'OUTGOING_PENDING');
 
   const handleCopyInvite = () => {
     const invite = exportMyInvitation();
@@ -142,7 +149,7 @@ export const Sidebar: React.FC = () => {
           className={`veil-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
           onClick={() => setActiveTab('contacts')}
         >
-          Contacts ({contacts.length})
+          Contacts ({contacts.length}{pendingIncoming.length > 0 ? ` · ${pendingIncoming.length} req` : ''})
         </button>
       </div>
 
@@ -180,51 +187,137 @@ export const Sidebar: React.FC = () => {
           </div>
         ) : activeTab === 'contacts' ? (
           <div>
-            {contacts.length === 0 ? (
+            {/* Incoming Requests Section */}
+            {pendingIncoming.length > 0 && (
+              <div style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--veil-radius-md)' }}>
+                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-accent)', marginBottom: '0.5rem' }}>
+                  Incoming Contact Requests ({pendingIncoming.length})
+                </div>
+                {pendingIncoming.map((req) => (
+                  <div
+                    key={req.requestId}
+                    style={{
+                      padding: '0.5rem',
+                      backgroundColor: 'var(--veil-bg-surface)',
+                      borderRadius: 'var(--veil-radius-sm)',
+                      marginBottom: '0.4rem',
+                      border: '1px solid var(--veil-border-subtle)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-xs)' }}>
+                        {req.peerDisplayName} <span style={{ color: 'var(--veil-accent)' }}>@{req.peerUsername}</span>
+                      </span>
+                    </div>
+                    {req.greeting && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--veil-text-secondary)', marginBottom: '0.4rem', fontStyle: 'italic' }}>
+                        "{req.greeting}"
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        className="veil-btn veil-btn-primary"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                        onClick={() => acceptContactRequest(req.requestId)}
+                      >
+                        ✓ Accept
+                      </button>
+                      <button
+                        type="button"
+                        className="veil-btn veil-btn-secondary"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                        onClick={() => declineContactRequest(req.requestId)}
+                      >
+                        ✕ Decline
+                      </button>
+                      <button
+                        type="button"
+                        className="veil-btn veil-btn-danger"
+                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                        onClick={() => blockUser(req.peerIdentityId)}
+                        title="Block User"
+                      >
+                        🚫
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Outgoing Requests Section */}
+            {pendingOutgoing.length > 0 && (
+              <div style={{ marginBottom: '0.75rem', padding: '0.5rem' }}>
+                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-muted)', marginBottom: '0.3rem' }}>
+                  Sent Requests ({pendingOutgoing.length})
+                </div>
+                {pendingOutgoing.map((req) => (
+                  <div
+                    key={req.requestId}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.35rem 0.5rem',
+                      fontSize: 'var(--veil-text-xs)',
+                      color: 'var(--veil-text-secondary)',
+                    }}
+                  >
+                    <span>@{req.peerUsername}</span>
+                    <span className="veil-badge veil-badge-warning" style={{ fontSize: '0.65rem' }}>
+                      Pending
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {contacts.length === 0 && pendingIncoming.length === 0 && (
               <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
                 No contacts added yet.
                 <div style={{ marginTop: '0.5rem' }}>
-                  Click <strong>+ Chat</strong> to import an invitation.
+                  Click <strong>+ Chat</strong> to find users or import an invitation.
                 </div>
               </div>
-            ) : (
-              contacts.map((contact) => (
-                <div
-                  key={contact.identityId}
-                  className="veil-conversation-item"
-                  onClick={() => selectConversation(contact.identityId)}
-                >
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #a855f7, #6366f1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      color: '#ffffff',
-                    }}
-                  >
-                    {contact.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="veil-conversation-info">
-                    <div className="veil-conversation-top">
-                      <span className="veil-conversation-name">{contact.name}</span>
-                      <span
-                        className={`veil-badge ${contact.verificationStatus === 'VERIFIED' ? 'veil-badge-secure' : 'veil-badge-warning'}`}
-                        style={{ fontSize: '0.65rem' }}
-                      >
-                        {contact.verificationStatus === 'VERIFIED' ? '✓ Verified' : 'Unverified'}
-                      </span>
-                    </div>
-                    <div className="veil-conversation-preview">ID: {contact.identityId.slice(0, 16)}...</div>
-                  </div>
-                </div>
-              ))
             )}
+
+            {contacts.map((contact) => (
+              <div
+                key={contact.identityId}
+                className="veil-conversation-item"
+                onClick={() => selectConversation(contact.identityId)}
+              >
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    color: '#ffffff',
+                  }}
+                >
+                  {contact.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="veil-conversation-info">
+                  <div className="veil-conversation-top">
+                    <span className="veil-conversation-name">{contact.name}</span>
+                    <span
+                      className={`veil-badge ${contact.verificationStatus === 'VERIFIED' ? 'veil-badge-secure' : 'veil-badge-warning'}`}
+                      style={{ fontSize: '0.65rem' }}
+                    >
+                      {contact.verificationStatus === 'VERIFIED' ? '✓ Verified' : 'Unverified'}
+                    </span>
+                  </div>
+                  <div className="veil-conversation-preview">ID: {contact.identityId.slice(0, 16)}...</div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div>

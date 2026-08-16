@@ -550,6 +550,10 @@ body {
   margin-bottom: 1rem;
 }
 
+.veil-back-btn {
+  display: none;
+}
+
 /* Responsive Rules */
 @media (max-width: 768px) {
   .veil-sidebar {
@@ -561,5 +565,9 @@ body {
   }
   .veil-app-layout:not(.has-active-chat) .veil-chat-main {
     display: none;
+  }
+  .veil-back-btn {
+    display: inline-flex;
+    align-items: center;
   }
 }

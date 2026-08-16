@@ -19,15 +19,35 @@ export const SettingsModal: React.FC = () => {
     store,
     notificationDispatcher,
     exportMyInvitation,
+    myProfile,
+    registerUsername,
   } = useApp();
 
   const [autoLockVal, setAutoLockVal] = useState('5');
   const [notifLevel, setNotifLevel] = useState<NotificationPrivacyMode>(notificationDispatcher.getPrivacyMode());
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [usernameInput, setUsernameInput] = useState(myProfile?.username || '');
+  const [displayNameInput, setDisplayNameInput] = useState(myProfile?.displayName || activeSession?.name || '');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [showPairingSas, setShowPairingSas] = useState(false);
   const [devices, setDevices] = useState<{ id: string; name: string; lastSeen: number }[]>([
     { id: 'dev_primary', name: 'Primary Device (This Browser)', lastSeen: Date.now() },
   ]);
+
+  const handleSaveUsername = async () => {
+    if (!usernameInput.trim()) return;
+    setProfileSaving(true);
+    setProfileStatus(null);
+    try {
+      await registerUsername(usernameInput.trim(), displayNameInput.trim() || undefined);
+      setProfileStatus('Username successfully registered & published to directory!');
+    } catch (err: any) {
+      setProfileStatus(`Error: ${err.message || 'Failed to update username'}`);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const loadedIdentity = activeSession ? idMgr.loadIdentity(activeSession, store) : null;
   const fingerprint = loadedIdentity?.document.fingerprint || 'E2EE-IDENTITY';
@@ -104,6 +124,63 @@ export const SettingsModal: React.FC = () => {
             >
               {fingerprint}
             </div>
+          </div>
+
+          {/* Public Profile & Handle */}
+          <div className="veil-card" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.4rem' }}>
+              Public Profile & Discovery Handle
+            </h3>
+            <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.6rem' }}>
+              Set or update your public @username so peers can find and connect with you directly.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <input
+                  type="text"
+                  className="veil-input"
+                  style={{ fontSize: 'var(--veil-text-xs)' }}
+                  placeholder="Username (e.g. phone1)"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                />
+                <input
+                  type="text"
+                  className="veil-input"
+                  style={{ fontSize: 'var(--veil-text-xs)' }}
+                  placeholder="Display Name"
+                  value={displayNameInput}
+                  onChange={(e) => setDisplayNameInput(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="veil-btn veil-btn-primary"
+                style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.75rem' }}
+                onClick={handleSaveUsername}
+                disabled={profileSaving || !usernameInput.trim()}
+              >
+                {profileSaving ? 'Publishing to Directory...' : 'Save & Publish Handle'}
+              </button>
+            </div>
+
+            {myProfile && (
+              <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-success)', marginTop: '0.3rem' }}>
+                ✓ Registered Handle: <strong>@{myProfile.username}</strong> ({myProfile.displayName})
+              </div>
+            )}
+            {profileStatus && (
+              <div
+                style={{
+                  fontSize: 'var(--veil-text-xs)',
+                  color: profileStatus.includes('Error') ? 'var(--veil-danger)' : 'var(--veil-accent)',
+                  marginTop: '0.3rem',
+                }}
+              >
+                {profileStatus}
+              </div>
+            )}
           </div>
 
           {/* Export Signed Invitation */}
