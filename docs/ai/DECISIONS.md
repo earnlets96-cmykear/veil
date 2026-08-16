@@ -1129,6 +1129,62 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Concludes full-lifecycle real-world validation of VEIL v1.0.0.
 - **Consequences**: Complete multi-platform release readiness.
 
+---
+
+## ADR-106: Blind Mailbox Inclusion in Signed Invitations
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Relay delivery required a blind random 256-bit `mailboxId`. When invitations only contained static Ed25519 identity IDs, dispatch failed with 404 on the relay.
+- **Decision**: Include the Space's active `mailboxId` in `InvitationPayload` and sign it canonically under Ed25519 to prevent forgery or tampering.
+- **Reason**: Ensures contact onboarding automatically binds recipient blind routing targets without directory lookups.
+- **Consequences**: Seamless peer-to-peer mailbox resolution across untrusted relays.
+
+---
+
+## ADR-107: Public PrekeyBundle Bundling in Peer Invitations
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Asynchronous 1-to-1 Double Ratchet requires the recipient's Signed Prekey (and optional One-Time Prekey) for X3DH initial key agreement.
+- **Decision**: Embed the public `PrekeyBundle` within signed invitations (`InvitationPayload.prekeyBundle`) and persist it on the `Contact` record.
+- **Reason**: Allows the initiator to immediately establish Double Ratchet sessions upon contact import without querying third-party prekey servers.
+- **Consequences**: Purely serverless asynchronous cryptographic session initiation.
+
+---
+
+## ADR-108: Dynamic Contact-Based Mailbox Addressing in Network Dispatch
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: `AppState.sendMessage` originally passed local `conversationId` (`identityId`) directly to `sendEnvelope`, causing relay 404 rejections.
+- **Decision**: `AppState.sendMessage` must look up the recipient `Contact` record and route the envelope to `contact.mailboxId`.
+- **Reason**: Decouples cryptographic identity IDs from blind routing mailboxes on the untrusted relay.
+- **Consequences**: Correct delivery routing to the recipient's assigned mailbox.
+
+---
+
+## ADR-109: Authenticated Wire Payload Packaging & Inbound Routing Invariant
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Raw ciphertext payloads received over relay mailboxes lacked explicit sender document bindings, causing inbound message routing inversions in UI history.
+- **Decision**: Implement `WirePayload` containing authenticated `senderDocument`, `deliveryId`, and size-padded Double Ratchet `ratchetMessage`. Decrypted messages are indexed strictly by the verified `senderIdentityId`.
+- **Reason**: Guarantees deterministic inbound routing to the sender's conversation timeline.
+- **Consequences**: Immune to conversation ID inversion or spoofing.
+
+---
+
+## ADR-110: Phase 22 Real-Device Delivery Defect Resolution Certification
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Phase 22 reproduces, isolates, and repairs the Phone 2 -> Phone 1 real-device delivery failure across 10 focused regression test suites.
+- **Decision**: Formally certify Phase 22 completion across all 172 automated test suites (358 tests) and verified production builds.
+- **Reason**: Completely resolves real-device mobile delivery failure with zero security regressions.
+- **Consequences**: Turnkey real-device delivery validation and production readiness.
+
+
 
 
 

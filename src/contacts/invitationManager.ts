@@ -9,6 +9,7 @@ import { InvitationPayload } from './types.ts';
 import { IdentityDocument } from '../identity/document.ts';
 import { sign as edSign, verify as edVerify } from '../identity/signing.ts';
 import { bytesToBase64, base64ToBytes } from '../crypto/utils.ts';
+import { PrekeyBundle } from '../ratchet/types.ts';
 
 const DEFAULT_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 Days
 
@@ -20,12 +21,14 @@ export class InvitationManager {
     identityDoc: IdentityDocument,
     signingPrivateKey: Uint8Array,
     name: string,
-    expiresInMs = DEFAULT_INVITATION_TTL_MS
+    expiresInMs = DEFAULT_INVITATION_TTL_MS,
+    mailboxId?: string,
+    prekeyBundle?: PrekeyBundle
   ): InvitationPayload {
     const now = Date.now();
     const expiresAt = now + expiresInMs;
 
-    const unsignedPayload = {
+    const unsignedPayload: any = {
       version: 1 as const,
       identityId: identityDoc.identityId,
       name,
@@ -35,6 +38,13 @@ export class InvitationManager {
       createdAt: now,
       expiresAt,
     };
+
+    if (mailboxId) {
+      unsignedPayload.mailboxId = mailboxId;
+    }
+    if (prekeyBundle) {
+      unsignedPayload.prekeyBundle = prekeyBundle;
+    }
 
     const canonicalBytes = new TextEncoder().encode(JSON.stringify(unsignedPayload));
     const signatureBytes = edSign(signingPrivateKey, canonicalBytes);
@@ -90,7 +100,7 @@ export class InvitationManager {
     }
 
     // Verify Ed25519 signature
-    const unsignedObj = {
+    const unsignedObj: any = {
       version: payload.version,
       identityId: payload.identityId,
       name: payload.name,
@@ -100,6 +110,13 @@ export class InvitationManager {
       createdAt: payload.createdAt,
       expiresAt: payload.expiresAt,
     };
+
+    if (payload.mailboxId !== undefined) {
+      unsignedObj.mailboxId = payload.mailboxId;
+    }
+    if (payload.prekeyBundle !== undefined) {
+      unsignedObj.prekeyBundle = payload.prekeyBundle;
+    }
 
     const canonicalBytes = new TextEncoder().encode(JSON.stringify(unsignedObj));
     const signPubKeyBytes = base64ToBytes(payload.signingPublicKey);

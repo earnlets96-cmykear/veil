@@ -44,6 +44,7 @@ export class ContactManager {
       verificationStatus: 'UNVERIFIED',
       addedAt: Date.now(),
       prekeyBundle: invitation.prekeyBundle,
+      mailboxId: invitation.mailboxId,
     };
 
     if (existingIdx >= 0) {

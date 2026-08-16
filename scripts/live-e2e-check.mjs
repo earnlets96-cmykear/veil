@@ -72,14 +72,15 @@ async function runLiveE2ECheck() {
     // Transmit over relay to Bob's mailbox
     await netA.sendEnvelope(sessionA, mbB.mailboxId, JSON.stringify(enc));
 
-    // Bob syncs from relay
-    const fetched = await netB.syncMailbox(sessionB, mbB.mailboxId, mbB.capabilityToken);
-    if (fetched.length !== 1) throw new Error('Bob did not receive envelope');
+    // Bob syncs from relay & decrypts
+    let decryptedText = '';
+    const processedCount = await netB.syncMailbox(sessionB, async (payload) => {
+      const receivedEnc = JSON.parse(payload);
+      const decryptedBytes = bob.ratchetDecrypt(receivedEnc);
+      decryptedText = new TextDecoder().decode(decryptedBytes);
+    });
 
-    // Bob decrypts
-    const receivedEnc = JSON.parse(fetched[0].payload);
-    const decryptedBytes = bob.ratchetDecrypt(receivedEnc);
-    const decryptedText = new TextDecoder().decode(decryptedBytes);
+    if (processedCount !== 1) throw new Error('Bob did not receive envelope');
     if (decryptedText !== msg) throw new Error('Decrypted text mismatch');
 
     console.log(`✅ Live E2EE Verified: "${decryptedText}" successfully delivered across platforms!`);

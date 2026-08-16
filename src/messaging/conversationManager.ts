@@ -41,13 +41,13 @@ export class ConversationManager {
   private idMgr: SpaceIdentityManager;
   private prekeyMgr: PrekeyManager;
   private sessionStore: RatchetSessionStore;
-  private transportClient: TransportClient;
+  private transportClient?: TransportClient;
 
   constructor(
     store: EncryptedSpaceStore,
     idMgr: SpaceIdentityManager,
     prekeyMgr: PrekeyManager,
-    transportClient: TransportClient
+    transportClient?: TransportClient
   ) {
     this.store = store;
     this.idMgr = idMgr;
@@ -145,8 +145,10 @@ export class ConversationManager {
     // 3. Persist updated ratchet session state
     this.sessionStore.saveSession(session, ratchetSession);
 
-    // 4. Send via TransportClient (queues in outbox and flushes)
-    await this.transportClient.sendEnvelope(session, transportEnvelope, recipientMailboxId);
+    // 4. Send via TransportClient if configured (queues in outbox and flushes)
+    if (this.transportClient) {
+      await this.transportClient.sendEnvelope(session, transportEnvelope, recipientMailboxId);
+    }
 
     // 5. Store in local encrypted message history
     const storedMsg: StoredMessage = {
@@ -253,6 +255,188 @@ export class ConversationManager {
     this.appendMessage(session, senderId, storedMsg);
 
     return storedMsg;
+  }
+
+  /**
+   * Encrypts a message using Double Ratchet and packages it into a size-padded wire payload.
+   */
+  public async encryptAndPackWireMessage(
+    session: SpaceSession,
+    peerBundle: PrekeyBundle,
+    text: string,
+    attachment?: { name: string; sizeBytes: number; mimeType: string }
+  ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {
+    this.assertSession(session);
+
+    const peerId = peerBundle.identityDocument.identityId;
+    let ratchetSession = this.sessionStore.loadSession(session, peerId);
+    let x3dhHeader = undefined;
+
+    const myIdentity = this.idMgr.loadIdentity(session, this.store);
+    if (!myIdentity) throw new Error('Cannot send message: no Space identity');
+    const myDoc = this.idMgr.getPublicDocument(session, this.store)!;
+
+    // If no existing session, establish new session via X3DH
+    if (!ratchetSession) {
+      const x3dhRes = initiateX3DH(myIdentity.keyAgreementPrivateKey, peerBundle);
+      x3dhHeader = x3dhRes.header;
+
+      const peerRatchetPub = base64ToBytes(peerBundle.signedPrekey.publicKey);
+      ratchetSession = DoubleRatchetSession.initAlice(
+        `sess_${Date.now()}_${peerId.slice(0, 8)}`,
+        peerId,
+        peerBundle.identityDocument.signingPublicKey,
+        peerBundle.identityDocument.keyAgreementPublicKey,
+        x3dhRes.sharedMasterKey,
+        peerRatchetPub
+      );
+    }
+
+    // 1. Encrypt plaintext through Double Ratchet
+    const ratchetMsg = ratchetSession.ratchetEncrypt(text, x3dhHeader);
+    const deliveryId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // 2. Package into WirePayload
+    const wireObj = {
+      version: 1 as const,
+      deliveryId,
+      senderIdentityId: myDoc.identityId,
+      senderDocument: myDoc,
+      ratchetMessage: ratchetMsg,
+      attachment,
+    };
+
+    // 3. Size-normalize & Pad
+    const jsonBytes = new TextEncoder().encode(JSON.stringify(wireObj));
+    const { padded } = padPayload(jsonBytes);
+    const wirePayloadBase64 = bytesToBase64(padded);
+
+    // 4. Save updated ratchet session state
+    this.sessionStore.saveSession(session, ratchetSession);
+
+    // 5. Save in local message history
+    const storedMessage: StoredMessage = {
+      messageId: deliveryId,
+      conversationId: peerId,
+      senderIdentityId: myDoc.identityId,
+      recipientIdentityId: peerId,
+      text,
+      isOutgoing: true,
+      timestamp: Date.now(),
+      status: 'sent',
+    };
+    this.appendMessage(session, peerId, storedMessage);
+
+    return { wirePayloadBase64, deliveryId, storedMessage };
+  }
+
+  /**
+   * Processes, decrypts, and persists an incoming wire payload from a peer.
+   */
+  public async processInboundWirePayload(
+    session: SpaceSession,
+    rawPayloadBase64: string
+  ): Promise<{ storedMessage: StoredMessage; senderDoc: IdentityDocument; attachment?: any }> {
+    this.assertSession(session);
+
+    let wireObj: any;
+    try {
+      // 1. Unpad transport bytes
+      const paddedBytes = base64ToBytes(rawPayloadBase64);
+      const unpaddedBytes = unpadPayload(paddedBytes);
+      wireObj = JSON.parse(new TextDecoder().decode(unpaddedBytes));
+    } catch (_e) {
+      // Fallback if raw JSON
+      try {
+        wireObj = JSON.parse(rawPayloadBase64);
+      } catch (err) {
+        throw new Error('Failed to decode incoming wire payload');
+      }
+    }
+
+    if (!wireObj || !wireObj.ratchetMessage || !wireObj.senderDocument) {
+      throw new Error('Malformed wire payload: missing required E2EE fields');
+    }
+
+    const senderDoc: IdentityDocument = wireObj.senderDocument;
+    const senderId = senderDoc.identityId;
+    const ratchetMsg: RatchetMessage = wireObj.ratchetMessage;
+
+    let ratchetSession = this.sessionStore.loadSession(session, senderId);
+
+    // 2. If no session exists and message contains X3DH header, initialize Bob's session
+    if (!ratchetSession) {
+      if (!ratchetMsg.header.x3dhHeader) {
+        throw new Error('Cannot receive message: no session exists and message lacks X3DH header');
+      }
+
+      const myIdentity = this.idMgr.loadIdentity(session, this.store);
+      if (!myIdentity) throw new Error('Cannot receive message: Space has no identity');
+
+      const spkPriv = this.prekeyMgr.getSignedPrekeyPrivate(
+        session,
+        ratchetMsg.header.x3dhHeader.signedPrekeyId
+      );
+      if (!spkPriv) {
+        throw new Error(`Signed prekey ${ratchetMsg.header.x3dhHeader.signedPrekeyId} not found`);
+      }
+
+      let opkPriv: Uint8Array | null = null;
+      if (ratchetMsg.header.x3dhHeader.oneTimePrekeyId !== undefined) {
+        opkPriv = this.prekeyMgr.consumeOneTimePrekey(
+          session,
+          ratchetMsg.header.x3dhHeader.oneTimePrekeyId
+        );
+      }
+
+      const senderIdentityPub = base64ToBytes(senderDoc.keyAgreementPublicKey);
+      const sharedMasterKey = receiveX3DH(
+        myIdentity.keyAgreementPrivateKey,
+        spkPriv,
+        opkPriv,
+        senderIdentityPub,
+        ratchetMsg.header.x3dhHeader
+      );
+
+      // Initialize Bob's Double Ratchet with Bob's SPK keypair
+      const spkKeypair = {
+        privateKey: spkPriv,
+        publicKey: base64ToBytes(this.prekeyMgr.getSignedPrekeyPublic(session)!.publicKey),
+      };
+
+      ratchetSession = DoubleRatchetSession.initBob(
+        `sess_${Date.now()}_${senderId.slice(0, 8)}`,
+        senderId,
+        senderDoc.signingPublicKey,
+        senderDoc.keyAgreementPublicKey,
+        sharedMasterKey,
+        spkKeypair
+      );
+    }
+
+    // 3. Decrypt through Double Ratchet
+    const plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
+    const text = new TextDecoder().decode(plaintextBytes);
+
+    // 4. Save updated session state
+    this.sessionStore.saveSession(session, ratchetSession);
+
+    // 5. Append to encrypted local conversation history
+    const deliveryId = wireObj.deliveryId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const myDoc = this.idMgr.getPublicDocument(session, this.store);
+    const storedMessage: StoredMessage = {
+      messageId: deliveryId,
+      conversationId: senderId,
+      senderIdentityId: senderId,
+      recipientIdentityId: myDoc?.identityId || 'local_user',
+      text,
+      isOutgoing: false,
+      timestamp: Date.now(),
+      status: 'delivered',
+    };
+    this.appendMessage(session, senderId, storedMessage);
+
+    return { storedMessage, senderDoc, attachment: wireObj.attachment };
   }
 
   /**

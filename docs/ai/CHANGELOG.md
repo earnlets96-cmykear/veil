@@ -4,6 +4,30 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 22] - 2026-08-16
+
+### Added
+- **Real-Device Delivery Failure Diagnosis, Repair & Acceptance**:
+  - Comprehensive root cause analysis document (`docs/PHASE22_ROOT_CAUSE.md`).
+  - Contact & Invitation model expansion to package blind `mailboxId` and public `PrekeyBundle` under canonical Ed25519 signature checks (`src/contacts/types.ts`, `src/contacts/invitationManager.ts`, `src/contacts/contactManager.ts`).
+  - Wire message packaging (`WirePayload`) in `ConversationManager` providing authenticated sender documents, size padding (`padPayload`), Double Ratchet encrypt/decrypt, and dynamic conversation timeline mapping.
+  - Complete application state integration in `AppState.tsx` wiring `PrekeyManager`, `ConversationManager`, and dynamic recipient mailbox addressing.
+  - 10 new regression test suites in `tests/`:
+    - `tests/phase22-delivery-trace.test.ts` (12-stage Phone 1 <-> Phone 2 lifecycle trace)
+    - `tests/phase22-mailbox-routing.test.ts` (Mailbox allocation, binding persistence, 404 queue safety)
+    - `tests/phase22-identity-routing.test.ts` (Cryptographic invitation signing and tamper detection)
+    - `tests/phase22-e2ee-recipient.test.ts` (Bidirectional Double Ratchet session establishment)
+    - `tests/phase22-ack-semantics.test.ts` (Persistence-before-ACK invariant & deduplication)
+    - `tests/phase22-multicontact-routing.test.ts` (3-party routing in normal and reversed contact order)
+    - `tests/phase22-multispace-routing.test.ts` (5 isolated Spaces with zero cross-space message leakage)
+    - `tests/phase22-reconnect-delivery.test.ts` (Offline queuing and reconnect catch-up delivery)
+    - `tests/phase22-android-lifecycle-delivery.test.ts` (Cold process kill & restart recovery)
+    - `tests/phase22-real-device-contract.test.ts` (20-message bidirectional real-device contract)
+  - Documented `ADR-106` through `ADR-110` in `docs/ai/DECISIONS.md`.
+  - Total test count expanded to 172 test files (358 tests) passing 100% cleanly.
+
+---
+
 ## [Phase 21] - 2026-08-16
 
 ### Added

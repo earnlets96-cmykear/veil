@@ -25,6 +25,10 @@ import { LocalSearchEngine } from '../../search/searchEngine.ts';
 import { SearchResult } from '../../search/types.ts';
 import { ConfigManager } from '../../config/appConfig.ts';
 import { AppConfig } from '../../config/types.ts';
+import { PrekeyManager } from '../../ratchet/prekeys.ts';
+import { ConversationManager } from '../../messaging/conversationManager.ts';
+import { SpaceMailboxBinding } from '../../network/types.ts';
+import { PrekeyBundle } from '../../ratchet/types.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -32,6 +36,8 @@ const vault = new SpaceVaultManager();
 const store = new EncryptedSpaceStore(storageAdapter);
 const idMgr = new SpaceIdentityManager();
 const netManager = new NetworkManager(store);
+const prekeyManager = new PrekeyManager(store, idMgr);
+const convManager = new ConversationManager(store, idMgr, prekeyManager);
 const sessionController = new SessionController(vault, store, storageAdapter, idMgr, netManager);
 const contactManager = new ContactManager(store);
 const notificationDispatcher = new NotificationDispatcher('SENDER_ONLY');
@@ -143,40 +149,117 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 4. Update Search Engine Index
     searchEngine.updateIndex(storedContacts, storedConvs, storedMsgs);
 
-    // 5. Connect NetworkManager for real-time WebSocket delivery
+    // 5. Ensure Mailbox and Prekey pool are initialized
+    try {
+      await netManager.getOrCreateMailbox(session);
+    } catch (_e) {}
+    try {
+      prekeyManager.generateSignedPrekey(session);
+      prekeyManager.generateOneTimePrekeys(session, 10);
+    } catch (_e) {}
+
+    // 6. Connect NetworkManager for real-time WebSocket delivery & sync
     try {
       await netManager.startListening(session, async (payload) => {
         try {
-          const parsed = JSON.parse(payload);
-          if (parsed && parsed.conversationId && (parsed.text || parsed.attachment)) {
-            const incomingMsg: UIMessage = {
-              id: parsed.id || `msg_${Date.now()}`,
-              conversationId: parsed.conversationId,
-              senderId: parsed.senderId || 'peer',
-              text: parsed.text || '',
-              isOutgoing: false,
-              timestamp: Date.now(),
-              status: 'DELIVERED_TO_RECIPIENT',
-              attachment: parsed.attachment,
-            };
+          // Attempt E2EE wire payload processing
+          const result = await convManager.processInboundWirePayload(session, payload);
+          const { storedMessage, senderDoc, attachment } = result;
 
-            setMessages((prev) => {
-              const list = prev[parsed.conversationId] || [];
-              const updated = { ...prev, [parsed.conversationId]: [...list, incomingMsg] };
-              store.setAsync(session, 'veil:ui:messages', updated);
-              searchEngine.updateIndex(storedContacts, storedConvs, updated);
+          const incomingMsg: UIMessage = {
+            id: storedMessage.messageId,
+            conversationId: storedMessage.conversationId,
+            senderId: storedMessage.senderIdentityId,
+            text: storedMessage.text,
+            isOutgoing: false,
+            timestamp: storedMessage.timestamp,
+            status: 'DELIVERED_TO_RECIPIENT',
+            attachment,
+          };
+
+          setMessages((prev) => {
+            const list = prev[incomingMsg.conversationId] || [];
+            const updated = { ...prev, [incomingMsg.conversationId]: [...list, incomingMsg] };
+            store.setAsync(session, 'veil:ui:messages', updated);
+            searchEngine.updateIndex(storedContacts, storedConvs, updated);
+            return updated;
+          });
+
+          // Ensure conversation exists in list and update last message
+          setConversations((prev) => {
+            const existing = prev.find((c) => c.id === incomingMsg.conversationId);
+            if (existing) {
+              const updated = prev.map((c) =>
+                c.id === incomingMsg.conversationId
+                  ? {
+                      ...c,
+                      lastMessage: incomingMsg.text,
+                      timestamp: incomingMsg.timestamp,
+                      unreadCount: (c.unreadCount || 0) + 1,
+                    }
+                  : c
+              );
+              store.setAsync(session, 'veil:ui:conversations', updated);
               return updated;
-            });
+            } else {
+              const newConv: UIConversation = {
+                id: incomingMsg.conversationId,
+                type: 'direct',
+                name: senderDoc.identityId.slice(0, 10),
+                avatarSeed: incomingMsg.conversationId,
+                fingerprint: senderDoc.fingerprint,
+                isVerified: false,
+                unreadCount: 1,
+                lastMessage: incomingMsg.text,
+                timestamp: incomingMsg.timestamp,
+                peerDoc: senderDoc,
+              };
+              const updated = [newConv, ...prev];
+              store.setAsync(session, 'veil:ui:conversations', updated);
+              return updated;
+            }
+          });
 
-            // Dispatch notification
-            notificationDispatcher.dispatch({
-              id: incomingMsg.id,
-              senderName: parsed.senderName || 'Peer',
-              text: parsed.text,
-              timestamp: Date.now(),
-            });
-          }
-        } catch (_e) {}
+          // Dispatch notification
+          notificationDispatcher.dispatch({
+            id: incomingMsg.id,
+            senderName: senderDoc.identityId.slice(0, 8),
+            text: incomingMsg.text,
+            timestamp: Date.now(),
+          });
+        } catch (_wireErr) {
+          // Fallback to raw JSON if payload was legacy/unencrypted
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed && parsed.conversationId && (parsed.text || parsed.attachment)) {
+              const incomingMsg: UIMessage = {
+                id: parsed.id || `msg_${Date.now()}`,
+                conversationId: parsed.conversationId,
+                senderId: parsed.senderId || 'peer',
+                text: parsed.text || '',
+                isOutgoing: false,
+                timestamp: Date.now(),
+                status: 'DELIVERED_TO_RECIPIENT',
+                attachment: parsed.attachment,
+              };
+
+              setMessages((prev) => {
+                const list = prev[parsed.conversationId] || [];
+                const updated = { ...prev, [parsed.conversationId]: [...list, incomingMsg] };
+                store.setAsync(session, 'veil:ui:messages', updated);
+                searchEngine.updateIndex(storedContacts, storedConvs, updated);
+                return updated;
+              });
+
+              notificationDispatcher.dispatch({
+                id: incomingMsg.id,
+                senderName: parsed.senderName || 'Peer',
+                text: parsed.text,
+                timestamp: Date.now(),
+              });
+            }
+          } catch (_e) {}
+        }
       });
       setNetworkState('connected');
     } catch (_err) {
@@ -252,14 +335,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
 
+      // Resolve recipient contact for mailboxId and prekeyBundle
+      const targetContact = contacts.find((c) => c.identityId === conversationId);
+      const targetMailboxId = targetContact?.mailboxId || conversationId;
+
       try {
-        const payload = JSON.stringify({
-          id: msgId,
-          conversationId,
-          senderId: activeSession.spaceId,
-          text: text.trim(),
-        });
-        await netManager.sendEnvelope(activeSession, conversationId, payload);
+        let wirePayload: string;
+        if (targetContact?.prekeyBundle) {
+          const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+            activeSession,
+            targetContact.prekeyBundle,
+            text.trim()
+          );
+          wirePayload = wirePayloadBase64;
+        } else {
+          wirePayload = JSON.stringify({
+            id: msgId,
+            conversationId,
+            senderId: activeSession.spaceId,
+            text: text.trim(),
+          });
+        }
+
+        await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
 
         setMessages((prev) => {
           const list = (prev[conversationId] || []).map((m) =>
@@ -327,10 +425,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
 
       try {
-        await netManager.sendEnvelope(activeSession, conversationId, payload);
+        const targetContact = contacts.find((c) => c.identityId === conversationId);
+        const targetMailboxId = targetContact?.mailboxId || conversationId;
+        await netManager.sendEnvelope(activeSession, targetMailboxId, payload);
       } catch (_e) {}
     },
-    [activeSession]
+    [activeSession, contacts]
   );
 
   const addDirectContact = useCallback(
@@ -375,10 +475,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         fingerprint: contact.fingerprint,
         isVerified: false,
         unreadCount: 0,
+        peerDoc: invitation.prekeyBundle?.identityDocument,
       };
 
       setConversations((prev) => {
-        if (prev.some((c) => c.id === contact.identityId)) return prev;
+        if (prev.some((c) => c.id === contact.identityId)) {
+          return prev.map((c) =>
+            c.id === contact.identityId ? { ...c, name: contact.name, fingerprint: contact.fingerprint } : c
+          );
+        }
         const updated = [newConv, ...prev];
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
@@ -395,14 +500,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const identity = idMgr.loadIdentity(activeSession, store);
     if (!identity) return null;
 
+    let mailboxId: string | undefined;
+    const binding = store.get<SpaceMailboxBinding>(activeSession, 'net_mailbox_binding');
+    if (binding && binding.mailboxId) {
+      mailboxId = binding.mailboxId;
+    }
+
+    let prekeyBundle: PrekeyBundle | undefined;
+    try {
+      prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+    } catch (_e) {}
+
     const invitation = InvitationManager.createInvitation(
       identity.document,
       identity.signingPrivateKey,
-      activeSession.name
+      activeSession.name,
+      undefined,
+      mailboxId,
+      prekeyBundle
     );
     return InvitationManager.toShareableString(invitation);
   }, [activeSession]);
-
 
   const updateContactVerification = useCallback(
     async (identityId: string, status: VerificationStatus) => {

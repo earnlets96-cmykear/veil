@@ -4,7 +4,7 @@
  * Decouples relay business logic from specific database implementations.
  */
 
-import { RelayEnvelope, MailboxRecord } from '../types.ts';
+import type { RelayEnvelope, MailboxRecord } from '../types.ts';
 
 export interface IRelayStore {
   init(): Promise<void>;

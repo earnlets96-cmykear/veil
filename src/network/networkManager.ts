@@ -133,6 +133,8 @@ export class NetworkManager {
     } catch (err: any) {
       // Keep in queue for automatic drain upon reconnect
       await this.queue.updateOutboundStatus(session, queueId, 'QUEUED', err.message);
+      item.status = 'QUEUED';
+      item.errorMessage = err.message;
     }
 
     return item;

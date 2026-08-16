@@ -18,6 +18,7 @@ export interface Contact {
   addedAt: number;
   lastSeen?: number;
   prekeyBundle?: PrekeyBundle;
+  mailboxId?: string;
   metadata?: Record<string, string>;
 }
 
@@ -28,6 +29,7 @@ export interface InvitationPayload {
   signingPublicKey: string; // Base64
   keyAgreementPublicKey: string; // Base64
   fingerprint: string;
+  mailboxId?: string;
   prekeyBundle?: PrekeyBundle;
   createdAt: number;
   expiresAt: number;
