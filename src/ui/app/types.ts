@@ -42,6 +42,8 @@ export type ActiveModal =
   | { type: 'newGroup' }
   | { type: 'groupDetails'; conversationId: string }
   | { type: 'contactDetails'; conversationId: string }
+  | { type: 'contactRequests' }
+  | { type: 'findUser' }
   | { type: 'settings' }
   | { type: 'panicLock' }
   | null;

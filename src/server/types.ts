@@ -107,3 +107,36 @@ export type ServerWsMessage =
   | { type: 'envelope'; envelope: RelayEnvelope }
   | { type: 'ack_confirm'; acknowledgedCount: number }
   | { type: 'error'; code: RelayErrorCode; message: string };
+
+// Directory Protocol Types
+import type { SignedProfileDocument } from '../identity/profile.ts';
+
+export interface RegisterProfileRequest {
+  profile: SignedProfileDocument;
+}
+
+export interface RegisterProfileResponse {
+  protocolVersion: 'v1';
+  success: boolean;
+  username: string;
+  identityId: string;
+}
+
+export interface DirectorySearchResult {
+  identityId: string;
+  username: string;
+  displayName: string;
+  avatar?: string;
+  profileSignature: string;
+}
+
+export interface DirectorySearchResponse {
+  protocolVersion: 'v1';
+  results: DirectorySearchResult[];
+  query: string;
+}
+
+export interface DirectoryProfileResponse {
+  protocolVersion: 'v1';
+  profile: SignedProfileDocument;
+}

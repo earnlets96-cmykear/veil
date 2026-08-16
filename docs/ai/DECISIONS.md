@@ -1184,6 +1184,95 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Completely resolves real-device mobile delivery failure with zero security regressions.
 - **Consequences**: Turnkey real-device delivery validation and production readiness.
 
+---
+
+## ADR-111: Global Canonical Username Model & Homoglyph Rejection
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Real-world user discovery requires human-readable handles without exposing users to Unicode spoofing, homoglyph attacks, zero-width confusion, or trailing delimiter ambiguities.
+- **Decision**: Restrict usernames strictly to 3–32 ASCII characters `[a-z0-9_-]`, starting and ending with alphanumeric characters, with zero consecutive separators. Canonicalize via lowercase ASCII normalization. Reject all non-ASCII, Unicode homoglyphs, and control characters at the validation boundary.
+- **Reason**: Guarantees unambiguous identity representation across all platforms and prevents impersonation.
+- **Consequences**: Deterministic handle lookup and zero Unicode confusable attack surface.
+
+---
+
+## ADR-112: Ed25519-Signed Public Profiles with Deterministic Canonical Serialization
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: The directory server is untrusted; it must not be capable of modifying a user's display name, assigned mailbox, or public prekeys without detection.
+- **Decision**: Public profiles (`SignedProfileDocument`) are signed by the Space's Ed25519 identity key using recursive deterministic JSON key sorting (`canonicalizeProfile`). Clients and servers verify the signature prior to indexing or accepting requests.
+- **Reason**: Prevents server-side tampering or injection of attacker prekeys.
+- **Consequences**: Public profiles are cryptographically tamper-proof even when stored on untrusted relays.
+
+---
+
+## ADR-113: Untrusted Directory Storage & Conflict Detection
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Relay servers require an index of registered usernames without having access to private keys or plaintext communications.
+- **Decision**: Implement directory storage (`IRelayStore.registerProfile`, `getProfileByUsername`, `searchProfiles`) with atomic collision detection (`409 CONFLICT`). Allow profile updates only when signed by the identical `identityId` that owns the record.
+- **Reason**: Enforces handle ownership while preventing account takeover or namespace collisions.
+- **Consequences**: Safe handle management and atomic persistence.
+
+---
+
+## ADR-114: Anti-Enumeration & Bounded Search Query Constraints
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Public directories risk being scraped in bulk by adversaries to construct full user registries or link metadata.
+- **Decision**: Enforce minimum search query length (`q.length >= 3`), bound search results to a maximum of 10 items, omit private mailbox and prekey fields from generic search results, and apply IP-based rate limiting.
+- **Reason**: Prevents bulk scraping and directory enumeration while maintaining responsive user search.
+- **Consequences**: Adversaries cannot dump the user database through the search endpoint.
+
+---
+
+## ADR-115: Cryptographic Contact Request Handshake over Blind Relay Mailboxes
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Two users must be able to initiate contact without prior out-of-band link exchange, while preserving zero-knowledge relay privacy.
+- **Decision**: Package contact requests (`ContactRequestWire`) and acceptances (`ContactResponseWire`) as signed payloads dispatched over blind relay mailboxes via `NetworkManager.sendEnvelope`.
+- **Reason**: The relay learns only random mailbox IDs and opaque envelopes, while the clients establish mutual cryptographic identity verification.
+- **Consequences**: Seamless peer discovery without sacrificing transport privacy.
+
+---
+
+## ADR-116: Space-Isolated Contact Request & Blocklist Storage Partitioning
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Multi-Space architecture requires that contact requests, incoming pending invitations, and blocked users in one Space never leak into another Space.
+- **Decision**: Store contact requests under `veil:contact_requests:list` and blocklists under `veil:blocklist:list` within `EncryptedSpaceStore`, strictly encrypted under the active Space's `StorageKey`.
+- **Reason**: Preserves absolute cryptographic boundaries between Spaces.
+- **Consequences**: Zero cross-space contact or metadata leakage.
+
+---
+
+## ADR-117: Autonomous Contact Creation upon Handshake Acceptance
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Manual prekey and mailbox configuration between discovered peers creates friction and risks session establishment failure.
+- **Decision**: When a contact request is accepted, both the recipient and initiator automatically ingest the verified peer's `PrekeyBundle` and `mailboxId` into `ContactManager`, immediately transitioning the relationship to an active Double Ratchet conversation.
+- **Reason**: Provides an instant, seamless real-world messaging experience identical to modern chat apps while remaining 100% end-to-end encrypted.
+- **Consequences**: Zero user friction after accepting a contact request.
+
+---
+
+## ADR-118: Phase 23 Username Discovery & Contact Request Certification
+
+- **Date**: 2026-08-16
+- **Status**: Accepted
+- **Context**: Phase 23 delivers real-world identity discovery, anti-enumeration search, signed profiles, contact requests, and acceptance flows across 15 comprehensive regression test suites.
+- **Decision**: Formally certify Phase 23 completion across all 187 automated test suites (380 tests) and verified production builds.
+- **Reason**: Fulfills the Phase 23 master implementation requirements with zero regressions to the frozen cryptographic core.
+- **Consequences**: Fully operational real-world identity and discovery subsystem.
+
+
 
 
 

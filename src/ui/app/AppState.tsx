@@ -29,6 +29,10 @@ import { PrekeyManager } from '../../ratchet/prekeys.ts';
 import { ConversationManager } from '../../messaging/conversationManager.ts';
 import { SpaceMailboxBinding } from '../../network/types.ts';
 import { PrekeyBundle } from '../../ratchet/types.ts';
+import { DirectoryClient } from '../../network/directoryClient.ts';
+import { ContactRequestManager, ContactRequest } from '../../contacts/contactRequestManager.ts';
+import { SignedProfileDocument, createSignedProfile, verifySignedProfile } from '../../identity/profile.ts';
+import { DirectorySearchResult } from '../../server/types.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -43,6 +47,8 @@ const contactManager = new ContactManager(store);
 const notificationDispatcher = new NotificationDispatcher('SENDER_ONLY');
 const searchEngine = new LocalSearchEngine();
 const appConfig = ConfigManager.getConfig();
+const directoryClient = new DirectoryClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787');
+const contactRequestManager = new ContactRequestManager(store, contactManager, idMgr, netManager);
 
 export interface AppContextType {
   storageReady: boolean;
@@ -50,6 +56,8 @@ export interface AppContextType {
   activeSession: SpaceSession | null;
   conversations: UIConversation[];
   contacts: Contact[];
+  contactRequests: ContactRequest[];
+  myProfile: SignedProfileDocument | null;
   activeChatId: string | null;
   messages: Record<string, UIMessage[]>;
   activeModal: ActiveModal;
@@ -75,10 +83,22 @@ export interface AppContextType {
   exportMyInvitation: () => string | null;
   updateContactVerification: (identityId: string, status: VerificationStatus) => Promise<void>;
   createGroup: (name: string, description?: string) => Promise<void>;
+
+  // Phase 23 Actions
+  registerUsername: (username: string, displayName?: string) => Promise<SignedProfileDocument>;
+  searchDirectory: (query: string) => Promise<DirectorySearchResult[]>;
+  sendContactRequest: (targetUsername: string, greeting?: string) => Promise<void>;
+  acceptContactRequest: (requestId: string) => Promise<void>;
+  declineContactRequest: (requestId: string) => Promise<void>;
+  blockUser: (identityId: string) => Promise<void>;
+  unblockUser: (identityId: string) => Promise<void>;
+
   sessionController: SessionController;
   idMgr: SpaceIdentityManager;
   store: EncryptedSpaceStore;
   notificationDispatcher: NotificationDispatcher;
+  contactRequestManager: ContactRequestManager;
+  directoryClient: DirectoryClient;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -89,6 +109,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [activeSession, setActiveSession] = useState<SpaceSession | null>(null);
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactRequests, setContactRequests] = useState<ContactRequest[]>([]);
+  const [myProfile, setMyProfile] = useState<SignedProfileDocument | null>(null);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, UIMessage[]>>({});
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -119,6 +141,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setActiveSession(null);
       setConversations([]);
       setContacts([]);
+      setContactRequests([]);
+      setMyProfile(null);
       setMessages({});
       setActiveChatId(null);
       setActiveModal(null);
@@ -142,14 +166,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const storedContacts = await contactManager.listContacts(session);
     setContacts(storedContacts);
 
-    // 3. Load message history
+    // 3. Load contact requests
+    const storedRequests = await contactRequestManager.listRequests(session);
+    setContactRequests(storedRequests);
+
+    // 4. Load public profile
+    const storedProfile = (await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile')) || null;
+    setMyProfile(storedProfile);
+
+    // 5. Load message history
     const storedMsgs = (await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages')) || {};
     setMessages(storedMsgs);
 
-    // 4. Update Search Engine Index
+    // 6. Update Search Engine Index
     searchEngine.updateIndex(storedContacts, storedConvs, storedMsgs);
 
-    // 5. Ensure Mailbox and Prekey pool are initialized
+    // 7. Ensure Mailbox and Prekey pool are initialized
     try {
       await netManager.getOrCreateMailbox(session);
     } catch (_e) {}
@@ -158,11 +190,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prekeyManager.generateOneTimePrekeys(session, 10);
     } catch (_e) {}
 
-    // 6. Connect NetworkManager for real-time WebSocket delivery & sync
+    // 8. Connect NetworkManager for real-time WebSocket delivery & sync
     try {
       await netManager.startListening(session, async (payload) => {
+        // Check for Contact Requests or Responses
         try {
-          // Attempt E2EE wire payload processing
+          if (payload.includes('"type":"CONTACT_REQUEST"')) {
+            const parsed = JSON.parse(payload);
+            const req = await contactRequestManager.handleInboundRequest(session, parsed);
+            if (req) {
+              const updated = await contactRequestManager.listRequests(session);
+              setContactRequests(updated);
+              notificationDispatcher.dispatch({
+                id: req.requestId,
+                senderName: req.peerDisplayName || `@${req.peerUsername}`,
+                text: req.greeting || 'Sent you a contact request',
+                timestamp: req.createdAt,
+              });
+              return;
+            }
+          } else if (payload.includes('"type":"CONTACT_RESPONSE"')) {
+            const parsed = JSON.parse(payload);
+            const resp = await contactRequestManager.handleInboundResponse(session, parsed);
+            if (resp) {
+              const updatedReqs = await contactRequestManager.listRequests(session);
+              setContactRequests(updatedReqs);
+              const updatedContacts = await contactManager.listContacts(session);
+              setContacts(updatedContacts);
+              return;
+            }
+          }
+        } catch (_reqErr) {}
+
+        // Standard E2EE wire payload processing
+        try {
           const result = await convManager.processInboundWirePayload(session, payload);
           const { storedMessage, senderDoc, attachment } = result;
 
@@ -568,12 +629,137 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sessionController.recordUserActivity();
   }, []);
 
+  const registerUsername = useCallback(
+    async (username: string, displayName?: string) => {
+      if (!activeSession) throw new Error('No active Space');
+      const identity = idMgr.loadIdentity(activeSession, store);
+      if (!identity) throw new Error('Identity not loaded');
+
+      const binding = await netManager.getOrCreateMailbox(activeSession);
+      const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+
+      const profile = createSignedProfile(
+        identity.document.identityId,
+        identity.signingPrivateKey,
+        username,
+        displayName || username,
+        binding.mailboxId,
+        prekeyBundle
+      );
+
+      await directoryClient.registerProfile(profile);
+      await store.setAsync(activeSession, 'veil:user:profile', profile);
+      setMyProfile(profile);
+      return profile;
+    },
+    [activeSession]
+  );
+
+  const searchDirectory = useCallback(
+    async (query: string) => {
+      return directoryClient.searchProfiles(query);
+    },
+    []
+  );
+
+  const sendContactRequest = useCallback(
+    async (targetUsername: string, greeting?: string) => {
+      if (!activeSession) throw new Error('No active Space');
+      const targetProfile = await directoryClient.getProfileByUsername(targetUsername);
+      if (!targetProfile) {
+        throw new Error(`User @${targetUsername} not found`);
+      }
+
+      let profileToSend = myProfile;
+      if (!profileToSend) {
+        const identity = idMgr.loadIdentity(activeSession, store);
+        if (!identity) throw new Error('Identity not loaded');
+        const binding = await netManager.getOrCreateMailbox(activeSession);
+        const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+        profileToSend = createSignedProfile(
+          identity.document.identityId,
+          identity.signingPrivateKey,
+          `user_${identity.document.identityId.slice(0, 8)}`,
+          activeSession.name,
+          binding.mailboxId,
+          prekeyBundle
+        );
+      }
+
+      await contactRequestManager.sendContactRequest(
+        activeSession,
+        profileToSend,
+        targetProfile,
+        greeting
+      );
+      setContactRequests(await contactRequestManager.listRequests(activeSession));
+    },
+    [activeSession, myProfile]
+  );
+
+  const acceptContactRequest = useCallback(
+    async (requestId: string) => {
+      if (!activeSession) throw new Error('No active Space');
+      let profileToSend = myProfile;
+      if (!profileToSend) {
+        const identity = idMgr.loadIdentity(activeSession, store);
+        if (!identity) throw new Error('Identity not loaded');
+        const binding = await netManager.getOrCreateMailbox(activeSession);
+        const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+        profileToSend = createSignedProfile(
+          identity.document.identityId,
+          identity.signingPrivateKey,
+          `user_${identity.document.identityId.slice(0, 8)}`,
+          activeSession.name,
+          binding.mailboxId,
+          prekeyBundle
+        );
+      }
+
+      await contactRequestManager.acceptRequest(activeSession, requestId, profileToSend);
+      setContactRequests(await contactRequestManager.listRequests(activeSession));
+      setContacts(await contactManager.listContacts(activeSession));
+    },
+    [activeSession, myProfile]
+  );
+
+  const declineContactRequest = useCallback(
+    async (requestId: string) => {
+      if (!activeSession) return;
+      await contactRequestManager.declineRequest(activeSession, requestId);
+      setContactRequests(await contactRequestManager.listRequests(activeSession));
+    },
+    [activeSession]
+  );
+
+  const blockUser = useCallback(
+    async (identityId: string) => {
+      if (!activeSession) return;
+      await contactRequestManager.blockUser(activeSession, identityId);
+      setContactRequests(await contactRequestManager.listRequests(activeSession));
+      setContacts(await contactManager.listContacts(activeSession));
+    },
+    [activeSession]
+  );
+
+  const unblockUser = useCallback(
+    async (identityId: string) => {
+      if (!activeSession) return;
+      await contactRequestManager.unblockUser(activeSession, identityId);
+      setContactRequests(await contactRequestManager.listRequests(activeSession));
+      setContacts(await contactManager.listContacts(activeSession));
+    },
+    [activeSession]
+  );
+
   const value: AppContextType = {
     storageReady,
     storageError,
     activeSession,
     conversations,
     contacts,
+    contactRequests,
+    myProfile,
     activeChatId,
     messages,
     activeModal,
@@ -597,10 +783,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     exportMyInvitation,
     updateContactVerification,
     createGroup,
+    registerUsername,
+    searchDirectory,
+    sendContactRequest,
+    acceptContactRequest,
+    declineContactRequest,
+    blockUser,
+    unblockUser,
     sessionController,
     idMgr,
     store,
     notificationDispatcher,
+    contactRequestManager,
+    directoryClient,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

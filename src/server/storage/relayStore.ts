@@ -4,7 +4,8 @@
  * Decouples relay business logic from specific database implementations.
  */
 
-import type { RelayEnvelope, MailboxRecord } from '../types.ts';
+import type { RelayEnvelope, MailboxRecord, DirectorySearchResult } from '../types.ts';
+import type { SignedProfileDocument } from '../../identity/profile.ts';
 
 export interface IRelayStore {
   init(): Promise<void>;
@@ -17,6 +18,14 @@ export interface IRelayStore {
   deleteEnvelopes(mailboxId: string, envelopeIds: string[]): Promise<number>;
   countEnvelopes(mailboxId: string): Promise<number>;
   sweepExpired(now: number): Promise<{ expiredMailboxes: number; expiredEnvelopes: number }>;
+
+  // Directory & Public Profile Methods
+  registerProfile(profile: SignedProfileDocument): Promise<void>;
+  getProfileByUsername(canonicalUsername: string): Promise<SignedProfileDocument | null>;
+  getProfileByIdentity(identityId: string): Promise<SignedProfileDocument | null>;
+  searchProfiles(query: string, limit: number): Promise<DirectorySearchResult[]>;
+  deleteProfile(identityId: string): Promise<boolean>;
+
   close(): Promise<void>;
   destroyStore(): Promise<void>;
 }

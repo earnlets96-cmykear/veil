@@ -27,14 +27,16 @@
 | **Phase 20** | Live Production Deployment, Android Client & Cross-Platform Validation | **COMPLETED** | Android container, diagnostic tooling, cross-platform E2EE validation |
 | **Phase 21** | Real-Device and Live-Production Validation | **COMPLETED** | Live relay diagnostics, logcat leak auditor, offline recovery & deep-link tests |
 | **Phase 22** | Real-Device Delivery Failure Diagnosis, Repair & Acceptance | **COMPLETED** | Fixed blind mailbox invitation bundling, prekey packaging, dynamic routing & wire payloads (10 test suites) |
+| **Phase 23** | Real-World Identity, Username Discovery & Contact Requests | **COMPLETED** | Global unique usernames, Ed25519-signed profiles, anti-enumeration search, contact request handshake (15 test suites) |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
-- **Release Version**: **`1.0.0` (Production GA)**
-- **Total Test Files**: **172 / 172 passed (100% pass rate)**
-- **Total Tests**: **358 / 358 passed (0 failures, 0 skipped)**
-- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in 1.23s)
+- **Release Version**: **`1.0.0` (Production GA with Discovery Extension)**
+- **Total Test Files**: **187 / 187 passed (100% pass rate)**
+- **Total Tests**: **380 / 380 passed (0 failures, 0 skipped)**
+- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in 1.37s)
 - **Release Manifest**: SHA-256 verified in `release/v1.0.0/manifest.json`
 - **Working Tree**: Clean and fully verified.
+

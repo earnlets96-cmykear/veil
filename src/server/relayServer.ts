@@ -34,7 +34,13 @@ import {
   AckEnvelopesRequest,
   AckEnvelopesResponse,
   RelayErrorCode,
+  RegisterProfileRequest,
+  RegisterProfileResponse,
+  DirectorySearchResponse,
+  DirectoryProfileResponse,
 } from './types.ts';
+import { verifySignedProfile } from '../identity/profile.ts';
+import { validateUsername } from '../identity/username.ts';
 
 export class RelayServer {
   private config: RelayServerConfig;
@@ -194,6 +200,33 @@ export class RelayServer {
       if (method === 'POST' && url === '/v1/envelopes/ack') {
         const body = await this.readJsonBody<AckEnvelopesRequest>(req);
         await this.handleAckEnvelopes(body, res);
+        return;
+      }
+
+      // Directory endpoints
+      if (method === 'POST' && url === '/v1/directory/register') {
+        const body = await this.readJsonBody<RegisterProfileRequest>(req);
+        await this.handleRegisterProfile(body, res);
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/directory/update') {
+        const body = await this.readJsonBody<RegisterProfileRequest>(req);
+        await this.handleUpdateProfile(body, res);
+        return;
+      }
+
+      if (method === 'GET' && url === '/v1/directory/search') {
+        const rawUrl = req.url || '';
+        const queryParams = new URL(rawUrl, `http://${this.config.host}`).searchParams;
+        const q = queryParams.get('q') || '';
+        await this.handleDirectorySearch(q, res);
+        return;
+      }
+
+      if (method === 'GET' && url.startsWith('/v1/directory/profile/')) {
+        const username = decodeURIComponent(url.slice('/v1/directory/profile/'.length));
+        await this.handleGetProfile(username, res);
         return;
       }
 
@@ -361,6 +394,123 @@ export class RelayServer {
       protocolVersion: RELAY_PROTOCOL_VERSION,
       mailboxId: body.mailboxId,
       acknowledgedCount: count,
+    };
+
+    res.statusCode = 200;
+    res.end(JSON.stringify(response));
+  }
+
+  private async handleRegisterProfile(body: RegisterProfileRequest, res: ServerResponse): Promise<void> {
+    if (!body?.profile) {
+      this.sendError(res, 'BAD_REQUEST', 'Missing profile document', 400);
+      return;
+    }
+
+    const profile = body.profile;
+    const validation = validateUsername(profile.username);
+    if (!validation.valid || validation.canonical !== profile.username) {
+      this.sendError(res, 'BAD_REQUEST', `Invalid username format: ${validation.error}`, 400);
+      return;
+    }
+
+    // Verify signature against identity public key
+    const isValidSignature = verifySignedProfile(profile);
+    if (!isValidSignature) {
+      this.sendError(res, 'FORBIDDEN', 'Invalid or forged profile signature', 403);
+      return;
+    }
+
+    try {
+      await this.store.registerProfile(profile);
+      const response: RegisterProfileResponse = {
+        protocolVersion: RELAY_PROTOCOL_VERSION,
+        success: true,
+        username: profile.username,
+        identityId: profile.identityId,
+      };
+      res.statusCode = 201;
+      res.end(JSON.stringify(response));
+    } catch (err: any) {
+      if (err.message?.includes('CONFLICT')) {
+        this.sendError(res, 'CONFLICT', 'Username is already registered by another identity', 409);
+      } else {
+        this.sendError(res, 'INTERNAL_ERROR', err.message, 500);
+      }
+    }
+  }
+
+  private async handleUpdateProfile(body: RegisterProfileRequest, res: ServerResponse): Promise<void> {
+    if (!body?.profile) {
+      this.sendError(res, 'BAD_REQUEST', 'Missing profile document', 400);
+      return;
+    }
+
+    const profile = body.profile;
+    const existing = await this.store.getProfileByIdentity(profile.identityId);
+    if (!existing) {
+      this.sendError(res, 'NOT_FOUND', 'Identity not found in directory', 404);
+      return;
+    }
+
+    const isValidSignature = verifySignedProfile(profile);
+    if (!isValidSignature) {
+      this.sendError(res, 'FORBIDDEN', 'Invalid profile signature', 403);
+      return;
+    }
+
+    try {
+      await this.store.registerProfile(profile);
+      const response: RegisterProfileResponse = {
+        protocolVersion: RELAY_PROTOCOL_VERSION,
+        success: true,
+        username: profile.username,
+        identityId: profile.identityId,
+      };
+      res.statusCode = 200;
+      res.end(JSON.stringify(response));
+    } catch (err: any) {
+      if (err.message?.includes('CONFLICT')) {
+        this.sendError(res, 'CONFLICT', 'Username is already registered by another identity', 409);
+      } else {
+        this.sendError(res, 'INTERNAL_ERROR', err.message, 500);
+      }
+    }
+  }
+
+  private async handleDirectorySearch(query: string, res: ServerResponse): Promise<void> {
+    const q = query.trim();
+    if (!q || q.length < 3) {
+      this.sendError(res, 'BAD_REQUEST', 'Search query must be at least 3 characters long', 400);
+      return;
+    }
+
+    const results = await this.store.searchProfiles(q, 10);
+    const response: DirectorySearchResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      results,
+      query: q,
+    };
+
+    res.statusCode = 200;
+    res.end(JSON.stringify(response));
+  }
+
+  private async handleGetProfile(rawUsername: string, res: ServerResponse): Promise<void> {
+    const canonical = rawUsername.toLowerCase().trim().replace(/^@/, '');
+    if (!canonical) {
+      this.sendError(res, 'BAD_REQUEST', 'Username required', 400);
+      return;
+    }
+
+    const profile = await this.store.getProfileByUsername(canonical);
+    if (!profile) {
+      this.sendError(res, 'NOT_FOUND', `User @${canonical} not found in directory`, 404);
+      return;
+    }
+
+    const response: DirectoryProfileResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      profile,
     };
 
     res.statusCode = 200;

@@ -2,25 +2,30 @@
  * Persistent File-Backed Relay Store Implementation for VEIL Relay Server.
  *
  * Implements IRelayStore with filesystem persistence, atomic write-rename semantics,
- * mailbox isolation, and TTL sweep garbage collection.
+ * mailbox isolation, directory index, and TTL sweep garbage collection.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { IRelayStore } from './relayStore.ts';
-import { RelayEnvelope, MailboxRecord } from '../types.ts';
+import type { RelayEnvelope, MailboxRecord, DirectorySearchResult } from '../types.ts';
+import type { SignedProfileDocument } from '../../identity/profile.ts';
 
 export class PersistentFileRelayStore implements IRelayStore {
   private baseDir: string;
   private mailboxesFile: string;
+  private profilesFile: string;
   private envelopesDir: string;
   private mailboxes = new Map<string, MailboxRecord>();
   private envelopes = new Map<string, Map<string, RelayEnvelope>>();
+  private profilesByUsername = new Map<string, SignedProfileDocument>();
+  private profilesByIdentity = new Map<string, SignedProfileDocument>();
   private initialized = false;
 
   constructor(baseDir = path.join(process.cwd(), '.veil_relay_data')) {
     this.baseDir = baseDir;
     this.mailboxesFile = path.join(baseDir, 'mailboxes.json');
+    this.profilesFile = path.join(baseDir, 'profiles.json');
     this.envelopesDir = path.join(baseDir, 'envelopes');
   }
 
@@ -40,6 +45,18 @@ export class PersistentFileRelayStore implements IRelayStore {
         for (const mb of list) {
           this.mailboxes.set(mb.mailboxId, mb);
           this.envelopes.set(mb.mailboxId, new Map());
+        }
+      } catch (_e) {}
+    }
+
+    // Load persisted profiles
+    if (fs.existsSync(this.profilesFile)) {
+      try {
+        const raw = fs.readFileSync(this.profilesFile, 'utf8');
+        const list: SignedProfileDocument[] = JSON.parse(raw);
+        for (const prof of list) {
+          this.profilesByUsername.set(prof.username, prof);
+          this.profilesByIdentity.set(prof.identityId, prof);
         }
       } catch (_e) {}
     }
@@ -122,7 +139,6 @@ export class PersistentFileRelayStore implements IRelayStore {
       .slice(0, limit);
   }
 
-
   public async deleteEnvelopes(mailboxId: string, envelopeIds: string[]): Promise<number> {
     this.assertInit();
     const queue = this.envelopes.get(mailboxId);
@@ -171,7 +187,107 @@ export class PersistentFileRelayStore implements IRelayStore {
       }
     }
 
+    let profilesChanged = false;
+    for (const [username, prof] of this.profilesByUsername.entries()) {
+      if (prof.expiresAt && prof.expiresAt <= now) {
+        this.profilesByUsername.delete(username);
+        this.profilesByIdentity.delete(prof.identityId);
+        profilesChanged = true;
+      }
+    }
+    if (profilesChanged) {
+      await this.persistProfiles();
+    }
+
     return { expiredMailboxes, expiredEnvelopes };
+  }
+
+  // ===========================================================================
+  // DIRECTORY & PROFILE METHODS
+  // ===========================================================================
+
+  public async registerProfile(profile: SignedProfileDocument): Promise<void> {
+    this.assertInit();
+    const existing = this.profilesByUsername.get(profile.username);
+    if (existing && existing.identityId !== profile.identityId) {
+      throw new Error('CONFLICT: Username is already registered by another identity');
+    }
+
+    // If this identity had a previous username, clean it up
+    const prev = this.profilesByIdentity.get(profile.identityId);
+    if (prev && prev.username !== profile.username) {
+      this.profilesByUsername.delete(prev.username);
+    }
+
+    this.profilesByUsername.set(profile.username, { ...profile });
+    this.profilesByIdentity.set(profile.identityId, { ...profile });
+    await this.persistProfiles();
+  }
+
+  public async getProfileByUsername(canonicalUsername: string): Promise<SignedProfileDocument | null> {
+    this.assertInit();
+    const prof = this.profilesByUsername.get(canonicalUsername);
+    if (!prof) return null;
+    if (prof.expiresAt && prof.expiresAt <= Date.now()) {
+      this.profilesByUsername.delete(canonicalUsername);
+      this.profilesByIdentity.delete(prof.identityId);
+      await this.persistProfiles();
+      return null;
+    }
+    return { ...prof };
+  }
+
+  public async getProfileByIdentity(identityId: string): Promise<SignedProfileDocument | null> {
+    this.assertInit();
+    const prof = this.profilesByIdentity.get(identityId);
+    if (!prof) return null;
+    if (prof.expiresAt && prof.expiresAt <= Date.now()) {
+      this.profilesByUsername.delete(prof.username);
+      this.profilesByIdentity.delete(identityId);
+      await this.persistProfiles();
+      return null;
+    }
+    return { ...prof };
+  }
+
+  public async searchProfiles(query: string, limit: number): Promise<DirectorySearchResult[]> {
+    this.assertInit();
+    const q = query.toLowerCase().trim();
+    if (!q) return [];
+
+    const results: DirectorySearchResult[] = [];
+    const now = Date.now();
+
+    for (const prof of this.profilesByUsername.values()) {
+      if (prof.expiresAt && prof.expiresAt <= now) continue;
+
+      const matchUsername = prof.username.toLowerCase().includes(q);
+      const matchDisplayName = prof.displayName.toLowerCase().includes(q);
+
+      if (matchUsername || matchDisplayName) {
+        results.push({
+          identityId: prof.identityId,
+          username: prof.username,
+          displayName: prof.displayName,
+          avatar: prof.avatar,
+          profileSignature: prof.signature,
+        });
+
+        if (results.length >= limit) break;
+      }
+    }
+
+    return results;
+  }
+
+  public async deleteProfile(identityId: string): Promise<boolean> {
+    this.assertInit();
+    const prof = this.profilesByIdentity.get(identityId);
+    if (!prof) return false;
+    this.profilesByUsername.delete(prof.username);
+    this.profilesByIdentity.delete(identityId);
+    await this.persistProfiles();
+    return true;
   }
 
   public async close(): Promise<void> {
@@ -181,6 +297,8 @@ export class PersistentFileRelayStore implements IRelayStore {
   public async destroyStore(): Promise<void> {
     this.mailboxes.clear();
     this.envelopes.clear();
+    this.profilesByUsername.clear();
+    this.profilesByIdentity.clear();
     if (fs.existsSync(this.baseDir)) {
       try {
         fs.rmSync(this.baseDir, { recursive: true, force: true });
@@ -194,6 +312,13 @@ export class PersistentFileRelayStore implements IRelayStore {
     const tmp = `${this.mailboxesFile}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
     fs.renameSync(tmp, this.mailboxesFile);
+  }
+
+  private async persistProfiles(): Promise<void> {
+    const list = Array.from(this.profilesByIdentity.values());
+    const tmp = `${this.profilesFile}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
+    fs.renameSync(tmp, this.profilesFile);
   }
 
   private async persistMailboxEnvelopes(mailboxId: string): Promise<void> {
