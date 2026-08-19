@@ -297,11 +297,13 @@ export class ConversationManager {
     const deliveryId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     // 2. Package into WirePayload
+    const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
     const wireObj = {
       version: 1 as const,
       deliveryId,
       senderIdentityId: myDoc.identityId,
       senderDocument: myDoc,
+      senderMailboxId: binding?.mailboxId,
       ratchetMessage: ratchetMsg,
       attachment,
     };
@@ -336,7 +338,7 @@ export class ConversationManager {
   public async processInboundWirePayload(
     session: SpaceSession,
     rawPayloadBase64: string
-  ): Promise<{ storedMessage: StoredMessage; senderDoc: IdentityDocument; attachment?: any }> {
+  ): Promise<{ storedMessage: StoredMessage; senderDoc: IdentityDocument; senderMailboxId?: string; attachment?: any }> {
     this.assertSession(session);
 
     let wireObj: any;
@@ -436,7 +438,7 @@ export class ConversationManager {
     };
     this.appendMessage(session, senderId, storedMessage);
 
-    return { storedMessage, senderDoc, attachment: wireObj.attachment };
+    return { storedMessage, senderDoc, senderMailboxId: wireObj.senderMailboxId, attachment: wireObj.attachment };
   }
 
   /**

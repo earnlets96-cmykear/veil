@@ -293,7 +293,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Standard E2EE wire payload processing
         try {
           const result = await convManager.processInboundWirePayload(session, payload);
-          const { storedMessage, senderDoc, attachment } = result;
+          const { storedMessage, senderDoc, senderMailboxId, attachment } = result;
 
           const incomingMsg: UIMessage = {
             id: storedMessage.messageId,
@@ -307,9 +307,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           };
 
           const currentContacts = await contactManager.listContacts(session);
-          const matchingContact = currentContacts.find(
+          let matchingContact = currentContacts.find(
             (c) => c.identityId === incomingMsg.conversationId || c.identityId === senderDoc.identityId
           );
+
+          if (senderMailboxId && (!matchingContact || !matchingContact.mailboxId)) {
+            try {
+              const updatedContact = await contactManager.addContactFromInvitation(session, {
+                version: 1,
+                identityId: senderDoc.identityId,
+                name: matchingContact?.name || senderDoc.identityId.slice(0, 10),
+                signingPublicKey: senderDoc.signingPublicKey,
+                keyAgreementPublicKey: senderDoc.keyAgreementPublicKey,
+                fingerprint: senderDoc.fingerprint,
+                mailboxId: senderMailboxId,
+                createdAt: Date.now(),
+                expiresAt: 0,
+                signature: senderDoc.signature,
+              });
+              matchingContact = updatedContact;
+              setContacts((prev) => [...prev.filter((c) => c.identityId !== updatedContact.identityId), updatedContact]);
+            } catch (_e) {}
+          }
 
           setMessages((prev) => {
             const keys = new Set([
