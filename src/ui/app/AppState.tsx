@@ -140,6 +140,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     initStorage();
   }, []);
 
+  // Continuous mailbox polling heartbeat when a Space is active
+  useEffect(() => {
+    if (!activeSession) return;
+    const interval = setInterval(async () => {
+      try {
+        await netManager.syncMailbox(activeSession);
+      } catch (_e) {}
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
   // Listen for lock events
   useEffect(() => {
     const unsub = sessionController.onLock(() => {
@@ -476,7 +487,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
 
       // Resolve recipient contact for mailboxId and prekeyBundle
-      const targetContact = contacts.find((c) => c.identityId === conversationId);
+      const freshContacts = await contactManager.listContacts(activeSession);
+      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
 
       try {
