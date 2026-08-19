@@ -212,13 +212,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 6. Update Search Engine Index
     searchEngine.updateIndex(storedContacts, storedConvs, storedMsgs);
 
-    // 7. Ensure Mailbox and Prekey pool are initialized
+    // 7. Ensure Mailbox, Prekey pool, and Directory registration are initialized
     try {
-      await netManager.getOrCreateMailbox(session);
-    } catch (_e) {}
-    try {
+      const binding = await netManager.getOrCreateMailbox(session);
       prekeyManager.generateSignedPrekey(session);
       prekeyManager.generateOneTimePrekeys(session, 10);
+
+      // Auto-register public profile in Directory so Space is immediately routeable
+      const identity = idMgr.loadIdentity(session, store);
+      const username = storedProfile?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (identity && username && binding) {
+        const prekeyBundle = prekeyManager.createPrekeyBundle(session);
+        const autoProfile = createSignedProfile(
+          identity.document.identityId,
+          identity.signingPrivateKey,
+          username,
+          storedProfile?.displayName || session.name,
+          binding.mailboxId,
+          prekeyBundle
+        );
+        await directoryClient.registerProfile(autoProfile);
+        await store.setAsync(session, 'veil:user:profile', autoProfile);
+        setMyProfile(autoProfile);
+      }
     } catch (_e) {}
 
     // 8. Connect NetworkManager for real-time WebSocket delivery & sync
@@ -488,7 +504,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Resolve recipient contact for mailboxId and prekeyBundle
       const freshContacts = await contactManager.listContacts(activeSession);
-      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+
+      // If contact is missing mailboxId or prekeyBundle, try on-the-fly Directory lookup
+      if (!targetContact?.mailboxId || !targetContact?.prekeyBundle) {
+        try {
+          const lookupName = (targetContact?.name || conversationId).replace(/^@/, '').trim();
+          const profile = await directoryClient.getProfileByUsername(lookupName);
+          if (profile) {
+            targetContact = await contactManager.addContactFromInvitation(activeSession, {
+              version: 1,
+              identityId: profile.identityId,
+              name: profile.displayName || profile.username,
+              signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
+              keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+              fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+              mailboxId: profile.mailboxId,
+              prekeyBundle: profile.prekeyBundle,
+              createdAt: profile.issuedAt,
+              expiresAt: profile.expiresAt || 0,
+              signature: profile.signature,
+            });
+            setContacts((prev) => [...prev.filter((c) => c.identityId !== targetContact!.identityId), targetContact!]);
+          }
+        } catch (_e) {}
+      }
+
       const targetMailboxId = targetContact?.mailboxId || conversationId;
 
       try {
@@ -596,25 +637,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addDirectContact = useCallback(
     async (doc: IdentityDocument) => {
       if (!activeSession) return;
-      const newConv: UIConversation = {
-        id: doc.identityId,
-        type: 'direct',
-        name: doc.identityId.substring(0, 12),
-        avatarSeed: doc.identityId,
-        fingerprint: doc.fingerprint,
-        isVerified: false,
-        unreadCount: 0,
-        peerDoc: doc,
-      };
 
-      setConversations((prev) => {
-        if (prev.some((c) => c.id === doc.identityId)) return prev;
-        const updated = [newConv, ...prev];
-        store.setAsync(activeSession, 'veil:ui:conversations', updated);
-        return updated;
-      });
+      const cleanName = doc.identityId.replace(/^@/, '').trim();
+      let targetProfile = null;
+      try {
+        targetProfile = await directoryClient.getProfileByUsername(cleanName);
+      } catch (_e) {}
 
-      setActiveChatId(doc.identityId);
+      if (targetProfile) {
+        const contact = await contactManager.addContactFromInvitation(activeSession, {
+          version: 1,
+          identityId: targetProfile.identityId,
+          name: targetProfile.displayName || targetProfile.username,
+          signingPublicKey: targetProfile.prekeyBundle.identityDocument.signingPublicKey,
+          keyAgreementPublicKey: targetProfile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+          fingerprint: targetProfile.prekeyBundle.identityDocument.fingerprint,
+          mailboxId: targetProfile.mailboxId,
+          prekeyBundle: targetProfile.prekeyBundle,
+          createdAt: targetProfile.issuedAt,
+          expiresAt: targetProfile.expiresAt || 0,
+          signature: targetProfile.signature,
+        });
+        setContacts((prev) => [...prev.filter((c) => c.identityId !== contact.identityId), contact]);
+        const newConv: UIConversation = {
+          id: contact.identityId,
+          type: 'direct',
+          name: contact.name,
+          avatarSeed: contact.identityId,
+          fingerprint: contact.fingerprint,
+          isVerified: false,
+          unreadCount: 0,
+          peerDoc: targetProfile.prekeyBundle?.identityDocument,
+        };
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === contact.identityId)) return prev;
+          const updated = [newConv, ...prev];
+          store.setAsync(activeSession, 'veil:ui:conversations', updated);
+          return updated;
+        });
+        setActiveChatId(contact.identityId);
+      } else {
+        const newConv: UIConversation = {
+          id: doc.identityId,
+          type: 'direct',
+          name: doc.identityId.substring(0, 12),
+          avatarSeed: doc.identityId,
+          fingerprint: doc.fingerprint,
+          isVerified: false,
+          unreadCount: 0,
+          peerDoc: doc,
+        };
+
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === doc.identityId)) return prev;
+          const updated = [newConv, ...prev];
+          store.setAsync(activeSession, 'veil:ui:conversations', updated);
+          return updated;
+        });
+
+        setActiveChatId(doc.identityId);
+      }
       setActiveModal(null);
     },
     [activeSession]

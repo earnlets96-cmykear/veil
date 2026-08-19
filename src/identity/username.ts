@@ -11,9 +11,9 @@ export interface UsernameValidationResult {
   error?: string;
 }
 
-export const USERNAME_MIN_LENGTH = 3;
+export const USERNAME_MIN_LENGTH = 2;
 export const USERNAME_MAX_LENGTH = 32;
-const USERNAME_REGEX = /^[a-z0-9][a-z0-9_-]{1,30}[a-z0-9]$/;
+const USERNAME_REGEX = /^[a-z0-9][a-z0-9_-]{0,30}[a-z0-9]?$/;
 
 /**
  * Canonicalizes a raw username string:

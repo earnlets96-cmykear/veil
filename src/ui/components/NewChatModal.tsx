@@ -18,6 +18,7 @@ export const NewChatModal: React.FC = () => {
     sendContactRequest,
     contacts,
     contactRequests,
+    directoryClient,
     closeModal,
   } = useApp();
 
@@ -39,7 +40,7 @@ export const NewChatModal: React.FC = () => {
   // Live Directory Search Debounced
   useEffect(() => {
     const q = searchUsername.trim().replace(/^@/, '');
-    if (q.length < 3) {
+    if (q.length < 1) {
       setSearchResults([]);
       return;
     }
@@ -61,7 +62,7 @@ export const NewChatModal: React.FC = () => {
           setIsSearching(false);
         }
       }
-    }, 250);
+    }, 200);
 
     return () => {
       isMounted = false;
@@ -105,16 +106,34 @@ export const NewChatModal: React.FC = () => {
         const doc = JSON.parse(raw);
         await addDirectContact(doc);
       } else {
-        const doc = {
-          version: 1 as const,
-          identityId: raw,
-          signingPublicKey: 'dummy_sign_pub',
-          keyAgreementPublicKey: 'dummy_ka_pub',
-          fingerprint: raw.slice(0, 16).toUpperCase(),
-          createdAt: Date.now(),
-          signature: 'dummy_sig',
-        };
-        await addDirectContact(doc);
+        const cleanName = raw.replace(/^@/, '').trim();
+        const profile = await directoryClient.getProfileByUsername(cleanName);
+        if (profile) {
+          await addContactFromInvitation({
+            version: 1,
+            identityId: profile.identityId,
+            name: profile.displayName || profile.username,
+            signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
+            keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+            fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+            mailboxId: profile.mailboxId,
+            prekeyBundle: profile.prekeyBundle,
+            createdAt: profile.issuedAt,
+            expiresAt: profile.expiresAt || 0,
+            signature: profile.signature,
+          });
+        } else {
+          const doc = {
+            version: 1 as const,
+            identityId: raw,
+            signingPublicKey: 'dummy_sign_pub',
+            keyAgreementPublicKey: 'dummy_ka_pub',
+            fingerprint: raw.slice(0, 16).toUpperCase(),
+            createdAt: Date.now(),
+            signature: 'dummy_sig',
+          };
+          await addDirectContact(doc);
+        }
       }
       closeModal();
     } catch (err: any) {
@@ -197,7 +216,7 @@ export const NewChatModal: React.FC = () => {
             {!selectedUser ? (
               <>
                 <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-xs)', marginBottom: '0.75rem' }}>
-                  Search for other VEIL users by their public handle. Requires at least 3 characters.
+                  Search for other VEIL users by their public handle.
                 </p>
 
                 <div style={{ marginBottom: '1rem' }}>
@@ -218,7 +237,7 @@ export const NewChatModal: React.FC = () => {
                       id="username-search-input"
                       type="text"
                       className="veil-input"
-                      placeholder="e.g. phone2 or @alice_secure"
+                      placeholder="e.g. io, we, or @alice_secure"
                       value={searchUsername}
                       onChange={(e) => setSearchUsername(e.target.value)}
                       autoFocus
@@ -242,7 +261,7 @@ export const NewChatModal: React.FC = () => {
 
                 {/* Search Results List */}
                 <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1rem' }}>
-                  {searchUsername.trim().length >= 3 && searchResults.length === 0 && !isSearching && (
+                  {searchUsername.trim().length >= 1 && searchResults.length === 0 && !isSearching && (
                     <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
                       No users found matching "@{searchUsername.trim().replace(/^@/, '')}"
                     </div>
