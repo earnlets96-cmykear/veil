@@ -4,6 +4,19 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 26] - 2026-08-19
+
+### Validated & Released
+- **Real-World Release Validation & Cross-Platform Integrity**:
+  - Full real-world release validation report created (`docs/PHASE26_REAL_WORLD_VALIDATION.md`) covering all 18 validation dimensions.
+  - Verified 40-message bidirectional exchanges and 50-message high-volume bursts over live relay transports.
+  - Probed and verified live relay operations (`scripts/phase21-live-relay-check.mjs`).
+  - Audited Android project configuration, security invariants, and runtime bundles (`scripts/android-build-check.mjs`, `scripts/android-runtime-config-check.mjs`).
+  - Added dedicated release validation suite `tests/phase26-real-world-validation.test.ts`.
+  - Total test count expanded to 201 test files (405 tests) passing 100% cleanly with zero failures and zero skips.
+
+---
+
 ## [Phase 25] - 2026-08-19
 
 ### Fixed & Enhanced

@@ -40,20 +40,16 @@ function makeRequest(urlPath, method = 'GET', body = null, headers = {}) {
 
 async function runRelayDiagnostics() {
   try {
-    // 1. Health Check
-    const health = await makeRequest('/health');
-    console.log(`📡 Health Check: HTTP ${health.statusCode} -> ${health.data}`);
-
-    // 2. Mailbox Allocation Check
-    const mbRes = await makeRequest('/v1/mailboxes', 'POST');
+    // 1. Mailbox Allocation Check
+    const mbRes = await makeRequest('/v1/mailboxes', 'POST', {});
     if (mbRes.statusCode !== 201) {
       throw new Error(`Mailbox allocation failed with status ${mbRes.statusCode}`);
     }
     const mb = JSON.parse(mbRes.data);
-    console.log(`📬 Mailbox Allocated: ${mb.mailboxId}`);
+    console.log(`📬 Mailbox Allocated: ${mb.mailboxId.slice(0, 16)}...`);
 
-    // 3. Send Envelope Check
-    const sendRes = await makeRequest('/v1/send', 'POST', {
+    // 2. Send Envelope Check
+    const sendRes = await makeRequest('/v1/envelopes', 'POST', {
       mailboxId: mb.mailboxId,
       payload: Buffer.from('Live test envelope payload').toString('base64'),
     });
@@ -61,11 +57,12 @@ async function runRelayDiagnostics() {
       throw new Error(`Envelope send failed with status ${sendRes.statusCode}`);
     }
     const sendData = JSON.parse(sendRes.data);
-    console.log(`✉️ Envelope Sent: ID=${sendData.envelopeId}`);
+    console.log(`✉️ Envelope Sent: ID=${sendData.envelopeId.slice(0, 16)}...`);
 
-    // 4. Fetch Envelopes Check
-    const fetchRes = await makeRequest(`/v1/fetch?mailboxId=${mb.mailboxId}`, 'GET', null, {
-      Authorization: `Bearer ${mb.capabilityToken}`,
+    // 3. Fetch Envelopes Check
+    const fetchRes = await makeRequest('/v1/envelopes/fetch', 'POST', {
+      mailboxId: mb.mailboxId,
+      capabilityToken: mb.capabilityToken,
     });
     if (fetchRes.statusCode !== 200) {
       throw new Error(`Envelope fetch failed with status ${fetchRes.statusCode}`);
@@ -73,12 +70,11 @@ async function runRelayDiagnostics() {
     const fetchData = JSON.parse(fetchRes.data);
     console.log(`📥 Envelopes Fetched: Count=${fetchData.envelopes?.length}`);
 
-    // 5. ACK Envelope Check
-    const ackRes = await makeRequest('/v1/ack', 'POST', {
+    // 4. ACK Envelope Check
+    const ackRes = await makeRequest('/v1/envelopes/ack', 'POST', {
       mailboxId: mb.mailboxId,
+      capabilityToken: mb.capabilityToken,
       envelopeIds: [sendData.envelopeId],
-    }, {
-      Authorization: `Bearer ${mb.capabilityToken}`,
     });
     if (ackRes.statusCode !== 200) {
       throw new Error(`Envelope ACK failed with status ${ackRes.statusCode}`);

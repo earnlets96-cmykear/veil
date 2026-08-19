@@ -7,10 +7,10 @@
 
 import { WebSocket, WebSocketServer } from 'ws';
 import type { IncomingMessage } from 'http';
-import { IRelayStore } from './storage/relayStore.ts';
+import type { IRelayStore } from './storage/relayStore.ts';
 import { PrivacyLogger } from './logger.ts';
-import { RelayServerConfig } from './config.ts';
-import { RelayEnvelope, ClientWsMessage, ServerWsMessage } from './types.ts';
+import type { RelayServerConfig } from './config.ts';
+import type { RelayEnvelope, ClientWsMessage, ServerWsMessage } from './types.ts';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '../crypto/utils.ts';
 

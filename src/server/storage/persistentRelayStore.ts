@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { IRelayStore } from './relayStore.ts';
+import type { IRelayStore } from './relayStore.ts';
 import type { RelayEnvelope, MailboxRecord, DirectorySearchResult } from '../types.ts';
 import type { SignedProfileDocument } from '../../identity/profile.ts';
 

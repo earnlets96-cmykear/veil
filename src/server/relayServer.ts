@@ -15,29 +15,29 @@ import http, { IncomingMessage, ServerResponse, Server } from 'http';
 import { WebSocketServer } from 'ws';
 import { randomBytes, bytesToHex } from '../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { IRelayStore } from './storage/relayStore.ts';
+import type { IRelayStore } from './storage/relayStore.ts';
 import { MemoryRelayStore } from './storage/memoryRelayStore.ts';
 import { WebSocketDeliveryHandler } from './wsHandler.ts';
 import { RateLimiter } from './rateLimiter.ts';
 import { PrivacyLogger } from './logger.ts';
-import { RelayServerConfig, DEFAULT_RELAY_CONFIG } from './config.ts';
+import { DEFAULT_RELAY_CONFIG, type RelayServerConfig } from './config.ts';
 import {
   RELAY_PROTOCOL_VERSION,
-  RelayEnvelope,
-  MailboxRecord,
-  CreateMailboxRequest,
-  CreateMailboxResponse,
-  SendEnvelopeRequest,
-  SendEnvelopeResponse,
-  FetchEnvelopesRequest,
-  FetchEnvelopesResponse,
-  AckEnvelopesRequest,
-  AckEnvelopesResponse,
-  RelayErrorCode,
-  RegisterProfileRequest,
-  RegisterProfileResponse,
-  DirectorySearchResponse,
-  DirectoryProfileResponse,
+  type RelayEnvelope,
+  type MailboxRecord,
+  type CreateMailboxRequest,
+  type CreateMailboxResponse,
+  type SendEnvelopeRequest,
+  type SendEnvelopeResponse,
+  type FetchEnvelopesRequest,
+  type FetchEnvelopesResponse,
+  type AckEnvelopesRequest,
+  type AckEnvelopesResponse,
+  type RelayErrorCode,
+  type RegisterProfileRequest,
+  type RegisterProfileResponse,
+  type DirectorySearchResponse,
+  type DirectoryProfileResponse,
 } from './types.ts';
 import { verifySignedProfile } from '../identity/profile.ts';
 import { validateUsername } from '../identity/username.ts';
