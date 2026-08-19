@@ -14,7 +14,9 @@ export const ConversationView: React.FC = () => {
   const timelineEndRef = useRef<HTMLDivElement>(null);
 
   const activeConv = conversations.find((c) => c.id === activeChatId);
-  const activeMessages = activeChatId ? messages[activeChatId] || [] : [];
+  const activeMessages = activeChatId
+    ? messages[activeChatId] || (activeConv?.peerDoc?.identityId ? messages[activeConv.peerDoc.identityId] : []) || []
+    : [];
 
   useEffect(() => {
     timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });

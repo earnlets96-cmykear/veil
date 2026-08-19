@@ -312,8 +312,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           );
 
           setMessages((prev) => {
-            const list = prev[incomingMsg.conversationId] || [];
-            const updated = { ...prev, [incomingMsg.conversationId]: [...list, incomingMsg] };
+            const keys = new Set([
+              incomingMsg.conversationId,
+              senderDoc.identityId,
+              matchingContact?.identityId,
+              matchingContact?.name,
+            ].filter(Boolean) as string[]);
+
+            const list = prev[incomingMsg.conversationId] || (matchingContact?.name ? prev[matchingContact.name] : []) || [];
+            const nextList = [...list, incomingMsg];
+
+            const updated = { ...prev };
+            for (const k of keys) {
+              updated[k] = nextList;
+            }
             store.setAsync(session, 'veil:ui:messages', updated);
             searchEngine.updateIndex(currentContacts, storedConvs, updated);
             return updated;
@@ -321,10 +333,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           // Ensure conversation exists in list and update last message
           setConversations((prev) => {
-            const existing = prev.find((c) => c.id === incomingMsg.conversationId);
+            const matchId = (c: UIConversation) =>
+              c.id === incomingMsg.conversationId ||
+              c.id === senderDoc.identityId ||
+              (matchingContact && (c.id === matchingContact.identityId || c.name === matchingContact.name));
+
+            const existing = prev.find(matchId);
             if (existing) {
               const updated = prev.map((c) =>
-                c.id === incomingMsg.conversationId
+                matchId(c)
                   ? {
                       ...c,
                       name: matchingContact?.name || c.name,
@@ -338,7 +355,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               return updated;
             } else {
               const newConv: UIConversation = {
-                id: incomingMsg.conversationId,
+                id: matchingContact?.identityId || senderDoc.identityId || incomingMsg.conversationId,
                 type: 'direct',
                 name: matchingContact?.name || senderDoc.identityId.slice(0, 10),
                 avatarSeed: incomingMsg.conversationId,
@@ -550,13 +567,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
         }
 
+        const keys = new Set([
+          conversationId,
+          targetContact?.identityId,
+          targetContact?.name,
+        ].filter(Boolean) as string[]);
+
         await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
 
         setMessages((prev) => {
-          const list = (prev[conversationId] || []).map((m) =>
+          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
             m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
           );
-          const updated = { ...prev, [conversationId]: list };
+          const updated = { ...prev };
+          for (const k of keys) {
+            updated[k] = list;
+          }
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
@@ -565,11 +591,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           console.debug(`[VEIL-UI] Outbound message sent: msgId=${msgId.slice(0, 8)}, convId=${conversationId.slice(0, 8)}, state=SENT_TO_RELAY`);
         }
       } catch (sendErr: any) {
+        const keys = new Set([
+          conversationId,
+          targetContact?.identityId,
+          targetContact?.name,
+        ].filter(Boolean) as string[]);
+
         setMessages((prev) => {
-          const list = (prev[conversationId] || []).map((m) =>
+          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
             m.id === msgId ? { ...m, status: 'QUEUED' as const } : m
           );
-          const updated = { ...prev, [conversationId]: list };
+          const updated = { ...prev };
+          for (const k of keys) {
+            updated[k] = list;
+          }
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
