@@ -117,4 +117,30 @@ export class DirectoryClient {
     const data = (await res.json()) as DirectoryProfileResponse;
     return data.profile || null;
   }
+
+  /**
+   * Fetches the complete signed profile document by cryptographic identity ID.
+   */
+  public async getProfileByIdentity(identityId: string): Promise<SignedProfileDocument | null> {
+    const cleanId = identityId.trim();
+    if (!cleanId) return null;
+
+    const url = `${this.baseUrl}/v1/directory/identity/${encodeURIComponent(cleanId)}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (res.status === 404) {
+      return null;
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      throw new Error(err.error?.message || `Directory getProfileByIdentity failed with HTTP ${res.status}`);
+    }
+
+    const data = (await res.json()) as DirectoryProfileResponse;
+    return data.profile || null;
+  }
 }

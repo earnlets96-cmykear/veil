@@ -266,6 +266,12 @@ export class RelayServer {
         return;
       }
 
+      if (method === 'GET' && url.startsWith('/v1/directory/identity/')) {
+        const identityId = decodeURIComponent(url.slice('/v1/directory/identity/'.length));
+        await this.handleGetProfileByIdentity(identityId, res);
+        return;
+      }
+
       // Check Cloud & Account API routes
       const cloudHandled = await this.cloudHandler.handleRequest(req, res);
       if (cloudHandled) {
@@ -551,8 +557,8 @@ export class RelayServer {
 
   private async handleDirectorySearch(query: string, res: ServerResponse): Promise<void> {
     const q = query.trim();
-    if (!q || q.length < 3) {
-      this.sendError(res, 'BAD_REQUEST', 'Search query must be at least 3 characters long', 400);
+    if (!q || q.length < 1) {
+      this.sendError(res, 'BAD_REQUEST', 'Search query must not be empty', 400);
       return;
     }
 
@@ -577,6 +583,28 @@ export class RelayServer {
     const profile = await this.store.getProfileByUsername(canonical);
     if (!profile) {
       this.sendError(res, 'NOT_FOUND', `User @${canonical} not found in directory`, 404);
+      return;
+    }
+
+    const response: DirectoryProfileResponse = {
+      protocolVersion: RELAY_PROTOCOL_VERSION,
+      profile,
+    };
+
+    res.statusCode = 200;
+    res.end(JSON.stringify(response));
+  }
+
+  private async handleGetProfileByIdentity(identityId: string, res: ServerResponse): Promise<void> {
+    const cleanId = identityId.trim();
+    if (!cleanId) {
+      this.sendError(res, 'BAD_REQUEST', 'Identity ID required', 400);
+      return;
+    }
+
+    const profile = await this.store.getProfileByIdentity(cleanId);
+    if (!profile) {
+      this.sendError(res, 'NOT_FOUND', `Identity ${cleanId} not found in directory`, 404);
       return;
     }
 

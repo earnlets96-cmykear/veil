@@ -546,7 +546,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!targetContact?.mailboxId || !targetContact?.prekeyBundle) {
         try {
           const lookupName = (targetContact?.name || conversationId).replace(/^@/, '').trim();
-          const profile = await directoryClient.getProfileByUsername(lookupName);
+          let profile = await directoryClient.getProfileByUsername(lookupName);
+          if (!profile && targetContact?.identityId) {
+            profile = await directoryClient.getProfileByIdentity(targetContact.identityId);
+          }
+          if (!profile && conversationId) {
+            profile = await directoryClient.getProfileByIdentity(conversationId);
+          }
+          if (!profile) {
+            const results = await directoryClient.searchProfiles(lookupName);
+            if (results.length > 0) {
+              profile = await directoryClient.getProfileByUsername(results[0].username);
+            }
+          }
           if (profile) {
             targetContact = await contactManager.addContactFromInvitation(activeSession, {
               version: 1,
