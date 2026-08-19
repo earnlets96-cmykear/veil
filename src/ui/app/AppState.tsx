@@ -39,14 +39,19 @@ const storageAdapter = new IndexedDBStorageAdapter();
 const vault = new SpaceVaultManager();
 const store = new EncryptedSpaceStore(storageAdapter);
 const idMgr = new SpaceIdentityManager();
-const netManager = new NetworkManager(store);
+const appConfig = ConfigManager.getConfig();
+const netManager = new NetworkManager(store, {
+  httpUrl: appConfig.relayHttpUrl,
+  wsUrl: appConfig.relayWsUrl,
+  requestTimeoutMs: appConfig.requestTimeoutMs,
+  enforceTls: appConfig.enforceTls,
+});
 const prekeyManager = new PrekeyManager(store, idMgr);
 const convManager = new ConversationManager(store, idMgr, prekeyManager);
 const sessionController = new SessionController(vault, store, storageAdapter, idMgr, netManager);
 const contactManager = new ContactManager(store);
 const notificationDispatcher = new NotificationDispatcher('SENDER_ONLY');
 const searchEngine = new LocalSearchEngine();
-const appConfig = ConfigManager.getConfig();
 const directoryClient = new DirectoryClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787');
 const contactRequestManager = new ContactRequestManager(store, contactManager, idMgr, netManager);
 
@@ -155,6 +160,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return unsub;
   }, []);
 
+  // Periodic mailbox background sync while Space is unlocked
+  useEffect(() => {
+    if (!activeSession || !activeSession.isActive()) return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (activeSession && activeSession.isActive()) {
+          await netManager.syncMailbox(activeSession);
+        }
+      } catch (_e) {}
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
   const loadSpaceData = useCallback(async (session: SpaceSession) => {
     notificationDispatcher.setLocked(false);
 
@@ -217,6 +237,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               setContactRequests(updatedReqs);
               const updatedContacts = await contactManager.listContacts(session);
               setContacts(updatedContacts);
+
+              // Ensure conversation exists in UI
+              const targetContact = updatedContacts.find((c) => c.identityId === resp.peerIdentityId);
+              if (targetContact) {
+                setConversations((prev) => {
+                  if (prev.some((c) => c.id === targetContact.identityId)) return prev;
+                  const newConv: UIConversation = {
+                    id: targetContact.identityId,
+                    type: 'direct',
+                    name: targetContact.name,
+                    avatarSeed: targetContact.identityId,
+                    fingerprint: targetContact.fingerprint,
+                    isVerified: targetContact.verificationStatus === 'VERIFIED',
+                    unreadCount: 0,
+                    peerDoc: targetContact.prekeyBundle?.identityDocument,
+                  };
+                  const updated = [newConv, ...prev];
+                  store.setAsync(session, 'veil:ui:conversations', updated);
+                  return updated;
+                });
+              }
               return;
             }
           }
@@ -238,11 +279,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             attachment,
           };
 
+          const currentContacts = await contactManager.listContacts(session);
+          const matchingContact = currentContacts.find(
+            (c) => c.identityId === incomingMsg.conversationId || c.identityId === senderDoc.identityId
+          );
+
           setMessages((prev) => {
             const list = prev[incomingMsg.conversationId] || [];
             const updated = { ...prev, [incomingMsg.conversationId]: [...list, incomingMsg] };
             store.setAsync(session, 'veil:ui:messages', updated);
-            searchEngine.updateIndex(storedContacts, storedConvs, updated);
+            searchEngine.updateIndex(currentContacts, storedConvs, updated);
             return updated;
           });
 
@@ -254,6 +300,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 c.id === incomingMsg.conversationId
                   ? {
                       ...c,
+                      name: matchingContact?.name || c.name,
                       lastMessage: incomingMsg.text,
                       timestamp: incomingMsg.timestamp,
                       unreadCount: (c.unreadCount || 0) + 1,
@@ -266,10 +313,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const newConv: UIConversation = {
                 id: incomingMsg.conversationId,
                 type: 'direct',
-                name: senderDoc.identityId.slice(0, 10),
+                name: matchingContact?.name || senderDoc.identityId.slice(0, 10),
                 avatarSeed: incomingMsg.conversationId,
                 fingerprint: senderDoc.fingerprint,
-                isVerified: false,
+                isVerified: matchingContact?.verificationStatus === 'VERIFIED',
                 unreadCount: 1,
                 lastMessage: incomingMsg.text,
                 timestamp: incomingMsg.timestamp,
@@ -284,11 +331,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Dispatch notification
           notificationDispatcher.dispatch({
             id: incomingMsg.id,
-            senderName: senderDoc.identityId.slice(0, 8),
+            senderName: matchingContact?.name || senderDoc.identityId.slice(0, 8),
             text: incomingMsg.text,
             timestamp: Date.now(),
           });
-        } catch (_wireErr) {
+
+          if (typeof console !== 'undefined' && console.debug) {
+            console.debug(`[VEIL-UI] Inbound wire message processed: msgId=${incomingMsg.id.slice(0, 8)}, convId=${incomingMsg.conversationId.slice(0, 8)}`);
+          }
+        } catch (wireErr: any) {
+          if (typeof console !== 'undefined' && console.error) {
+            console.error('[VEIL-UI] Inbound wire payload decryption error:', wireErr?.name || 'Error', wireErr?.message || wireErr);
+          }
           // Fallback to raw JSON if payload was legacy/unencrypted
           try {
             const parsed = JSON.parse(payload);
@@ -350,10 +404,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sessionController.panicLock();
   }, []);
 
-  const selectConversation = useCallback((id: string | null) => {
-    setActiveChatId(id);
-    sessionController.recordUserActivity();
-  }, []);
+  const selectConversation = useCallback(
+    (id: string | null) => {
+      setActiveChatId(id);
+      if (id && activeSession) {
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === id)) return prev;
+          const contact = contacts.find((c) => c.identityId === id);
+          if (contact) {
+            const newConv: UIConversation = {
+              id: contact.identityId,
+              type: 'direct',
+              name: contact.name,
+              avatarSeed: contact.identityId,
+              fingerprint: contact.fingerprint,
+              isVerified: contact.verificationStatus === 'VERIFIED',
+              unreadCount: 0,
+              peerDoc: contact.prekeyBundle?.identityDocument,
+            };
+            const updated = [newConv, ...prev];
+            store.setAsync(activeSession, 'veil:ui:conversations', updated);
+            return updated;
+          }
+          return prev;
+        });
+      }
+      sessionController.recordUserActivity();
+    },
+    [activeSession, contacts]
+  );
 
   const setSearchQuery = useCallback((query: string) => {
     setSearchQueryState(query);
@@ -428,7 +507,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
-      } catch (_err) {
+
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`[VEIL-UI] Outbound message sent: msgId=${msgId.slice(0, 8)}, convId=${conversationId.slice(0, 8)}, state=SENT_TO_RELAY`);
+        }
+      } catch (sendErr: any) {
         setMessages((prev) => {
           const list = (prev[conversationId] || []).map((m) =>
             m.id === msgId ? { ...m, status: 'QUEUED' as const } : m
@@ -437,6 +520,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
+
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(`[VEIL-UI] Outbound message send failed, queued locally: msgId=${msgId.slice(0, 8)}, error=${sendErr?.message || sendErr}`);
+        }
       }
     },
     [activeSession, contacts, conversations]
@@ -716,9 +803,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         );
       }
 
-      await contactRequestManager.acceptRequest(activeSession, requestId, profileToSend);
-      setContactRequests(await contactRequestManager.listRequests(activeSession));
-      setContacts(await contactManager.listContacts(activeSession));
+      const req = await contactRequestManager.acceptRequest(activeSession, requestId, profileToSend);
+      const updatedReqs = await contactRequestManager.listRequests(activeSession);
+      setContactRequests(updatedReqs);
+      const updatedContacts = await contactManager.listContacts(activeSession);
+      setContacts(updatedContacts);
+
+      // Create conversation entry immediately
+      const targetContact = updatedContacts.find((c) => c.identityId === req.peerIdentityId);
+      if (targetContact) {
+        setConversations((prev) => {
+          if (prev.some((c) => c.id === targetContact.identityId)) return prev;
+          const newConv: UIConversation = {
+            id: targetContact.identityId,
+            type: 'direct',
+            name: targetContact.name,
+            avatarSeed: targetContact.identityId,
+            fingerprint: targetContact.fingerprint,
+            isVerified: targetContact.verificationStatus === 'VERIFIED',
+            unreadCount: 0,
+            peerDoc: targetContact.prekeyBundle?.identityDocument,
+          };
+          const updated = [newConv, ...prev];
+          store.setAsync(activeSession, 'veil:ui:conversations', updated);
+          return updated;
+        });
+      }
     },
     [activeSession, myProfile]
   );

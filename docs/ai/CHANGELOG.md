@@ -4,6 +4,19 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 25] - 2026-08-19
+
+### Fixed & Enhanced
+- **Browser Double Ratchet Compatibility & Intermittent Delivery Fix**:
+  - Replaced Node.js-specific `!Buffer.from(this.dhReceivingPub).equals(...)` with browser-compatible constant-time comparison `!constantTimeEquals(this.dhReceivingPub, remoteRatchetPub)` in `src/ratchet/ratchet.ts`.
+  - Added dual-runtime WebSocket client support for standard `window.WebSocket` and Node `ws` in `src/network/websocketTransport.ts`.
+  - Added privacy-safe structured diagnostics `[VEIL-NET]` and `[VEIL-UI]` across outbound and inbound pipelines with truncated hashes and zero secret leakage.
+  - Implemented 2.5s centralized background mailbox polling fallback in `AppState.tsx` when WebSocket delivery is disrupted or unavailable.
+  - Created dedicated regression suite `tests/phase25-intermittent-delivery.test.ts` (9 comprehensive test scenarios verifying 20+ sequential/burst message exchanges, bidirectional turns, polling fallback, offline reconnects, and zero-plaintext invariants).
+  - Total test count expanded to 200 test files (402 tests) passing 100% cleanly.
+
+---
+
 ## [Phase 22] - 2026-08-16
 
 ### Added

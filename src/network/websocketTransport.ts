@@ -5,13 +5,23 @@
  * periodic heartbeats, and exponential backoff with jitter.
  */
 
-import { WebSocket } from 'ws';
+import { WebSocket as NodeWebSocket } from 'ws';
 import { NetworkConfig, NetworkState } from './types.ts';
 import { RelayEnvelope, ClientWsMessage, ServerWsMessage } from '../server/types.ts';
 
+const getWebSocketClass = (): any => {
+  if (typeof window !== 'undefined' && (window as any).WebSocket) {
+    return (window as any).WebSocket;
+  }
+  if (typeof globalThis !== 'undefined' && (globalThis as any).WebSocket) {
+    return (globalThis as any).WebSocket;
+  }
+  return NodeWebSocket;
+};
+
 export class WebSocketTransport {
   private config: NetworkConfig;
-  private ws: WebSocket | null = null;
+  private ws: any = null;
   private state: NetworkState = 'offline';
   private mailboxId: string | null = null;
   private capabilityToken: string | null = null;
@@ -21,8 +31,8 @@ export class WebSocketTransport {
   private stateListeners: ((state: NetworkState) => void)[] = [];
 
   // Timers & Reconnect state
-  private heartbeatTimer?: NodeJS.Timeout;
-  private reconnectTimer?: NodeJS.Timeout;
+  private heartbeatTimer?: any;
+  private reconnectTimer?: any;
   private retryCount = 0;
   private isExplicitlyClosed = false;
 
@@ -83,7 +93,7 @@ export class WebSocketTransport {
    * Sends an ACK message for received envelopes over the active WebSocket channel.
    */
   public sendAck(envelopeIds: string[]): boolean {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.state === 'connected') {
+    if (this.ws && this.ws.readyState === 1 && this.state === 'connected') {
       const msg: ClientWsMessage = { type: 'ack', envelopeIds };
       this.ws.send(JSON.stringify(msg));
       return true;
@@ -97,7 +107,8 @@ export class WebSocketTransport {
 
     return new Promise<void>((resolve, reject) => {
       try {
-        this.ws = new WebSocket(this.config.wsUrl);
+        const WS = getWebSocketClass();
+        this.ws = new WS(this.config.wsUrl);
       } catch (err: any) {
         this.handleConnectionFailure();
         return reject(err);
@@ -114,7 +125,7 @@ export class WebSocketTransport {
         }
       }, this.config.connectTimeoutMs);
 
-      this.ws.on('open', () => {
+      const onOpen = () => {
         // Authenticate immediately upon connection
         if (this.mailboxId && this.capabilityToken) {
           const authMsg: ClientWsMessage = {
@@ -124,9 +135,9 @@ export class WebSocketTransport {
           };
           this.ws?.send(JSON.stringify(authMsg));
         }
-      });
+      };
 
-      this.ws.on('message', (raw: Buffer | string) => {
+      const onMessageData = (raw: any) => {
         try {
           const text = typeof raw === 'string' ? raw : raw.toString('utf8');
           const msg = JSON.parse(text) as ServerWsMessage;
@@ -152,24 +163,36 @@ export class WebSocketTransport {
         } catch (_e) {
           // Ignore malformed message frames
         }
-      });
+      };
 
-      this.ws.on('close', () => {
+      const onClose = () => {
         clearTimeout(connectTimeout);
         this.clearTimers();
         if (!this.isExplicitlyClosed) {
           this.handleConnectionFailure();
         }
-      });
+      };
 
-      this.ws.on('error', (_err) => {
+      const onError = (_err: any) => {
         clearTimeout(connectTimeout);
         if (!authResolved) {
           authResolved = true;
           this.handleConnectionFailure();
           reject(new Error('WebSocket connection error'));
         }
-      });
+      };
+
+      if (typeof this.ws.on === 'function') {
+        this.ws.on('open', onOpen);
+        this.ws.on('message', onMessageData);
+        this.ws.on('close', onClose);
+        this.ws.on('error', onError);
+      } else if (typeof this.ws.addEventListener === 'function') {
+        this.ws.addEventListener('open', onOpen);
+        this.ws.addEventListener('message', (ev: any) => onMessageData(ev.data));
+        this.ws.addEventListener('close', onClose);
+        this.ws.addEventListener('error', onError);
+      }
     });
   }
 

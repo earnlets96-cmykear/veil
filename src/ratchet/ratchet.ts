@@ -15,7 +15,7 @@ import {
   KeyAgreementKeypair,
 } from '../identity/keyAgreement.ts';
 import { encryptXChaCha20Poly1305, decryptXChaCha20Poly1305 } from '../crypto/aead.ts';
-import { bytesToBase64, base64ToBytes, randomBytes } from '../crypto/utils.ts';
+import { bytesToBase64, base64ToBytes, randomBytes, constantTimeEquals } from '../crypto/utils.ts';
 import { zeroize } from '../crypto/memory.ts';
 import {
   kdfRK,
@@ -210,7 +210,7 @@ export class DoubleRatchetSession {
 
     // 2. If message contains a new DH ratchet public key, perform DH ratchet step
     const isNewRatchetKey = !this.dhReceivingPub ||
-      !Buffer.from(this.dhReceivingPub).equals(Buffer.from(remoteRatchetPub));
+      !constantTimeEquals(this.dhReceivingPub, remoteRatchetPub);
 
     if (isNewRatchetKey) {
       // Skip any remaining message keys on previous receiving chain

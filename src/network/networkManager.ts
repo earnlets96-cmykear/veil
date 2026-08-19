@@ -23,7 +23,13 @@ import {
   NetworkState,
 } from './types.ts';
 import { randomBytes, bytesToHex } from '../crypto/utils.ts';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { RelayEnvelope } from '../server/types.ts';
+
+function maskMailbox(mailboxId: string): string {
+  if (!mailboxId) return 'unknown';
+  return bytesToHex(sha256(new TextEncoder().encode(mailboxId))).slice(0, 8);
+}
 
 const KEY_MAILBOX_BINDING = 'net_mailbox_binding';
 
@@ -130,11 +136,17 @@ export class NetworkManager {
       // Successfully accepted by relay -> remove from outbound queue
       await this.queue.removeOutbound(session, queueId);
       item.status = 'SENT_TO_RELAY';
+      if (typeof console !== 'undefined' && console.debug) {
+        console.debug(`[VEIL-NET] Outbound: queueId=${queueId.slice(0, 8)}, mailbox=${maskMailbox(targetMailboxId)}, transport=http, state=SENT_TO_RELAY`);
+      }
     } catch (err: any) {
       // Keep in queue for automatic drain upon reconnect
       await this.queue.updateOutboundStatus(session, queueId, 'QUEUED', err.message);
       item.status = 'QUEUED';
       item.errorMessage = err.message;
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn(`[VEIL-NET] Outbound failed: queueId=${queueId.slice(0, 8)}, mailbox=${maskMailbox(targetMailboxId)}, error=${err.name}: ${err.message}`);
+      }
     }
 
     return item;
@@ -155,6 +167,9 @@ export class NetworkManager {
         await this.http.sendEnvelope(item.mailboxId, item.payload, item.ttlSeconds);
         await this.queue.removeOutbound(session, item.queueId);
         flushedCount++;
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`[VEIL-NET] Outbound flush: queueId=${item.queueId.slice(0, 8)}, mailbox=${maskMailbox(item.mailboxId)}, state=SENT_TO_RELAY`);
+        }
       } catch (err: any) {
         await this.queue.updateOutboundStatus(session, item.queueId, 'QUEUED', err.message);
         break; // Stop draining on connection failure
@@ -257,8 +272,11 @@ export class NetworkManager {
             await handler(env.payload);
             await this.queue.markInboundProcessed(session, queueId);
             totalProcessed++;
-          } catch (err) {
-            console.error('[NetworkManager] Error decrypting inbound envelope:', err);
+            if (typeof console !== 'undefined' && console.debug) {
+              console.debug(`[VEIL-NET] Inbound (poll): envId=${env.envelopeId.slice(0, 8)}, mailbox=${maskMailbox(env.mailboxId)}, persisted=true`);
+            }
+          } catch (err: any) {
+            console.error(`[VEIL-NET] Inbound (poll) processing error for envId=${env.envelopeId.slice(0, 8)}:`, err?.name || 'Error', err?.message || err);
           }
         }
 
@@ -268,6 +286,9 @@ export class NetworkManager {
       // 3. ACK-after-persistence: Acknowledge processed envelopes to relay
       if (ackIds.length > 0) {
         await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, ackIds);
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`[VEIL-NET] ACKed ${ackIds.length} envelopes via HTTP for mailbox=${maskMailbox(binding.mailboxId)}`);
+        }
       }
 
       // Flush any queued outbound envelopes
@@ -319,8 +340,11 @@ export class NetworkManager {
           }
         }
         await this.queue.markInboundAcknowledged(session, queueId);
-      } catch (err) {
-        console.error('[NetworkManager] Failed to process inbound envelope:', err);
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`[VEIL-NET] Inbound (ws): envId=${envelope.envelopeId.slice(0, 8)}, mailbox=${maskMailbox(envelope.mailboxId)}, persisted=true, acked=true`);
+        }
+      } catch (err: any) {
+        console.error(`[VEIL-NET] Inbound (ws) processing error for envId=${envelope.envelopeId.slice(0, 8)}:`, err?.name || 'Error', err?.message || err);
       }
     }
   }
