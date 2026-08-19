@@ -66,7 +66,9 @@ export class ConfigManager {
         const urlParams = new URLSearchParams(window.location.search);
         const queryRelay = urlParams.get('relay');
         const storedRelay = window.localStorage.getItem('veil_custom_relay_url');
-        const customUrl = queryRelay || storedRelay;
+        const origin = window.location.origin;
+        const autoOrigin = origin && !origin.includes('localhost') && !origin.includes('127.0.0.1') && !origin.startsWith('file:') ? origin : null;
+        const customUrl = queryRelay || storedRelay || autoOrigin;
         if (customUrl) {
           if (queryRelay) {
             window.localStorage.setItem('veil_custom_relay_url', queryRelay);
