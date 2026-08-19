@@ -69,17 +69,19 @@ export class NetworkManager {
   /**
    * Retrieves the persisted mailbox binding for an active Space, or creates a new one on the relay.
    */
-  public async getOrCreateMailbox(session: SpaceSession): Promise<SpaceMailboxBinding> {
+  public async getOrCreateMailbox(session: SpaceSession, forceNew = false): Promise<SpaceMailboxBinding> {
     this.assertSession(session);
 
-    let binding = await this.store.getAsync<SpaceMailboxBinding>(session, KEY_MAILBOX_BINDING);
-    if (binding && binding.expiresAt > Date.now()) {
-      return binding;
+    if (!forceNew) {
+      const binding = await this.store.getAsync<SpaceMailboxBinding>(session, KEY_MAILBOX_BINDING);
+      if (binding && binding.expiresAt > Date.now()) {
+        return binding;
+      }
     }
 
     // Allocate new blind mailbox on relay
     const res = await this.http.createMailbox();
-    binding = {
+    const binding: SpaceMailboxBinding = {
       spaceId: session.spaceId,
       mailboxId: res.mailboxId,
       capabilityToken: res.capabilityToken,
@@ -293,8 +295,19 @@ export class NetworkManager {
 
       // Flush any queued outbound envelopes
       await this.flushOutboundQueue(session);
-    } catch (_err) {
-      // Catch network sync failures gracefully
+    } catch (err: any) {
+      if (
+        err?.name === 'MailboxRevokedError' ||
+        err?.message?.includes('404') ||
+        err?.message?.includes('not found') ||
+        err?.message?.includes('expired')
+      ) {
+        try {
+          // Server restarted or mailbox expired -> reallocate fresh mailbox
+          await this.getOrCreateMailbox(session, true);
+          await this.startListening(session, handler);
+        } catch (_rebindErr) {}
+      }
     }
 
     return totalProcessed;
