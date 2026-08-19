@@ -25,6 +25,7 @@
     "@noble/hashes": "^1.7.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "tsx": "^4.23.12",
     "ws": "^8.21.3"
   },
   "devDependencies": {
