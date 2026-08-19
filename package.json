@@ -11,6 +11,8 @@
     "verify:release": "npm test && npm run build && node scripts/release-build.mjs",
     "preview": "vite preview",
     "relay": "node --import tsx/esm src/server/cli.ts",
+    "tunnel": "node scripts/free-tunnel.mjs",
+    "backup": "node scripts/production-backup.mjs --backup",
     "test": "vitest run",
     "test:watch": "vitest"
   },

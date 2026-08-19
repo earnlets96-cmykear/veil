@@ -1,0 +1,25 @@
+# Render Blueprint for VEIL Free 24/7 Cloud Relay Backend
+# Deploy freely at https://render.com
+
+services:
+  - type: web
+    name: veil-cloud-relay
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npx tsx src/server/cli.ts
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RELAY_HOST
+        value: 0.0.0.0
+      - key: RELAY_PORT
+        value: 10000
+      - key: RELAY_LOG_LEVEL
+        value: info
+      - key: RELAY_STORAGE_DIR
+        value: /tmp/veil_relay_data
+      - key: DATABASE_URL
+        value: file:///tmp/veil_cloud_db

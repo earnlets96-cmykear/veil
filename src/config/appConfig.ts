@@ -47,15 +47,44 @@ export class ConfigManager {
   public static getConfig(env?: AppEnvironment): AppConfig {
     const currentEnv = env || (process.env.NODE_ENV === 'production' ? 'production' : process.env.NODE_ENV === 'test' ? 'test' : 'development');
 
+    let base: AppConfig;
     switch (currentEnv) {
       case 'production':
-        return { ...PROD_CONFIG };
+        base = { ...PROD_CONFIG };
+        break;
       case 'test':
-        return { ...TEST_CONFIG };
+        base = { ...TEST_CONFIG };
+        break;
       case 'development':
       default:
-        return { ...DEV_CONFIG };
+        base = { ...DEV_CONFIG };
+        break;
     }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryRelay = urlParams.get('relay');
+        const storedRelay = window.localStorage.getItem('veil_custom_relay_url');
+        const customUrl = queryRelay || storedRelay;
+        if (customUrl) {
+          if (queryRelay) {
+            window.localStorage.setItem('veil_custom_relay_url', queryRelay);
+          }
+          const cleanHttp = customUrl.replace(/\/+$/, '');
+          const cleanWs = cleanHttp.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:') + '/v1/ws';
+          base.relayHttpUrl = cleanHttp;
+          base.relayWsUrl = cleanWs;
+          if (cleanHttp.startsWith('https://')) {
+            base.enforceTls = true;
+          }
+        }
+      } catch (_e) {
+        // ignore in non-browser/restricted context
+      }
+    }
+
+    return base;
   }
 
   public static validateConfig(config: AppConfig): void {
