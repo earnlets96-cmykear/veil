@@ -4,6 +4,21 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 27] - 2026-08-19
+
+### Added & Enhanced
+- **Cloud & Account Foundation (Persistent Account, Multi-Device, Sync Engine, Object Storage)**:
+  - Persistent Account & Device Model: Unique opaque `accountId` and `deviceId` hierarchies separating device installation state from cloud account ownership.
+  - Server Cloud Database Abstraction: Implemented `ICloudDatabase` schema entities (`AccountEntity`, `DeviceEntity`, `SessionEntity`, `CloudSpaceEntity`, `CloudMessageEntity`, `CloudAttachmentEntity`, `SyncStateEntity`, `RecoveryStateEntity`) with `FileCloudDatabase` and `MemoryCloudDatabase`.
+  - Object Storage Abstraction: Implemented `IObjectStorage` interface supporting `LocalDiskObjectStorage` (path-sanitized local storage) and `S3ObjectStorage` (S3 REST API / Cloudflare R2 / MinIO / AWS S3).
+  - Client-Side Encrypted Attachments: Encrypted chunking and full payload upload to object storage with SHA-256 integrity verification upon upload and download. Zero plaintexts stored on server.
+  - Bidirectional Sync Engine (`SyncEngine`): Synchronizes messages and space states across multiple devices with monotonic versioning and deterministic tombstones for deletions.
+  - Local-to-Cloud Storage Migration (`StorageMigrationManager`): Scans local IndexedDB / SpaceStore records, registers spaces to account, uploads encrypted history, verifies integrity, and preserves local cache for full offline capability.
+  - Added 5 dedicated test suites (`tests/phase27-*.test.ts`) covering account auth, multi-device sync, encrypted attachments, local migration, and security isolation.
+  - Total test count expanded to 206 test files (419 tests) passing 100% cleanly.
+
+---
+
 ## [Phase 26] - 2026-08-19
 
 ### Validated & Released

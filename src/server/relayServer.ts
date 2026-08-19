@@ -41,10 +41,18 @@ import {
 } from './types.ts';
 import { verifySignedProfile } from '../identity/profile.ts';
 import { validateUsername } from '../identity/username.ts';
+import type { ICloudDatabase } from './cloud/database/types.ts';
+import { MemoryCloudDatabase } from './cloud/database/memoryCloudDatabase.ts';
+import type { IObjectStorage } from './cloud/storage/types.ts';
+import { LocalDiskObjectStorage } from './cloud/storage/localDiskObjectStorage.ts';
+import { CloudHandler } from './cloud/cloudHandler.ts';
 
 export class RelayServer {
   private config: RelayServerConfig;
   private store: IRelayStore;
+  private cloudDb: ICloudDatabase;
+  private objectStorage: IObjectStorage;
+  private cloudHandler: CloudHandler;
   private logger: PrivacyLogger;
   private rateLimiter: RateLimiter;
   private server: Server | null = null;
@@ -54,9 +62,17 @@ export class RelayServer {
   private startTime: number = Date.now();
   private isShuttingDown = false;
 
-  constructor(config: Partial<RelayServerConfig> = {}, store?: IRelayStore) {
+  constructor(
+    config: Partial<RelayServerConfig> = {},
+    store?: IRelayStore,
+    cloudDb?: ICloudDatabase,
+    objectStorage?: IObjectStorage
+  ) {
     this.config = { ...DEFAULT_RELAY_CONFIG, ...config };
     this.store = store || new MemoryRelayStore();
+    this.cloudDb = cloudDb || new MemoryCloudDatabase();
+    this.objectStorage = objectStorage || new LocalDiskObjectStorage();
+    this.cloudHandler = new CloudHandler(this.cloudDb, this.objectStorage);
     this.logger = new PrivacyLogger(this.config.logLevel);
     this.rateLimiter = new RateLimiter(this.config.rateLimitWindowMs, this.config.maxRequestsPerWindow);
   }
@@ -66,6 +82,8 @@ export class RelayServer {
    */
   public async start(): Promise<{ port: number; host: string }> {
     await this.store.init();
+    await this.cloudDb.init();
+    await this.objectStorage.init();
 
     this.server = http.createServer((req, res) => this.handleHttpRequest(req, res));
     this.wss = new WebSocketServer({ server: this.server, path: '/v1/ws' });
@@ -122,11 +140,21 @@ export class RelayServer {
     }
 
     await this.store.close();
+    await this.cloudDb.close();
+    await this.objectStorage.close();
     this.logger.info('VEIL Relay Server shutdown complete');
   }
 
   public getStore(): IRelayStore {
     return this.store;
+  }
+
+  public getCloudDb(): ICloudDatabase {
+    return this.cloudDb;
+  }
+
+  public getObjectStorage(): IObjectStorage {
+    return this.objectStorage;
   }
 
   public getConfig(): RelayServerConfig {
@@ -227,6 +255,12 @@ export class RelayServer {
       if (method === 'GET' && url.startsWith('/v1/directory/profile/')) {
         const username = decodeURIComponent(url.slice('/v1/directory/profile/'.length));
         await this.handleGetProfile(username, res);
+        return;
+      }
+
+      // Check Cloud & Account API routes
+      const cloudHandled = await this.cloudHandler.handleRequest(req, res);
+      if (cloudHandled) {
         return;
       }
 
