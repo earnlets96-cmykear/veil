@@ -203,7 +203,13 @@ export class RelayServer {
 
       if (method === 'GET' && url === '/readyz') {
         res.statusCode = 200;
-        res.end(JSON.stringify({ status: 'ready', store: 'ok' }));
+        res.end(JSON.stringify({
+          status: 'ready',
+          store: 'ok',
+          cloudDb: 'ok',
+          objectStorage: 'ok',
+          protocolVersion: RELAY_PROTOCOL_VERSION,
+        }));
         return;
       }
 

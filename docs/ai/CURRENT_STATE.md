@@ -32,15 +32,16 @@
 | **Phase 25** | Intermittent Cross-Client Delivery & Browser Double Ratchet Fix | **COMPLETED** | Fixed browser Node Buffer ReferenceError in Double Ratchet, continuous 20+ message exchanges, safe diagnostics |
 | **Phase 26** | Real-World Release Validation (Web ↔ Web & Android Readiness) | **COMPLETED** | 40-message bidirectional test, 50-message burst, live relay probe, Android diagnostic audit, validation report |
 | **Phase 27** | Cloud & Account Foundation (Persistent Account, Multi-Device, Sync Engine, Object Storage) | **COMPLETED** | Persistent Account/Device identity, SQL/File database schema, Object Storage abstraction, encrypted attachments, SyncEngine, local migration (5 dedicated test suites) |
+| **Phase 28** | Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore) | **COMPLETED** | Deterministic SQL migrations, S3 Object Storage, Caddy TLS reverse proxy, Docker stack, backup/restore tool, fresh-install re-hydration tests |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
-- **Release Version**: **`1.0.0` (Production GA with Full Cloud & Account Foundation)**
-- **Total Test Files**: **206 / 206 passed (100% pass rate)**
-- **Total Tests**: **419 / 419 passed (0 failures, 0 skipped)**
-- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.3s)
+- **Release Version**: **`1.0.0` (Production GA with Full Cloud Deployment Infrastructure)**
+- **Total Test Files**: **207 / 207 passed (100% pass rate)**
+- **Total Tests**: **426 / 426 passed (0 failures, 0 skipped)**
+- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.2s)
 - **Release Manifest**: SHA-256 verified in `release/v1.0.0/manifest.json`
 - **Working Tree**: Clean and fully verified.
 

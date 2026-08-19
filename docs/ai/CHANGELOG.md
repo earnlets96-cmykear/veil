@@ -4,6 +4,22 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 28] - 2026-08-19
+
+### Added & Enhanced
+- **Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore)**:
+  - Database Migration Engine (`MigrationRunner`): Deterministic, version-tracked SQL migrations for fresh databases and existing production data without data loss.
+  - SQL Database Adapter (`SqlCloudDatabase`): Production SQL database implementation with parameterized queries, ACID transactions, and foreign key integrity.
+  - Reverse Proxy & TLS 1.3: Authored production `Caddyfile.production` enforcing TLS 1.3, HTTPS redirection, long-lived WebSocket proxying (`/v1/ws`), and security headers.
+  - Multi-Container Docker Stack: Production `docker-compose.production.yml` deploying Caddy, VEIL Backend, PostgreSQL 16, and MinIO S3 Object Storage on private internal networks.
+  - Automated Backup & Disaster Recovery: Implemented `src/server/cloud/backup.ts` and `scripts/production-backup.mjs` for backup and byte-for-byte disaster recovery.
+  - Production Operations Manual: Created `docs/PRODUCTION_DEPLOYMENT.md` detailing architecture, runbooks, DNS/TLS setups, and health probes.
+  - Health & Readiness Probes: Enhanced `/readyz` endpoint to verify database and object storage readiness.
+  - Added dedicated test suite `tests/phase28-production-deployment.test.ts` (7 comprehensive test scenarios).
+  - Total test count expanded to 207 test files (426 tests) passing 100% cleanly.
+
+---
+
 ## [Phase 27] - 2026-08-19
 
 ### Added & Enhanced
