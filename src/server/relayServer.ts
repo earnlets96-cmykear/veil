@@ -12,6 +12,8 @@
  */
 
 import http, { IncomingMessage, ServerResponse, Server } from 'http';
+import fs from 'fs';
+import path from 'path';
 import { WebSocketServer } from 'ws';
 import { randomBytes, bytesToHex } from '../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -268,6 +270,36 @@ export class RelayServer {
       const cloudHandled = await this.cloudHandler.handleRequest(req, res);
       if (cloudHandled) {
         return;
+      }
+
+      // Serve static frontend assets if built
+      if (method === 'GET') {
+        const distDir = path.resolve(process.cwd(), 'dist');
+        if (fs.existsSync(distDir)) {
+          let reqPath = url === '/' ? '/index.html' : url;
+          let filePath = path.join(distDir, reqPath);
+          if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+            filePath = path.join(distDir, 'index.html');
+          }
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            const ext = path.extname(filePath).toLowerCase();
+            const mimeTypes: Record<string, string> = {
+              '.html': 'text/html; charset=utf-8',
+              '.js': 'application/javascript; charset=utf-8',
+              '.css': 'text/css; charset=utf-8',
+              '.json': 'application/json',
+              '.png': 'image/png',
+              '.jpg': 'image/jpeg',
+              '.svg': 'image/svg+xml',
+              '.ico': 'image/x-icon',
+              '.woff2': 'font/woff2',
+            };
+            res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+            res.statusCode = 200;
+            res.end(fs.readFileSync(filePath));
+            return;
+          }
+        }
       }
 
       this.sendError(res, 'NOT_FOUND', `Cannot ${method} ${url}`, 404);
