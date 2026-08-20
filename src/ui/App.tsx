@@ -13,6 +13,7 @@ import { NewGroupModal } from './components/NewGroupModal.tsx';
 import { GroupDetailsModal } from './components/GroupDetailsModal.tsx';
 import { ContactDetailsModal } from './components/ContactDetailsModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
+import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
 
 export const App: React.FC = () => {
   const { activeSession, activeChatId, activeModal } = useApp();
@@ -22,6 +23,7 @@ export const App: React.FC = () => {
       <>
         <LockScreen />
         {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
+        {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
       </>
     );
   }
@@ -33,6 +35,7 @@ export const App: React.FC = () => {
 
       {/* Modals */}
       {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
+      {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
       {activeModal?.type === 'newChat' && <NewChatModal />}
       {activeModal?.type === 'newGroup' && <NewGroupModal />}
       {activeModal?.type === 'groupDetails' && (

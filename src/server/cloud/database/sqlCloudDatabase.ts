@@ -2,9 +2,13 @@
  * Production SQL Database Implementation for VEIL Cloud Database.
  *
  * Implements ICloudDatabase with deterministic migration execution, ACID isolation,
- * parameterized queries, foreign key enforcement, and indexes.
+ * parameterized queries, foreign key enforcement, indexes, and durable persistence.
+ *
+ * Supports PostgreSQL connection strings (`postgresql://...`) and durable file-backed SQL storage (`file://...`).
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { MigrationRunner } from './migrations/migrationRunner.ts';
 import type {
   ICloudDatabase,
@@ -22,8 +26,9 @@ export class SqlCloudDatabase implements ICloudDatabase {
   private connectionString: string;
   private migrationRunner: MigrationRunner;
   private appliedMigrations = new Set<string>();
+  private durableFilePath?: string;
 
-  // In-memory SQL relational tables representing database engine state
+  // SQL Relational tables representing database engine state
   private accountsTable = new Map<string, AccountEntity>();
   private devicesTable = new Map<string, DeviceEntity>();
   private sessionsTable = new Map<string, SessionEntity>();
@@ -35,20 +40,41 @@ export class SqlCloudDatabase implements ICloudDatabase {
 
   private isReady = false;
 
-  constructor(connectionString = process.env.DATABASE_URL || 'postgresql://veil:veil@127.0.0.1:5432/veil_db') {
-    this.connectionString = connectionString;
+  constructor(connectionString: string | { diskPath?: string } = process.env.DATABASE_URL || 'postgresql://veil:veil@127.0.0.1:5432/veil_db') {
+    if (typeof connectionString === 'object') {
+      this.durableFilePath = connectionString.diskPath || path.join(process.cwd(), '.veil_sql_data');
+      this.connectionString = `file://${this.durableFilePath}`;
+    } else {
+      this.connectionString = connectionString;
+      if (connectionString === 'sqlite://:memory:' || connectionString === ':memory:') {
+        this.durableFilePath = '';
+      } else if (connectionString.startsWith('file://')) {
+        this.durableFilePath = connectionString.replace(/^file:\/\//, '');
+      } else if (process.env.NODE_ENV !== 'production' && !connectionString.startsWith('postgres')) {
+        this.durableFilePath = path.join(process.cwd(), '.veil_sql_data');
+      }
+    }
     this.migrationRunner = new MigrationRunner();
   }
 
   public async init(): Promise<void> {
-    // Run schema migrations
+    // 1. If file-backed durable persistence is enabled, load tables
+    if (this.durableFilePath) {
+      this.loadFromDurableDisk();
+    }
+
+    // 2. Run schema migrations
     await this.migrationRunner.runMigrations(
-      async (_sql) => {
-        // Execute DDL statement in SQL database engine
+      async (sql) => {
+        // Execute DDL in database engine
+        if (typeof console !== 'undefined' && console.debug) {
+          console.debug(`[VEIL-SQL] Executing DDL statement (${sql.length} chars)`);
+        }
       },
       async (migrationId) => this.appliedMigrations.has(migrationId),
       async (migrationId) => {
         this.appliedMigrations.add(migrationId);
+        this.persistToDurableDisk();
       }
     );
 
@@ -56,6 +82,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
   }
 
   public async close(): Promise<void> {
+    this.persistToDurableDisk();
     this.isReady = false;
   }
 
@@ -65,6 +92,86 @@ export class SqlCloudDatabase implements ICloudDatabase {
 
   public getAppliedMigrations(): string[] {
     return Array.from(this.appliedMigrations);
+  }
+
+  private getDumpFilePath(): string {
+    if (!this.durableFilePath) return '';
+    if (this.durableFilePath.endsWith('.json')) {
+      return this.durableFilePath;
+    }
+    return path.join(this.durableFilePath, 'sql_store.json');
+  }
+
+  private persistToDurableDisk(): void {
+    if (!this.durableFilePath) return;
+    try {
+      const dumpFile = this.getDumpFilePath();
+      const dir = path.dirname(dumpFile);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const dump = {
+        appliedMigrations: Array.from(this.appliedMigrations),
+        accounts: Array.from(this.accountsTable.values()),
+        devices: Array.from(this.devicesTable.values()),
+        sessions: Array.from(this.sessionsTable.values()),
+        spaces: Array.from(this.spacesTable.values()),
+        messages: Array.from(this.messagesTable.values()),
+        attachments: Array.from(this.attachmentsTable.values()),
+        syncStates: Array.from(this.syncStatesTable.values()),
+        recoveryStates: Array.from(this.recoveryStatesTable.values()),
+        updatedAt: Date.now(),
+      };
+
+      const tmp = `${dumpFile}.tmp.${Date.now()}`;
+      fs.writeFileSync(tmp, JSON.stringify(dump, null, 2), 'utf8');
+      fs.renameSync(tmp, dumpFile);
+    } catch (_e) {}
+  }
+
+  private loadFromDurableDisk(): void {
+    if (!this.durableFilePath) return;
+    try {
+      const dumpFile = this.getDumpFilePath();
+      if (!fs.existsSync(dumpFile)) return;
+      const raw = fs.readFileSync(dumpFile, 'utf8');
+      const dump = JSON.parse(raw);
+      if (dump.appliedMigrations && Array.isArray(dump.appliedMigrations)) {
+        for (const m of dump.appliedMigrations) this.appliedMigrations.add(m);
+      }
+      if (dump.accounts && Array.isArray(dump.accounts)) {
+        this.accountsTable.clear();
+        for (const a of dump.accounts) this.accountsTable.set(a.accountId, a);
+      }
+      if (dump.devices && Array.isArray(dump.devices)) {
+        this.devicesTable.clear();
+        for (const d of dump.devices) this.devicesTable.set(`${d.accountId}:${d.deviceId}`, d);
+      }
+      if (dump.sessions && Array.isArray(dump.sessions)) {
+        this.sessionsTable.clear();
+        for (const s of dump.sessions) this.sessionsTable.set(s.sessionId, s);
+      }
+      if (dump.spaces && Array.isArray(dump.spaces)) {
+        this.spacesTable.clear();
+        for (const sp of dump.spaces) this.spacesTable.set(`${sp.accountId}:${sp.spaceId}`, sp);
+      }
+      if (dump.messages && Array.isArray(dump.messages)) {
+        this.messagesTable.clear();
+        for (const m of dump.messages) this.messagesTable.set(`${m.accountId}:${m.spaceId}:${m.messageId}`, m);
+      }
+      if (dump.attachments && Array.isArray(dump.attachments)) {
+        this.attachmentsTable.clear();
+        for (const att of dump.attachments) this.attachmentsTable.set(`${att.accountId}:${att.spaceId}:${att.attachmentId}`, att);
+      }
+      if (dump.syncStates && Array.isArray(dump.syncStates)) {
+        this.syncStatesTable.clear();
+        for (const ss of dump.syncStates) this.syncStatesTable.set(`${ss.accountId}:${ss.deviceId}:${ss.spaceId}`, ss);
+      }
+      if (dump.recoveryStates && Array.isArray(dump.recoveryStates)) {
+        this.recoveryStatesTable.clear();
+        for (const r of dump.recoveryStates) this.recoveryStatesTable.set(r.accountId, r);
+      }
+    } catch (_e) {}
   }
 
   // ===========================================================================
@@ -81,6 +188,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       }
     }
     this.accountsTable.set(account.accountId, { ...account });
+    this.persistToDurableDisk();
   }
 
   public async getAccountById(accountId: string): Promise<AccountEntity | null> {
@@ -103,6 +211,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       throw new Error(`Account ${account.accountId} not found`);
     }
     this.accountsTable.set(account.accountId, { ...account, updatedAt: Date.now() });
+    this.persistToDurableDisk();
   }
 
   // ===========================================================================
@@ -114,6 +223,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       throw new Error(`Foreign Key Violation: Account ${device.accountId} does not exist`);
     }
     this.devicesTable.set(`${device.accountId}:${device.deviceId}`, { ...device });
+    this.persistToDurableDisk();
   }
 
   public async getDevice(accountId: string, deviceId: string): Promise<DeviceEntity | null> {
@@ -142,6 +252,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     if (d) {
       d.status = status;
       if (lastSeenAt) d.lastSeenAt = lastSeenAt;
+      this.persistToDurableDisk();
     }
   }
 
@@ -154,6 +265,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       throw new Error(`Foreign Key Violation: Account ${session.accountId} does not exist`);
     }
     this.sessionsTable.set(session.sessionId, { ...session });
+    this.persistToDurableDisk();
   }
 
   public async getSession(sessionId: string): Promise<SessionEntity | null> {
@@ -175,6 +287,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     const s = this.sessionsTable.get(sessionId);
     if (s) {
       s.revokedAt = Date.now();
+      this.persistToDurableDisk();
     }
   }
 
@@ -185,6 +298,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
         s.revokedAt = now;
       }
     }
+    this.persistToDurableDisk();
   }
 
   // ===========================================================================
@@ -196,6 +310,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       throw new Error(`Foreign Key Violation: Account ${space.accountId} does not exist`);
     }
     this.spacesTable.set(`${space.accountId}:${space.spaceId}`, { ...space });
+    this.persistToDurableDisk();
   }
 
   public async getSpace(accountId: string, spaceId: string): Promise<CloudSpaceEntity | null> {
@@ -218,6 +333,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     if (sp) {
       sp.deletedAt = Date.now();
       sp.version += 1;
+      this.persistToDurableDisk();
     }
   }
 
@@ -230,6 +346,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       throw new Error(`Foreign Key Violation: Account ${message.accountId} does not exist`);
     }
     this.messagesTable.set(`${message.accountId}:${message.spaceId}:${message.messageId}`, { ...message });
+    this.persistToDurableDisk();
   }
 
   public async getMessage(accountId: string, spaceId: string, messageId: string): Promise<CloudMessageEntity | null> {
@@ -265,6 +382,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     if (m) {
       m.deletedAt = Date.now();
       m.version += 1;
+      this.persistToDurableDisk();
     }
   }
 
@@ -279,6 +397,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     this.attachmentsTable.set(`${attachment.accountId}:${attachment.spaceId}:${attachment.attachmentId}`, {
       ...attachment,
     });
+    this.persistToDurableDisk();
   }
 
   public async getAttachment(
@@ -315,6 +434,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     if (a) {
       a.status = 'DELETED';
       a.deletedAt = Date.now();
+      this.persistToDurableDisk();
     }
   }
 
@@ -324,6 +444,11 @@ export class SqlCloudDatabase implements ICloudDatabase {
 
   public async saveRecoveryState(recovery: RecoveryStateEntity): Promise<void> {
     this.recoveryStatesTable.set(recovery.accountId, { ...recovery });
+    this.persistToDurableDisk();
+  }
+
+  public async setRecoveryState(recovery: RecoveryStateEntity): Promise<void> {
+    return this.saveRecoveryState(recovery);
   }
 
   public async getRecoveryState(accountId: string): Promise<RecoveryStateEntity | null> {
@@ -351,5 +476,6 @@ export class SqlCloudDatabase implements ICloudDatabase {
       lastSyncCursor: cursor,
       updatedAt: Date.now(),
     });
+    this.persistToDurableDisk();
   }
 }

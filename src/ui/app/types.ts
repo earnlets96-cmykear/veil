@@ -33,11 +33,30 @@ export interface UIMessage {
     name: string;
     sizeBytes: number;
     mimeType: string;
+    objectId?: string;
+    ciphertextHash?: string;
+  };
+  voice?: {
+    durationSeconds: number;
+    sizeBytes: number;
+    objectId: string;
+    mimeType: string;
+    ciphertextHash: string;
+    encryptionKeyBase64: string;
+    nonceBase64: string;
+  };
+  replyTo?: {
+    messageId: string;
+    senderName?: string;
+    text: string;
+    attachmentType?: string;
   };
 }
 
 export type ActiveModal =
   | { type: 'createSpace' }
+  | { type: 'restoreAccount' }
+  | { type: 'accountSettings' }
   | { type: 'newChat' }
   | { type: 'newGroup' }
   | { type: 'groupDetails'; conversationId: string }

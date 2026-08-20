@@ -282,7 +282,9 @@ export class ConversationManager {
     session: SpaceSession,
     peerBundle: PrekeyBundle,
     text: string,
-    attachment?: { name: string; sizeBytes: number; mimeType: string }
+    attachment?: { name: string; sizeBytes: number; mimeType: string; objectId?: string; ciphertextHash?: string },
+    replyTo?: { messageId: string; senderName?: string; text: string; attachmentType?: string },
+    voice?: { durationSeconds: number; sizeBytes: number; objectId: string; mimeType: string; ciphertextHash: string; encryptionKeyBase64: string; nonceBase64: string }
   ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {
     this.assertSession(session);
 
@@ -324,6 +326,8 @@ export class ConversationManager {
       senderMailboxId: binding?.mailboxId,
       ratchetMessage: ratchetMsg,
       attachment,
+      replyTo,
+      voice,
     };
 
     // 3. Size-normalize & Pad
@@ -356,7 +360,14 @@ export class ConversationManager {
   public async processInboundWirePayload(
     session: SpaceSession,
     rawPayloadBase64: string
-  ): Promise<{ storedMessage: StoredMessage; senderDoc: IdentityDocument; senderMailboxId?: string; attachment?: any }> {
+  ): Promise<{
+    storedMessage: StoredMessage;
+    senderDoc: IdentityDocument;
+    senderMailboxId?: string;
+    attachment?: any;
+    replyTo?: any;
+    voice?: any;
+  }> {
     this.assertSession(session);
 
     let wireObj: any;
@@ -474,7 +485,14 @@ export class ConversationManager {
     };
     this.appendMessage(session, senderId, storedMessage);
 
-    return { storedMessage, senderDoc, senderMailboxId: wireObj.senderMailboxId, attachment: wireObj.attachment };
+    return {
+      storedMessage,
+      senderDoc,
+      senderMailboxId: wireObj.senderMailboxId,
+      attachment: wireObj.attachment,
+      replyTo: wireObj.replyTo,
+      voice: wireObj.voice,
+    };
   }
 
   /**

@@ -160,6 +160,7 @@ export const LockScreen: React.FC = () => {
             paddingTop: '1.25rem',
             borderTop: '1px solid var(--veil-border-subtle)',
             display: 'flex',
+            gap: '0.5rem',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
@@ -170,17 +171,27 @@ export const LockScreen: React.FC = () => {
             style={{ fontSize: 'var(--veil-text-xs)' }}
             onClick={() => openModal({ type: 'createSpace' })}
           >
-            + Create New Space
+            + New Space
+          </button>
+
+          <button
+            type="button"
+            className="veil-btn veil-btn-secondary"
+            style={{ fontSize: 'var(--veil-text-xs)' }}
+            onClick={() => openModal({ type: 'restoreAccount' })}
+            title="Restore Account on Fresh Device"
+          >
+            🔄 Restore Account
           </button>
 
           <button
             type="button"
             className="veil-btn veil-btn-panic"
-            style={{ fontSize: 'var(--veil-text-xs)' }}
+            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
             onClick={panicLock}
             title="Instant Memory Wipe"
           >
-            🚨 Panic Lock
+            🚨 Panic
           </button>
         </div>
 

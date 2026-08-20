@@ -33,6 +33,10 @@ import { DirectoryClient } from '../../network/directoryClient.ts';
 import { ContactRequestManager, ContactRequest } from '../../contacts/contactRequestManager.ts';
 import { SignedProfileDocument, createSignedProfile, verifySignedProfile } from '../../identity/profile.ts';
 import { DirectorySearchResult } from '../../server/types.ts';
+import { CloudClient } from '../../network/cloudClient.ts';
+import { AccountManager } from '../../account/accountManager.ts';
+import { SyncEngine } from '../../sync/syncEngine.ts';
+import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -54,6 +58,9 @@ const notificationDispatcher = new NotificationDispatcher('SENDER_ONLY');
 const searchEngine = new LocalSearchEngine();
 const directoryClient = new DirectoryClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787');
 const contactRequestManager = new ContactRequestManager(store, contactManager, idMgr, netManager);
+const cloudClient = new CloudClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787');
+const accountManager = new AccountManager(cloudClient, vault, idMgr, store, storageAdapter);
+const syncEngine = new SyncEngine(store, cloudClient);
 
 export interface AppContextType {
   storageReady: boolean;
@@ -71,15 +78,20 @@ export interface AppContextType {
   searchResults: SearchResult[];
   searchQuery: string;
   config: AppConfig;
+  replyTarget: UIMessage | null;
 
   // Actions
   unlockSpace: (passphrase: string) => Promise<void>;
   createSpace: (name: string, passphrase: string) => Promise<void>;
+  restoreAccount: (username: string, password: string) => Promise<void>;
+  registerCloudAccount: (username: string, password: string, spaceName?: string) => Promise<void>;
   lockSpace: () => void;
   panicLock: () => void;
   selectConversation: (id: string | null) => void;
+  setReplyTarget: (msg: UIMessage | null) => void;
   sendMessage: (conversationId: string, text: string) => Promise<void>;
   sendAttachment: (conversationId: string, file: File) => Promise<void>;
+  sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
@@ -104,6 +116,9 @@ export interface AppContextType {
   notificationDispatcher: NotificationDispatcher;
   contactRequestManager: ContactRequestManager;
   directoryClient: DirectoryClient;
+  cloudClient: CloudClient;
+  accountManager: AccountManager;
+  syncEngine: SyncEngine;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -508,12 +523,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
+  const [replyTarget, setReplyTarget] = useState<UIMessage | null>(null);
+
   const sendMessage = useCallback(
     async (conversationId: string, text: string) => {
       if (!activeSession || !text.trim()) return;
 
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const activeReply = replyTarget ? {
+        messageId: replyTarget.id,
+        senderName: replyTarget.senderName || replyTarget.senderId,
+        text: replyTarget.text,
+        attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
+      } : undefined;
+
       const newMsg: UIMessage = {
         id: msgId,
         conversationId,
@@ -522,7 +546,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         isOutgoing: true,
         timestamp: Date.now(),
         status: 'SENDING',
+        replyTo: activeReply,
       };
+
+      setReplyTarget(null);
 
       setMessages((prev) => {
         const list = prev[conversationId] || [];
@@ -588,7 +615,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
             activeSession,
             targetContact.prekeyBundle,
-            text.trim()
+            text.trim(),
+            undefined,
+            activeReply
           );
           wirePayload = wirePayloadBase64;
         } else {
@@ -597,6 +626,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             conversationId,
             senderId: activeSession.spaceId,
             text: text.trim(),
+            replyTo: activeReply,
           });
         }
 
@@ -661,7 +691,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const key = activeSession.getStorageKey();
       const { metadata } = AttachmentPipeline.chunkAndEncrypt(fileBytes, file.name, file.type, key);
 
-
       const msgId = `att_${Date.now()}`;
       const newMsg: UIMessage = {
         id: msgId,
@@ -700,6 +729,167 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (_e) {}
     },
     [activeSession, contacts]
+  );
+
+  const sendVoiceMessage = useCallback(
+    async (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => {
+      if (!activeSession) return;
+      sessionController.recordUserActivity();
+
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const rawBytes = new Uint8Array(arrayBuffer);
+
+      let voiceMeta: any = {
+        durationSeconds,
+        sizeBytes: rawBytes.length,
+        objectId: `voice_${Date.now()}`,
+        mimeType,
+        ciphertextHash: '',
+        encryptionKeyBase64: '',
+        nonceBase64: '',
+      };
+
+      try {
+        voiceMeta = await VoiceRecorder.encryptAndUploadVoiceNote(
+          activeSession,
+          cloudClient,
+          rawBytes,
+          durationSeconds,
+          mimeType
+        );
+      } catch (_uploadErr) {}
+
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const activeReply = replyTarget ? {
+        messageId: replyTarget.id,
+        senderName: replyTarget.senderName || replyTarget.senderId,
+        text: replyTarget.text,
+        attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
+      } : undefined;
+
+      const newMsg: UIMessage = {
+        id: msgId,
+        conversationId,
+        senderId: activeSession.spaceId,
+        text: '🎙️ Voice Message',
+        isOutgoing: true,
+        timestamp: Date.now(),
+        status: 'SENDING',
+        voice: voiceMeta,
+        replyTo: activeReply,
+      };
+
+      setReplyTarget(null);
+
+      setMessages((prev) => {
+        const list = prev[conversationId] || [];
+        const updated = { ...prev, [conversationId]: [...list, newMsg] };
+        store.setAsync(activeSession, 'veil:ui:messages', updated);
+        return updated;
+      });
+
+      const freshContacts = await contactManager.listContacts(activeSession);
+      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      const targetMailboxId = targetContact?.mailboxId || conversationId;
+
+      try {
+        let wirePayload: string;
+        if (targetContact?.prekeyBundle) {
+          const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+            activeSession,
+            targetContact.prekeyBundle,
+            '🎙️ Voice Message',
+            undefined,
+            activeReply,
+            voiceMeta
+          );
+          wirePayload = wirePayloadBase64;
+        } else {
+          wirePayload = JSON.stringify({
+            id: msgId,
+            conversationId,
+            senderId: activeSession.spaceId,
+            text: '🎙️ Voice Message',
+            voice: voiceMeta,
+            replyTo: activeReply,
+          });
+        }
+
+        await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+
+        setMessages((prev) => {
+          const list = (prev[conversationId] || []).map((m) =>
+            m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
+          );
+          const updated = { ...prev, [conversationId]: list };
+          store.setAsync(activeSession, 'veil:ui:messages', updated);
+          return updated;
+        });
+      } catch (_e) {
+        setMessages((prev) => {
+          const list = (prev[conversationId] || []).map((m) =>
+            m.id === msgId ? { ...m, status: 'QUEUED' as const } : m
+          );
+          const updated = { ...prev, [conversationId]: list };
+          store.setAsync(activeSession, 'veil:ui:messages', updated);
+          return updated;
+        });
+      }
+    },
+    [activeSession, contacts, replyTarget]
+  );
+
+  const restoreAccount = useCallback(
+    async (username: string, password: string) => {
+      const { session, identityDoc } = await accountManager.restoreAccount({
+        username,
+        password,
+      });
+      setActiveSession(session);
+      sessionController.recordUserActivity();
+
+      const loadedContacts = await contactManager.listContacts(session);
+      setContacts(loadedContacts);
+
+      const loadedMessages = store.get<Record<string, UIMessage[]>>(session, 'veil:ui:messages') || {};
+      setMessages(loadedMessages);
+
+      const loadedConversations = store.get<UIConversation[]>(session, 'veil:ui:conversations') || [];
+      setConversations(loadedConversations);
+
+      try {
+        const binding = await netManager.allocateMailbox(session);
+        store.set(session, 'net_mailbox_binding', binding);
+        await syncEngine.sync(session);
+      } catch (_e) {}
+    },
+    []
+  );
+
+  const registerCloudAccount = useCallback(
+    async (username: string, password: string, spaceName?: string) => {
+      const { session, identityDoc } = await accountManager.registerAccount({
+        username,
+        password,
+        spaceName,
+      });
+      setActiveSession(session);
+      sessionController.recordUserActivity();
+
+      try {
+        const prekeyBundle = prekeyManager.generatePrekeyBundle(session);
+        const signedProfile = createSignedProfile(
+          username,
+          identityDoc,
+          session.spaceId,
+          prekeyBundle,
+          identityDoc.signingPrivateKey ? base64ToBytes(identityDoc.signingPrivateKey) : undefined
+        );
+        await directoryClient.publishProfile(signedProfile);
+        setMyProfile(signedProfile);
+      } catch (_e) {}
+    },
+    []
   );
 
   const addDirectContact = useCallback(
@@ -1040,13 +1230,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     searchResults,
     searchQuery,
     config: appConfig,
+    replyTarget,
     unlockSpace,
     createSpace,
+    restoreAccount,
+    registerCloudAccount,
     lockSpace,
     panicLock,
     selectConversation,
+    setReplyTarget,
     sendMessage,
     sendAttachment,
+    sendVoiceMessage,
     setSearchQuery,
     openModal,
     closeModal,
@@ -1068,6 +1263,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     notificationDispatcher,
     contactRequestManager,
     directoryClient,
+    cloudClient,
+    accountManager,
+    syncEngine,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

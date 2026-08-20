@@ -154,6 +154,13 @@ export class PrekeyManager {
   }
 
   /**
+   * Alias for createPrekeyBundle.
+   */
+  public generatePrekeyBundle(session: SpaceSession): PrekeyBundle {
+    return this.createPrekeyBundle(session);
+  }
+
+  /**
    * Consumes and retrieves a One-Time Prekey's private key, permanently removing it from storage.
    */
   public consumeOneTimePrekey(session: SpaceSession, opkId: number): Uint8Array | null {

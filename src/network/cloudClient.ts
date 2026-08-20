@@ -24,9 +24,14 @@ export class CloudClient {
   private accountId: string | null = null;
   private deviceId: string | null = null;
 
-  constructor(config: CloudClientConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/+$/, '');
-    this.timeoutMs = config.requestTimeoutMs || 10000;
+  constructor(config: string | CloudClientConfig) {
+    if (typeof config === 'string') {
+      this.baseUrl = config.replace(/\/+$/, '');
+      this.timeoutMs = 10000;
+    } else {
+      this.baseUrl = (config?.baseUrl || 'http://127.0.0.1:8787').replace(/\/+$/, '');
+      this.timeoutMs = config?.requestTimeoutMs || 10000;
+    }
   }
 
   public setSession(token: string | null, accountId: string | null, deviceId: string | null): void {
@@ -109,6 +114,19 @@ export class CloudClient {
     deviceKeyAgreementPub?: string;
   }): Promise<{ account: any; device: any; session: any }> {
     const res = await this.request('/v1/account/login', 'POST', params);
+    this.setSession(res.session.sessionToken, res.account.accountId, res.device.deviceId);
+    return res;
+  }
+
+  public async restoreAccount(params: {
+    username: string;
+    password: string;
+    deviceId: string;
+    deviceName?: string;
+    deviceSigningPub?: string;
+    deviceKeyAgreementPub?: string;
+  }): Promise<{ account: any; device: any; session: any; recovery: RecoveryStateEntity | null }> {
+    const res = await this.request('/v1/account/restore', 'POST', params);
     this.setSession(res.session.sessionToken, res.account.accountId, res.device.deviceId);
     return res;
   }

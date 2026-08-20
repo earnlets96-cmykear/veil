@@ -98,3 +98,5 @@ export class MemoryStorageAdapter implements IStorageAdapter {
     }
   }
 }
+
+export const MemoryAdapter = MemoryStorageAdapter;

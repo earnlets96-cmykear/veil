@@ -35,3 +35,6 @@ dist-ssr
 # Local development & test runtime stores
 .veil_relay_data
 .veil_object_store
+.veil_sql_data
+.veil_*.json
+*.tmp.*

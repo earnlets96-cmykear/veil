@@ -37,6 +37,10 @@ export class CloudHandler {
       await this.handleLogin(req, res);
       return true;
     }
+    if (pathname === '/v1/account/restore' && method === 'POST') {
+      await this.handleRestore(req, res);
+      return true;
+    }
     if (pathname === '/v1/account/recovery/reset-password' && method === 'POST') {
       await this.handlePasswordReset(req, res);
       return true;
@@ -219,6 +223,28 @@ export class CloudHandler {
         deviceKeyAgreementPub: body.deviceKeyAgreementPub,
       });
       this.sendJson(res, 200, result);
+    } catch (err: any) {
+      this.sendJson(res, 401, { error: err.message });
+    }
+  }
+
+  private async handleRestore(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    try {
+      const body = await this.parseJsonBody(req);
+      const loginResult = await this.accountService.loginAccount({
+        username: body.username,
+        password: body.password,
+        deviceId: body.deviceId,
+        deviceName: body.deviceName,
+        deviceSigningPub: body.deviceSigningPub,
+        deviceKeyAgreementPub: body.deviceKeyAgreementPub,
+      });
+
+      const recovery = await this.db.getRecoveryState(loginResult.account.accountId);
+      this.sendJson(res, 200, {
+        ...loginResult,
+        recovery,
+      });
     } catch (err: any) {
       this.sendJson(res, 401, { error: err.message });
     }
@@ -421,14 +447,32 @@ export class CloudHandler {
     objectId: string
   ): Promise<void> {
     try {
-      const attRecord = await this.db.getAttachmentByObjectId(objectId);
-      if (!attRecord || attRecord.accountId !== accountId || attRecord.status === 'DELETED') {
-        return this.sendJson(res, 404, { error: 'Attachment not found or access denied' });
+      if (!accountId) {
+        return this.sendJson(res, 401, { error: 'Unauthorized: authentication required' });
       }
 
-      const data = await this.storage.download(objectId);
+      const attRecord = await this.db.getAttachmentByObjectId(objectId);
+      if (!attRecord || attRecord.status === 'DELETED') {
+        return this.sendJson(res, 404, { error: 'Attachment not found or deleted' });
+      }
+
+      if (attRecord.accountId !== accountId) {
+        const requesterSpaces = await this.db.listSpaces(accountId);
+        const hasSpaceAccess = requesterSpaces.some((s) => s.spaceId === attRecord.spaceId);
+        if (!hasSpaceAccess) {
+          return this.sendJson(res, 404, { error: 'Attachment not found or access denied' });
+        }
+      }
+
+      let data: Uint8Array | null = null;
+      try {
+        data = await this.storage.download(objectId);
+      } catch (_e) {
+        data = null;
+      }
+
       if (!data) {
-        return this.sendJson(res, 404, { error: 'Object data missing from storage' });
+        return this.sendJson(res, 404, { error: 'Attachment not found or missing from storage' });
       }
 
       const base64Data = bytesToBase64(data);
@@ -440,7 +484,7 @@ export class CloudHandler {
         ciphertextBase64: base64Data,
       });
     } catch (err: any) {
-      this.sendJson(res, 400, { error: err.message });
+      this.sendJson(res, 500, { error: err.message || 'Internal server error' });
     }
   }
 
