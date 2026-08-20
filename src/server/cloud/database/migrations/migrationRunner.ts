@@ -146,6 +146,67 @@ export const INITIAL_SCHEMA_MIGRATION: Migration = {
   `,
 };
 
+export const RELAY_AND_DIRECTORY_MIGRATION: Migration = {
+  id: '002_relay_and_directory_persistence',
+  name: 'Relay Mailboxes, Envelopes, and Directory Profiles',
+  version: 2,
+  description: 'Creates relay_mailboxes, relay_envelopes, directory_profiles, contact_requests, and adds conversation_id to attachments',
+  upSql: `
+    CREATE TABLE IF NOT EXISTS relay_mailboxes (
+      mailbox_id VARCHAR(64) PRIMARY KEY,
+      capability_hash VARCHAR(64) NOT NULL,
+      created_at BIGINT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      last_active_at BIGINT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_relay_mailboxes_expires ON relay_mailboxes(expires_at);
+
+    CREATE TABLE IF NOT EXISTS relay_envelopes (
+      envelope_id VARCHAR(64) PRIMARY KEY,
+      mailbox_id VARCHAR(64) NOT NULL,
+      payload TEXT NOT NULL,
+      size_bytes BIGINT NOT NULL,
+      created_at BIGINT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      FOREIGN KEY (mailbox_id) REFERENCES relay_mailboxes(mailbox_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_relay_envelopes_mailbox ON relay_envelopes(mailbox_id);
+    CREATE INDEX IF NOT EXISTS idx_relay_envelopes_expires ON relay_envelopes(expires_at);
+
+    CREATE TABLE IF NOT EXISTS directory_profiles (
+      username VARCHAR(64) PRIMARY KEY,
+      identity_id VARCHAR(64) UNIQUE NOT NULL,
+      display_name VARCHAR(128),
+      avatar_url TEXT,
+      signing_public_key VARCHAR(255) NOT NULL,
+      key_agreement_public_key VARCHAR(255) NOT NULL,
+      mailbox_id VARCHAR(64) NOT NULL,
+      prekey_bundle_json TEXT,
+      signature TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_directory_identity ON directory_profiles(identity_id);
+
+    CREATE TABLE IF NOT EXISTS contact_requests (
+      request_id VARCHAR(64) PRIMARY KEY,
+      sender_identity_id VARCHAR(64) NOT NULL,
+      sender_username VARCHAR(64) NOT NULL,
+      recipient_identity_id VARCHAR(64) NOT NULL,
+      recipient_username VARCHAR(64) NOT NULL,
+      status VARCHAR(32) NOT NULL,
+      encrypted_payload TEXT,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_contact_requests_recipient ON contact_requests(recipient_identity_id, status);
+  `,
+};
+
 export class MigrationRunner {
   private appliedMigrations = new Set<string>();
 
@@ -153,7 +214,7 @@ export class MigrationRunner {
    * Returns all available migrations in order.
    */
   public getMigrations(): Migration[] {
-    return [INITIAL_SCHEMA_MIGRATION];
+    return [INITIAL_SCHEMA_MIGRATION, RELAY_AND_DIRECTORY_MIGRATION];
   }
 
   /**

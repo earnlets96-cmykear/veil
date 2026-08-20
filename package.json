@@ -23,6 +23,7 @@
     "@noble/ciphers": "^2.3.0",
     "@noble/curves": "^1.8.0",
     "@noble/hashes": "^1.7.0",
+    "pg": "^8.23.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "ws": "^8.21.3"
@@ -32,6 +33,7 @@
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@types/node": "^22.13.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/ws": "^8.18.1",

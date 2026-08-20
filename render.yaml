@@ -1,25 +1,32 @@
-# Render Blueprint for VEIL Free 24/7 Cloud Relay Backend
-# Deploy freely at https://render.com
+# ==============================================================================
+# VEIL Render Deployment Blueprint (Infrastructure as Code)
+# Web Service connecting to Supabase PostgreSQL & Cloudflare R2
+# ==============================================================================
 
 services:
   - type: web
-    name: veil-cloud-relay
-    runtime: node
-    plan: free
+    name: veil-backend
+    env: node
+    plan: starter
     region: oregon
-    buildCommand: npm install --include=dev && npm run build
-    startCommand: npx tsx src/server/cli.ts
-    healthCheckPath: /healthz
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:server
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: RELAY_HOST
-        value: 0.0.0.0
-      - key: RELAY_PORT
+      - key: PORT
         value: 10000
-      - key: RELAY_LOG_LEVEL
-        value: info
-      - key: RELAY_STORAGE_DIR
-        value: /tmp/veil_relay_data
       - key: DATABASE_URL
-        value: file:///tmp/veil_cloud_db
+        sync: false # Set in Render Dashboard securely (Supabase connection string)
+      - key: R2_ENDPOINT
+        sync: false # Set in Render Dashboard (e.g., https://<account-id>.r2.cloudflarestorage.com)
+      - key: R2_BUCKET
+        value: veil-attachments
+      - key: R2_ACCESS_KEY_ID
+        sync: false # Set in Render Dashboard securely
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false # Set in Render Dashboard securely
+      - key: R2_REGION
+        value: auto

@@ -34,11 +34,37 @@ export class S3ObjectStorage implements IObjectStorage {
 
   constructor(config?: Partial<S3StorageConfig>) {
     this.config = {
-      endpoint: (config?.endpoint || process.env.OBJECT_STORAGE_ENDPOINT || process.env.S3_ENDPOINT || 'https://s3.amazonaws.com').replace(/\/+$/, ''),
-      bucket: config?.bucket || process.env.OBJECT_STORAGE_BUCKET || process.env.S3_BUCKET || 'veil-attachments',
-      accessKeyId: config?.accessKeyId || process.env.OBJECT_STORAGE_ACCESS_KEY || process.env.S3_ACCESS_KEY_ID || '',
-      secretAccessKey: config?.secretAccessKey || process.env.OBJECT_STORAGE_SECRET_KEY || process.env.S3_SECRET_ACCESS_KEY || '',
-      region: config?.region || process.env.OBJECT_STORAGE_REGION || process.env.S3_REGION || 'us-east-1',
+      endpoint: (
+        config?.endpoint ||
+        process.env.R2_ENDPOINT ||
+        process.env.OBJECT_STORAGE_ENDPOINT ||
+        process.env.S3_ENDPOINT ||
+        'https://s3.amazonaws.com'
+      ).replace(/\/+$/, ''),
+      bucket:
+        config?.bucket ||
+        process.env.R2_BUCKET ||
+        process.env.OBJECT_STORAGE_BUCKET ||
+        process.env.S3_BUCKET ||
+        'veil-attachments',
+      accessKeyId:
+        config?.accessKeyId ||
+        process.env.R2_ACCESS_KEY_ID ||
+        process.env.OBJECT_STORAGE_ACCESS_KEY ||
+        process.env.S3_ACCESS_KEY_ID ||
+        '',
+      secretAccessKey:
+        config?.secretAccessKey ||
+        process.env.R2_SECRET_ACCESS_KEY ||
+        process.env.OBJECT_STORAGE_SECRET_KEY ||
+        process.env.S3_SECRET_ACCESS_KEY ||
+        '',
+      region:
+        config?.region ||
+        process.env.R2_REGION ||
+        process.env.OBJECT_STORAGE_REGION ||
+        process.env.S3_REGION ||
+        'auto',
       pathStyle: config?.pathStyle ?? true,
       timeoutMs: config?.timeoutMs || 15000,
     };
@@ -69,8 +95,11 @@ export class S3ObjectStorage implements IObjectStorage {
     if (!objectId || typeof objectId !== 'string') {
       throw new Error('Invalid objectId: must be a non-empty string');
     }
-    const sanitized = objectId.replace(/[^a-zA-Z0-9_-]/g, '');
-    if (sanitized !== objectId || objectId.includes('..') || objectId.includes('/') || objectId.includes('\\')) {
+    if (objectId.includes('..') || objectId.includes('\\') || objectId.startsWith('/')) {
+      throw new Error(`Security Violation: Path traversal in S3 objectId: ${objectId}`);
+    }
+    const sanitized = objectId.replace(/[^a-zA-Z0-9_\-\/]/g, '');
+    if (sanitized !== objectId) {
       throw new Error(`Security Violation: Path traversal or invalid character in S3 objectId: ${objectId}`);
     }
     return sanitized;

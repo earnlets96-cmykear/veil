@@ -377,10 +377,37 @@ export class CloudHandler {
   private async handleAttachmentCreate(req: IncomingMessage, res: ServerResponse, accountId: string): Promise<void> {
     try {
       const body = await this.parseJsonBody(req);
-      const { attachmentId, spaceId, encryptedMetadata, ciphertextSize, ciphertextHash, chunkCount, chunkSize } = body;
+      const {
+        attachmentId,
+        spaceId,
+        encryptedMetadata,
+        ciphertextSize,
+        ciphertextHash,
+        chunkCount,
+        chunkSize,
+        recipientAccountId,
+        conversationId,
+        allowedAccounts,
+      } = body;
 
       if (!attachmentId || !spaceId || !ciphertextHash) {
         return this.sendJson(res, 400, { error: 'Missing required attachment fields' });
+      }
+
+      let metaPayload = encryptedMetadata || '';
+      if (recipientAccountId || conversationId || allowedAccounts) {
+        let metaObj: any = {};
+        if (encryptedMetadata) {
+          try {
+            metaObj = JSON.parse(encryptedMetadata);
+          } catch (_e) {
+            metaObj = { raw: encryptedMetadata };
+          }
+        }
+        if (recipientAccountId) metaObj.recipientAccountId = recipientAccountId;
+        if (conversationId) metaObj.conversationId = conversationId;
+        if (allowedAccounts) metaObj.allowedAccounts = allowedAccounts;
+        metaPayload = JSON.stringify(metaObj);
       }
 
       const objectId = `obj_${bytesToHex(randomBytes(16))}`;
@@ -389,7 +416,7 @@ export class CloudHandler {
         accountId,
         spaceId,
         objectId,
-        encryptedMetadata: encryptedMetadata || '',
+        encryptedMetadata: metaPayload,
         ciphertextSize: ciphertextSize || 0,
         ciphertextHash,
         encryptionVersion: 1,
@@ -459,7 +486,21 @@ export class CloudHandler {
       if (attRecord.accountId !== accountId) {
         const requesterSpaces = await this.db.listSpaces(accountId);
         const hasSpaceAccess = requesterSpaces.some((s) => s.spaceId === attRecord.spaceId);
-        if (!hasSpaceAccess) {
+
+        let isRecipient = false;
+        if (attRecord.encryptedMetadata) {
+          try {
+            const metaObj = JSON.parse(attRecord.encryptedMetadata);
+            if (
+              metaObj.recipientAccountId === accountId ||
+              (Array.isArray(metaObj.allowedAccounts) && metaObj.allowedAccounts.includes(accountId))
+            ) {
+              isRecipient = true;
+            }
+          } catch (_e) {}
+        }
+
+        if (!hasSpaceAccess && !isRecipient) {
           return this.sendJson(res, 404, { error: 'Attachment not found or access denied' });
         }
       }

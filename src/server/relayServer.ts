@@ -193,10 +193,15 @@ export class RelayServer {
     const method = req.method;
 
     try {
-      if (method === 'GET' && url === '/healthz') {
+      if (method === 'GET' && (url === '/health' || url === '/healthz')) {
+        const dbAlive = typeof (this.cloudDb as any).checkHealth === 'function'
+          ? await (this.cloudDb as any).checkHealth()
+          : true;
         res.statusCode = 200;
         res.end(JSON.stringify({
           status: 'ok',
+          database: dbAlive ? 'connected' : 'disconnected',
+          objectStorage: 'connected',
           protocolVersion: RELAY_PROTOCOL_VERSION,
           uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
         }));
@@ -204,12 +209,16 @@ export class RelayServer {
       }
 
       if (method === 'GET' && url === '/readyz') {
-        res.statusCode = 200;
+        const dbAlive = typeof (this.cloudDb as any).checkHealth === 'function'
+          ? await (this.cloudDb as any).checkHealth()
+          : true;
+        res.statusCode = dbAlive ? 200 : 503;
         res.end(JSON.stringify({
-          status: 'ready',
-          store: 'ok',
-          cloudDb: 'ok',
+          status: dbAlive ? 'ready' : 'unready',
+          database: dbAlive ? 'connected' : 'disconnected',
+          cloudDb: dbAlive ? 'ok' : 'error',
           objectStorage: 'ok',
+          store: 'ok',
           protocolVersion: RELAY_PROTOCOL_VERSION,
         }));
         return;

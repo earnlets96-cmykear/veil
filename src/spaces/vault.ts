@@ -363,3 +363,5 @@ export class SpaceVaultManager {
   }
 }
 
+export { SpaceVaultManager as SpaceVault };
+

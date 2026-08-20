@@ -23,7 +23,7 @@ describe('VEIL Phase 24: Realistic Large Encrypted Attachment Tests', () => {
     // 2. Decrypt attachment
     const decryptedBytes = AttachmentPipeline.decryptAndReassemble(metadata, chunks, attachmentKey);
     expect(decryptedBytes.length).toBe(originalBytes.length);
-    expect(decryptedBytes).toEqual(originalBytes);
+    expect(Buffer.from(decryptedBytes).equals(Buffer.from(originalBytes))).toBe(true);
 
     // 3. Ephemeral URL revocation
     const blobUrl = AttachmentPipeline.createEphemeralBlobUrl(decryptedBytes, 'application/octet-stream');

@@ -208,28 +208,30 @@ export class PersistentFileRelayStore implements IRelayStore {
 
   public async registerProfile(profile: SignedProfileDocument): Promise<void> {
     this.assertInit();
-    const existing = this.profilesByUsername.get(profile.username);
+    const uname = profile.username.toLowerCase();
+    const existing = this.profilesByUsername.get(uname);
     if (existing && existing.identityId !== profile.identityId) {
       throw new Error('CONFLICT: Username is already registered by another identity');
     }
 
     // If this identity had a previous username, clean it up
     const prev = this.profilesByIdentity.get(profile.identityId);
-    if (prev && prev.username !== profile.username) {
-      this.profilesByUsername.delete(prev.username);
+    if (prev && prev.username.toLowerCase() !== uname) {
+      this.profilesByUsername.delete(prev.username.toLowerCase());
     }
 
-    this.profilesByUsername.set(profile.username, { ...profile });
+    this.profilesByUsername.set(uname, { ...profile });
     this.profilesByIdentity.set(profile.identityId, { ...profile });
     await this.persistProfiles();
   }
 
   public async getProfileByUsername(canonicalUsername: string): Promise<SignedProfileDocument | null> {
     this.assertInit();
-    const prof = this.profilesByUsername.get(canonicalUsername);
+    const uname = canonicalUsername.toLowerCase();
+    const prof = this.profilesByUsername.get(uname);
     if (!prof) return null;
     if (prof.expiresAt && prof.expiresAt <= Date.now()) {
-      this.profilesByUsername.delete(canonicalUsername);
+      this.profilesByUsername.delete(uname);
       this.profilesByIdentity.delete(prof.identityId);
       await this.persistProfiles();
       return null;
@@ -284,7 +286,7 @@ export class PersistentFileRelayStore implements IRelayStore {
     this.assertInit();
     const prof = this.profilesByIdentity.get(identityId);
     if (!prof) return false;
-    this.profilesByUsername.delete(prof.username);
+    this.profilesByUsername.delete(prof.username.toLowerCase());
     this.profilesByIdentity.delete(identityId);
     await this.persistProfiles();
     return true;

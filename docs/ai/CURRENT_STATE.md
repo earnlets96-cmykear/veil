@@ -33,17 +33,17 @@
 | **Phase 26** | Real-World Release Validation (Web ↔ Web & Android Readiness) | **COMPLETED** | 40-message bidirectional test, 50-message burst, live relay probe, Android diagnostic audit, validation report |
 | **Phase 27** | Cloud & Account Foundation (Persistent Account, Multi-Device, Sync Engine, Object Storage) | **COMPLETED** | Persistent Account/Device identity, SQL/File database schema, Object Storage abstraction, encrypted attachments, SyncEngine, local migration (5 dedicated test suites) |
 | **Phase 28** | Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore) | **COMPLETED** | Deterministic SQL migrations, S3 Object Storage, Caddy TLS reverse proxy, Docker stack, backup/restore tool, fresh-install re-hydration tests |
-| **Phase 29** | Production Cloud Activation, Persistent Accounts, Cloud File Storage & Real-World Data Continuity | **COMPLETED** | Zero-knowledge identity backup & exact byte-for-byte restore, durable disk SQL persistence across restarts, pure TypeScript AWS SigV4 S3 storage, E2EE voice messaging & audio AEAD pipeline, native message quoting & replies, 5 new test suites |
+| **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence Migration | **COMPLETED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, 10 new test suites (222 total suites, 453 tests passing, 9/9 smoke passed) |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
-- **Release Version**: **`1.0.0` (Production GA with Full Cloud Persistence & Voice/Replies)**
-- **Total Test Files**: **212 / 212 passed (100% pass rate)**
-- **Total Tests**: **436 / 436 passed (0 failures, 0 skipped)**
-- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.7s)
-- **Production Smoke**: `node scripts/phase29-production-smoke.mjs` (via tsx) passes 6/6 smoke tests cleanly.
+- **Release Version**: **`1.0.0` (Production GA with Supabase PostgreSQL & Cloudflare R2 Cloud Persistence)**
+- **Total Test Files**: **222 / 222 passed (100% pass rate)**
+- **Total Tests**: **453 / 453 passed (0 failures, 0 skipped)**
+- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.4s)
+- **Production Smoke**: `npx tsx scripts/phase30-production-smoke.mjs` passes 9/9 smoke tests cleanly (100%).
 - **Release Manifest**: SHA-256 verified in `release/v1.0.0/manifest.json`
 - **Working Tree**: Clean and fully verified.
 
