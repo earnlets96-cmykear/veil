@@ -183,8 +183,21 @@ export class ConversationManager {
 
     const senderId = senderIdentityDoc.identityId;
     let ratchetSession = this.sessionStore.loadSession(session, senderId);
+    let plaintextBytes: Uint8Array | null = null;
 
-    // 2. If no session exists and message contains X3DH header, initialize Bob's session
+    if (ratchetSession) {
+      try {
+        plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
+      } catch (err) {
+        if (ratchetMsg.header.x3dhHeader) {
+          ratchetSession = null;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // 2. If no session exists (or decryption failed) and message contains X3DH header, initialize Bob's session
     if (!ratchetSession) {
       if (!ratchetMsg.header.x3dhHeader) {
         throw new Error('Cannot receive message: no session exists and message lacks X3DH header');
@@ -232,10 +245,15 @@ export class ConversationManager {
         sharedMasterKey,
         spkKeypair
       );
+
+      plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
+    }
+
+    if (!plaintextBytes) {
+      throw new Error('Failed to decrypt ratchet message');
     }
 
     // 3. Decrypt through Double Ratchet
-    const plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
     const text = new TextDecoder().decode(plaintextBytes);
 
     // 4. Save updated session state
@@ -365,8 +383,21 @@ export class ConversationManager {
     const ratchetMsg: RatchetMessage = wireObj.ratchetMessage;
 
     let ratchetSession = this.sessionStore.loadSession(session, senderId);
+    let plaintextBytes: Uint8Array | null = null;
 
-    // 2. If no session exists and message contains X3DH header, initialize Bob's session
+    if (ratchetSession) {
+      try {
+        plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
+      } catch (err) {
+        if (ratchetMsg.header.x3dhHeader) {
+          ratchetSession = null;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // 2. If no session exists (or decryption failed) and message contains X3DH header, initialize Bob's session
     if (!ratchetSession) {
       if (!ratchetMsg.header.x3dhHeader) {
         throw new Error('Cannot receive message: no session exists and message lacks X3DH header');
@@ -414,10 +445,15 @@ export class ConversationManager {
         sharedMasterKey,
         spkKeypair
       );
+
+      plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
+    }
+
+    if (!plaintextBytes) {
+      throw new Error('Failed to decrypt ratchet message');
     }
 
     // 3. Decrypt through Double Ratchet
-    const plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
     const text = new TextDecoder().decode(plaintextBytes);
 
     // 4. Save updated session state

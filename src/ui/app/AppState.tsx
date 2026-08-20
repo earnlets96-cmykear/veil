@@ -215,7 +215,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 7. Ensure Mailbox, Prekey pool, and Directory registration are initialized
     try {
       const binding = await netManager.getOrCreateMailbox(session);
-      prekeyManager.generateSignedPrekey(session);
+      if (!prekeyManager.getSignedPrekeyPublic(session)) {
+        prekeyManager.generateSignedPrekey(session);
+      }
       prekeyManager.generateOneTimePrekeys(session, 10);
 
       // Auto-register public profile in Directory so Space is immediately routeable

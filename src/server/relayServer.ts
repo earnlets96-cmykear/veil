@@ -282,12 +282,9 @@ export class RelayServer {
       if (method === 'GET') {
         const distDir = path.resolve(process.cwd(), 'dist');
         if (fs.existsSync(distDir)) {
-          let reqPath = url === '/' ? '/index.html' : url;
-          let filePath = path.join(distDir, reqPath);
-          if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-            filePath = path.join(distDir, 'index.html');
-          }
-          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+          const reqPath = url === '/' ? '/index.html' : url;
+          const filePath = path.normalize(path.join(distDir, reqPath));
+          if (filePath.startsWith(distDir) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
             const ext = path.extname(filePath).toLowerCase();
             const mimeTypes: Record<string, string> = {
               '.html': 'text/html; charset=utf-8',

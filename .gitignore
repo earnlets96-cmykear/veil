@@ -32,4 +32,6 @@ dist-ssr
 .env.local
 .env.*.local
 *.pem
-*.key
+# Local development & test runtime stores
+.veil_relay_data
+.veil_object_store
