@@ -314,6 +314,20 @@ export class CloudHandler {
       for (const msg of messages) {
         msg.accountId = accountId;
         msg.senderDeviceId = deviceId;
+
+        // Auto-provision space record if not yet registered
+        const spaceRecord = await this.db.getSpace(accountId, msg.spaceId);
+        if (!spaceRecord) {
+          await this.db.saveSpace({
+            spaceId: msg.spaceId,
+            accountId,
+            encryptedHeader: 'auto_provisioned_v1',
+            version: 1,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+        }
+
         const existing = await this.db.getMessage(accountId, msg.spaceId, msg.messageId);
         if (!existing || msg.version >= existing.version) {
           await this.db.saveMessage({
@@ -410,6 +424,19 @@ export class CloudHandler {
         if (conversationId) metaObj.conversationId = conversationId;
         if (allowedAccounts) metaObj.allowedAccounts = allowedAccounts;
         metaPayload = JSON.stringify(metaObj);
+      }
+
+      // Auto-provision space record if not yet registered on cloud backend
+      const spaceRecord = await this.db.getSpace(accountId, spaceId);
+      if (!spaceRecord) {
+        await this.db.saveSpace({
+          spaceId,
+          accountId,
+          encryptedHeader: 'auto_provisioned_v1',
+          version: 1,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
       }
 
       const objectId = `obj_${bytesToHex(randomBytes(16))}`;

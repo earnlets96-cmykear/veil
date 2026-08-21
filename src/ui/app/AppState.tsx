@@ -217,12 +217,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         username?: string;
       }>(session, 'veil:cloud:session')) || null;
 
+      const syncCurrentSpace = async (accId: string) => {
+        try {
+          await cloudClient.syncSpaces([
+            {
+              spaceId: session.spaceId,
+              accountId: accId,
+              encryptedHeader: 'encrypted_header_v1',
+              version: 1,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            },
+          ]);
+        } catch (_sErr) {}
+      };
+
       if (savedCloudSession && savedCloudSession.sessionToken && savedCloudSession.expiresAt > Date.now()) {
         cloudClient.setSession(
           savedCloudSession.sessionToken,
           savedCloudSession.accountId,
           savedCloudSession.deviceId
         );
+        await syncCurrentSpace(savedCloudSession.accountId);
         return;
       }
 
@@ -251,6 +267,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             expiresAt: logRes.session.expiresAt,
             username: username.toLowerCase(),
           });
+          await syncCurrentSpace(logRes.account.accountId);
           return;
         }
       } catch (_loginErr) {
@@ -272,6 +289,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               expiresAt: regRes.session.expiresAt,
               username: username.toLowerCase(),
             });
+            await syncCurrentSpace(regRes.account.accountId);
             return;
           }
         } catch (_regErr) {
