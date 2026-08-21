@@ -5,6 +5,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppProvider } from './ui/app/AppState.tsx';
+import { ToastProvider } from './ui/components/ui/index.ts';
 import { App } from './ui/App.tsx';
 import './styles/veil-design-system.css';
 import './styles/veil-components.css';
@@ -15,7 +16,9 @@ if (rootEl) {
   root.render(
     <React.StrictMode>
       <AppProvider>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </AppProvider>
     </React.StrictMode>
   );

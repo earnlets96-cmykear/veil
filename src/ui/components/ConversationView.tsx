@@ -1,15 +1,14 @@
 /**
- * Modernized Conversation View Component for VEIL Phase 31 Step 5A.
+ * Polished Conversation View Component for VEIL Phase 31 Step 5B.
  *
  * Implements:
- * - Advanced message context menu (Reply, Copy, Select, Retry, Delete)
- * - Multi-message selection mode and floating action toolbar (Batch Copy & Delete)
- * - In-conversation search with match counter and Prev/Next match navigation
- * - Date separators ("Today", "Yesterday", formatted calendar dates)
- * - "New Messages" unread divider
- * - Floating scroll-to-latest button with unread counter
- * - Jump-to-message with momentary pulse highlighting
- * - Zero cryptographic or session modifications.
+ * - Robust unread state tracking, unread divider, and auto-scroll to first unread
+ * - Consecutive message grouping (5-minute window, same sender, same date)
+ * - State-aware context menu (FAILED vs normal messages)
+ * - Duplicate-safe failed message retry with loading spinner
+ * - Meaningful toast notifications via useToast() without leaking secrets
+ * - In-conversation search and selection toolbar
+ * - Zero cryptographic or protocol regressions.
  */
 
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
@@ -30,6 +29,7 @@ import {
   AttachmentCard,
   VoiceNoteCard,
   MessageBubble,
+  useToast,
 } from './ui/index.ts';
 
 interface ContextMenuState {
@@ -56,11 +56,17 @@ export const ConversationView: React.FC = () => {
     markConversationAsRead,
   } = useApp();
 
+  const { showToast } = useToast();
+
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineEndRef = useRef<HTMLDivElement>(null);
+  const unreadRef = useRef<HTMLDivElement>(null);
+  const hasAutoScrolledUnreadRef = useRef<string | null>(null);
+
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const audioElementsRef = useRef<Record<string, HTMLAudioElement>>({});
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+  const [retryingMessageIds, setRetryingMessageIds] = useState<Set<string>>(new Set());
 
   // In-Conversation Search State
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -91,26 +97,45 @@ export const ConversationView: React.FC = () => {
     return messages[activeChatId] || (activeConv?.peerDoc?.identityId ? messages[activeConv.peerDoc.identityId] : []) || [];
   }, [activeChatId, activeConv, messages]);
 
-  // Mark conversation as read on load
-  useEffect(() => {
-    if (activeChatId && activeConv && activeConv.unreadCount > 0) {
-      markConversationAsRead(activeChatId);
-    }
-  }, [activeChatId, activeConv, markConversationAsRead]);
+  // First unread message calculation
+  const unreadCount = activeConv?.unreadCount || 0;
+  const firstUnreadIndex = useMemo(() => {
+    if (unreadCount <= 0 || activeMessages.length === 0) return -1;
+    return Math.max(0, activeMessages.length - unreadCount);
+  }, [unreadCount, activeMessages.length]);
 
-  // Initial and new message auto-scroll
+  // Auto-scroll to first unread message or timeline end on chat selection
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    if (hasAutoScrolledUnreadRef.current !== activeChatId) {
+      hasAutoScrolledUnreadRef.current = activeChatId;
+      if (firstUnreadIndex > 0 && unreadRef.current) {
+        unreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [activeChatId, firstUnreadIndex]);
+
+  // New message auto-scroll when at bottom
   useEffect(() => {
     if (!showScrollBottom) {
       timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [activeMessages.length, showScrollBottom]);
 
-  // Handle timeline scroll detection
+  // Handle timeline scroll detection & mark as read at bottom
   const handleTimelineScroll = () => {
     if (!timelineRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = timelineRef.current;
-    const isScrolledUp = scrollHeight - scrollTop - clientHeight > 200;
+    const isScrolledUp = scrollHeight - scrollTop - clientHeight > 180;
     setShowScrollBottom(isScrolledUp);
+
+    // Mark as read when scrolled near bottom
+    if (!isScrolledUp && activeChatId && activeConv && activeConv.unreadCount > 0) {
+      markConversationAsRead(activeChatId);
+    }
   };
 
   // Close context menu on outside click or escape
@@ -216,7 +241,10 @@ export const ConversationView: React.FC = () => {
       audio.play();
       setPlayingAudioId(msg.id);
     } catch (err: any) {
-      alert(`Voice playback error: ${err.message || 'Failed to decrypt audio'}`);
+      showToast({
+        type: 'error',
+        message: `Audio playback error: ${err.message || 'Failed to decrypt voice note'}`,
+      });
     }
   };
 
@@ -255,11 +283,37 @@ export const ConversationView: React.FC = () => {
         a.download = msg.attachment.name;
         a.click();
         URL.revokeObjectURL(url);
+        showToast({
+          type: 'success',
+          message: `Downloaded ${msg.attachment.name}`,
+        });
       } catch (err: any) {
-        alert(`Attachment download error: ${err.message || 'Failed to download file'}`);
+        showToast({
+          type: 'error',
+          message: `Attachment download error: ${err.message || 'Failed to download file'}`,
+        });
       } finally {
         setDownloadingAttachmentId(null);
       }
+    }
+  };
+
+  // Safe failed message retry handler
+  const handleRetryMessage = async (messageId: string) => {
+    if (!activeChatId || retryingMessageIds.has(messageId)) return;
+
+    setRetryingMessageIds((prev) => new Set(prev).add(messageId));
+    try {
+      await retryFailedMessage(activeChatId, messageId);
+      showToast({ type: 'success', message: 'Message sent successfully' });
+    } catch (_err) {
+      showToast({ type: 'error', message: 'Failed to send message. Stored locally.' });
+    } finally {
+      setRetryingMessageIds((prev) => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
     }
   };
 
@@ -267,8 +321,10 @@ export const ConversationView: React.FC = () => {
   const handleOpenContextMenu = (e: React.MouseEvent, msg: UIMessage) => {
     e.preventDefault();
     e.stopPropagation();
-    const x = Math.min(e.clientX, window.innerWidth - 180);
-    const y = Math.min(e.clientY, window.innerHeight - 220);
+    const menuWidth = 175;
+    const menuHeight = 220;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
     setContextMenu({ isOpen: true, x, y, message: msg });
   };
 
@@ -276,6 +332,7 @@ export const ConversationView: React.FC = () => {
     const target = msg || contextMenu.message;
     if (target && target.text && navigator.clipboard) {
       navigator.clipboard.writeText(target.text);
+      showToast({ type: 'info', message: 'Message copied to clipboard' });
     }
   };
 
@@ -283,6 +340,7 @@ export const ConversationView: React.FC = () => {
     const target = msg || contextMenu.message;
     if (target && activeChatId) {
       await deleteMessageLocally(activeChatId, target.id);
+      showToast({ type: 'info', message: 'Message deleted locally' });
     }
   };
 
@@ -310,6 +368,7 @@ export const ConversationView: React.FC = () => {
       .join('\n\n');
     if (texts && navigator.clipboard) {
       navigator.clipboard.writeText(texts);
+      showToast({ type: 'info', message: `${selectedMessageIds.size} messages copied` });
     }
     setIsSelectionMode(false);
     setSelectedMessageIds(new Set());
@@ -317,7 +376,9 @@ export const ConversationView: React.FC = () => {
 
   const handleDeleteSelected = async () => {
     if (activeChatId && selectedMessageIds.size > 0) {
+      const count = selectedMessageIds.size;
       await deleteMessagesLocally(activeChatId, Array.from(selectedMessageIds));
+      showToast({ type: 'info', message: `${count} messages deleted locally` });
       setIsSelectionMode(false);
       setSelectedMessageIds(new Set());
     }
@@ -333,6 +394,22 @@ export const ConversationView: React.FC = () => {
     if (d.toDateString() === today.toDateString()) return 'Today';
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Consecutive Message Grouping Helpers
+  const isSameSender = (m1?: UIMessage | null, m2?: UIMessage | null) => {
+    if (!m1 || !m2) return false;
+    return m1.isOutgoing === m2.isOutgoing && m1.senderId === m2.senderId;
+  };
+
+  const isWithinTimeWindow = (m1?: UIMessage | null, m2?: UIMessage | null) => {
+    if (!m1 || !m2) return false;
+    return Math.abs(m1.timestamp - m2.timestamp) <= 300000; // 5 minutes
+  };
+
+  const isSameDate = (m1?: UIMessage | null, m2?: UIMessage | null) => {
+    if (!m1 || !m2) return false;
+    return new Date(m1.timestamp).toDateString() === new Date(m2.timestamp).toDateString();
   };
 
   return (
@@ -518,11 +595,22 @@ export const ConversationView: React.FC = () => {
             const isVoice = Boolean(msg.voice);
             const isAttachment = Boolean(msg.attachment);
 
-            // Date separator calculation
+            // Grouping calculations
             const prevMsg = index > 0 ? activeMessages[index - 1] : null;
+            const nextMsg = index < activeMessages.length - 1 ? activeMessages[index + 1] : null;
+
+            const isGroupedWithPrev =
+              isSameSender(msg, prevMsg) && isWithinTimeWindow(msg, prevMsg) && isSameDate(msg, prevMsg);
+            const isGroupedWithNext =
+              isSameSender(msg, nextMsg) && isWithinTimeWindow(msg, nextMsg) && isSameDate(msg, nextMsg);
+
+            // Date separator calculation
             const showDateSeparator =
               !prevMsg ||
               new Date(msg.timestamp).toDateString() !== new Date(prevMsg.timestamp).toDateString();
+
+            // Unread divider calculation
+            const showUnreadDivider = firstUnreadIndex > 0 && index === firstUnreadIndex;
 
             const voiceElement = isVoice ? (
               <VoiceNoteCard
@@ -552,6 +640,12 @@ export const ConversationView: React.FC = () => {
                   </div>
                 )}
 
+                {showUnreadDivider && (
+                  <div ref={unreadRef} className="veil-unread-divider">
+                    New Messages
+                  </div>
+                )}
+
                 <MessageBubble
                   id={msg.id}
                   isOutgoing={Boolean(msg.isOutgoing)}
@@ -570,7 +664,8 @@ export const ConversationView: React.FC = () => {
                   }
                   onReplyClick={scrollToMessage}
                   onReplyTrigger={() => setReplyTarget(msg)}
-                  onRetry={() => retryFailedMessage(activeChatId, msg.id)}
+                  onRetry={() => handleRetryMessage(msg.id)}
+                  isRetrying={retryingMessageIds.has(msg.id)}
                   isSelectionMode={isSelectionMode}
                   isSelected={selectedMessageIds.has(msg.id)}
                   onSelectToggle={() => toggleSelectMessage(msg.id)}
@@ -580,6 +675,8 @@ export const ConversationView: React.FC = () => {
                     toggleSelectMessage(msg.id);
                   }}
                   isHighlighted={highlightedMessageId === msg.id}
+                  isGroupedWithPrevious={isGroupedWithPrev}
+                  isGroupedWithNext={isGroupedWithNext}
                   voiceElement={voiceElement}
                   attachmentElement={attachmentElement}
                 />
@@ -603,7 +700,7 @@ export const ConversationView: React.FC = () => {
         </button>
       )}
 
-      {/* Context Menu Popup */}
+      {/* State-Aware Context Menu Popup */}
       {contextMenu.isOpen && contextMenu.message && (
         <div
           className="veil-context-menu"
@@ -612,17 +709,22 @@ export const ConversationView: React.FC = () => {
           aria-label="Message Actions"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className="veil-context-menu-item"
-            role="menuitem"
-            onClick={() => {
-              setReplyTarget(contextMenu.message);
-              setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-            }}
-          >
-            ↩ Reply
-          </button>
+          {/* Reply only available on non-failed messages */}
+          {contextMenu.message.status !== 'FAILED' && (
+            <button
+              type="button"
+              className="veil-context-menu-item"
+              role="menuitem"
+              onClick={() => {
+                setReplyTarget(contextMenu.message);
+                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+              }}
+            >
+              ↩ Reply
+            </button>
+          )}
+
+          {/* Copy available whenever text exists */}
           {contextMenu.message.text && (
             <button
               type="button"
@@ -636,6 +738,7 @@ export const ConversationView: React.FC = () => {
               📋 Copy Text
             </button>
           )}
+
           <button
             type="button"
             className="veil-context-menu-item"
@@ -648,20 +751,24 @@ export const ConversationView: React.FC = () => {
           >
             🔘 Select
           </button>
+
+          {/* Retry only available on failed messages */}
           {contextMenu.message.status === 'FAILED' && (
             <button
               type="button"
               className="veil-context-menu-item"
               role="menuitem"
               onClick={() => {
-                if (contextMenu.message) retryFailedMessage(activeChatId, contextMenu.message.id);
+                if (contextMenu.message) handleRetryMessage(contextMenu.message.id);
                 setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
               }}
             >
               🔄 Retry Send
             </button>
           )}
+
           <div style={{ height: '1px', backgroundColor: 'var(--veil-border)', margin: '2px 0' }} />
+
           <button
             type="button"
             className="veil-context-menu-item veil-context-menu-danger"

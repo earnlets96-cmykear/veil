@@ -3,13 +3,14 @@
  *
  * Handles incoming/outgoing alignment, reply quote rendering, attachment previews,
  * voice player embedding, delivery receipts, selection checkboxes, context menu triggers,
- * retry actions on failure, and timestamp formatting.
+ * retry actions on failure, consecutive grouping, and timestamp formatting.
  */
 
 import React, { ReactNode, useRef } from 'react';
 import { ReplyPreview, ReplyPreviewData } from './ReplyPreview.tsx';
 import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
+import { Spinner } from './Spinner.tsx';
 
 export interface MessageBubbleProps {
   id: string;
@@ -28,7 +29,10 @@ export interface MessageBubbleProps {
   onContextMenu?: (e: React.MouseEvent<HTMLDivElement>) => void;
   onLongPress?: () => void;
   onRetry?: () => void;
+  isRetrying?: boolean;
   isHighlighted?: boolean;
+  isGroupedWithPrevious?: boolean;
+  isGroupedWithNext?: boolean;
   className?: string;
 }
 
@@ -49,7 +53,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onContextMenu,
   onLongPress,
   onRetry,
+  isRetrying = false,
   isHighlighted = false,
+  isGroupedWithPrevious = false,
+  isGroupedWithNext = false,
   className = '',
 }) => {
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,11 +77,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   };
 
   const isFailed = status === 'FAILED';
+  const groupedClass = `${isGroupedWithPrevious ? 'veil-message-grouped-prev' : ''} ${
+    isGroupedWithNext ? 'veil-message-grouped-next' : ''
+  }`.trim();
 
   return (
     <div
       id={`msg-${id}`}
-      className={`veil-message-row ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
+      className={`veil-message-row ${isOutgoing ? 'outgoing' : 'incoming'} ${groupedClass} ${className}`.trim()}
       onClick={isSelectionMode && onSelectToggle ? onSelectToggle : undefined}
       onContextMenu={onContextMenu}
       onTouchStart={handleTouchStart}
@@ -94,9 +104,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
 
       <div
-        className={`veil-message-bubble ${isSelected ? 'veil-message-selected' : ''} ${
-          isHighlighted ? 'veil-message-highlight' : ''
-        }`}
+        className={`veil-message-bubble ${isOutgoing ? 'outgoing' : 'incoming'} ${
+          isSelected ? 'veil-message-selected' : ''
+        } ${isHighlighted ? 'veil-message-highlight' : ''}`}
       >
         {replyTo && (
           <ReplyPreview
@@ -114,7 +124,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         <div className="veil-message-meta">
-          {!isSelectionMode && onReplyTrigger && (
+          {!isSelectionMode && onReplyTrigger && !isFailed && (
             <button
               type="button"
               style={{
@@ -145,17 +155,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 color: 'var(--veil-danger)',
                 borderRadius: 'var(--veil-radius-sm)',
                 fontSize: '0.7rem',
-                cursor: 'pointer',
-                padding: '1px 5px',
+                cursor: isRetrying ? 'not-allowed' : 'pointer',
+                padding: '1px 6px',
                 fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
               }}
+              disabled={isRetrying}
               onClick={(e) => {
                 e.stopPropagation();
                 onRetry();
               }}
               aria-label="Retry sending failed message"
             >
-              🔄 Retry
+              {isRetrying ? (
+                <>
+                  <Spinner size="sm" aria-label="Retrying..." />
+                  <span>Retrying...</span>
+                </>
+              ) : (
+                '🔄 Retry'
+              )}
             </button>
           )}
 

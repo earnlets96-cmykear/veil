@@ -619,7 +619,7 @@
 
 .veil-scroll-bottom-btn {
   position: absolute;
-  bottom: 80px;
+  bottom: calc(var(--veil-safe-bottom, 0px) + 76px);
   right: var(--veil-space-4);
   width: 40px;
   height: 40px;
@@ -640,4 +640,30 @@
   background-color: var(--veil-bg-surface-hover);
   transform: translateY(-2px);
 }
+
+/* Consecutive Message Grouping */
+.veil-message-grouped-prev {
+  margin-top: 2px !important;
+}
+
+.veil-message-grouped-next {
+  margin-bottom: 2px !important;
+}
+
+.veil-message-grouped-prev .veil-message-bubble.incoming {
+  border-top-left-radius: var(--veil-radius-xs) !important;
+}
+
+.veil-message-grouped-next .veil-message-bubble.incoming {
+  border-bottom-left-radius: var(--veil-radius-xs) !important;
+}
+
+.veil-message-grouped-prev .veil-message-bubble.outgoing {
+  border-top-right-radius: var(--veil-radius-xs) !important;
+}
+
+.veil-message-grouped-next .veil-message-bubble.outgoing {
+  border-bottom-right-radius: var(--veil-radius-xs) !important;
+}
+
 
