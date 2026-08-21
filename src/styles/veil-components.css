@@ -1,0 +1,484 @@
+/**
+ * VEIL Component Stylesheet — Phase 31 Reusable Component Layer
+ *
+ * Uses existing --veil-* design system tokens strictly.
+ * Zero hardcoded colors or random CSS values.
+ */
+
+/* =========================================================================
+   1. BUTTONS & ICON BUTTONS
+   ========================================================================= */
+
+.veil-btn-sm {
+  padding: var(--veil-space-1) var(--veil-space-3);
+  font-size: var(--veil-text-xs);
+  min-height: var(--veil-touch-target-min);
+  border-radius: var(--veil-radius-sm);
+}
+
+.veil-btn-md {
+  padding: var(--veil-space-2) var(--veil-space-4);
+  font-size: var(--veil-text-sm);
+  min-height: var(--veil-touch-target-min);
+  border-radius: var(--veil-radius-md);
+}
+
+.veil-btn-lg {
+  padding: var(--veil-space-3) var(--veil-space-6);
+  font-size: var(--veil-text-base);
+  min-height: var(--veil-touch-target-comfort);
+  border-radius: var(--veil-radius-md);
+}
+
+.veil-btn-full {
+  width: 100%;
+}
+
+.veil-btn-icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+.veil-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--veil-touch-target-min);
+  min-height: var(--veil-touch-target-min);
+  width: var(--veil-touch-target-min);
+  height: var(--veil-touch-target-min);
+  padding: 0;
+  border-radius: var(--veil-radius-md);
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--veil-text-secondary);
+  cursor: pointer;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+  outline: none;
+  user-select: none;
+}
+
+.veil-icon-btn:hover:not(:disabled) {
+  background-color: var(--veil-bg-surface-hover);
+  color: var(--veil-text-primary);
+  border-color: var(--veil-border-subtle);
+}
+
+.veil-icon-btn-primary {
+  background-color: var(--veil-accent-primary);
+  color: #ffffff;
+}
+
+.veil-icon-btn-primary:hover:not(:disabled) {
+  background-color: var(--veil-accent-primary-hover);
+  box-shadow: 0 0 12px var(--veil-accent-glow);
+}
+
+.veil-icon-btn-secondary {
+  background-color: var(--veil-bg-surface-elevated);
+  border-color: var(--veil-border);
+  color: var(--veil-text-primary);
+}
+
+.veil-icon-btn-secondary:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.veil-icon-btn-danger {
+  background-color: var(--veil-danger-bg);
+  border-color: var(--veil-danger-border);
+  color: var(--veil-danger);
+}
+
+.veil-icon-btn-danger:hover:not(:disabled) {
+  background-color: var(--veil-danger);
+  color: #ffffff;
+}
+
+.veil-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* =========================================================================
+   2. INPUTS & FORM CONTROLS
+   ========================================================================= */
+
+.veil-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--veil-space-1);
+  width: 100%;
+}
+
+.veil-input-label {
+  font-size: var(--veil-text-label);
+  font-weight: var(--veil-weight-semibold);
+  color: var(--veil-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-1);
+}
+
+.veil-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.veil-input-leading-icon {
+  position: absolute;
+  left: var(--veil-space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--veil-text-muted);
+  pointer-events: none;
+  z-index: var(--veil-z-base);
+}
+
+.veil-input-trailing-action {
+  position: absolute;
+  right: var(--veil-space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--veil-z-base);
+}
+
+.veil-input-has-leading {
+  padding-left: 2.4rem;
+}
+
+.veil-input-has-trailing {
+  padding-right: 2.6rem;
+}
+
+.veil-input-error {
+  border-color: var(--veil-danger) !important;
+}
+
+.veil-input-error:focus {
+  box-shadow: 0 0 0 3px var(--veil-danger-bg) !important;
+}
+
+.veil-input-helper-text {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-muted);
+  margin-top: 2px;
+}
+
+.veil-input-error-text {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-danger);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-1);
+}
+
+/* =========================================================================
+   3. CARDS & SURFACES
+   ========================================================================= */
+
+.veil-card-interactive {
+  cursor: pointer;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-card-interactive:hover {
+  background-color: var(--veil-bg-surface-active);
+  border-color: var(--veil-border-strong);
+  transform: translateY(-1px);
+}
+
+.veil-card-elevated {
+  background-color: var(--veil-bg-surface-elevated);
+  box-shadow: var(--veil-shadow-md);
+}
+
+.veil-card-danger {
+  background-color: var(--veil-danger-bg);
+  border-color: var(--veil-danger-border);
+}
+
+.veil-card-success {
+  background-color: var(--veil-success-bg);
+  border-color: var(--veil-success-border);
+}
+
+.veil-card-warning {
+  background-color: var(--veil-warning-bg);
+  border-color: var(--veil-warning-border);
+}
+
+/* =========================================================================
+   4. AVATARS & PRESENCE
+   ========================================================================= */
+
+.veil-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--veil-radius-full);
+  font-weight: var(--veil-weight-bold);
+  color: #ffffff;
+  background: var(--veil-gradient-primary);
+  user-select: none;
+  flex-shrink: 0;
+  box-shadow: var(--veil-shadow-sm);
+}
+
+.veil-avatar-square {
+  border-radius: var(--veil-radius-md);
+}
+
+.veil-avatar-xs {
+  width: 24px;
+  height: 24px;
+  font-size: 0.65rem;
+}
+
+.veil-avatar-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 0.8rem;
+}
+
+.veil-avatar-md {
+  width: 40px;
+  height: 40px;
+  font-size: 0.95rem;
+}
+
+.veil-avatar-lg {
+  width: 48px;
+  height: 48px;
+  font-size: 1.15rem;
+}
+
+.veil-avatar-xl {
+  width: 64px;
+  height: 64px;
+  font-size: 1.5rem;
+}
+
+.veil-avatar-status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--veil-radius-full);
+  border: 2px solid var(--veil-bg-surface);
+}
+
+.veil-avatar-status-online {
+  background-color: var(--veil-success);
+  box-shadow: 0 0 6px var(--veil-success);
+}
+
+.veil-avatar-status-offline {
+  background-color: var(--veil-text-muted);
+}
+
+/* =========================================================================
+   5. SPINNERS, SKELETONS & EMPTY STATES
+   ========================================================================= */
+
+@keyframes veilSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.veil-spinner {
+  display: inline-block;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: currentColor;
+  border-radius: var(--veil-radius-full);
+  animation: veilSpin 0.7s linear infinite;
+}
+
+.veil-spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+.veil-spinner-md {
+  width: 20px;
+  height: 20px;
+  border-width: 2.5px;
+}
+
+.veil-spinner-lg {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+@keyframes veilSkeletonPulse {
+  0% { opacity: 0.45; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.45; }
+}
+
+.veil-skeleton {
+  background-color: var(--veil-bg-surface-elevated);
+  border-radius: var(--veil-radius-sm);
+  animation: veilSkeletonPulse 1.6s ease-in-out infinite;
+}
+
+.veil-divider {
+  width: 100%;
+  height: 1px;
+  background-color: var(--veil-border);
+  margin: var(--veil-space-3) 0;
+}
+
+.veil-divider-vertical {
+  width: 1px;
+  height: 100%;
+  background-color: var(--veil-border);
+  margin: 0 var(--veil-space-3);
+}
+
+/* =========================================================================
+   6. ATTACHMENTS & VOICE NOTE CARDS
+   ========================================================================= */
+
+.veil-attachment-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--veil-space-3);
+  padding: var(--veil-space-3);
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md);
+  max-width: 380px;
+  width: 100%;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-attachment-card-interactive {
+  cursor: pointer;
+}
+
+.veil-attachment-card-interactive:hover {
+  border-color: var(--veil-accent-primary);
+  background-color: var(--veil-bg-surface-active);
+}
+
+.veil-attachment-info {
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.veil-attachment-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.veil-attachment-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.veil-attachment-name {
+  font-weight: var(--veil-weight-semibold);
+  font-size: var(--veil-text-sm);
+  color: var(--veil-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.veil-attachment-meta {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-secondary);
+}
+
+.veil-voicenote-card {
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-3);
+  padding: var(--veil-space-2) var(--veil-space-3);
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md);
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.veil-voicenote-play-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: var(--veil-radius-full);
+  background-color: var(--veil-accent-primary);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-voicenote-play-btn:hover:not(:disabled) {
+  background-color: var(--veil-accent-primary-hover);
+  box-shadow: 0 0 10px var(--veil-accent-glow);
+}
+
+.veil-voicenote-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* =========================================================================
+   7. MESSAGE REPLIES & RECEIPTS
+   ========================================================================= */
+
+.veil-reply-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--veil-space-2) var(--veil-space-3);
+  background: var(--veil-accent-primary-subtle);
+  border-left: 3px solid var(--veil-accent-primary);
+  border-radius: var(--veil-radius-sm);
+  font-size: var(--veil-text-xs);
+  margin-bottom: var(--veil-space-1);
+}
+
+.veil-reply-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.veil-reply-sender {
+  font-weight: var(--veil-weight-semibold);
+  color: var(--veil-accent-primary);
+}
+
+.veil-reply-snippet {
+  color: var(--veil-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

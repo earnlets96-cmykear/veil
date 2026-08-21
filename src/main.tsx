@@ -7,6 +7,7 @@ import ReactDOM from 'react-dom/client';
 import { AppProvider } from './ui/app/AppState.tsx';
 import { App } from './ui/App.tsx';
 import './styles/veil-design-system.css';
+import './styles/veil-components.css';
 
 const rootEl = document.getElementById('root');
 if (rootEl) {
