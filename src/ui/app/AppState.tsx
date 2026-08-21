@@ -238,8 +238,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           username,
           password: authPassword,
           deviceId,
+          deviceName: session.name,
+          deviceSigningPub: identity?.document.signingPublicKey,
+          deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
         });
         if (logRes.session && logRes.session.sessionToken) {
+          cloudClient.setSession(logRes.session.sessionToken, logRes.account.accountId, logRes.device.deviceId);
           await store.setAsync(session, 'veil:cloud:session', {
             sessionToken: logRes.session.sessionToken,
             accountId: logRes.account.accountId,
@@ -247,6 +251,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             expiresAt: logRes.session.expiresAt,
             username: username.toLowerCase(),
           });
+          return;
         }
       } catch (_loginErr) {
         try {
@@ -259,6 +264,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
           });
           if (regRes.session && regRes.session.sessionToken) {
+            cloudClient.setSession(regRes.session.sessionToken, regRes.account.accountId, regRes.device.deviceId);
             await store.setAsync(session, 'veil:cloud:session', {
               sessionToken: regRes.session.sessionToken,
               accountId: regRes.account.accountId,
@@ -266,8 +272,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               expiresAt: regRes.session.expiresAt,
               username: username.toLowerCase(),
             });
+            return;
           }
-        } catch (_regErr) {}
+        } catch (_regErr) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[VEIL-CLOUD] Auto cloud session failed:', _regErr);
+          }
+        }
       }
     } catch (_e) {}
   }, []);
@@ -810,10 +821,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
         objectId = createRes.attachment.objectId;
         await cloudClient.uploadAttachment(objectId, rawCiphertext);
-      } catch (uploadErr) {
+      } catch (uploadErr: any) {
         if (typeof console !== 'undefined' && console.warn) {
           console.warn('[VEIL-ATTACHMENT] Attachment upload failed:', uploadErr);
         }
+        alert(`Attachment upload failed: ${uploadErr?.message || 'Cloud storage unavailable'}`);
+        return;
       }
 
       const attachmentPayload = {
@@ -851,9 +864,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       setReplyTarget(null);
 
+      const keys = new Set([
+        conversationId,
+        targetContact?.identityId,
+        targetContact?.name,
+      ].filter(Boolean) as string[]);
+
       setMessages((prev) => {
-        const list = prev[conversationId] || [];
-        const updated = { ...prev, [conversationId]: [...list, newMsg] };
+        const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []);
+        const updated = { ...prev };
+        for (const k of keys) {
+          updated[k] = [...list, newMsg];
+        }
         store.setAsync(activeSession, 'veil:ui:messages', updated);
         return updated;
       });
@@ -883,10 +905,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
 
         setMessages((prev) => {
-          const list = (prev[conversationId] || []).map((m) =>
+          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
             m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
           );
-          const updated = { ...prev, [conversationId]: list };
+          const updated = { ...prev };
+          for (const k of keys) {
+            updated[k] = list;
+          }
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
@@ -934,7 +959,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             recipientAccountId: targetContact?.metadata?.accountId,
           }
         );
-      } catch (_uploadErr) {}
+      } catch (uploadErr: any) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[VEIL-VOICE] Voice upload failed:', uploadErr);
+        }
+        alert(`Voice message upload failed: ${uploadErr?.message || 'Cloud storage unavailable'}`);
+        return;
+      }
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const activeReply = replyTarget ? {
@@ -958,9 +989,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       setReplyTarget(null);
 
+      const keys = new Set([
+        conversationId,
+        targetContact?.identityId,
+        targetContact?.name,
+      ].filter(Boolean) as string[]);
+
       setMessages((prev) => {
-        const list = prev[conversationId] || [];
-        const updated = { ...prev, [conversationId]: [...list, newMsg] };
+        const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []);
+        const updated = { ...prev };
+        for (const k of keys) {
+          updated[k] = [...list, newMsg];
+        }
         store.setAsync(activeSession, 'veil:ui:messages', updated);
         return updated;
       });
@@ -991,19 +1031,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
 
         setMessages((prev) => {
-          const list = (prev[conversationId] || []).map((m) =>
+          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
             m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
           );
-          const updated = { ...prev, [conversationId]: list };
+          const updated = { ...prev };
+          for (const k of keys) {
+            updated[k] = list;
+          }
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
       } catch (_e) {
         setMessages((prev) => {
-          const list = (prev[conversationId] || []).map((m) =>
+          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
             m.id === msgId ? { ...m, status: 'QUEUED' as const } : m
           );
-          const updated = { ...prev, [conversationId]: list };
+          const updated = { ...prev };
+          for (const k of keys) {
+            updated[k] = list;
+          }
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });

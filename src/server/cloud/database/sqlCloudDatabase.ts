@@ -243,7 +243,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       await this.pgClient.query(sql, [
         account.accountId,
         account.username,
-        account.passwordHash,
+        account.authHash || (account as any).passwordHash,
         account.authSalt || 'argon2id_salt',
         account.recoveryAnchor || null,
         account.createdAt,
@@ -267,7 +267,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
   public async getAccountById(accountId: string): Promise<AccountEntity | null> {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
-        SELECT account_id as "accountId", username, auth_hash as "passwordHash",
+        SELECT account_id as "accountId", username, auth_hash as "authHash",
                auth_salt as "authSalt", recovery_anchor as "recoveryAnchor",
                created_at as "createdAt", updated_at as "updatedAt"
         FROM accounts
@@ -279,7 +279,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       return {
         accountId: r.accountId,
         username: r.username,
-        passwordHash: r.passwordHash,
+        authHash: r.authHash || r.passwordHash || '',
         authSalt: r.authSalt,
         recoveryAnchor: r.recoveryAnchor,
         createdAt: Number(r.createdAt),
@@ -294,7 +294,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
   public async getAccountByUsername(username: string): Promise<AccountEntity | null> {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
-        SELECT account_id as "accountId", username, auth_hash as "passwordHash",
+        SELECT account_id as "accountId", username, auth_hash as "authHash",
                auth_salt as "authSalt", recovery_anchor as "recoveryAnchor",
                created_at as "createdAt", updated_at as "updatedAt"
         FROM accounts
@@ -306,7 +306,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       return {
         accountId: r.accountId,
         username: r.username,
-        passwordHash: r.passwordHash,
+        authHash: r.authHash || r.passwordHash || '',
         authSalt: r.authSalt,
         recoveryAnchor: r.recoveryAnchor,
         createdAt: Number(r.createdAt),
@@ -333,7 +333,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       await this.pgClient.query(sql, [
         account.accountId,
         account.username,
-        account.passwordHash,
+        account.authHash || (account as any).passwordHash,
         account.authSalt || 'salt',
         account.recoveryAnchor || null,
         Date.now(),
@@ -368,8 +368,8 @@ export class SqlCloudDatabase implements ICloudDatabase {
         device.deviceId,
         device.accountId,
         device.deviceName,
-        device.deviceSigningPub || '',
-        device.deviceKeyAgreementPub || '',
+        device.signingPublicKey || (device as any).deviceSigningPub || '',
+        device.keyAgreementPublicKey || (device as any).deviceKeyAgreementPub || '',
         device.status || 'ACTIVE',
         device.createdAt,
         device.lastSeenAt,
@@ -388,7 +388,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
         SELECT device_id as "deviceId", account_id as "accountId", device_name as "deviceName",
-               signing_pub as "deviceSigningPub", key_agreement_pub as "deviceKeyAgreementPub",
+               signing_pub as "signingPublicKey", key_agreement_pub as "keyAgreementPublicKey",
                status, created_at as "createdAt", last_seen_at as "lastSeenAt"
         FROM devices
         WHERE account_id = $1 AND device_id = $2
@@ -400,8 +400,8 @@ export class SqlCloudDatabase implements ICloudDatabase {
         deviceId: r.deviceId,
         accountId: r.accountId,
         deviceName: r.deviceName,
-        deviceSigningPub: r.deviceSigningPub,
-        deviceKeyAgreementPub: r.deviceKeyAgreementPub,
+        signingPublicKey: r.signingPublicKey || r.deviceSigningPub || '',
+        keyAgreementPublicKey: r.keyAgreementPublicKey || r.deviceKeyAgreementPub || '',
         status: r.status,
         createdAt: Number(r.createdAt),
         lastSeenAt: Number(r.lastSeenAt),
@@ -416,7 +416,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
         SELECT device_id as "deviceId", account_id as "accountId", device_name as "deviceName",
-               signing_pub as "deviceSigningPub", key_agreement_pub as "deviceKeyAgreementPub",
+               signing_pub as "signingPublicKey", key_agreement_pub as "keyAgreementPublicKey",
                status, created_at as "createdAt", last_seen_at as "lastSeenAt"
         FROM devices
         WHERE account_id = $1
@@ -427,8 +427,8 @@ export class SqlCloudDatabase implements ICloudDatabase {
         deviceId: r.deviceId,
         accountId: r.accountId,
         deviceName: r.deviceName,
-        deviceSigningPub: r.deviceSigningPub,
-        deviceKeyAgreementPub: r.deviceKeyAgreementPub,
+        signingPublicKey: r.signingPublicKey || r.deviceSigningPub || '',
+        keyAgreementPublicKey: r.keyAgreementPublicKey || r.deviceKeyAgreementPub || '',
         status: r.status,
         createdAt: Number(r.createdAt),
         lastSeenAt: Number(r.lastSeenAt),

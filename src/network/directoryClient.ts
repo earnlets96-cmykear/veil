@@ -16,23 +16,37 @@ import {
 
 export class DirectoryClient {
   private baseUrl: string;
+  private timeoutMs: number;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, timeoutMs = 15000) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.timeoutMs = timeoutMs;
   }
 
   public setBaseUrl(baseUrl: string): void {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      return await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   /**
    * Registers a signed profile document with the directory server.
    */
   public async registerProfile(profile: SignedProfileDocument): Promise<RegisterProfileResponse> {
-    const url = `${this.baseUrl}/v1/directory/register`;
     const payload: RegisterProfileRequest = { profile };
 
-    const res = await fetch(url, {
+    const res = await this.request('/v1/directory/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -50,10 +64,9 @@ export class DirectoryClient {
    * Updates an existing profile for the authenticated identity.
    */
   public async updateProfile(profile: SignedProfileDocument): Promise<RegisterProfileResponse> {
-    const url = `${this.baseUrl}/v1/directory/update`;
     const payload: RegisterProfileRequest = { profile };
 
-    const res = await fetch(url, {
+    const res = await this.request('/v1/directory/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -76,8 +89,7 @@ export class DirectoryClient {
       return [];
     }
 
-    const url = `${this.baseUrl}/v1/directory/search?q=${encodeURIComponent(q)}`;
-    const res = await fetch(url, {
+    const res = await this.request(`/v1/directory/search?q=${encodeURIComponent(q)}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -99,8 +111,7 @@ export class DirectoryClient {
     const canonical = username.trim().toLowerCase().replace(/^@/, '');
     if (!canonical) return null;
 
-    const url = `${this.baseUrl}/v1/directory/profile/${encodeURIComponent(canonical)}`;
-    const res = await fetch(url, {
+    const res = await this.request(`/v1/directory/profile/${encodeURIComponent(canonical)}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -125,8 +136,7 @@ export class DirectoryClient {
     const cleanId = identityId.trim();
     if (!cleanId) return null;
 
-    const url = `${this.baseUrl}/v1/directory/identity/${encodeURIComponent(cleanId)}`;
-    const res = await fetch(url, {
+    const res = await this.request(`/v1/directory/identity/${encodeURIComponent(cleanId)}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
