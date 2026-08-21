@@ -2,10 +2,11 @@
  * Reusable MessageBubble Component for VEIL Messaging Interface.
  *
  * Handles incoming/outgoing alignment, reply quote rendering, attachment previews,
- * voice player embedding, delivery receipts, and timestamp formatting.
+ * voice player embedding, delivery receipts, selection checkboxes, context menu triggers,
+ * retry actions on failure, and timestamp formatting.
  */
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useRef } from 'react';
 import { ReplyPreview, ReplyPreviewData } from './ReplyPreview.tsx';
 import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
@@ -21,6 +22,13 @@ export interface MessageBubbleProps {
   onReplyTrigger?: () => void;
   attachmentElement?: ReactNode;
   voiceElement?: ReactNode;
+  isSelected?: boolean;
+  isSelectionMode?: boolean;
+  onSelectToggle?: () => void;
+  onContextMenu?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onLongPress?: () => void;
+  onRetry?: () => void;
+  isHighlighted?: boolean;
   className?: string;
 }
 
@@ -35,14 +43,61 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onReplyTrigger,
   attachmentElement,
   voiceElement,
+  isSelected = false,
+  isSelectionMode = false,
+  onSelectToggle,
+  onContextMenu,
+  onLongPress,
+  onRetry,
+  isHighlighted = false,
   className = '',
 }) => {
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTouchStart = () => {
+    if (onLongPress) {
+      longPressTimerRef.current = setTimeout(() => {
+        onLongPress();
+      }, 500);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const isFailed = status === 'FAILED';
+
   return (
     <div
       id={`msg-${id}`}
       className={`veil-message-row ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
+      onClick={isSelectionMode && onSelectToggle ? onSelectToggle : undefined}
+      onContextMenu={onContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ cursor: isSelectionMode ? 'pointer' : undefined }}
     >
-      <div className="veil-message-bubble">
+      {isSelectionMode && (
+        <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onSelectToggle}
+            aria-label={`Select message ${id}`}
+            style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--veil-accent-primary)' }}
+          />
+        </div>
+      )}
+
+      <div
+        className={`veil-message-bubble ${isSelected ? 'veil-message-selected' : ''} ${
+          isHighlighted ? 'veil-message-highlight' : ''
+        }`}
+      >
         {replyTo && (
           <ReplyPreview
             replyTo={replyTo}
@@ -59,7 +114,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         <div className="veil-message-meta">
-          {onReplyTrigger && (
+          {!isSelectionMode && onReplyTrigger && (
             <button
               type="button"
               style={{
@@ -71,10 +126,36 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 cursor: 'pointer',
                 padding: '0 2px',
               }}
-              onClick={onReplyTrigger}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReplyTrigger();
+              }}
               aria-label="Reply to this message"
             >
               ↩ Reply
+            </button>
+          )}
+
+          {isFailed && onRetry && (
+            <button
+              type="button"
+              style={{
+                background: 'var(--veil-danger-bg)',
+                border: '1px solid var(--veil-danger-border)',
+                color: 'var(--veil-danger)',
+                borderRadius: 'var(--veil-radius-sm)',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                padding: '1px 5px',
+                fontWeight: 600,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRetry();
+              }}
+              aria-label="Retry sending failed message"
+            >
+              🔄 Retry
             </button>
           )}
 

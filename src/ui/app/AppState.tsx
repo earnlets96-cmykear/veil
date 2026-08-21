@@ -95,6 +95,10 @@ export interface AppContextType {
   sendAttachment: (conversationId: string, file: File) => Promise<void>;
   sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
+  deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
+  deleteMessagesLocally: (conversationId: string, messageIds: string[]) => Promise<void>;
+  retryFailedMessage: (conversationId: string, messageId: string) => Promise<void>;
+  markConversationAsRead: (conversationId: string) => void;
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
   addDirectContact: (doc: IdentityDocument) => Promise<void>;
@@ -1076,6 +1080,101 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, contacts, replyTarget]
   );
 
+  const deleteMessageLocally = useCallback(
+    async (conversationId: string, messageId: string) => {
+      if (!activeSession) return;
+      sessionController.recordUserActivity();
+
+      setMessages((prev) => {
+        const list = prev[conversationId] || [];
+        const filtered = list.filter((m) => m.id !== messageId);
+        const updated = { ...prev, [conversationId]: filtered };
+        store.setAsync(activeSession, 'veil:ui:messages', updated);
+        searchEngine.updateIndex(contacts, conversations, updated);
+        return updated;
+      });
+
+      setConversations((prev) => {
+        const updated = prev.map((c) => {
+          if (c.id === conversationId) {
+            const list = (messages[conversationId] || []).filter((m) => m.id !== messageId);
+            const lastMsg = list.length > 0 ? list[list.length - 1] : undefined;
+            return {
+              ...c,
+              lastMessage: lastMsg?.text || (c.type === 'group' ? 'Group created' : 'E2EE conversation'),
+              timestamp: lastMsg?.timestamp || c.timestamp,
+            };
+          }
+          return c;
+        });
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession, contacts, conversations, messages]
+  );
+
+  const deleteMessagesLocally = useCallback(
+    async (conversationId: string, messageIds: string[]) => {
+      if (!activeSession || messageIds.length === 0) return;
+      sessionController.recordUserActivity();
+      const idSet = new Set(messageIds);
+
+      setMessages((prev) => {
+        const list = prev[conversationId] || [];
+        const filtered = list.filter((m) => !idSet.has(m.id));
+        const updated = { ...prev, [conversationId]: filtered };
+        store.setAsync(activeSession, 'veil:ui:messages', updated);
+        searchEngine.updateIndex(contacts, conversations, updated);
+        return updated;
+      });
+
+      setConversations((prev) => {
+        const updated = prev.map((c) => {
+          if (c.id === conversationId) {
+            const list = (messages[conversationId] || []).filter((m) => !idSet.has(m.id));
+            const lastMsg = list.length > 0 ? list[list.length - 1] : undefined;
+            return {
+              ...c,
+              lastMessage: lastMsg?.text || (c.type === 'group' ? 'Group created' : 'E2EE conversation'),
+              timestamp: lastMsg?.timestamp || c.timestamp,
+            };
+          }
+          return c;
+        });
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession, contacts, conversations, messages]
+  );
+
+  const retryFailedMessage = useCallback(
+    async (conversationId: string, messageId: string) => {
+      const convMessages = messages[conversationId] || [];
+      const targetMsg = convMessages.find((m) => m.id === messageId);
+      if (!targetMsg || !activeSession) return;
+
+      await deleteMessageLocally(conversationId, messageId);
+      await sendMessage(conversationId, targetMsg.text);
+    },
+    [activeSession, messages, deleteMessageLocally, sendMessage]
+  );
+
+  const markConversationAsRead = useCallback(
+    (conversationId: string) => {
+      if (!activeSession) return;
+      setConversations((prev) => {
+        const updated = prev.map((c) =>
+          c.id === conversationId ? { ...c, unreadCount: 0 } : c
+        );
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession]
+  );
+
   const restoreAccount = useCallback(
     async (username: string, password: string) => {
       const { session, identityDoc } = await accountManager.restoreAccount({
@@ -1480,6 +1579,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sendAttachment,
     sendVoiceMessage,
     setSearchQuery,
+    deleteMessageLocally,
+    deleteMessagesLocally,
+    retryFailedMessage,
+    markConversationAsRead,
     openModal,
     closeModal,
     addDirectContact,

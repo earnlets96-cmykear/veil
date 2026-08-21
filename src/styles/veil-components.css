@@ -482,3 +482,162 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* =========================================================================
+   8. ADVANCED MESSAGING & TIMELINE EXTENSIONS (Phase 31 Step 5A)
+   ========================================================================= */
+
+.veil-date-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--veil-space-4) 0 var(--veil-space-2) 0;
+}
+
+.veil-date-pill {
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border-subtle);
+  color: var(--veil-text-secondary);
+  font-size: var(--veil-text-xs);
+  font-weight: var(--veil-weight-medium);
+  padding: 2px var(--veil-space-3);
+  border-radius: var(--veil-radius-full);
+  box-shadow: var(--veil-shadow-sm);
+}
+
+.veil-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-3);
+  margin: var(--veil-space-3) 0;
+  color: var(--veil-accent-primary);
+  font-size: var(--veil-text-xs);
+  font-weight: var(--veil-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.veil-unread-divider::before,
+.veil-unread-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--veil-accent-primary);
+  opacity: 0.5;
+}
+
+.veil-chat-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--veil-space-2);
+  padding: var(--veil-space-2) var(--veil-space-4);
+  background-color: var(--veil-bg-surface-elevated);
+  border-bottom: 1px solid var(--veil-border);
+  position: sticky;
+  top: 0;
+  z-index: var(--veil-z-header);
+}
+
+.veil-search-match-count {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-secondary);
+  white-space: nowrap;
+}
+
+.veil-selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--veil-space-3);
+  padding: var(--veil-space-2) var(--veil-space-4);
+  background-color: var(--veil-bg-surface-active);
+  border-bottom: 1px solid var(--veil-border-strong);
+  position: sticky;
+  top: 0;
+  z-index: var(--veil-z-header);
+  animation: veilFadeIn 0.15s ease-out;
+}
+
+.veil-message-selected {
+  outline: 2px solid var(--veil-accent-primary) !important;
+  background-color: var(--veil-accent-primary-subtle) !important;
+  border-radius: var(--veil-radius-md);
+}
+
+@keyframes veilHighlightPulse {
+  0% { background-color: var(--veil-accent-primary-subtle); transform: scale(1.02); }
+  50% { background-color: rgba(99, 102, 241, 0.4); }
+  100% { background-color: transparent; transform: scale(1); }
+}
+
+.veil-message-highlight {
+  animation: veilHighlightPulse 1.4s ease-out;
+}
+
+.veil-context-menu {
+  position: fixed;
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md);
+  box-shadow: var(--veil-shadow-lg);
+  padding: var(--veil-space-1);
+  min-width: 160px;
+  z-index: var(--veil-z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.veil-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-2);
+  padding: var(--veil-space-2) var(--veil-space-3);
+  background: transparent;
+  border: none;
+  color: var(--veil-text-primary);
+  font-size: var(--veil-text-sm);
+  border-radius: var(--veil-radius-sm);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background-color var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-context-menu-item:hover {
+  background-color: var(--veil-bg-surface-hover);
+}
+
+.veil-context-menu-danger {
+  color: var(--veil-danger) !important;
+}
+
+.veil-context-menu-danger:hover {
+  background-color: var(--veil-danger-bg) !important;
+}
+
+.veil-scroll-bottom-btn {
+  position: absolute;
+  bottom: 80px;
+  right: var(--veil-space-4);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--veil-radius-full);
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border);
+  color: var(--veil-text-primary);
+  box-shadow: var(--veil-shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: var(--veil-z-base);
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-scroll-bottom-btn:hover {
+  background-color: var(--veil-bg-surface-hover);
+  transform: translateY(-2px);
+}
+
