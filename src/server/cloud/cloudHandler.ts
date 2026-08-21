@@ -386,6 +386,7 @@ export class CloudHandler {
         chunkCount,
         chunkSize,
         recipientAccountId,
+        recipientUsername,
         conversationId,
         allowedAccounts,
       } = body;
@@ -395,7 +396,7 @@ export class CloudHandler {
       }
 
       let metaPayload = encryptedMetadata || '';
-      if (recipientAccountId || conversationId || allowedAccounts) {
+      if (recipientAccountId || recipientUsername || conversationId || allowedAccounts) {
         let metaObj: any = {};
         if (encryptedMetadata) {
           try {
@@ -405,6 +406,7 @@ export class CloudHandler {
           }
         }
         if (recipientAccountId) metaObj.recipientAccountId = recipientAccountId;
+        if (recipientUsername) metaObj.recipientUsername = recipientUsername;
         if (conversationId) metaObj.conversationId = conversationId;
         if (allowedAccounts) metaObj.allowedAccounts = allowedAccounts;
         metaPayload = JSON.stringify(metaObj);
@@ -496,6 +498,15 @@ export class CloudHandler {
               (Array.isArray(metaObj.allowedAccounts) && metaObj.allowedAccounts.includes(accountId))
             ) {
               isRecipient = true;
+            } else if (metaObj.recipientUsername) {
+              const reqAccount = await this.db.getAccountById(accountId);
+              if (
+                reqAccount &&
+                reqAccount.username.toLowerCase().replace(/^@/, '') ===
+                  metaObj.recipientUsername.toLowerCase().replace(/^@/, '')
+              ) {
+                isRecipient = true;
+              }
             }
           } catch (_e) {}
         }

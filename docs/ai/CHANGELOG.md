@@ -4,6 +4,20 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 30] - 2026-08-21
+
+### Added & Enhanced
+- **Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence & E2EE Attachments**:
+  - Cloud Session Persistence: Securely stored Bearer session credentials encrypted under `veil:cloud:session` in `EncryptedSpaceStore` with auto-restoration upon Space unlock and memory purge on lock.
+  - Inbound Voice Preservation: Fixed wire payload reception in `AppState.tsx` to preserve `voice` and `replyTo` metadata, rendering voice messages as active `VoiceNotePlayer` cards.
+  - Multi-Tenant Voice & Attachment Authorization: Supported `recipientUsername`, `recipientAccountId`, and `allowedAccounts` in `cloudHandler.ts` and `VoiceRecorder.encryptAndUploadVoiceNote()`. Enforced strict 404 Access Denied rejection for unauthorized accounts.
+  - Complete Normal File Attachment Pipeline: Implemented client-side authenticated chunking via `AttachmentPipeline.chunkAndEncrypt()`, R2 upload via `cloudClient.uploadAttachment()`, Double Ratchet wire packaging via `convManager.encryptAndPackWireMessage()`, and recipient download/reassembly/decryption via `AttachmentPipeline.decryptAndReassemble()`.
+  - Added dedicated test suites: `tests/phase30-cloud-session-persistence.test.ts`, `tests/phase30-inbound-voice-preservation.test.ts`, `tests/phase30-voice-authorization.test.ts`, `tests/phase30-file-attachment.test.ts`.
+  - Total test count expanded to 226 test files (466 tests) passing 100% cleanly.
+  - Verified Android native compilation with Gradle producing `app-debug.apk` (3.95 MB).
+
+---
+
 ## [Phase 28] - 2026-08-19
 
 ### Added & Enhanced

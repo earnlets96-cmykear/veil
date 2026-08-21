@@ -282,7 +282,18 @@ export class ConversationManager {
     session: SpaceSession,
     peerBundle: PrekeyBundle,
     text: string,
-    attachment?: { name: string; sizeBytes: number; mimeType: string; objectId?: string; ciphertextHash?: string },
+    attachment?: {
+      attachmentId?: string;
+      name: string;
+      sizeBytes: number;
+      mimeType: string;
+      objectId?: string;
+      ciphertextHash?: string;
+      chunkCount?: number;
+      chunkSize?: number;
+      sha256Hash?: string;
+      encryptionKeyBase64?: string;
+    },
     replyTo?: { messageId: string; senderName?: string; text: string; attachmentType?: string },
     voice?: { durationSeconds: number; sizeBytes: number; objectId: string; mimeType: string; ciphertextHash: string; encryptionKeyBase64: string; nonceBase64: string }
   ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {

@@ -30,11 +30,16 @@ export interface UIMessage {
   timestamp: number;
   status: DeliveryStatus;
   attachment?: {
+    attachmentId?: string;
     name: string;
     sizeBytes: number;
     mimeType: string;
     objectId?: string;
     ciphertextHash?: string;
+    chunkCount?: number;
+    chunkSize?: number;
+    sha256Hash?: string;
+    encryptionKeyBase64?: string;
   };
   voice?: {
     durationSeconds: number;

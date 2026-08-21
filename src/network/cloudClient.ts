@@ -205,6 +205,10 @@ export class CloudClient {
     ciphertextHash: string;
     chunkCount?: number;
     chunkSize?: number;
+    recipientAccountId?: string;
+    recipientUsername?: string;
+    conversationId?: string;
+    allowedAccounts?: string[];
   }): Promise<{ attachment: CloudAttachmentEntity }> {
     return await this.request('/v1/cloud/attachments/create', 'POST', params);
   }

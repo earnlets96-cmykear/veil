@@ -9,6 +9,9 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { MessageComposer } from './MessageComposer.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
+import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
+import type { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/types.ts';
+import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
 
 export const ConversationView: React.FC = () => {
@@ -91,8 +94,27 @@ export const ConversationView: React.FC = () => {
     if (!msg.attachment || !activeSession) return;
     if (msg.attachment.objectId) {
       try {
-        const ciphertext = await cloudClient.downloadAttachment(msg.attachment.objectId);
-        const blob = new Blob([ciphertext], { type: msg.attachment.mimeType });
+        const rawCiphertext = await cloudClient.downloadAttachment(msg.attachment.objectId);
+        let plaintextBytes: Uint8Array;
+
+        if (msg.attachment.encryptionKeyBase64) {
+          const encryptionKey = base64ToBytes(msg.attachment.encryptionKeyBase64);
+          const chunks: EncryptedAttachmentChunk[] = JSON.parse(new TextDecoder().decode(rawCiphertext));
+          const meta: AttachmentMetadata = {
+            attachmentId: msg.attachment.attachmentId || msg.attachment.objectId,
+            name: msg.attachment.name,
+            mimeType: msg.attachment.mimeType,
+            sizeBytes: msg.attachment.sizeBytes,
+            chunkCount: msg.attachment.chunkCount || chunks.length,
+            chunkSize: msg.attachment.chunkSize || (64 * 1024),
+            sha256Hash: msg.attachment.sha256Hash || '',
+          };
+          plaintextBytes = AttachmentPipeline.decryptAndReassemble(meta, chunks, encryptionKey);
+        } else {
+          plaintextBytes = rawCiphertext;
+        }
+
+        const blob = new Blob([plaintextBytes], { type: msg.attachment.mimeType || 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

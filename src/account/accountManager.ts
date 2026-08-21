@@ -146,6 +146,17 @@ export class AccountManager {
     // 5. Store zero-knowledge backup blob on cloud server
     await this.cloudClient.setRecoveryVault(encryptedVaultBlob, kdfConfig);
 
+    // 6. Save cloud session credentials inside encrypted space store
+    if (regResult.session && regResult.session.sessionToken) {
+      this.store.set(session, 'veil:cloud:session', {
+        sessionToken: regResult.session.sessionToken,
+        accountId: regResult.account.accountId,
+        deviceId: regResult.device.deviceId,
+        expiresAt: regResult.session.expiresAt,
+        username: username.toLowerCase(),
+      });
+    }
+
     return {
       account: regResult.account,
       session,
@@ -228,6 +239,17 @@ export class AccountManager {
       this.store.set(session, 'veil:identity:document', backupData.identityDocument);
       this.store.set(session, 'veil:identity:signing-private', backupData.signingPrivateKeyBase64);
       this.store.set(session, 'veil:identity:ka-private', backupData.keyAgreementPrivateKeyBase64);
+
+      // 5. Save restored cloud session credentials inside encrypted space store
+      if (restoreRes.session && restoreRes.session.sessionToken) {
+        this.store.set(session, 'veil:cloud:session', {
+          sessionToken: restoreRes.session.sessionToken,
+          accountId: restoreRes.account.accountId,
+          deviceId: restoreRes.device.deviceId,
+          expiresAt: restoreRes.session.expiresAt,
+          username: username.toLowerCase(),
+        });
+      }
 
       return {
         account: restoreRes.account,

@@ -37,6 +37,8 @@ import { CloudClient } from '../../network/cloudClient.ts';
 import { AccountManager } from '../../account/accountManager.ts';
 import { SyncEngine } from '../../sync/syncEngine.ts';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
+import { randomBytes, bytesToBase64, bytesToHex } from '../../crypto/utils.ts';
+import { sha256 } from '@noble/hashes/sha256.js';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -169,6 +171,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Listen for lock events
   useEffect(() => {
     const unsub = sessionController.onLock(() => {
+      cloudClient.setSession(null, null, null);
       setActiveSession(null);
       setConversations([]);
       setContacts([]);
@@ -203,6 +206,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const loadSpaceData = useCallback(async (session: SpaceSession) => {
     notificationDispatcher.setLocked(false);
+
+    // 0. Restore persistent cloud session if present and valid
+    try {
+      const savedCloudSession = (await store.getAsync<{
+        sessionToken: string;
+        accountId: string;
+        deviceId: string;
+        expiresAt: number;
+        username?: string;
+      }>(session, 'veil:cloud:session')) || null;
+
+      if (savedCloudSession && savedCloudSession.sessionToken && savedCloudSession.expiresAt > Date.now()) {
+        cloudClient.setSession(
+          savedCloudSession.sessionToken,
+          savedCloudSession.accountId,
+          savedCloudSession.deviceId
+        );
+      }
+    } catch (_cloudErr) {
+      // Non-fatal: space unlocks normally even if cloud session restoration fails
+    }
 
     // 1. Load active conversations
     const storedConvs = (await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations')) || [];
@@ -310,7 +334,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Standard E2EE wire payload processing
         try {
           const result = await convManager.processInboundWirePayload(session, payload);
-          const { storedMessage, senderDoc, senderMailboxId, attachment } = result;
+          const { storedMessage, senderDoc, senderMailboxId, attachment, replyTo, voice } = result;
 
           const incomingMsg: UIMessage = {
             id: storedMessage.messageId,
@@ -321,6 +345,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             timestamp: storedMessage.timestamp,
             status: 'DELIVERED_TO_RECIPIENT',
             attachment,
+            replyTo,
+            voice,
           };
 
           const currentContacts = await contactManager.listContacts(session);
@@ -426,7 +452,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // Fallback to raw JSON if payload was legacy/unencrypted
           try {
             const parsed = JSON.parse(payload);
-            if (parsed && parsed.conversationId && (parsed.text || parsed.attachment)) {
+            if (parsed && parsed.conversationId && (parsed.text || parsed.attachment || parsed.voice)) {
               const incomingMsg: UIMessage = {
                 id: parsed.id || `msg_${Date.now()}`,
                 conversationId: parsed.conversationId,
@@ -436,6 +462,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 timestamp: Date.now(),
                 status: 'DELIVERED_TO_RECIPIENT',
                 attachment: parsed.attachment,
+                voice: parsed.voice,
+                replyTo: parsed.replyTo,
               };
 
               setMessages((prev) => {
@@ -688,10 +716,73 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const arrayBuffer = await file.arrayBuffer();
       const fileBytes = new Uint8Array(arrayBuffer);
 
-      const key = activeSession.getStorageKey();
-      const { metadata } = AttachmentPipeline.chunkAndEncrypt(fileBytes, file.name, file.type, key);
+      // 1. Generate single-use random 32-byte ephemeral key and chunk/encrypt
+      const ephemeralKey = randomBytes(32);
+      const { metadata, chunks } = AttachmentPipeline.chunkAndEncrypt(
+        fileBytes,
+        file.name,
+        file.type || 'application/octet-stream',
+        ephemeralKey
+      );
 
-      const msgId = `att_${Date.now()}`;
+      // 2. Serialize ciphertext chunks into raw payload
+      const rawCiphertext = new TextEncoder().encode(JSON.stringify(chunks));
+      const ciphertextHash = bytesToHex(sha256(rawCiphertext));
+
+      // 3. Resolve recipient contact for authorization
+      const freshContacts = await contactManager.listContacts(activeSession);
+      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      const targetMailboxId = targetContact?.mailboxId || conversationId;
+      const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
+
+      let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
+      try {
+        const createRes = await cloudClient.createAttachment({
+          attachmentId: metadata.attachmentId,
+          spaceId: activeSession.spaceId,
+          ciphertextSize: rawCiphertext.length,
+          ciphertextHash,
+          chunkCount: metadata.chunkCount,
+          chunkSize: metadata.chunkSize,
+          recipientUsername: targetUsername,
+          recipientAccountId: targetContact?.metadata?.accountId,
+          encryptedMetadata: JSON.stringify({
+            name: metadata.name,
+            mimeType: metadata.mimeType,
+            sizeBytes: metadata.sizeBytes,
+            recipientUsername: targetUsername,
+            recipientAccountId: targetContact?.metadata?.accountId,
+          }),
+        });
+        objectId = createRes.attachment.objectId;
+        await cloudClient.uploadAttachment(objectId, rawCiphertext);
+      } catch (uploadErr) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[VEIL-ATTACHMENT] Attachment upload failed:', uploadErr);
+        }
+      }
+
+      const attachmentPayload = {
+        attachmentId: metadata.attachmentId,
+        objectId,
+        name: metadata.name,
+        mimeType: metadata.mimeType,
+        sizeBytes: metadata.sizeBytes,
+        chunkCount: metadata.chunkCount,
+        chunkSize: metadata.chunkSize,
+        sha256Hash: metadata.sha256Hash,
+        ciphertextHash,
+        encryptionKeyBase64: bytesToBase64(ephemeralKey),
+      };
+
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const activeReply = replyTarget ? {
+        messageId: replyTarget.id,
+        senderName: replyTarget.senderName || replyTarget.senderId,
+        text: replyTarget.text,
+        attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
+      } : undefined;
+
       const newMsg: UIMessage = {
         id: msgId,
         conversationId,
@@ -699,13 +790,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         text: `📎 Attachment: ${file.name}`,
         isOutgoing: true,
         timestamp: Date.now(),
-        status: 'SENT_TO_RELAY',
-        attachment: {
-          name: file.name,
-          sizeBytes: file.size,
-          mimeType: file.type || 'application/octet-stream',
-        },
+        status: 'SENDING',
+        attachment: attachmentPayload,
+        replyTo: activeReply,
       };
+
+      setReplyTarget(null);
 
       setMessages((prev) => {
         const list = prev[conversationId] || [];
@@ -714,21 +804,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
 
-      const payload = JSON.stringify({
-        id: msgId,
-        conversationId,
-        senderId: activeSession.spaceId,
-        text: `📎 Attachment: ${file.name}`,
-        attachment: newMsg.attachment,
-      });
-
       try {
-        const targetContact = contacts.find((c) => c.identityId === conversationId);
-        const targetMailboxId = targetContact?.mailboxId || conversationId;
-        await netManager.sendEnvelope(activeSession, targetMailboxId, payload);
+        let wirePayload: string;
+        if (targetContact?.prekeyBundle) {
+          const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+            activeSession,
+            targetContact.prekeyBundle,
+            `📎 Attachment: ${file.name}`,
+            attachmentPayload,
+            activeReply
+          );
+          wirePayload = wirePayloadBase64;
+        } else {
+          wirePayload = JSON.stringify({
+            id: msgId,
+            conversationId,
+            senderId: activeSession.spaceId,
+            text: `📎 Attachment: ${file.name}`,
+            attachment: attachmentPayload,
+            replyTo: activeReply,
+          });
+        }
+
+        await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+
+        setMessages((prev) => {
+          const list = (prev[conversationId] || []).map((m) =>
+            m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
+          );
+          const updated = { ...prev, [conversationId]: list };
+          store.setAsync(activeSession, 'veil:ui:messages', updated);
+          return updated;
+        });
       } catch (_e) {}
     },
-    [activeSession, contacts]
+    [activeSession, contacts, replyTarget]
   );
 
   const sendVoiceMessage = useCallback(
@@ -749,13 +859,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         nonceBase64: '',
       };
 
+      const freshContacts = await contactManager.listContacts(activeSession);
+      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      const targetMailboxId = targetContact?.mailboxId || conversationId;
+      const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
+
       try {
         voiceMeta = await VoiceRecorder.encryptAndUploadVoiceNote(
           activeSession,
           cloudClient,
           rawBytes,
           durationSeconds,
-          mimeType
+          mimeType,
+          {
+            recipientUsername: targetUsername,
+            recipientAccountId: targetContact?.metadata?.accountId,
+          }
         );
       } catch (_uploadErr) {}
 
@@ -787,10 +906,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         store.setAsync(activeSession, 'veil:ui:messages', updated);
         return updated;
       });
-
-      const freshContacts = await contactManager.listContacts(activeSession);
-      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
-      const targetMailboxId = targetContact?.mailboxId || conversationId;
 
       try {
         let wirePayload: string;
