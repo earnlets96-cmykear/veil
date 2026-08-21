@@ -13,7 +13,7 @@
 
 import { sha256 } from '@noble/hashes/sha256.js';
 import { hmac } from '@noble/hashes/hmac.js';
-import { bytesToHex } from '../../../../src/crypto/utils.ts';
+import { bytesToHex } from '../../../crypto/utils.ts';
 import type { IObjectStorage, ObjectMetadata } from './types.ts';
 
 export interface S3StorageConfig {
@@ -220,7 +220,7 @@ export class S3ObjectStorage implements IObjectStorage {
       const res = await fetch(url, {
         method: 'PUT',
         headers,
-        body: data,
+        body: data as unknown as BodyInit,
         signal: controller.signal,
       });
 
