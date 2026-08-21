@@ -37,4 +37,5 @@ dist-ssr
 .veil_object_store
 .veil_sql_data
 .veil_*.json
+.veil_acceptance_db_*
 *.tmp.*

@@ -6,6 +6,7 @@
  */
 
 import pg from 'pg';
+import * as fs from 'fs';
 const { Pool } = pg;
 
 export interface PostgresClientConfig {
@@ -16,6 +17,34 @@ export interface PostgresClientConfig {
   connectionTimeoutMillis?: number;
   maxRetries?: number;
   retryDelayMs?: number;
+}
+
+function resolveSslConfig(connectionString: string): boolean | pg.ConnectionConfig['ssl'] {
+  if (connectionString.includes('sslmode=disable')) {
+    return false;
+  }
+
+  // 1. Check for custom CA certificate file if provided
+  const caCertPath = process.env.PGSSLROOTCERT || process.env.SUPABASE_CA_CERT;
+  if (caCertPath && fs.existsSync(caCertPath)) {
+    try {
+      const ca = fs.readFileSync(caCertPath, 'utf8');
+      return {
+        rejectUnauthorized: true,
+        ca,
+      };
+    } catch (_e) {
+      // Fall through to default
+    }
+  }
+
+  // 2. Strict verification if requested via connection string or env var
+  if (connectionString.includes('sslmode=verify-full') || process.env.SSL_VERIFY === 'true') {
+    return { rejectUnauthorized: true };
+  }
+
+  // 3. Default to TLS encryption with SNI support for cloud poolers
+  return { rejectUnauthorized: false };
 }
 
 export class PostgresClient {
@@ -36,9 +65,7 @@ export class PostgresClient {
         min: 2,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 5000,
-        ssl: config.includes('sslmode=disable')
-          ? false
-          : { rejectUnauthorized: false }, // Supports Supabase SSL
+        ssl: resolveSslConfig(config),
       });
     } else {
       this.connectionString = config.connectionString;
@@ -50,9 +77,7 @@ export class PostgresClient {
         min: config.minConnections || 2,
         idleTimeoutMillis: config.idleTimeoutMillis || 30000,
         connectionTimeoutMillis: config.connectionTimeoutMillis || 5000,
-        ssl: config.connectionString.includes('sslmode=disable')
-          ? false
-          : { rejectUnauthorized: false },
+        ssl: resolveSslConfig(config.connectionString),
       });
     }
 

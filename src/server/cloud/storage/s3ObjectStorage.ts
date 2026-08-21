@@ -198,6 +198,9 @@ export class S3ObjectStorage implements IObjectStorage {
     };
 
     if (!this.isConfigured) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('[VEIL-S3] FATAL: S3 / Cloudflare R2 credentials are mandatory in production. Fail-closed.');
+      }
       // In-memory / local fallback for development/test harness
       this.inMemoryFallback.set(validId, { data: new Uint8Array(data), meta });
       return meta;
@@ -244,6 +247,9 @@ export class S3ObjectStorage implements IObjectStorage {
     const validId = this.validateObjectId(objectId);
 
     if (!this.isConfigured) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('[VEIL-S3] FATAL: S3 / Cloudflare R2 credentials are mandatory in production. Fail-closed.');
+      }
       const item = this.inMemoryFallback.get(validId);
       return item ? new Uint8Array(item.data) : null;
     }
@@ -300,6 +306,9 @@ export class S3ObjectStorage implements IObjectStorage {
     this.inMemoryFallback.delete(validId);
 
     if (!this.isConfigured) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('[VEIL-S3] FATAL: S3 / Cloudflare R2 credentials are mandatory in production. Fail-closed.');
+      }
       return true;
     }
 

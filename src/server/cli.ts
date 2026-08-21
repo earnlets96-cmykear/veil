@@ -36,9 +36,9 @@ async function main() {
 
   // Strict Fail-Closed Verification in Production
   if (isProduction) {
-    if (!databaseUrl) {
+    if (!databaseUrl || (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://'))) {
       throw new Error(
-        '🛑 [VEIL-CONFIG] FATAL: DATABASE_URL (Supabase / PostgreSQL) is mandatory in production. Fail-closed.'
+        '🛑 [VEIL-CONFIG] FATAL: DATABASE_URL must be a valid Supabase / PostgreSQL connection string in production. Fail-closed.'
       );
     }
     if (!hasR2 && !hasS3) {

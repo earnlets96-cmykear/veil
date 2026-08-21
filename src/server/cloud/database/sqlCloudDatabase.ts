@@ -93,6 +93,12 @@ export class SqlCloudDatabase implements ICloudDatabase {
         }
       );
     } else {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          '[VEIL-SQL] FATAL: SqlCloudDatabase must be configured with a PostgreSQL / Supabase connection string in production. Fail-closed.'
+        );
+      }
+
       // 1. If file-backed durable persistence is enabled, load tables
       if (this.durableFilePath) {
         this.loadFromDurableDisk();

@@ -33,7 +33,7 @@
 | **Phase 26** | Real-World Release Validation (Web ↔ Web & Android Readiness) | **COMPLETED** | 40-message bidirectional test, 50-message burst, live relay probe, Android diagnostic audit, validation report |
 | **Phase 27** | Cloud & Account Foundation (Persistent Account, Multi-Device, Sync Engine, Object Storage) | **COMPLETED** | Persistent Account/Device identity, SQL/File database schema, Object Storage abstraction, encrypted attachments, SyncEngine, local migration (5 dedicated test suites) |
 | **Phase 28** | Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore) | **COMPLETED** | Deterministic SQL migrations, S3 Object Storage, Caddy TLS reverse proxy, Docker stack, backup/restore tool, fresh-install re-hydration tests |
-| **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence Migration | **COMPLETED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, 10 new test suites (222 total suites, 453 tests passing, 9/9 smoke passed) |
+| **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence Migration | **COMPLETED & ACCEPTED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, fail-closed production enforcement, 12-check live acceptance suite passing 100% (222 total suites, 453 tests passing, release manifest verified) |
 
 ---
 
@@ -44,6 +44,7 @@
 - **Total Tests**: **453 / 453 passed (0 failures, 0 skipped)**
 - **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.4s)
 - **Production Smoke**: `npx tsx scripts/phase30-production-smoke.mjs` passes 9/9 smoke tests cleanly (100%).
+- **Live Acceptance Suite**: `npx tsx scripts/phase30-live-acceptance.mjs` passes 12/12 acceptance checks cleanly (100%).
 - **Release Manifest**: SHA-256 verified in `release/v1.0.0/manifest.json`
 - **Working Tree**: Clean and fully verified.
 

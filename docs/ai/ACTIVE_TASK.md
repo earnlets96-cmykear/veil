@@ -26,6 +26,8 @@
 - [x] Add 10 dedicated Phase 30 Vitest test suites.
 - [x] Author and verify 9-step production persistence smoke script `scripts/phase30-production-smoke.mjs`.
 - [x] Author comprehensive 10-document documentation suite in `docs/`.
+- [x] Implement fail-closed production safeguards and strict TLS CA support in `postgresClient.ts` and `cli.ts`.
+- [x] Execute and verify Phase 30 Live Production Acceptance Suite (`scripts/phase30-live-acceptance.mjs`) with 12/12 checks passing.
 - [x] Verify all 222 test suites (453 tests) pass cleanly.
 - [x] Verify production build and release manifest integrity.
 
