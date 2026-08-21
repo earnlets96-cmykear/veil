@@ -607,10 +607,10 @@ export class SqlCloudDatabase implements ICloudDatabase {
       await this.pgClient.query(sql, [
         space.spaceId,
         space.accountId,
-        space.encryptedMetadata,
-        space.version,
-        space.createdAt,
-        space.updatedAt,
+        space.encryptedHeader || (space as any).encryptedMetadata || 'encrypted_header_v1',
+        space.version || 1,
+        space.createdAt || Date.now(),
+        space.updatedAt || Date.now(),
         space.deletedAt || null,
       ]);
       return;
@@ -626,7 +626,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
   public async getSpace(accountId: string, spaceId: string): Promise<CloudSpaceEntity | null> {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
-        SELECT space_id as "spaceId", account_id as "accountId", encrypted_header as "encryptedMetadata",
+        SELECT space_id as "spaceId", account_id as "accountId", encrypted_header as "encryptedHeader",
                version, created_at as "createdAt", updated_at as "updatedAt", deleted_at as "deletedAt"
         FROM spaces
         WHERE account_id = $1 AND space_id = $2
@@ -637,7 +637,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       return {
         spaceId: r.spaceId,
         accountId: r.accountId,
-        encryptedMetadata: r.encryptedMetadata,
+        encryptedHeader: r.encryptedHeader || r.encryptedMetadata || 'encrypted_header_v1',
         version: r.version,
         createdAt: Number(r.createdAt),
         updatedAt: Number(r.updatedAt),
@@ -652,7 +652,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
   public async listSpaces(accountId: string): Promise<CloudSpaceEntity[]> {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
-        SELECT space_id as "spaceId", account_id as "accountId", encrypted_header as "encryptedMetadata",
+        SELECT space_id as "spaceId", account_id as "accountId", encrypted_header as "encryptedHeader",
                version, created_at as "createdAt", updated_at as "updatedAt", deleted_at as "deletedAt"
         FROM spaces
         WHERE account_id = $1 AND deleted_at IS NULL
@@ -662,7 +662,7 @@ export class SqlCloudDatabase implements ICloudDatabase {
       return res.rows.map((r) => ({
         spaceId: r.spaceId,
         accountId: r.accountId,
-        encryptedMetadata: r.encryptedMetadata,
+        encryptedHeader: r.encryptedHeader || r.encryptedMetadata || 'encrypted_header_v1',
         version: r.version,
         createdAt: Number(r.createdAt),
         updatedAt: Number(r.updatedAt),
