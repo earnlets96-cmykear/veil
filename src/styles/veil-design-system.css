@@ -1,36 +1,72 @@
 /**
  * VEIL Design System — Tokenized Vanilla CSS Architecture
  * Production Application Shell & Messaging UI Styling
+ *
+ * Phase 31 Design System Expansion
+ * Incorporates comprehensive tokens for colors, typography, spacing,
+ * elevation, z-index, safe areas, touch targets, motion, accessibility,
+ * voice UI foundations, and toast notifications.
  */
 
 :root {
-  /* Surface & Background Tokens */
+  /* =========================================================================
+     1. COLORS & SURFACES
+     ========================================================================= */
+
+  /* Surface & Background Hierarchy */
   --veil-bg-base: #090c13;
   --veil-bg-surface: #101622;
   --veil-bg-surface-elevated: #182233;
   --veil-bg-surface-active: #202d44;
+  --veil-bg-surface-hover: rgba(255, 255, 255, 0.05);
+  --veil-bg-surface-subtle: rgba(16, 22, 34, 0.6);
   --veil-bg-glass: rgba(16, 22, 34, 0.85);
+  --veil-overlay-backdrop: rgba(0, 0, 0, 0.75);
+  --veil-overlay-glass: rgba(9, 12, 19, 0.88);
+
+  /* Border Tokens */
   --veil-border: rgba(255, 255, 255, 0.08);
   --veil-border-subtle: rgba(255, 255, 255, 0.04);
+  --veil-border-strong: rgba(255, 255, 255, 0.16);
   --veil-border-focus: #6366f1;
 
   /* Accent & Brand Colors */
   --veil-accent-primary: #6366f1;
   --veil-accent-primary-hover: #4f46e5;
+  --veil-accent-primary-subtle: rgba(99, 102, 241, 0.12);
+  --veil-accent-primary-alpha: rgba(99, 102, 241, 0.25);
   --veil-accent-secondary: #06b6d4;
+  --veil-accent-secondary-hover: #0891b2;
+  --veil-accent-secondary-subtle: rgba(6, 182, 212, 0.12);
   --veil-accent-glow: rgba(99, 102, 241, 0.25);
   --veil-accent-glow-subtle: rgba(99, 102, 241, 0.12);
 
   /* Functional & Alert Colors */
   --veil-success: #10b981;
+  --veil-success-bg: rgba(16, 185, 129, 0.12);
+  --veil-success-border: rgba(16, 185, 129, 0.25);
+
   --veil-warning: #f59e0b;
+  --veil-warning-bg: rgba(245, 158, 11, 0.12);
+  --veil-warning-border: rgba(245, 158, 11, 0.25);
+
   --veil-danger: #ef4444;
+  --veil-danger-bg: rgba(239, 68, 68, 0.12);
+  --veil-danger-border: rgba(239, 68, 68, 0.3);
+
+  --veil-info: #3b82f6;
+  --veil-info-bg: rgba(59, 130, 246, 0.12);
+  --veil-info-border: rgba(59, 130, 246, 0.25);
+
   --veil-panic-bg: #450a0a;
+  --veil-panic-border: rgba(239, 68, 68, 0.4);
+  --veil-panic-text: #fca5a5;
 
   /* Typography Colors */
   --veil-text-primary: #f8fafc;
   --veil-text-secondary: #94a3b8;
   --veil-text-muted: #64748b;
+  --veil-text-disabled: #475569;
   --veil-text-inverse: #090c13;
 
   /* Space Identity Color Accents */
@@ -39,35 +75,154 @@
   --veil-space-private: #a855f7;
   --veil-space-decoy: #10b981;
 
-  /* Typography Scale */
-  --veil-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-  --veil-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  
-  --veil-text-2xl: 1.75rem;
-  --veil-text-xl: 1.25rem;
-  --veil-text-lg: 1.125rem;
-  --veil-text-base: 0.9375rem;
-  --veil-text-sm: 0.8125rem;
-  --veil-text-xs: 0.75rem;
+  /* Standardized Brand & Accent Gradients */
+  --veil-gradient-primary: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --veil-gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  --veil-gradient-group: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+  --veil-gradient-brand: linear-gradient(135deg, #f8fafc 0%, #a855f7 50%, #6366f1 100%);
+  --veil-gradient-dark: radial-gradient(ellipse at top, #141b2d 0%, #090c13 100%);
+  --veil-gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 
-  /* Radii */
+  /* =========================================================================
+     2. TYPOGRAPHY
+     ========================================================================= */
+
+  --veil-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+  --veil-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Type Scale */
+  --veil-text-display: 2.25rem;   /* 36px */
+  --veil-text-2xl: 1.75rem;       /* 28px */
+  --veil-text-heading: 1.75rem;   /* 28px */
+  --veil-text-xl: 1.25rem;        /* 20px */
+  --veil-text-title: 1.25rem;     /* 20px */
+  --veil-text-lg: 1.125rem;       /* 18px */
+  --veil-text-subtitle: 1.125rem; /* 18px */
+  --veil-text-base: 0.9375rem;    /* 15px */
+  --veil-text-body: 0.9375rem;    /* 15px */
+  --veil-text-sm: 0.8125rem;      /* 13px */
+  --veil-text-body-sm: 0.8125rem; /* 13px */
+  --veil-text-xs: 0.75rem;        /* 12px */
+  --veil-text-caption: 0.75rem;   /* 12px */
+  --veil-text-label: 0.75rem;     /* 12px */
+  --veil-text-button: 0.875rem;   /* 14px */
+
+  /* Line Heights */
+  --veil-leading-tight: 1.2;
+  --veil-leading-snug: 1.35;
+  --veil-leading-normal: 1.5;
+  --veil-leading-relaxed: 1.65;
+
+  /* Font Weights */
+  --veil-weight-normal: 400;
+  --veil-weight-medium: 500;
+  --veil-weight-semibold: 600;
+  --veil-weight-bold: 700;
+
+  /* =========================================================================
+     3. SPACING SCALE (8-Point Grid)
+     ========================================================================= */
+
+  --veil-space-0: 0;
+  --veil-space-1: 0.25rem;  /* 4px */
+  --veil-space-2: 0.5rem;   /* 8px */
+  --veil-space-3: 0.75rem;  /* 12px */
+  --veil-space-4: 1rem;     /* 16px */
+  --veil-space-5: 1.25rem;  /* 20px */
+  --veil-space-6: 1.5rem;   /* 24px */
+  --veil-space-8: 2rem;     /* 32px */
+  --veil-space-10: 2.5rem;  /* 40px */
+  --veil-space-12: 3rem;    /* 48px */
+
+  /* =========================================================================
+     4. RADII
+     ========================================================================= */
+
+  --veil-radius-xs: 4px;
   --veil-radius-sm: 6px;
   --veil-radius-md: 12px;
   --veil-radius-lg: 18px;
+  --veil-radius-xl: 24px;
   --veil-radius-full: 9999px;
 
-  /* Shadows & Elevation */
-  --veil-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
-  --veil-shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
-  --veil-shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.6);
+  /* =========================================================================
+     5. SHADOWS & ELEVATION
+     ========================================================================= */
+
+  --veil-elevation-0: none;
+  --veil-elevation-1: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --veil-elevation-2: 0 6px 16px rgba(0, 0, 0, 0.45);
+  --veil-elevation-3: 0 16px 36px rgba(0, 0, 0, 0.60);
+  --veil-elevation-4: 0 24px 48px rgba(0, 0, 0, 0.75);
+
+  --veil-shadow-sm: var(--veil-elevation-1);
+  --veil-shadow-md: var(--veil-elevation-2);
+  --veil-shadow-lg: var(--veil-elevation-3);
+
   --veil-glass-blur: blur(16px);
+  --veil-glass-blur-sm: blur(8px);
+
+  /* =========================================================================
+     6. Z-INDEX HIERARCHY
+     ========================================================================= */
+
+  --veil-z-base: 1;
+  --veil-z-content: 10;
+  --veil-z-header: 100;
+  --veil-z-dropdown: 200;
+  --veil-z-modal-backdrop: 900;
+  --veil-z-modal: 1000;
+  --veil-z-toast: 2000;
+  --veil-z-panic: 9999;
+
+  /* =========================================================================
+     7. SAFE AREA INSETS (with zero fallbacks)
+     ========================================================================= */
+
+  --veil-safe-top: env(safe-area-inset-top, 0px);
+  --veil-safe-right: env(safe-area-inset-right, 0px);
+  --veil-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --veil-safe-left: env(safe-area-inset-left, 0px);
+
+  /* =========================================================================
+     8. MOBILE TOUCH TARGETS
+     ========================================================================= */
+
+  --veil-touch-target-min: 44px;
+  --veil-touch-target-comfort: 48px;
+
+  /* =========================================================================
+     9. FOCUS & ACCESSIBILITY
+     ========================================================================= */
+
+  --veil-focus-ring: 0 0 0 2px var(--veil-bg-base), 0 0 0 4px var(--veil-accent-primary);
+
+  /* =========================================================================
+     10. MOTION & TRANSITIONS
+     ========================================================================= */
+
+  --veil-duration-fast: 120ms;
+  --veil-duration-normal: 200ms;
+  --veil-duration-slow: 350ms;
+
+  --veil-easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --veil-easing-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --veil-easing-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
 }
 
-/* Global Reset & Base Styles */
+/* =========================================================================
+   GLOBAL RESET & ACCESSIBLE FOCUS
+   ========================================================================= */
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--veil-focus-ring);
 }
 
 body {
@@ -75,21 +230,131 @@ body {
   color: var(--veil-text-primary);
   font-family: var(--veil-font-sans);
   font-size: var(--veil-text-base);
-  line-height: 1.5;
+  line-height: var(--veil-leading-normal);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   height: 100vh;
+  height: 100dvh;
   width: 100vw;
+  padding-top: var(--veil-safe-top);
+  padding-right: var(--veil-safe-right);
+  padding-bottom: var(--veil-safe-bottom);
+  padding-left: var(--veil-safe-left);
 }
 
 #root {
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   display: flex;
   overflow: hidden;
 }
 
-/* Reusable UI Components */
+/* Motion Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =========================================================================
+   TYPOGRAPHY UTILITIES
+   ========================================================================= */
+
+.veil-type-display {
+  font-size: var(--veil-text-display);
+  font-weight: var(--veil-weight-bold);
+  line-height: var(--veil-leading-tight);
+  letter-spacing: -0.03em;
+}
+
+.veil-type-heading {
+  font-size: var(--veil-text-heading);
+  font-weight: var(--veil-weight-bold);
+  line-height: var(--veil-leading-tight);
+  letter-spacing: -0.02em;
+}
+
+.veil-type-title {
+  font-size: var(--veil-text-title);
+  font-weight: var(--veil-weight-semibold);
+  line-height: var(--veil-leading-snug);
+}
+
+.veil-type-subtitle {
+  font-size: var(--veil-text-subtitle);
+  font-weight: var(--veil-weight-medium);
+  line-height: var(--veil-leading-snug);
+}
+
+.veil-type-body {
+  font-size: var(--veil-text-body);
+  font-weight: var(--veil-weight-normal);
+  line-height: var(--veil-leading-normal);
+}
+
+.veil-type-body-sm {
+  font-size: var(--veil-text-body-sm);
+  font-weight: var(--veil-weight-normal);
+  line-height: var(--veil-leading-normal);
+}
+
+.veil-type-caption {
+  font-size: var(--veil-text-caption);
+  font-weight: var(--veil-weight-normal);
+  line-height: var(--veil-leading-snug);
+  color: var(--veil-text-secondary);
+}
+
+.veil-type-label {
+  font-size: var(--veil-text-label);
+  font-weight: var(--veil-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--veil-text-secondary);
+}
+
+.veil-type-mono {
+  font-family: var(--veil-font-mono);
+}
+
+/* =========================================================================
+   SAFE AREA & TOUCH TARGET UTILITIES
+   ========================================================================= */
+
+.veil-safe-padding-top {
+  padding-top: var(--veil-safe-top);
+}
+
+.veil-safe-padding-bottom {
+  padding-bottom: var(--veil-safe-bottom);
+}
+
+.veil-safe-container {
+  padding-top: var(--veil-safe-top);
+  padding-right: var(--veil-safe-right);
+  padding-bottom: var(--veil-safe-bottom);
+  padding-left: var(--veil-safe-left);
+}
+
+.veil-touch-target {
+  min-height: var(--veil-touch-target-min);
+  min-width: var(--veil-touch-target-min);
+}
+
+.veil-touch-target-comfort {
+  min-height: var(--veil-touch-target-comfort);
+  min-width: var(--veil-touch-target-comfort);
+}
+
+/* =========================================================================
+   REUSABLE UI COMPONENTS & CARDS
+   ========================================================================= */
 
 .veil-card {
   background-color: var(--veil-bg-surface);
@@ -97,6 +362,7 @@ body {
   border-radius: var(--veil-radius-md);
   padding: 1.25rem;
   box-shadow: var(--veil-shadow-sm);
+  transition: border-color var(--veil-duration-normal) var(--veil-easing-standard);
 }
 
 .veil-card-glass {
@@ -105,9 +371,13 @@ body {
   -webkit-backdrop-filter: var(--veil-glass-blur);
   border: 1px solid var(--veil-border);
   border-radius: var(--veil-radius-lg);
+  box-shadow: var(--veil-shadow-md);
 }
 
-/* Buttons */
+/* =========================================================================
+   BUTTONS
+   ========================================================================= */
+
 .veil-btn {
   display: inline-flex;
   align-items: center;
@@ -115,14 +385,17 @@ body {
   gap: 0.5rem;
   font-family: var(--veil-font-sans);
   font-size: var(--veil-text-sm);
-  font-weight: 500;
+  font-weight: var(--veil-weight-medium);
   padding: 0.5rem 1rem;
+  min-height: var(--veil-touch-target-min);
   border-radius: var(--veil-radius-md);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
   outline: none;
   user-select: none;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .veil-btn-primary {
@@ -132,7 +405,7 @@ body {
 
 .veil-btn-primary:hover:not(:disabled) {
   background-color: var(--veil-accent-primary-hover);
-  box-shadow: 0 0 12px var(--veil-accent-glow);
+  box-shadow: 0 0 16px var(--veil-accent-glow);
 }
 
 .veil-btn-secondary {
@@ -143,69 +416,93 @@ body {
 
 .veil-btn-secondary:hover:not(:disabled) {
   background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .veil-btn-danger {
-  background-color: rgba(239, 68, 68, 0.15);
+  background-color: var(--veil-danger-bg);
   color: var(--veil-danger);
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: var(--veil-danger-border);
 }
 
 .veil-btn-danger:hover:not(:disabled) {
   background-color: var(--veil-danger);
   color: #ffffff;
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
 }
 
 .veil-btn-panic {
   background-color: var(--veil-panic-bg);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  font-weight: 600;
+  color: var(--veil-panic-text);
+  border: 1px solid var(--veil-panic-border);
+  font-weight: var(--veil-weight-semibold);
 }
 
 .veil-btn-panic:hover:not(:disabled) {
   background-color: var(--veil-danger);
   color: #ffffff;
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+.veil-btn-ghost {
+  background-color: transparent;
+  color: var(--veil-text-secondary);
+}
+
+.veil-btn-ghost:hover:not(:disabled) {
+  background-color: var(--veil-bg-surface-hover);
+  color: var(--veil-text-primary);
 }
 
 .veil-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-/* Badges & Indicators */
+/* =========================================================================
+   BADGES & STATUS INDICATORS
+   ========================================================================= */
+
 .veil-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-size: var(--veil-text-xs);
-  font-weight: 500;
+  font-weight: var(--veil-weight-medium);
   padding: 0.2rem 0.55rem;
   border-radius: var(--veil-radius-full);
+  line-height: 1;
 }
 
 .veil-badge-secure {
-  background-color: rgba(16, 185, 129, 0.12);
+  background-color: var(--veil-success-bg);
   color: var(--veil-success);
-  border: 1px solid rgba(16, 185, 129, 0.25);
+  border: 1px solid var(--veil-success-border);
 }
 
 .veil-badge-warning {
-  background-color: rgba(245, 158, 11, 0.12);
+  background-color: var(--veil-warning-bg);
   color: var(--veil-warning);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  border: 1px solid var(--veil-warning-border);
 }
 
 .veil-badge-danger {
-  background-color: rgba(239, 68, 68, 0.12);
+  background-color: var(--veil-danger-bg);
   color: var(--veil-danger);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border: 1px solid var(--veil-danger-border);
 }
 
-/* Form Controls */
+.veil-badge-info {
+  background-color: var(--veil-info-bg);
+  color: var(--veil-info);
+  border: 1px solid var(--veil-info-border);
+}
+
+/* =========================================================================
+   FORM CONTROLS
+   ========================================================================= */
+
 .veil-input {
   width: 100%;
   font-family: var(--veil-font-sans);
@@ -216,7 +513,8 @@ body {
   border-radius: var(--veil-radius-md);
   padding: 0.65rem 0.9rem;
   outline: none;
-  transition: all 0.15s ease-in-out;
+  min-height: var(--veil-touch-target-min);
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
 }
 
 .veil-input:focus {
@@ -228,15 +526,21 @@ body {
   color: var(--veil-text-muted);
 }
 
+.veil-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* =========================================================================
    APPLICATION LAYOUT
    ========================================================================= */
 
 .veil-app-layout {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   background-color: var(--veil-bg-base);
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -249,6 +553,7 @@ body {
   border-right: 1px solid var(--veil-border);
   display: flex;
   flex-direction: column;
+  z-index: var(--veil-z-content);
 }
 
 .veil-sidebar-header {
@@ -269,13 +574,14 @@ body {
   width: 36px;
   height: 36px;
   border-radius: var(--veil-radius-md);
-  background: linear-gradient(135deg, var(--veil-accent-primary), #a855f7);
+  background: var(--veil-gradient-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: var(--veil-weight-bold);
   font-size: 1rem;
   color: #ffffff;
+  box-shadow: 0 0 12px var(--veil-accent-glow-subtle);
 }
 
 .veil-sidebar-search {
@@ -296,12 +602,13 @@ body {
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--veil-text-secondary);
-  font-weight: 600;
+  font-weight: var(--veil-weight-semibold);
   font-size: var(--veil-text-xs);
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  transition: all 0.15s;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+  min-height: var(--veil-touch-target-min);
 }
 
 .veil-tab-btn.active {
@@ -322,12 +629,13 @@ body {
   padding: 0.75rem;
   border-radius: var(--veil-radius-md);
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--veil-duration-fast) var(--veil-easing-standard);
   user-select: none;
+  min-height: 56px;
 }
 
 .veil-conversation-item:hover {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: var(--veil-bg-surface-hover);
 }
 
 .veil-conversation-item.active {
@@ -348,7 +656,7 @@ body {
 }
 
 .veil-conversation-name {
-  font-weight: 600;
+  font-weight: var(--veil-weight-semibold);
   font-size: var(--veil-text-sm);
   color: var(--veil-text-primary);
   white-space: nowrap;
@@ -385,16 +693,19 @@ body {
   display: flex;
   flex-direction: column;
   background-color: var(--veil-bg-base);
+  overflow: hidden;
 }
 
 .veil-chat-header {
   height: 64px;
+  min-height: 64px;
   padding: 0 1.25rem;
   border-bottom: 1px solid var(--veil-border);
   background-color: var(--veil-bg-surface);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  z-index: var(--veil-z-header);
 }
 
 .veil-chat-peer-info {
@@ -426,13 +737,14 @@ body {
 }
 
 .veil-message-bubble {
-  max-width: 65%;
+  max-width: 68%;
   padding: 0.75rem 1rem;
   border-radius: var(--veil-radius-lg);
   font-size: var(--veil-text-sm);
-  line-height: 1.4;
+  line-height: var(--veil-leading-snug);
   position: relative;
   word-break: break-word;
+  box-shadow: var(--veil-shadow-sm);
 }
 
 .veil-message-row.outgoing .veil-message-bubble {
@@ -455,7 +767,7 @@ body {
   gap: 0.35rem;
   font-size: 0.68rem;
   margin-top: 0.3rem;
-  opacity: 0.8;
+  opacity: 0.85;
 }
 
 /* Message Composer */
@@ -466,11 +778,12 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
+  z-index: var(--veil-z-header);
 }
 
 .veil-composer-input {
   flex: 1;
-  min-height: 42px;
+  min-height: 44px;
   max-height: 140px;
   resize: none;
   font-family: var(--veil-font-sans);
@@ -481,6 +794,7 @@ body {
   border-radius: var(--veil-radius-md);
   padding: 0.65rem 0.85rem;
   outline: none;
+  transition: border-color var(--veil-duration-fast) var(--veil-easing-standard);
 }
 
 .veil-composer-input:focus {
@@ -491,13 +805,15 @@ body {
 .veil-modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--veil-overlay-backdrop);
   backdrop-filter: var(--veil-glass-blur);
+  -webkit-backdrop-filter: var(--veil-glass-blur);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999;
+  z-index: var(--veil-z-modal);
   padding: 1rem;
+  animation: veilFadeIn var(--veil-duration-normal) var(--veil-easing-decelerate);
 }
 
 .veil-modal-card {
@@ -508,6 +824,7 @@ body {
   border-radius: var(--veil-radius-lg);
   box-shadow: var(--veil-shadow-lg);
   overflow: hidden;
+  animation: veilScaleIn var(--veil-duration-normal) var(--veil-easing-decelerate);
 }
 
 .veil-modal-header {
@@ -554,20 +871,249 @@ body {
   display: none;
 }
 
-/* Responsive Rules */
+/* =========================================================================
+   11. VOICE UI FOUNDATION & WAVEFORMS
+   ========================================================================= */
+
+@keyframes veilPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes veilWaveBar {
+  0%, 100% {
+    height: 4px;
+  }
+  50% {
+    height: 20px;
+  }
+}
+
+.veil-voice-recording-pulse {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--veil-radius-full);
+  background-color: var(--veil-danger);
+  box-shadow: 0 0 8px var(--veil-danger);
+  animation: veilPulse 1.4s infinite var(--veil-easing-standard);
+  display: inline-block;
+}
+
+.veil-waveform-container {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 0.5rem;
+}
+
+.veil-waveform-bar {
+  width: 3px;
+  border-radius: var(--veil-radius-full);
+  background-color: var(--veil-accent-primary);
+  min-height: 4px;
+  transition: height var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-waveform-bar.active {
+  animation: veilWaveBar 0.8s infinite ease-in-out;
+}
+
+.veil-voice-progress-bar {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: var(--veil-radius-full);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.veil-voice-progress-fill {
+  height: 100%;
+  background: var(--veil-gradient-primary);
+  border-radius: var(--veil-radius-full);
+  transition: width var(--veil-duration-fast) linear;
+}
+
+.veil-voice-timer {
+  font-family: var(--veil-font-mono);
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-secondary);
+  min-width: 40px;
+}
+
+/* =========================================================================
+   12. TOAST NOTIFICATION FOUNDATION
+   ========================================================================= */
+
+@keyframes veilToastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes veilToastExit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.95);
+  }
+}
+
+@keyframes veilFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes veilScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.veil-toast-container {
+  position: fixed;
+  bottom: calc(1.5rem + var(--veil-safe-bottom));
+  right: calc(1.5rem + var(--veil-safe-right));
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  z-index: var(--veil-z-toast);
+  pointer-events: none;
+  max-width: calc(100vw - 2rem);
+}
+
+.veil-toast {
+  pointer-events: auto;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 0.85rem 1.15rem;
+  background: var(--veil-overlay-glass);
+  backdrop-filter: var(--veil-glass-blur);
+  -webkit-backdrop-filter: var(--veil-glass-blur);
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md);
+  box-shadow: var(--veil-shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: var(--veil-text-sm);
+  color: var(--veil-text-primary);
+  animation: veilToastEnter var(--veil-duration-normal) var(--veil-easing-decelerate);
+}
+
+.veil-toast-success {
+  border-left: 4px solid var(--veil-success);
+}
+
+.veil-toast-info {
+  border-left: 4px solid var(--veil-info);
+}
+
+.veil-toast-warning {
+  border-left: 4px solid var(--veil-warning);
+}
+
+.veil-toast-error {
+  border-left: 4px solid var(--veil-danger);
+}
+
+.veil-toast-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.veil-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.veil-toast-title {
+  font-weight: var(--veil-weight-semibold);
+  font-size: var(--veil-text-sm);
+  margin-bottom: 0.15rem;
+}
+
+.veil-toast-message {
+  font-size: var(--veil-text-xs);
+  color: var(--veil-text-secondary);
+  word-break: break-word;
+}
+
+.veil-toast-close {
+  background: none;
+  border: none;
+  color: var(--veil-text-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: color var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-toast-close:hover {
+  color: var(--veil-text-primary);
+}
+
+/* =========================================================================
+   RESPONSIVE LAYOUT & MOBILE OPTIMIZATIONS
+   ========================================================================= */
+
 @media (max-width: 768px) {
   .veil-sidebar {
     width: 100%;
     max-width: none;
   }
+
   .veil-app-layout.has-active-chat .veil-sidebar {
     display: none;
   }
+
   .veil-app-layout:not(.has-active-chat) .veil-chat-main {
     display: none;
   }
+
   .veil-back-btn {
     display: inline-flex;
     align-items: center;
+  }
+
+  .veil-message-bubble {
+    max-width: 85%;
+  }
+
+  .veil-toast-container {
+    left: 1rem;
+    right: 1rem;
+    bottom: calc(1rem + var(--veil-safe-bottom));
+  }
+
+  .veil-toast {
+    min-width: 0;
+    max-width: 100%;
   }
 }
