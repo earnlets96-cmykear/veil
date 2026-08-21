@@ -1,13 +1,15 @@
 /**
- * Message Composer Component for VEIL.
+ * Modernized Message Composer Component for VEIL Phase 31.
  *
  * Implements Enter to send, Shift+Enter for multiline, encrypted file attachment picking,
- * live voice note recording & sending, and message reply quote banners.
+ * live voice note recording & sending, and message reply quote banners using
+ * VEIL reusable component primitives.
  */
 
 import React, { useState, useRef, KeyboardEvent } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
+import { Button, IconButton, ReplyPreview } from './ui/index.ts';
 
 export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const { sendMessage, sendAttachment, sendVoiceMessage, replyTarget, setReplyTarget } = useApp();
@@ -100,41 +102,15 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
       {/* Quoted Message Reply Banner */}
       {replyTarget && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0.4rem 0.85rem',
-            background: 'rgba(99, 102, 241, 0.15)',
-            borderLeft: '3px solid var(--veil-accent-primary)',
-            borderRadius: 'var(--veil-radius-sm) var(--veil-radius-sm) 0 0',
-            fontSize: 'var(--veil-text-xs)',
+        <ReplyPreview
+          replyTo={{
+            messageId: replyTarget.id,
+            senderName: replyTarget.senderName || (replyTarget.isOutgoing ? 'yourself' : 'Peer'),
+            text: replyTarget.text,
+            attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
           }}
-        >
-          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <span style={{ fontWeight: 600, color: 'var(--veil-accent-primary)' }}>
-              Replying to {replyTarget.senderName || (replyTarget.isOutgoing ? 'yourself' : 'peer')}:
-            </span>{' '}
-            <span style={{ color: 'var(--veil-text-secondary)' }}>
-              {replyTarget.voice
-                ? '🎙️ Voice message'
-                : replyTarget.attachment
-                ? `📎 ${replyTarget.attachment.name}`
-                : replyTarget.text.slice(0, 60)}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.1rem 0.4rem', fontSize: '0.75rem', marginLeft: '0.5rem' }}
-            onClick={() => setReplyTarget(null)}
-            title="Cancel Reply"
-            aria-label="Cancel Reply"
-          >
-            ✕
-          </button>
-        </div>
+          onDismiss={() => setReplyTarget(null)}
+        />
       )}
 
       {/* Composer Input Row */}
@@ -167,7 +143,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
                   borderRadius: '50%',
                   backgroundColor: 'var(--veil-danger)',
                   boxShadow: '0 0 8px var(--veil-danger)',
-                  animation: 'pulse 1.2s infinite',
+                  animation: 'veilPulse 1.2s infinite',
                 }}
               />
               <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
@@ -176,50 +152,42 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                type="button"
-                className="veil-btn veil-btn-secondary"
-                style={{ height: '38px', padding: '0 0.75rem', fontSize: 'var(--veil-text-xs)' }}
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={handleCancelVoice}
                 disabled={isSending}
               >
                 ✕ Cancel
-              </button>
-              <button
-                type="button"
-                className="veil-btn veil-btn-primary"
-                style={{ height: '38px', padding: '0 1rem', fontSize: 'var(--veil-text-xs)', fontWeight: 600 }}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleSendVoice}
-                disabled={isSending}
+                isLoading={isSending}
               >
-                {isSending ? 'Encrypting & Sending...' : '✔ Send Voice'}
-              </button>
+                ✔ Send Voice
+              </Button>
             </div>
           </div>
         ) : (
           /* Standard Message & Attachment Controls */
           <>
-            <button
-              type="button"
-              className="veil-btn veil-btn-secondary"
-              style={{ height: '42px', padding: '0 0.75rem', fontSize: '1.1rem' }}
+            <IconButton
+              icon="📎"
+              variant="secondary"
               onClick={() => fileInputRef.current?.click()}
-              title="Attach Encrypted File"
               aria-label="Attach Encrypted File"
-            >
-              📎
-            </button>
+              title="Attach Encrypted File"
+            />
 
-            <button
-              type="button"
-              className="veil-btn veil-btn-secondary"
-              style={{ height: '42px', padding: '0 0.75rem', fontSize: '1.1rem' }}
+            <IconButton
+              icon="🎙️"
+              variant="secondary"
               onClick={handleStartVoice}
-              title="Record Voice Note"
               aria-label="Record Voice Note"
-            >
-              🎙️
-            </button>
+              title="Record Voice Note"
+            />
 
             <textarea
               className="veil-composer-input"
@@ -231,16 +199,16 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
               aria-label="Message Input Field"
             />
 
-            <button
-              type="button"
-              className="veil-btn veil-btn-primary"
-              style={{ height: '42px', padding: '0 1.25rem', fontWeight: 600 }}
+            <Button
+              variant="primary"
+              size="md"
               onClick={handleSend}
               disabled={!text.trim() || isSending}
+              isLoading={isSending}
               aria-label="Send Message"
             >
-              {isSending ? 'Encrypting...' : 'Send ➤'}
-            </button>
+              Send ➤
+            </Button>
           </>
         )}
       </div>

@@ -1,12 +1,22 @@
 /**
- * Sidebar Component for VEIL Phase 15.
+ * Modernized Conversation Sidebar Component for VEIL Phase 31.
  *
- * Implements instant in-memory search, conversation lists, contacts tab,
- * and invitation sharing.
+ * Implements instant in-memory search, active Space identity header,
+ * tabbed filtering (All, Chats, Groups, Contacts), contact request actions,
+ * and invitation sharing using VEIL reusable component primitives.
  */
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import {
+  Avatar,
+  Badge,
+  Button,
+  IconButton,
+  SearchInput,
+  StatusIndicator,
+  EmptyState,
+} from './ui/index.ts';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -55,64 +65,48 @@ export const Sidebar: React.FC = () => {
       {/* Space Header */}
       <div className="veil-sidebar-header">
         <div className="veil-space-status-box">
-          <div className="veil-space-avatar" aria-hidden="true">
-            {activeSession?.name.charAt(0).toUpperCase() || 'S'}
-          </div>
+          <Avatar
+            name={activeSession?.name || 'Active Space'}
+            size="md"
+            isSquare
+            aria-label="Current Space"
+          />
           <div>
             <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
               {activeSession?.name || 'Active Space'}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
-              <span
-                style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: networkState === 'connected' ? 'var(--veil-success)' : 'var(--veil-warning)',
-                  boxShadow: `0 0 6px ${networkState === 'connected' ? 'var(--veil-success)' : 'var(--veil-warning)'}`,
-                }}
-                aria-hidden="true"
-              />
-              <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
-                {networkState === 'connected' ? 'Encrypted & Online' : 'Offline / Queued'}
-              </span>
-            </div>
+            <StatusIndicator
+              status={networkState === 'connected' ? 'online' : 'offline'}
+              label={networkState === 'connected' ? 'Encrypted & Online' : 'Offline / Queued'}
+            />
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.35rem' }}>
-          <button
-            type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.35rem 0.55rem', fontSize: '0.85rem' }}
+          <IconButton
+            icon="🔒"
+            variant="secondary"
             onClick={lockSpace}
-            title="Lock Space"
             aria-label="Lock Space"
-          >
-            🔒
-          </button>
-          <button
-            type="button"
-            className="veil-btn veil-btn-panic"
-            style={{ padding: '0.35rem 0.55rem', fontSize: '0.85rem' }}
+            title="Lock Space"
+          />
+          <IconButton
+            icon="🚨"
+            variant="danger"
             onClick={panicLock}
+            aria-label="Panic Lock: Instant Memory Wipe"
             title="Panic Lock: Instant Memory Wipe"
-            aria-label="Emergency Panic Lock"
-          >
-            🚨
-          </button>
+          />
         </div>
       </div>
 
       {/* Instant Search Bar */}
       <div className="veil-sidebar-search" role="search">
-        <input
-          type="text"
-          className="veil-input"
-          style={{ padding: '0.45rem 0.75rem', fontSize: 'var(--veil-text-xs)' }}
-          placeholder="Search contacts, messages & groups..."
+        <SearchInput
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery('')}
+          placeholder="Search contacts, messages & groups..."
           aria-label="Search conversation history"
         />
       </div>
@@ -149,11 +143,11 @@ export const Sidebar: React.FC = () => {
           className={`veil-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
           onClick={() => setActiveTab('contacts')}
         >
-          Contacts ({contacts.length}{pendingIncoming.length > 0 ? ` · ${pendingIncoming.length} req` : ''})
+          Contacts {pendingIncoming.length > 0 && <Badge variant="warning">{pendingIncoming.length}</Badge>}
         </button>
       </div>
 
-      {/* Search Results Overlay or Normal List */}
+      {/* Conversation / Contacts / Search List */}
       <div className="veil-conversation-list">
         {searchQuery.trim() ? (
           <div>
@@ -161,23 +155,34 @@ export const Sidebar: React.FC = () => {
               Search Results ({searchResults.length})
             </div>
             {searchResults.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
-                No matches found in active Space.
-              </div>
+              <EmptyState
+                icon="🔍"
+                title="No Matches Found"
+                description="No messages, contacts, or groups match your search in this Space."
+              />
             ) : (
               searchResults.map((res) => (
                 <div
                   key={res.id}
                   className="veil-conversation-item"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     if (res.conversationId) selectConversation(res.conversationId);
                     setSearchQuery('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      if (res.conversationId) selectConversation(res.conversationId);
+                      setSearchQuery('');
+                    }
                   }}
                 >
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{res.title}</span>
-                      <span className="veil-badge veil-badge-secure" style={{ fontSize: '0.65rem' }}>{res.type}</span>
+                      <Badge variant="secure">{res.type}</Badge>
                     </div>
                     <div className="veil-conversation-preview">{res.matchSnippet || res.subtitle}</div>
                   </div>
@@ -189,15 +194,15 @@ export const Sidebar: React.FC = () => {
           <div>
             {/* Incoming Requests Section */}
             {pendingIncoming.length > 0 && (
-              <div style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: 'rgba(99, 102, 241, 0.08)', borderRadius: 'var(--veil-radius-md)' }}>
-                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-accent)', marginBottom: '0.5rem' }}>
+              <div style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: 'var(--veil-accent-primary-subtle)', borderRadius: 'var(--veil-radius-md)' }}>
+                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-accent-primary)', marginBottom: '0.5rem' }}>
                   Incoming Contact Requests ({pendingIncoming.length})
                 </div>
                 {pendingIncoming.map((req) => (
                   <div
                     key={req.requestId}
                     style={{
-                      padding: '0.5rem',
+                      padding: '0.6rem',
                       backgroundColor: 'var(--veil-bg-surface)',
                       borderRadius: 'var(--veil-radius-sm)',
                       marginBottom: '0.4rem',
@@ -206,7 +211,7 @@ export const Sidebar: React.FC = () => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                       <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-xs)' }}>
-                        {req.peerDisplayName} <span style={{ color: 'var(--veil-accent)' }}>@{req.peerUsername}</span>
+                        {req.peerDisplayName} <span style={{ color: 'var(--veil-accent-primary)' }}>@{req.peerUsername}</span>
                       </span>
                     </div>
                     {req.greeting && (
@@ -215,31 +220,28 @@ export const Sidebar: React.FC = () => {
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: '0.35rem' }}>
-                      <button
-                        type="button"
-                        className="veil-btn veil-btn-primary"
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => acceptContactRequest(req.requestId)}
                       >
                         ✓ Accept
-                      </button>
-                      <button
-                        type="button"
-                        className="veil-btn veil-btn-secondary"
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => declineContactRequest(req.requestId)}
                       >
                         ✕ Decline
-                      </button>
-                      <button
-                        type="button"
-                        className="veil-btn veil-btn-danger"
-                        style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => blockUser(req.peerIdentityId)}
                         title="Block User"
                       >
                         🚫
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -265,54 +267,46 @@ export const Sidebar: React.FC = () => {
                     }}
                   >
                     <span>@{req.peerUsername}</span>
-                    <span className="veil-badge veil-badge-warning" style={{ fontSize: '0.65rem' }}>
-                      Pending
-                    </span>
+                    <Badge variant="warning">Pending</Badge>
                   </div>
                 ))}
               </div>
             )}
 
             {contacts.length === 0 && pendingIncoming.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
-                No contacts added yet.
-                <div style={{ marginTop: '0.5rem' }}>
-                  Click <strong>+ Chat</strong> to find users or import an invitation.
-                </div>
-              </div>
+              <EmptyState
+                icon="👥"
+                title="No Contacts Added"
+                description="Add contacts by username search or import an invitation link."
+                action={
+                  <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
+                    + Find Users
+                  </Button>
+                }
+              />
             )}
 
             {contacts.map((contact) => (
               <div
                 key={contact.identityId}
                 className="veil-conversation-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => selectConversation(contact.identityId)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    selectConversation(contact.identityId);
+                  }
+                }}
               >
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #a855f7, #6366f1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    color: '#ffffff',
-                  }}
-                >
-                  {contact.name.charAt(0).toUpperCase()}
-                </div>
+                <Avatar name={contact.name} size="md" />
                 <div className="veil-conversation-info">
                   <div className="veil-conversation-top">
                     <span className="veil-conversation-name">{contact.name}</span>
-                    <span
-                      className={`veil-badge ${contact.verificationStatus === 'VERIFIED' ? 'veil-badge-secure' : 'veil-badge-warning'}`}
-                      style={{ fontSize: '0.65rem' }}
-                    >
+                    <Badge variant={contact.verificationStatus === 'VERIFIED' ? 'secure' : 'warning'}>
                       {contact.verificationStatus === 'VERIFIED' ? '✓ Verified' : 'Unverified'}
-                    </span>
+                    </Badge>
                   </div>
                   <div className="veil-conversation-preview">ID: {contact.identityId.slice(0, 16)}...</div>
                 </div>
@@ -322,39 +316,41 @@ export const Sidebar: React.FC = () => {
         ) : (
           <div>
             {filteredConversations.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
-                No conversations found.
-                <div style={{ marginTop: '0.5rem' }}>
-                  Click <strong>+ Chat</strong> or <strong>+ Group</strong> below to begin.
-                </div>
-              </div>
+              <EmptyState
+                icon="💬"
+                title="No Conversations"
+                description="Begin an end-to-end encrypted chat or create a secure group."
+                action={
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                    <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
+                      + Chat
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'newGroup' })}>
+                      + Group
+                    </Button>
+                  </div>
+                }
+              />
             ) : (
               filteredConversations.map((conv) => (
                 <div
                   key={conv.id}
                   className={`veil-conversation-item ${activeChatId === conv.id ? 'active' : ''}`}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => selectConversation(conv.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      selectConversation(conv.id);
+                    }
+                  }}
                 >
-                  <div
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: conv.type === 'group' ? 'var(--veil-radius-md)' : '50%',
-                      background:
-                        conv.type === 'group'
-                          ? 'linear-gradient(135deg, #0ea5e9, #6366f1)'
-                          : 'linear-gradient(135deg, #a855f7, #6366f1)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      color: '#ffffff',
-                    }}
-                    aria-hidden="true"
-                  >
-                    {conv.type === 'group' ? '👥' : conv.name.charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar
+                    name={conv.name}
+                    isGroup={conv.type === 'group'}
+                    size="md"
+                  />
 
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
@@ -379,45 +375,39 @@ export const Sidebar: React.FC = () => {
       {/* Sidebar Footer Controls */}
       <div className="veil-sidebar-footer">
         <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <button
-            type="button"
-            className="veil-btn veil-btn-primary"
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.35rem 0.65rem' }}
+          <Button
+            variant="primary"
+            size="sm"
             onClick={() => openModal({ type: 'newChat' })}
           >
             + Chat
-          </button>
-          <button
-            type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.35rem 0.65rem' }}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => openModal({ type: 'newGroup' })}
           >
             + Group
-          </button>
+          </Button>
         </div>
 
         <div style={{ display: 'flex', gap: '0.35rem' }}>
-          <button
-            type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.35rem 0.55rem' }}
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleCopyInvite}
             title="Copy Signed My Invitation"
           >
-            {copiedInvite ? '✓ Link Copied!' : '🔗 Invite'}
-          </button>
+            {copiedInvite ? '✓ Copied!' : '🔗 Invite'}
+          </Button>
 
-          <button
-            type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.35rem 0.55rem' }}
+          <IconButton
+            icon="⚙️"
+            variant="secondary"
             onClick={() => openModal({ type: 'settings' })}
+            aria-label="Settings and Space Management"
             title="Settings & Space Management"
-            aria-label="Settings"
-          >
-            ⚙️
-          </button>
+          />
         </div>
       </div>
     </aside>
