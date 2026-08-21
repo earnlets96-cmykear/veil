@@ -102,6 +102,7 @@ export interface AppContextType {
   exportMyInvitation: () => string | null;
   updateContactVerification: (identityId: string, status: VerificationStatus) => Promise<void>;
   createGroup: (name: string, description?: string) => Promise<void>;
+  ensureCloudSession: (session: SpaceSession) => Promise<void>;
 
   // Phase 23 Actions
   registerUsername: (username: string, displayName?: string) => Promise<SignedProfileDocument>;
@@ -204,10 +205,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => clearInterval(interval);
   }, [activeSession]);
 
-  const loadSpaceData = useCallback(async (session: SpaceSession) => {
-    notificationDispatcher.setLocked(false);
+  const ensureCloudSession = useCallback(async (session: SpaceSession) => {
+    if (cloudClient.getSessionToken()) return;
 
-    // 0. Restore persistent cloud session if present and valid
     try {
       const savedCloudSession = (await store.getAsync<{
         sessionToken: string;
@@ -223,10 +223,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           savedCloudSession.accountId,
           savedCloudSession.deviceId
         );
+        return;
       }
-    } catch (_cloudErr) {
-      // Non-fatal: space unlocks normally even if cloud session restoration fails
-    }
+
+      // Auto-register / authenticate cloud session deterministically for this Space
+      const identity = idMgr.loadIdentity(session, store);
+      const storedProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
+      const username = (storedProfile?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${session.spaceId.slice(0, 8)}`).replace(/^@/, '');
+      const authPassword = bytesToHex(sha256(session.getMasterKey()));
+      const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
+
+      try {
+        const logRes = await cloudClient.loginAccount({
+          username,
+          password: authPassword,
+          deviceId,
+        });
+        if (logRes.session && logRes.session.sessionToken) {
+          await store.setAsync(session, 'veil:cloud:session', {
+            sessionToken: logRes.session.sessionToken,
+            accountId: logRes.account.accountId,
+            deviceId: logRes.device.deviceId,
+            expiresAt: logRes.session.expiresAt,
+            username: username.toLowerCase(),
+          });
+        }
+      } catch (_loginErr) {
+        try {
+          const regRes = await cloudClient.registerAccount({
+            username,
+            password: authPassword,
+            deviceId,
+            deviceName: session.name,
+            deviceSigningPub: identity?.document.signingPublicKey,
+            deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
+          });
+          if (regRes.session && regRes.session.sessionToken) {
+            await store.setAsync(session, 'veil:cloud:session', {
+              sessionToken: regRes.session.sessionToken,
+              accountId: regRes.account.accountId,
+              deviceId: regRes.device.deviceId,
+              expiresAt: regRes.session.expiresAt,
+              username: username.toLowerCase(),
+            });
+          }
+        } catch (_regErr) {}
+      }
+    } catch (_e) {}
+  }, []);
+
+  const loadSpaceData = useCallback(async (session: SpaceSession) => {
+    notificationDispatcher.setLocked(false);
+
+    // 0. Ensure persistent cloud session is active
+    await ensureCloudSession(session);
 
     // 1. Load active conversations
     const storedConvs = (await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations')) || [];
@@ -735,6 +785,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
 
+      if (!cloudClient.getSessionToken()) {
+        await ensureCloudSession(activeSession);
+      }
+
       let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
       try {
         const createRes = await cloudClient.createAttachment({
@@ -863,6 +917,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
+
+      if (!cloudClient.getSessionToken()) {
+        await ensureCloudSession(activeSession);
+      }
 
       try {
         voiceMeta = await VoiceRecorder.encryptAndUploadVoiceNote(
@@ -1365,6 +1423,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     exportMyInvitation,
     updateContactVerification,
     createGroup,
+    ensureCloudSession,
     registerUsername,
     searchDirectory,
     sendContactRequest,

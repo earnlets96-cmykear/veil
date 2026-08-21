@@ -15,7 +15,7 @@ import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
 
 export const ConversationView: React.FC = () => {
-  const { conversations, activeChatId, messages, openModal, selectConversation, setReplyTarget, activeSession, cloudClient } = useApp();
+  const { conversations, activeChatId, messages, openModal, selectConversation, setReplyTarget, activeSession, cloudClient, ensureCloudSession } = useApp();
   const timelineEndRef = useRef<HTMLDivElement>(null);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const audioElementsRef = useRef<Record<string, HTMLAudioElement>>({});
@@ -78,6 +78,9 @@ export const ConversationView: React.FC = () => {
     try {
       let audio = audioElementsRef.current[msg.id];
       if (!audio) {
+        if (!cloudClient.getSessionToken()) {
+          await ensureCloudSession(activeSession);
+        }
         const audioUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice as any);
         audio = new Audio(audioUrl);
         audioElementsRef.current[msg.id] = audio;
@@ -94,6 +97,9 @@ export const ConversationView: React.FC = () => {
     if (!msg.attachment || !activeSession) return;
     if (msg.attachment.objectId) {
       try {
+        if (!cloudClient.getSessionToken()) {
+          await ensureCloudSession(activeSession);
+        }
         const rawCiphertext = await cloudClient.downloadAttachment(msg.attachment.objectId);
         let plaintextBytes: Uint8Array;
 

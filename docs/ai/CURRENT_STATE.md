@@ -33,15 +33,15 @@
 | **Phase 26** | Real-World Release Validation (Web ↔ Web & Android Readiness) | **COMPLETED** | 40-message bidirectional test, 50-message burst, live relay probe, Android diagnostic audit, validation report |
 | **Phase 27** | Cloud & Account Foundation (Persistent Account, Multi-Device, Sync Engine, Object Storage) | **COMPLETED** | Persistent Account/Device identity, SQL/File database schema, Object Storage abstraction, encrypted attachments, SyncEngine, local migration (5 dedicated test suites) |
 | **Phase 28** | Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore) | **COMPLETED** | Deterministic SQL migrations, S3 Object Storage, Caddy TLS reverse proxy, Docker stack, backup/restore tool, fresh-install re-hydration tests |
-| **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence & Attachments | **COMPLETED & ACCEPTED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, session persistence in EncryptedSpaceStore, inbound voice preservation, complete normal file attachment pipeline, Android APK compilation verified (226 total suites, 466 tests passing, release manifest verified) |
+| **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence & Attachments | **COMPLETED & ACCEPTED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, session persistence & auto-healing in EncryptedSpaceStore, inbound voice preservation, complete normal file attachment pipeline, Android APK compilation verified (227 total suites, 468 tests passing, release manifest verified) |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
 - **Release Version**: **`1.0.0` (Production GA with Supabase PostgreSQL & Cloudflare R2 Cloud Persistence & E2EE Attachments)**
-- **Total Test Files**: **226 / 226 passed (100% pass rate)**
-- **Total Tests**: **466 / 466 passed (0 failures, 0 skipped)**
+- **Total Test Files**: **227 / 227 passed (100% pass rate)**
+- **Total Tests**: **468 / 468 passed (0 failures, 0 skipped)**
 - **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.3s)
 - **Android Build Status**: `npm run android:build` succeeds cleanly (`app-debug.apk` 3.95 MB generated)
 - **Production Smoke**: `npx tsx scripts/phase30-production-smoke.mjs` passes 9/9 smoke tests cleanly (100%).
