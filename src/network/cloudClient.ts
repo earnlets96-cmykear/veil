@@ -55,7 +55,8 @@ export class CloudClient {
   private async request<T = any>(
     path: string,
     method: 'GET' | 'POST' | 'DELETE' = 'GET',
-    body?: any
+    body?: any,
+    timeoutOverrideMs?: number
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -67,7 +68,7 @@ export class CloudClient {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), timeoutOverrideMs || this.timeoutMs);
 
     try {
       const res = await fetch(url, {
@@ -100,7 +101,7 @@ export class CloudClient {
     deviceKeyAgreementPub?: string;
     recoveryAnchor?: string;
   }): Promise<{ account: any; device: any; session: any }> {
-    const res = await this.request('/v1/account/register', 'POST', params);
+    const res = await this.request('/v1/account/register', 'POST', params, 60000);
     this.setSession(res.session.sessionToken, res.account.accountId, res.device.deviceId);
     return res;
   }
@@ -113,7 +114,7 @@ export class CloudClient {
     deviceSigningPub?: string;
     deviceKeyAgreementPub?: string;
   }): Promise<{ account: any; device: any; session: any }> {
-    const res = await this.request('/v1/account/login', 'POST', params);
+    const res = await this.request('/v1/account/login', 'POST', params, 60000);
     this.setSession(res.session.sessionToken, res.account.accountId, res.device.deviceId);
     return res;
   }
@@ -126,7 +127,7 @@ export class CloudClient {
     deviceSigningPub?: string;
     deviceKeyAgreementPub?: string;
   }): Promise<{ account: any; device: any; session: any; recovery: RecoveryStateEntity | null }> {
-    const res = await this.request('/v1/account/restore', 'POST', params);
+    const res = await this.request('/v1/account/restore', 'POST', params, 60000);
     this.setSession(res.session.sessionToken, res.account.accountId, res.device.deviceId);
     return res;
   }
@@ -215,13 +216,15 @@ export class CloudClient {
 
   public async uploadAttachment(objectId: string, rawCiphertext: Uint8Array): Promise<void> {
     const ciphertextBase64 = bytesToBase64(rawCiphertext);
-    await this.request('/v1/cloud/attachments/upload', 'POST', { objectId, ciphertextBase64 });
+    await this.request('/v1/cloud/attachments/upload', 'POST', { objectId, ciphertextBase64 }, 120000);
   }
 
   public async downloadAttachment(objectId: string): Promise<Uint8Array> {
     const res = await this.request<{ ciphertextBase64: string; ciphertextHash: string }>(
       `/v1/cloud/attachments/download/${objectId}`,
-      'GET'
+      'GET',
+      undefined,
+      120000
     );
     const raw = base64ToBytes(res.ciphertextBase64);
     const computedHash = bytesToHex(sha256(raw));
