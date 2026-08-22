@@ -11,6 +11,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import {
   Avatar,
   Badge,
@@ -65,21 +66,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId }) => {
     ? peerConv?.fingerprint || peerConv?.id.slice(0, 16).toUpperCase() || 'E2EE-IDENTITY'
     : loadedIdentity?.document.fingerprint || 'E2EE-IDENTITY';
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast({ type: 'error', message: 'Profile picture must be under 2MB' });
-      return;
+    try {
+      const optimizedThumbnail = await processAvatarImage(file);
+      setAvatarPreview(optimizedThumbnail);
+      showToast({ type: 'info', message: 'Profile photo optimized (<32 KB)' });
+    } catch (err: any) {
+      showToast({ type: 'error', message: err.message || 'Failed to process profile photo' });
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setAvatarPreview(dataUrl);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemovePhoto = () => {

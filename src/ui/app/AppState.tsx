@@ -39,6 +39,7 @@ import { SyncEngine } from '../../sync/syncEngine.ts';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { randomBytes, bytesToBase64, bytesToHex } from '../../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha256.js';
+import { processAvatarImage } from '../utils/avatarProcessor.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -1439,7 +1440,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const binding = await netManager.getOrCreateMailbox(activeSession);
       const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
 
-      const avatarToUse = avatar !== undefined ? avatar : (privacySettings.avatar || myProfile?.avatar);
+      let avatarToUse = avatar !== undefined ? avatar : (privacySettings.avatar || myProfile?.avatar);
+      if (avatarToUse && avatarToUse.length > 32 * 1024) {
+        try {
+          avatarToUse = await processAvatarImage(avatarToUse);
+        } catch (_err) {
+          // Keep best effort if downsampling fails in headless context
+        }
+      }
 
       const profile = createSignedProfile(
         identity.document.identityId,

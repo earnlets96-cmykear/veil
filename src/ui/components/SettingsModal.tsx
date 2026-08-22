@@ -18,6 +18,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { NotificationPrivacyMode } from '../../notifications/types.ts';
+import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import {
   Avatar,
   Badge,
@@ -90,20 +91,17 @@ export const SettingsModal: React.FC = () => {
   const fingerprint = loadedIdentity?.document.fingerprint || 'E2EE-IDENTITY';
   const invitationLink = exportMyInvitation();
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast({ type: 'error', message: 'Profile photo must be under 2MB' });
-      return;
+    try {
+      const optimizedThumbnail = await processAvatarImage(file);
+      setAvatarPreview(optimizedThumbnail);
+      showToast({ type: 'info', message: 'Profile photo optimized (<32 KB)' });
+    } catch (err: any) {
+      showToast({ type: 'error', message: err.message || 'Failed to process profile photo' });
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
