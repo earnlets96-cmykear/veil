@@ -42,6 +42,7 @@ interface ContextMenuState {
 export const ConversationView: React.FC = () => {
   const {
     conversations,
+    contacts,
     activeChatId,
     messages,
     openModal,
@@ -499,11 +500,11 @@ export const ConversationView: React.FC = () => {
                   <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
                     {activeConv.name}
                   </span>
-                  {activeConv.isVerified && (
-                    <Badge variant="secure">
-                      ✓ Verified Identity
-                    </Badge>
-                  )}
+                  {activeContact?.verificationStatus === 'FAILED' ? (
+                    <Badge variant="danger">🚨 Key Changed</Badge>
+                  ) : (activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED') ? (
+                    <Badge variant="secure">✓ Verified</Badge>
+                  ) : null}
                 </div>
                 <StatusIndicator
                   status="secure"
@@ -527,11 +528,15 @@ export const ConversationView: React.FC = () => {
 
             {activeConv.type === 'direct' ? (
               <Button
-                variant="secondary"
+                variant={activeContact?.verificationStatus === 'FAILED' ? 'danger' : (activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED') ? 'secondary' : 'primary'}
                 size="sm"
                 onClick={() => openModal({ type: 'contactDetails', conversationId: activeConv.id })}
               >
-                Verify Safety Number
+                {activeContact?.verificationStatus === 'FAILED'
+                  ? '🚨 Review Key'
+                  : (activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED')
+                  ? '🛡️ Safety Number'
+                  : 'Verify Identity'}
               </Button>
             ) : (
               <Button
