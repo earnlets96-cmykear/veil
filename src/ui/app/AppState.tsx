@@ -12,7 +12,7 @@ import { IndexedDBStorageAdapter } from '../../storage/indexedDbAdapter.ts';
 import { SpaceIdentityManager } from '../../identity/manager.ts';
 import { NetworkManager } from '../../network/networkManager.ts';
 import { SessionController } from './sessionController.ts';
-import { UIConversation, UIMessage, ActiveModal } from './types.ts';
+import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings } from './types.ts';
 import { SpaceSession } from '../../spaces/session.ts';
 import { IdentityDocument } from '../../identity/document.ts';
 import { NetworkState } from '../../network/types.ts';
@@ -82,6 +82,9 @@ export interface AppContextType {
   config: AppConfig;
   replyTarget: UIMessage | null;
 
+  privacySettings: UserPrivacySettings;
+  updatePrivacySettings: (settings: Partial<UserPrivacySettings>) => Promise<void>;
+
   // Actions
   unlockSpace: (passphrase: string) => Promise<void>;
   createSpace: (name: string, passphrase: string) => Promise<void>;
@@ -108,8 +111,8 @@ export interface AppContextType {
   createGroup: (name: string, description?: string) => Promise<void>;
   ensureCloudSession: (session: SpaceSession) => Promise<void>;
 
-  // Phase 23 Actions
-  registerUsername: (username: string, displayName?: string) => Promise<SignedProfileDocument>;
+  // Phase 23 & Phase 32 Actions
+  registerUsername: (username: string, displayName?: string, bio?: string, avatar?: string) => Promise<SignedProfileDocument>;
   searchDirectory: (query: string) => Promise<DirectorySearchResult[]>;
   sendContactRequest: (targetUsername: string, greeting?: string) => Promise<void>;
   acceptContactRequest: (requestId: string) => Promise<void>;
@@ -138,6 +141,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactRequests, setContactRequests] = useState<ContactRequest[]>([]);
   const [myProfile, setMyProfile] = useState<SignedProfileDocument | null>(null);
+  const [privacySettings, setPrivacySettings] = useState<UserPrivacySettings>({
+    phoneVisibility: 'contacts',
+    profileVisibility: 'everyone',
+  });
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Record<string, UIMessage[]>>({});
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -182,6 +189,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setContacts([]);
       setContactRequests([]);
       setMyProfile(null);
+      setPrivacySettings({
+        phoneVisibility: 'contacts',
+        profileVisibility: 'everyone',
+      });
       setMessages({});
       setActiveChatId(null);
       setActiveModal(null);
@@ -323,9 +334,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const storedRequests = await contactRequestManager.listRequests(session);
     setContactRequests(storedRequests);
 
-    // 4. Load public profile
+    // 4. Load public profile & privacy settings
     const storedProfile = (await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile')) || null;
     setMyProfile(storedProfile);
+    const storedPrivacy = (await store.getAsync<UserPrivacySettings>(session, 'veil:user:privacy_settings')) || {
+      phoneVisibility: 'contacts',
+      profileVisibility: 'everyone',
+    };
+    setPrivacySettings(storedPrivacy);
 
     // 5. Load message history
     const storedMsgs = (await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages')) || {};
@@ -1404,8 +1420,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sessionController.recordUserActivity();
   }, []);
 
+  const updatePrivacySettings = useCallback(
+    async (updated: Partial<UserPrivacySettings>) => {
+      if (!activeSession) return;
+      const next = { ...privacySettings, ...updated };
+      setPrivacySettings(next);
+      await store.setAsync(activeSession, 'veil:user:privacy_settings', next);
+    },
+    [activeSession, privacySettings]
+  );
+
   const registerUsername = useCallback(
-    async (username: string, displayName?: string) => {
+    async (username: string, displayName?: string, bio?: string, avatar?: string) => {
       if (!activeSession) throw new Error('No active Space');
       const identity = idMgr.loadIdentity(activeSession, store);
       if (!identity) throw new Error('Identity not loaded');
@@ -1413,21 +1439,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const binding = await netManager.getOrCreateMailbox(activeSession);
       const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
 
+      const avatarToUse = avatar !== undefined ? avatar : (privacySettings.avatar || myProfile?.avatar);
+
       const profile = createSignedProfile(
         identity.document.identityId,
         identity.signingPrivateKey,
         username,
         displayName || username,
         binding.mailboxId,
-        prekeyBundle
+        prekeyBundle,
+        avatarToUse
       );
 
-      await directoryClient.registerProfile(profile);
+      try {
+        await directoryClient.registerProfile(profile);
+      } catch (err: any) {
+        const msg = err.message || '';
+        if (msg.includes('CONFLICT') || msg.includes('already registered')) {
+          throw new Error(`Username @${username} is already taken by another identity.`);
+        }
+        if (msg.includes('Invalid') || msg.includes('format')) {
+          throw new Error(`Invalid username format: ${msg}`);
+        }
+        throw new Error("Couldn't publish your profile. Please check your connection and try again.");
+      }
+
       await store.setAsync(activeSession, 'veil:user:profile', profile);
+      if (bio !== undefined || avatar !== undefined) {
+        await updatePrivacySettings({ bio, avatar });
+      }
       setMyProfile(profile);
       return profile;
     },
-    [activeSession]
+    [activeSession, myProfile, privacySettings, updatePrivacySettings]
   );
 
   const searchDirectory = useCallback(
@@ -1558,6 +1602,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     contacts,
     contactRequests,
     myProfile,
+    privacySettings,
+    updatePrivacySettings,
     activeChatId,
     messages,
     activeModal,

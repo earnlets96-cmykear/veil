@@ -14,6 +14,7 @@ import { GroupDetailsModal } from './components/GroupDetailsModal.tsx';
 import { ContactDetailsModal } from './components/ContactDetailsModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
+import { ProfileModal } from './components/ProfileModal.tsx';
 
 export const App: React.FC = () => {
   const { activeSession, activeChatId, activeModal } = useApp();
@@ -45,6 +46,7 @@ export const App: React.FC = () => {
         <ContactDetailsModal conversationId={activeModal.conversationId} />
       )}
       {activeModal?.type === 'settings' && <SettingsModal />}
+      {activeModal?.type === 'profile' && <ProfileModal peerId={activeModal.peerId} />}
     </div>
   );
 };

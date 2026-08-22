@@ -64,12 +64,24 @@ export const Sidebar: React.FC = () => {
     <aside className="veil-sidebar" role="complementary" aria-label="Sidebar Navigation">
       {/* Space Header */}
       <div className="veil-sidebar-header">
-        <div className="veil-space-status-box">
+        <div
+          className="veil-space-status-box"
+          onClick={() => openModal({ type: 'profile' })}
+          style={{ cursor: 'pointer' }}
+          title="View & Edit My Profile"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              openModal({ type: 'profile' });
+            }
+          }}
+        >
           <Avatar
             name={activeSession?.name || 'Active Space'}
             size="md"
             isSquare
-            aria-label="Current Space"
+            aria-label="Current Space Profile"
           />
           <div>
             <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>

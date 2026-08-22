@@ -58,6 +58,14 @@ export interface UIMessage {
   };
 }
 
+export interface UserPrivacySettings {
+  phoneVisibility: 'nobody' | 'contacts' | 'everyone';
+  profileVisibility: 'nobody' | 'contacts' | 'everyone';
+  phoneNumber?: string;
+  bio?: string;
+  avatar?: string;
+}
+
 export type ActiveModal =
   | { type: 'createSpace' }
   | { type: 'restoreAccount' }
@@ -69,5 +77,6 @@ export type ActiveModal =
   | { type: 'contactRequests' }
   | { type: 'findUser' }
   | { type: 'settings' }
+  | { type: 'profile'; peerId?: string }
   | { type: 'panicLock' }
   | null;

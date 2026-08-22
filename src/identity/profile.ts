@@ -26,9 +26,14 @@ export interface SignedProfileDocument {
   username: string;
   displayName: string;
   avatar?: string;
+  avatarUrl?: string;
+  signingPublicKey?: string;
+  keyAgreementPublicKey?: string;
   mailboxId: string;
   prekeyBundle: PrekeyBundle;
   issuedAt: number;
+  createdAt?: number;
+  updatedAt?: number;
   expiresAt?: number;
   signature: string; // Base64 Ed25519 signature
 }
@@ -140,6 +145,11 @@ export function createSignedProfile(
 
   return {
     ...fields,
+    signingPublicKey: prekeyBundle?.identityDocument?.signingPublicKey,
+    keyAgreementPublicKey: prekeyBundle?.identityDocument?.keyAgreementPublicKey,
+    avatarUrl: avatar?.trim(),
+    createdAt: now,
+    updatedAt: now,
     signature,
   };
 }

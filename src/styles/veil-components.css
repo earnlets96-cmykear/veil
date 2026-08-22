@@ -666,4 +666,127 @@
   border-bottom-right-radius: var(--veil-radius-xs) !important;
 }
 
+/* Telegram-Style Settings Information Architecture & Profile Styles */
+.veil-settings-modal-card {
+  max-width: 840px !important;
+  width: 95vw;
+  height: 640px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.veil-settings-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.veil-settings-sidebar {
+  width: 250px;
+  min-width: 250px;
+  border-right: 1px solid var(--veil-border);
+  background-color: var(--veil-bg-base);
+  overflow-y: auto;
+  padding: var(--veil-space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.veil-settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--veil-space-3);
+  padding: var(--veil-space-3) var(--veil-space-4);
+  background: transparent;
+  border: none;
+  color: var(--veil-text-secondary);
+  font-size: var(--veil-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  min-height: 44px;
+  transition: all var(--veil-duration-fast) var(--veil-easing-standard);
+}
+
+.veil-settings-nav-item:hover {
+  background-color: var(--veil-bg-surface-hover);
+  color: var(--veil-text-primary);
+}
+
+.veil-settings-nav-item.active {
+  background-color: var(--veil-bg-surface-elevated);
+  color: var(--veil-accent-secondary);
+  border-left: 3px solid var(--veil-accent-primary);
+  font-weight: 600;
+}
+
+.veil-settings-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--veil-space-4) var(--veil-space-6);
+  background-color: var(--veil-bg-surface);
+}
+
+.veil-profile-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--veil-space-4) 0 var(--veil-space-6);
+  border-bottom: 1px solid var(--veil-border);
+  margin-bottom: var(--veil-space-4);
+}
+
+.veil-profile-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--veil-space-3) 0;
+  border-bottom: 1px solid var(--veil-border-subtle);
+  font-size: var(--veil-text-sm);
+}
+
+.veil-profile-info-label {
+  color: var(--veil-text-secondary);
+  font-size: var(--veil-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.veil-profile-info-val {
+  color: var(--veil-text-primary);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .veil-settings-layout {
+    position: relative;
+  }
+
+  .veil-settings-sidebar {
+    width: 100%;
+    border-right: none;
+  }
+
+  .veil-settings-sidebar.hide-mobile {
+    display: none;
+  }
+
+  .veil-settings-detail {
+    width: 100%;
+    padding: var(--veil-space-3);
+  }
+
+  .veil-settings-detail.hide-mobile {
+    display: none;
+  }
+}
+
+
 

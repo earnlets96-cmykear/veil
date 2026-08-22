@@ -191,6 +191,20 @@ export class PostgresRelayStore implements IRelayStore {
       throw new Error(`CONFLICT: Username @${profile.username} is already registered to a different identity`);
     }
 
+    const signingPublicKey =
+      profile.prekeyBundle?.identityDocument?.signingPublicKey ||
+      (profile as any).signingPublicKey;
+    const keyAgreementPublicKey =
+      profile.prekeyBundle?.identityDocument?.keyAgreementPublicKey ||
+      (profile as any).keyAgreementPublicKey;
+    const createdAt = profile.issuedAt || (profile as any).createdAt || Date.now();
+    const updatedAt = (profile as any).updatedAt || Date.now();
+    const avatarUrl = profile.avatar || (profile as any).avatarUrl || null;
+
+    if (!signingPublicKey || !keyAgreementPublicKey) {
+      throw new Error('INVALID_PROFILE: Missing signing or key agreement public key in profile document');
+    }
+
     const sql = `
       INSERT INTO directory_profiles (
         username, identity_id, display_name, avatar_url,
@@ -213,14 +227,14 @@ export class PostgresRelayStore implements IRelayStore {
       profile.username.toLowerCase(),
       profile.identityId,
       profile.displayName || null,
-      profile.avatarUrl || null,
-      profile.signingPublicKey,
-      profile.keyAgreementPublicKey,
+      avatarUrl,
+      signingPublicKey,
+      keyAgreementPublicKey,
       profile.mailboxId,
       profile.prekeyBundle ? JSON.stringify(profile.prekeyBundle) : null,
       profile.signature,
-      profile.createdAt,
-      profile.updatedAt,
+      createdAt,
+      updatedAt,
     ]);
   }
 
@@ -238,17 +252,20 @@ export class PostgresRelayStore implements IRelayStore {
     const res = await this.pg.query<any>(sql, [canonicalUsername.toLowerCase()]);
     if (res.rows.length === 0) return null;
     const r = res.rows[0];
+    const prekeyBundle = r.prekeyBundleJson ? JSON.parse(r.prekeyBundleJson) : undefined;
     return {
       version: 1,
       username: r.username,
       identityId: r.identityId,
       displayName: r.displayName || undefined,
+      avatar: r.avatarUrl || undefined,
       avatarUrl: r.avatarUrl || undefined,
       signingPublicKey: r.signingPublicKey,
       keyAgreementPublicKey: r.keyAgreementPublicKey,
       mailboxId: r.mailboxId,
-      prekeyBundle: r.prekeyBundleJson ? JSON.parse(r.prekeyBundleJson) : undefined,
+      prekeyBundle,
       signature: r.signature,
+      issuedAt: Number(r.createdAt),
       createdAt: Number(r.createdAt),
       updatedAt: Number(r.updatedAt),
     };
@@ -268,17 +285,20 @@ export class PostgresRelayStore implements IRelayStore {
     const res = await this.pg.query<any>(sql, [identityId]);
     if (res.rows.length === 0) return null;
     const r = res.rows[0];
+    const prekeyBundle = r.prekeyBundleJson ? JSON.parse(r.prekeyBundleJson) : undefined;
     return {
       version: 1,
       username: r.username,
       identityId: r.identityId,
       displayName: r.displayName || undefined,
+      avatar: r.avatarUrl || undefined,
       avatarUrl: r.avatarUrl || undefined,
       signingPublicKey: r.signingPublicKey,
       keyAgreementPublicKey: r.keyAgreementPublicKey,
       mailboxId: r.mailboxId,
-      prekeyBundle: r.prekeyBundleJson ? JSON.parse(r.prekeyBundleJson) : undefined,
+      prekeyBundle,
       signature: r.signature,
+      issuedAt: Number(r.createdAt),
       createdAt: Number(r.createdAt),
       updatedAt: Number(r.updatedAt),
     };
@@ -288,8 +308,8 @@ export class PostgresRelayStore implements IRelayStore {
     this.assertInit();
     const prefix = query.toLowerCase().replace(/[%_]/g, '');
     const sql = `
-      SELECT username, display_name as "displayName", avatar_url as "avatarUrl",
-             signing_public_key as "signingPublicKey", key_agreement_public_key as "keyAgreementPublicKey"
+      SELECT identity_id as "identityId", username, display_name as "displayName",
+             avatar_url as "avatarUrl", signature as "profileSignature"
       FROM directory_profiles
       WHERE username LIKE $1 OR LOWER(display_name) LIKE $1
       ORDER BY username ASC
@@ -297,11 +317,11 @@ export class PostgresRelayStore implements IRelayStore {
     `;
     const res = await this.pg.query<any>(sql, [`${prefix}%`, Math.min(limit, 50)]);
     return res.rows.map((r) => ({
+      identityId: r.identityId,
       username: r.username,
-      displayName: r.displayName || undefined,
-      avatarUrl: r.avatarUrl || undefined,
-      signingPublicKey: r.signingPublicKey,
-      keyAgreementPublicKey: r.keyAgreementPublicKey,
+      displayName: r.displayName || r.username,
+      avatar: r.avatarUrl || undefined,
+      profileSignature: r.profileSignature || '',
     }));
   }
 
