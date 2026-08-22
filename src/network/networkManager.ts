@@ -42,6 +42,8 @@ export class NetworkManager {
   // Active WebSocket transports keyed by spaceId
   private activeWsTransports = new Map<string, WebSocketTransport>();
   private messageHandlers = new Map<string, (payload: string) => Promise<void>>();
+  private stateListeners: ((state: NetworkState) => void)[] = [];
+  private lastKnownState: NetworkState = 'offline';
 
   constructor(store: EncryptedSpaceStore, config: Partial<NetworkConfig> = {}) {
     this.store = store;
@@ -60,6 +62,32 @@ export class NetworkManager {
 
   public getConfig(): NetworkConfig {
     return this.config;
+  }
+
+  public getState(session?: SpaceSession): NetworkState {
+    if (session) {
+      const ws = this.activeWsTransports.get(session.spaceId);
+      if (ws) return ws.getState();
+    }
+    return this.lastKnownState;
+  }
+
+  public onStateChange(listener: (state: NetworkState) => void): () => void {
+    this.stateListeners.push(listener);
+    // Emit current state immediately
+    listener(this.lastKnownState);
+    return () => {
+      this.stateListeners = this.stateListeners.filter((l) => l !== listener);
+    };
+  }
+
+  private emitStateChange(state: NetworkState): void {
+    this.lastKnownState = state;
+    for (const listener of this.stateListeners) {
+      try {
+        listener(state);
+      } catch (_e) {}
+    }
   }
 
   // ===========================================================================
@@ -208,6 +236,11 @@ export class NetworkManager {
       wsTransport.onEnvelope(async (envelope) => {
         await this.processInboundEnvelope(session, envelope, wsTransport);
       });
+
+      // Forward network state changes in real time
+      wsTransport.onStateChange((state) => {
+        this.emitStateChange(state);
+      });
     }
 
     // Connect & authenticate WebSocket
@@ -215,6 +248,7 @@ export class NetworkManager {
       await wsTransport.connect(binding.mailboxId, binding.capabilityToken);
     } catch (_err) {
       // Falls back to HTTP polling if WebSocket is temporarily unavailable
+      this.emitStateChange('degraded');
     }
 
     // Perform initial catch-up synchronization over HTTP
@@ -231,6 +265,9 @@ export class NetworkManager {
       this.activeWsTransports.delete(session.spaceId);
     }
     this.messageHandlers.delete(session.spaceId);
+    if (this.activeWsTransports.size === 0) {
+      this.emitStateChange('offline');
+    }
   }
 
   /**

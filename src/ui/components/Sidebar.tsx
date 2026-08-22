@@ -163,8 +163,26 @@ export const Sidebar: React.FC = () => {
               {activeSession?.name || 'Active Space'}
             </div>
             <StatusIndicator
-              status={networkState === 'connected' ? 'online' : 'offline'}
-              label={networkState === 'connected' ? 'Encrypted & Online' : 'Offline / Queued'}
+              status={
+                networkState === 'connected'
+                  ? 'online'
+                  : networkState === 'connecting' || networkState === 'reconnecting'
+                  ? 'connecting'
+                  : networkState === 'degraded'
+                  ? 'warning'
+                  : 'offline'
+              }
+              label={
+                networkState === 'connected'
+                  ? 'Encrypted & Online'
+                  : networkState === 'connecting'
+                  ? 'Connecting...'
+                  : networkState === 'reconnecting'
+                  ? 'Reconnecting...'
+                  : networkState === 'degraded'
+                  ? 'Degraded (Polling)'
+                  : 'Offline / Queued'
+              }
             />
           </div>
         </div>

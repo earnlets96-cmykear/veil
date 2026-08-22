@@ -172,6 +172,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     initStorage();
   }, []);
 
+  // Listen for real-time network state changes from NetworkManager
+  useEffect(() => {
+    const unsub = netManager.onStateChange((state) => {
+      setNetworkState(state);
+    });
+    return unsub;
+  }, []);
+
+  // Listen for native online/offline browser & Capacitor events
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (activeSession && activeSession.isActive()) {
+        try {
+          await loadSpaceData(activeSession);
+        } catch (_e) {
+          setNetworkState('degraded');
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      setNetworkState('offline');
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      }
+    };
+  }, [activeSession, loadSpaceData]);
+
   // Continuous mailbox polling heartbeat when a Space is active
   useEffect(() => {
     if (!activeSession) return;
