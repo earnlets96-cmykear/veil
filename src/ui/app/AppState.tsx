@@ -118,6 +118,7 @@ export interface AppContextType {
   sendContactRequest: (targetUsername: string, greeting?: string) => Promise<void>;
   acceptContactRequest: (requestId: string) => Promise<void>;
   declineContactRequest: (requestId: string) => Promise<void>;
+  cancelContactRequest: (requestId: string) => Promise<void>;
   blockUser: (identityId: string) => Promise<void>;
   unblockUser: (identityId: string) => Promise<void>;
   removeContact: (identityId: string) => Promise<void>;
@@ -395,6 +396,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 senderName: req.peerDisplayName || `@${req.peerUsername}`,
                 text: req.greeting || 'Sent you a contact request',
                 timestamp: req.createdAt,
+              });
+              return;
+            }
+          } else if (payload.includes('"type":"CONTACT_CANCEL"')) {
+            const parsed = JSON.parse(payload);
+            const cancelledReq = await contactRequestManager.handleInboundCancel(session, parsed);
+            if (cancelledReq) {
+              const updatedReqs = await contactRequestManager.listRequests(session);
+              setContactRequests(updatedReqs);
+              notificationDispatcher.dispatch({
+                id: cancelledReq.requestId,
+                senderName: cancelledReq.peerDisplayName || `@${cancelledReq.peerUsername}`,
+                text: 'Contact request withdrawn.',
+                timestamp: Date.now(),
               });
               return;
             }
@@ -1583,6 +1598,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession]
   );
 
+  const cancelContactRequest = useCallback(
+    async (requestId: string) => {
+      if (!activeSession || !myProfile) return;
+      await contactRequestManager.cancelRequest(activeSession, requestId, myProfile);
+      setContactRequests(await contactRequestManager.listRequests(activeSession));
+    },
+    [activeSession, myProfile]
+  );
+
   const blockUser = useCallback(
     async (identityId: string) => {
       if (!activeSession) return;
@@ -1660,6 +1684,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sendContactRequest,
     acceptContactRequest,
     declineContactRequest,
+    cancelContactRequest,
     blockUser,
     unblockUser,
     removeContact,

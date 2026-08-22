@@ -74,26 +74,23 @@ export function getRelationshipState(
     return 'CONTACT_UNVERIFIED';
   }
 
-  // 4. Check pending contact requests
-  const matchedRequest = ctx.contactRequests.find(
+  // 4. Check contact requests (prioritize active pending requests)
+  const activeRequests = ctx.contactRequests.filter(
     (r) =>
       (peerIdentityId && r.peerIdentityId === peerIdentityId) ||
       (cleanPeerUsername && r.peerUsername.toLowerCase().replace(/^@/, '') === cleanPeerUsername)
   );
 
-  if (matchedRequest) {
-    if (matchedRequest.status === 'INCOMING_PENDING') {
-      return 'PENDING_INCOMING';
-    }
-    if (matchedRequest.status === 'OUTGOING_PENDING') {
-      return 'PENDING_OUTGOING';
-    }
-    if (matchedRequest.status === 'BLOCKED') {
-      return 'BLOCKED';
-    }
-    if (matchedRequest.status === 'ACCEPTED') {
-      return 'CONTACT_UNVERIFIED';
-    }
+  const pendingReq = activeRequests.find((r) => r.status === 'INCOMING_PENDING' || r.status === 'OUTGOING_PENDING');
+  if (pendingReq) {
+    if (pendingReq.status === 'INCOMING_PENDING') return 'PENDING_INCOMING';
+    if (pendingReq.status === 'OUTGOING_PENDING') return 'PENDING_OUTGOING';
+  }
+
+  const otherReq = activeRequests.find((r) => r.status === 'BLOCKED' || r.status === 'ACCEPTED');
+  if (otherReq) {
+    if (otherReq.status === 'BLOCKED') return 'BLOCKED';
+    if (otherReq.status === 'ACCEPTED') return 'CONTACT_UNVERIFIED';
   }
 
   return 'NOT_CONNECTED';

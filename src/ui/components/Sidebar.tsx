@@ -31,6 +31,7 @@ export const Sidebar: React.FC = () => {
     contactRequests,
     acceptContactRequest,
     declineContactRequest,
+    cancelContactRequest,
     blockUser,
     activeChatId,
     selectConversation,
@@ -462,7 +463,25 @@ export const Sidebar: React.FC = () => {
                     }}
                   >
                     <span>@{req.peerUsername}</span>
-                    <Badge variant="warning">Pending</Badge>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Badge variant="warning">Pending</Badge>
+                      <button
+                        type="button"
+                        onClick={() => cancelContactRequest(req.requestId)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--veil-danger)',
+                          fontSize: '0.7rem',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                        }}
+                        title="Cancel Request"
+                        aria-label={`Cancel request to @${req.peerUsername}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

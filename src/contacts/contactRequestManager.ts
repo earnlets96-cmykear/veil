@@ -19,6 +19,7 @@ export type ContactRequestStatus =
   | 'INCOMING_PENDING'
   | 'ACCEPTED'
   | 'DECLINED'
+  | 'CANCELLED'
   | 'BLOCKED';
 
 export interface ContactRequest {
@@ -49,6 +50,15 @@ export interface ContactResponseWire {
   responderProfile: SignedProfileDocument;
   status: 'ACCEPTED' | 'DECLINED';
   respondedAt: number;
+  signature: string; // Ed25519 signature
+}
+
+export interface ContactCancelWire {
+  type: 'CONTACT_CANCEL';
+  requestId: string;
+  senderIdentityId: string;
+  targetIdentityId?: string;
+  cancelledAt: number;
   signature: string; // Ed25519 signature
 }
 
@@ -438,6 +448,135 @@ export class ContactRequestManager {
       request.status = 'DECLINED';
       request.updatedAt = Date.now();
     }
+
+    const idx = requests.findIndex((r) => r.requestId === request.requestId);
+    if (idx >= 0) requests[idx] = request;
+    await this.store.setAsync(session, REQUESTS_STORAGE_KEY, requests);
+
+    return request;
+  }
+
+  /**
+   * Cancels a pending outgoing contact request and dispatches a signed cancellation wire.
+   */
+  public async cancelRequest(
+    session: SpaceSession,
+    requestId: string,
+    myProfile: SignedProfileDocument
+  ): Promise<ContactRequest> {
+    const request = await this.getRequest(session, requestId);
+    if (!request) {
+      throw new Error(`Contact request not found: ${requestId}`);
+    }
+
+    if (request.status !== 'OUTGOING_PENDING') {
+      throw new Error(`Cannot cancel contact request with status: ${request.status}`);
+    }
+
+    const myIdentity = this.identityManager.loadIdentity(session, this.store);
+    if (!myIdentity) {
+      throw new Error('Active Space identity not loaded');
+    }
+
+    const now = Date.now();
+    const canonicalCancel = JSON.stringify({
+      requestId,
+      senderIdentityId: myProfile.identityId,
+      targetIdentityId: request.peerProfile.identityId,
+      cancelledAt: now,
+    });
+    const sigBytes = sign(myIdentity.signingPrivateKey, new TextEncoder().encode(canonicalCancel));
+    const signature = bytesToBase64(sigBytes);
+
+    const cancelWire: ContactCancelWire = {
+      type: 'CONTACT_CANCEL',
+      requestId,
+      senderIdentityId: myProfile.identityId,
+      targetIdentityId: request.peerProfile.identityId,
+      cancelledAt: now,
+      signature,
+    };
+
+    // Dispatch cancellation over blind relay envelope if networkManager is available
+    if (this.networkManager) {
+      await this.networkManager.sendEnvelope(
+        session,
+        request.peerProfile.mailboxId,
+        JSON.stringify(cancelWire)
+      );
+    }
+
+    // Mark request as CANCELLED
+    request.status = 'CANCELLED';
+    request.updatedAt = now;
+
+    const requests = await this.listRequests(session);
+    const idx = requests.findIndex((r) => r.requestId === requestId);
+    if (idx >= 0) requests[idx] = request;
+    await this.store.setAsync(session, REQUESTS_STORAGE_KEY, requests);
+
+    return request;
+  }
+
+  /**
+   * Handles an inbound contact request cancellation from a peer.
+   */
+  public async handleInboundCancel(
+    session: SpaceSession,
+    wire: ContactCancelWire
+  ): Promise<ContactRequest | null> {
+    if (!wire || wire.type !== 'CONTACT_CANCEL' || !wire.requestId) {
+      return null;
+    }
+
+    const requests = await this.listRequests(session);
+    const request = requests.find(
+      (r) => r.requestId === wire.requestId || r.peerIdentityId === wire.senderIdentityId
+    );
+
+    if (!request) return null;
+
+    // Deterministic race condition handling:
+    // If request was already ACCEPTED, acceptance takes precedence and contact remains valid.
+    if (request.status === 'ACCEPTED') {
+      return request;
+    }
+
+    // Verify Ed25519 signature of the cancellation message
+    try {
+      const pubKeyBytes = base64ToBytes(
+        request.peerProfile.prekeyBundle.identityDocument.signingPublicKey
+      );
+      const sigBytes = base64ToBytes(wire.signature);
+
+      const canonicalPayload = JSON.stringify({
+        requestId: wire.requestId,
+        senderIdentityId: wire.senderIdentityId,
+        targetIdentityId: (this.identityManager.getPublicDocument(session, this.store))?.identityId,
+        cancelledAt: wire.cancelledAt,
+      });
+
+      const fallbackPayload = JSON.stringify({
+        requestId: wire.requestId,
+        senderIdentityId: wire.senderIdentityId,
+        targetIdentityId: wire.targetIdentityId,
+        cancelledAt: wire.cancelledAt,
+      });
+
+      const valid =
+        verify(pubKeyBytes, new TextEncoder().encode(canonicalPayload), sigBytes) ||
+        verify(pubKeyBytes, new TextEncoder().encode(fallbackPayload), sigBytes);
+
+      if (!valid) {
+        return null; // Reject forged or tampered cancellation
+      }
+    } catch (_err) {
+      return null;
+    }
+
+    // Update status to CANCELLED
+    request.status = 'CANCELLED';
+    request.updatedAt = Date.now();
 
     const idx = requests.findIndex((r) => r.requestId === request.requestId);
     if (idx >= 0) requests[idx] = request;

@@ -133,8 +133,14 @@ export class LocalDiskObjectStorage implements IObjectStorage {
 
   private async persistMetadata(): Promise<void> {
     const list = Array.from(this.metadataMap.values());
-    const tmpPath = `${this.metadataFile}.tmp.${Date.now()}`;
+    const tmpPath = `${this.metadataFile}.tmp.${Date.now()}.${Math.random().toString(36).slice(2)}`;
     await fs.promises.writeFile(tmpPath, JSON.stringify(list, null, 2), 'utf8');
-    await fs.promises.rename(tmpPath, this.metadataFile);
+    try {
+      await fs.promises.rename(tmpPath, this.metadataFile);
+    } catch (_err) {
+      // Fallback for Windows EPERM / temporary file lock
+      await fs.promises.copyFile(tmpPath, this.metadataFile);
+      await fs.promises.unlink(tmpPath).catch(() => {});
+    }
   }
 }

@@ -54,6 +54,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     sendContactRequest,
     acceptContactRequest,
     declineContactRequest,
+    cancelContactRequest,
     blockUser,
     unblockUser,
     removeContact,
@@ -98,6 +99,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const [showAddGreeting, setShowAddGreeting] = useState(false);
   const [greetingText, setGreetingText] = useState('');
   const [isSendingRequest, setIsSendingRequest] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const loadedIdentity = activeSession ? idMgr.loadIdentity(activeSession, store) : null;
 
@@ -118,6 +120,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const matchingIncomingRequest = contactRequests.find(
     (r) =>
       r.status === 'INCOMING_PENDING' &&
+      ((effectiveIdentityId && r.peerIdentityId === effectiveIdentityId) ||
+        (effectiveUsername && r.peerUsername.toLowerCase() === effectiveUsername.toLowerCase()))
+  );
+
+  const matchingOutgoingRequest = contactRequests.find(
+    (r) =>
+      r.status === 'OUTGOING_PENDING' &&
       ((effectiveIdentityId && r.peerIdentityId === effectiveIdentityId) ||
         (effectiveUsername && r.peerUsername.toLowerCase() === effectiveUsername.toLowerCase()))
   );
@@ -262,6 +271,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
       closeModal();
     } catch (err: any) {
       showToast({ type: 'error', message: err.message || 'Failed to decline request' });
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!matchingOutgoingRequest) return;
+    setIsCancelling(true);
+    setErrorMessage(null);
+    try {
+      await cancelContactRequest(matchingOutgoingRequest.requestId);
+      showToast({ type: 'info', message: 'Contact request cancelled' });
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to cancel contact request');
+      showToast({ type: 'error', message: err.message || 'Failed to cancel contact request' });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -633,9 +657,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                     </Button>
                   </div>
                 ) : relState === 'PENDING_OUTGOING' ? (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Button type="button" variant="secondary" style={{ flex: 1 }} disabled>
-                      ⏳ Request Pending
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      style={{ flex: 1 }}
+                      onClick={handleCancelRequest}
+                      disabled={isCancelling}
+                    >
+                      {isCancelling ? (
+                        <>
+                          <Spinner size="sm" />
+                          <span>Cancelling...</span>
+                        </>
+                      ) : (
+                        '✕ Cancel Request'
+                      )}
                     </Button>
                     <Button type="button" variant="secondary" onClick={closeModal}>
                       Done
