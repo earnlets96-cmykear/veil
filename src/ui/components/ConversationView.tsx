@@ -93,6 +93,16 @@ export const ConversationView: React.FC = () => {
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   const activeConv = conversations.find((c) => c.id === activeChatId);
+  const activeContact = useMemo(() => {
+    if (!activeConv || activeConv.type !== 'direct') return null;
+    return contacts.find((c) => c.identityId === activeConv.id) || null;
+  }, [activeConv, contacts]);
+
+  const isKeyChanged = activeContact?.verificationStatus === 'MISMATCH';
+  const isVerifiedContact = Boolean(
+    activeConv?.isVerified || activeContact?.verificationStatus === 'VERIFIED'
+  );
+
   const activeMessages = useMemo(() => {
     if (!activeChatId) return [];
     return messages[activeChatId] || (activeConv?.peerDoc?.identityId ? messages[activeConv.peerDoc.identityId] : []) || [];
@@ -500,9 +510,9 @@ export const ConversationView: React.FC = () => {
                   <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
                     {activeConv.name}
                   </span>
-                  {activeContact?.verificationStatus === 'FAILED' ? (
+                  {isKeyChanged ? (
                     <Badge variant="danger">🚨 Key Changed</Badge>
-                  ) : (activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED') ? (
+                  ) : isVerifiedContact ? (
                     <Badge variant="secure">✓ Verified</Badge>
                   ) : null}
                 </div>
@@ -528,13 +538,13 @@ export const ConversationView: React.FC = () => {
 
             {activeConv.type === 'direct' ? (
               <Button
-                variant={activeContact?.verificationStatus === 'FAILED' ? 'danger' : (activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED') ? 'secondary' : 'primary'}
+                variant={isKeyChanged ? 'danger' : isVerifiedContact ? 'secondary' : 'primary'}
                 size="sm"
                 onClick={() => openModal({ type: 'contactDetails', conversationId: activeConv.id })}
               >
-                {activeContact?.verificationStatus === 'FAILED'
+                {isKeyChanged
                   ? '🚨 Review Key'
-                  : (activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED')
+                  : isVerifiedContact
                   ? '🛡️ Safety Number'
                   : 'Verify Identity'}
               </Button>

@@ -169,9 +169,9 @@ describe('Phase 33 Step 6: Identity Verification & Safety Number UX', () => {
       signature: bobProfile.signature,
     });
 
-    // Mark as FAILED (key mismatch detected)
-    const failed = await contactMgr.updateVerification(session, bobProfile.identityId, 'FAILED');
-    expect(failed.verificationStatus).toBe('FAILED');
+    // Mark as MISMATCH (key mismatch detected)
+    const mismatch = await contactMgr.updateVerification(session, bobProfile.identityId, 'MISMATCH');
+    expect(mismatch.verificationStatus).toBe('MISMATCH');
 
     // Re-verify after reviewing safety number
     const reVerified = await contactMgr.updateVerification(session, bobProfile.identityId, 'VERIFIED');

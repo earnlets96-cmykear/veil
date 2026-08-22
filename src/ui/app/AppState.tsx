@@ -134,7 +134,7 @@ export interface AppContextType {
   syncEngine: SyncEngine;
 }
 
-const AppContext = createContext<AppContextType | null>(null);
+export const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [storageReady, setStorageReady] = useState(false);

@@ -108,7 +108,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
 
         <div className="veil-modal-body">
           {/* Key Changed Alert */}
-          {verificationStatus === 'FAILED' && (
+          {verificationStatus === 'MISMATCH' && (
             <div
               style={{
                 padding: '0.75rem',
@@ -139,7 +139,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
               <div style={{ marginTop: '0.25rem' }}>
                 {verificationStatus === 'VERIFIED' ? (
                   <Badge variant="secure">✓ Verified Safety Number</Badge>
-                ) : verificationStatus === 'FAILED' ? (
+                ) : verificationStatus === 'MISMATCH' ? (
                   <Badge variant="danger">🚨 Key Changed</Badge>
                 ) : (
                   <Badge variant="warning">⚠️ Not Verified</Badge>
@@ -255,7 +255,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
 
           {/* Contextual Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1.25rem' }}>
-            {verificationStatus === 'FAILED' ? (
+            {verificationStatus === 'MISMATCH' ? (
               <Button
                 variant="danger"
                 style={{ width: '100%' }}
