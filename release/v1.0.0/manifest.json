@@ -1,24 +1,24 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-08-22T13:00:17.349Z",
+  "generatedAt": "2026-08-22T13:08:53.720Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 3,
   "artifacts": [
+    {
+      "path": "dist/assets/index-B8jqXgn0.js",
+      "sizeBytes": 458783,
+      "sha256": "5d67a5cedd1bba26d84be4ad17b7c561de48a8442d9a98adbf114ff936da1162"
+    },
     {
       "path": "dist/assets/index-DEooa30A.css",
       "sizeBytes": 34526,
       "sha256": "67400f5f23ed9b0cad8231f68da86e7597b60633be6c713b8d44ff08d8a74b81"
     },
     {
-      "path": "dist/assets/index-q4CYU9HV.js",
-      "sizeBytes": 465955,
-      "sha256": "b1fb28ca8092264152e479c388a8629b12fea7684be02a25ad73ad8c606523f6"
-    },
-    {
       "path": "dist/index.html",
       "sizeBytes": 893,
-      "sha256": "a961e01226637ebd5724e8ed428929440150f92b7d996b7bf6dcfb18a1b6bef5"
+      "sha256": "e2a723c1435d4cac34bd264072e1a50f542e5d0d98ec91f803ed9e0062cf6b2a"
     }
   ]
 }

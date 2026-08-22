@@ -1,13 +1,16 @@
 /**
- * Modernized Conversation Sidebar Component for VEIL Phase 31.
+ * Modernized Conversation Sidebar Component for VEIL Phase 33.
  *
- * Implements instant in-memory search, active Space identity header,
+ * Implements unified instant search (local conversations, contacts, messages,
+ * and debounced global directory discovery), active Space identity header,
  * tabbed filtering (All, Chats, Groups, Contacts), contact request actions,
  * and invitation sharing using VEIL reusable component primitives.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { getRelationshipState } from '../../contacts/relationshipHelper.ts';
+import { DirectorySearchResult } from '../../server/types.ts';
 import {
   Avatar,
   Badge,
@@ -16,6 +19,8 @@ import {
   SearchInput,
   StatusIndicator,
   EmptyState,
+  Spinner,
+  UserSearchResult,
 } from './ui/index.ts';
 
 export const Sidebar: React.FC = () => {
@@ -36,14 +41,65 @@ export const Sidebar: React.FC = () => {
     searchQuery,
     searchResults,
     setSearchQuery,
+    searchDirectory,
     exportMyInvitation,
+    myProfile,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
   const [copiedInvite, setCopiedInvite] = useState(false);
 
+  // Global Directory Search State
+  const [globalResults, setGlobalResults] = useState<DirectorySearchResult[]>([]);
+  const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
+  const [directoryError, setDirectoryError] = useState<string | null>(null);
+  const lastQueriedRef = useRef<string>('');
+
   const pendingIncoming = contactRequests.filter((r) => r.status === 'INCOMING_PENDING');
   const pendingOutgoing = contactRequests.filter((r) => r.status === 'OUTGOING_PENDING');
+
+  // Debounced Global Directory Search
+  useEffect(() => {
+    const raw = searchQuery.trim();
+    const cleanQuery = raw.replace(/^@/, '').trim();
+
+    if (cleanQuery.length < 2) {
+      setGlobalResults([]);
+      setIsSearchingDirectory(false);
+      setDirectoryError(null);
+      lastQueriedRef.current = '';
+      return;
+    }
+
+    if (lastQueriedRef.current === cleanQuery) {
+      return;
+    }
+
+    let isMounted = true;
+    setIsSearchingDirectory(true);
+    setDirectoryError(null);
+
+    const timer = setTimeout(async () => {
+      try {
+        lastQueriedRef.current = cleanQuery;
+        const results = await searchDirectory(cleanQuery);
+        if (isMounted) {
+          setGlobalResults(results || []);
+          setIsSearchingDirectory(false);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setDirectoryError("Couldn't search directory right now.");
+          setIsSearchingDirectory(false);
+        }
+      }
+    }, 280);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, searchDirectory]);
 
   const handleCopyInvite = () => {
     const invite = exportMyInvitation();
@@ -59,6 +115,24 @@ export const Sidebar: React.FC = () => {
     if (activeTab === 'group') return c.type === 'group';
     return true;
   });
+
+  const queryLower = searchQuery.trim().toLowerCase().replace(/^@/, '');
+  const localMatchingContacts = queryLower
+    ? contacts.filter(
+        (c) =>
+          c.name.toLowerCase().includes(queryLower) ||
+          c.identityId.toLowerCase().includes(queryLower)
+      )
+    : [];
+
+  const localConvResults = searchResults.filter((r) => r.type === 'contact' || r.type === 'group');
+  const localMessageResults = searchResults.filter((r) => r.type === 'message');
+
+  const hasAnySearchResults =
+    localConvResults.length > 0 ||
+    localMatchingContacts.length > 0 ||
+    globalResults.length > 0 ||
+    localMessageResults.length > 0;
 
   return (
     <aside className="veil-sidebar" role="complementary" aria-label="Sidebar Navigation">
@@ -118,88 +192,197 @@ export const Sidebar: React.FC = () => {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onClear={() => setSearchQuery('')}
-          placeholder="Search contacts, messages & groups..."
-          aria-label="Search conversation history"
+          placeholder="Search contacts, messages or @username..."
+          aria-label="Search conversation history and directory"
         />
       </div>
 
-      {/* Filter Tabs */}
-      <div className="veil-sidebar-tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={activeTab === 'all'}
-          className={`veil-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => setActiveTab('all')}
-        >
-          All
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'direct'}
-          className={`veil-tab-btn ${activeTab === 'direct' ? 'active' : ''}`}
-          onClick={() => setActiveTab('direct')}
-        >
-          Chats
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'group'}
-          className={`veil-tab-btn ${activeTab === 'group' ? 'active' : ''}`}
-          onClick={() => setActiveTab('group')}
-        >
-          Groups
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'contacts'}
-          className={`veil-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('contacts')}
-        >
-          Contacts {pendingIncoming.length > 0 && <Badge variant="warning">{pendingIncoming.length}</Badge>}
-        </button>
-      </div>
+      {/* Filter Tabs (Hidden during search) */}
+      {!searchQuery.trim() && (
+        <div className="veil-sidebar-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'all'}
+            className={`veil-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+            onClick={() => setActiveTab('all')}
+          >
+            All
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'direct'}
+            className={`veil-tab-btn ${activeTab === 'direct' ? 'active' : ''}`}
+            onClick={() => setActiveTab('direct')}
+          >
+            Chats
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'group'}
+            className={`veil-tab-btn ${activeTab === 'group' ? 'active' : ''}`}
+            onClick={() => setActiveTab('group')}
+          >
+            Groups
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'contacts'}
+            className={`veil-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('contacts')}
+          >
+            Contacts {pendingIncoming.length > 0 && <Badge variant="warning">{pendingIncoming.length}</Badge>}
+          </button>
+        </div>
+      )}
 
-      {/* Conversation / Contacts / Search List */}
+      {/* Conversation / Contacts / Unified Search List */}
       <div className="veil-conversation-list">
         {searchQuery.trim() ? (
           <div>
-            <div style={{ padding: '0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
-              Search Results ({searchResults.length})
-            </div>
-            {searchResults.length === 0 ? (
+            {/* 1. Local Conversations */}
+            {localConvResults.length > 0 && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
+                  Chats & Groups
+                </div>
+                {localConvResults.map((res) => (
+                  <div
+                    key={res.id}
+                    className="veil-conversation-item"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (res.conversationId) selectConversation(res.conversationId);
+                      setSearchQuery('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (res.conversationId) selectConversation(res.conversationId);
+                        setSearchQuery('');
+                      }
+                    }}
+                  >
+                    <div className="veil-conversation-info">
+                      <div className="veil-conversation-top">
+                        <span className="veil-conversation-name">{res.title}</span>
+                        <Badge variant="secure">{res.type}</Badge>
+                      </div>
+                      <div className="veil-conversation-preview">{res.matchSnippet || res.subtitle}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 2. Local Contacts */}
+            {localMatchingContacts.length > 0 && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
+                  Contacts
+                </div>
+                {localMatchingContacts.map((c) => {
+                  const rel = getRelationshipState(c.identityId, c.name, {
+                    myIdentityId: myProfile?.identityId,
+                    myUsername: myProfile?.username,
+                    contacts,
+                    contactRequests,
+                  });
+                  return (
+                    <UserSearchResult
+                      key={c.identityId}
+                      displayName={c.name}
+                      username={c.name}
+                      relationshipState={rel}
+                      onClick={() => {
+                        openModal({ type: 'profile', peerId: c.identityId, peerUsername: c.name });
+                        setSearchQuery('');
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 3. Global Public Directory Users */}
+            {(globalResults.length > 0 || isSearchingDirectory) && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.5rem' }}>
+                  <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
+                    Global People (@directory)
+                  </span>
+                  {isSearchingDirectory && <Spinner size="sm" />}
+                </div>
+
+                {globalResults.map((user) => {
+                  const rel = getRelationshipState(user.identityId, user.username, {
+                    myIdentityId: myProfile?.identityId,
+                    myUsername: myProfile?.username,
+                    contacts,
+                    contactRequests,
+                  });
+                  return (
+                    <UserSearchResult
+                      key={user.identityId}
+                      displayName={user.displayName}
+                      username={user.username}
+                      avatarUrl={user.avatar}
+                      relationshipState={rel}
+                      onClick={() => {
+                        openModal({
+                          type: 'profile',
+                          peerId: user.identityId,
+                          peerUsername: user.username,
+                          searchResult: user,
+                        });
+                        setSearchQuery('');
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 4. Local Decrypted Messages */}
+            {localMessageResults.length > 0 && (
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
+                  Matching Messages
+                </div>
+                {localMessageResults.map((res) => (
+                  <div
+                    key={res.id}
+                    className="veil-conversation-item"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (res.conversationId) selectConversation(res.conversationId);
+                      setSearchQuery('');
+                    }}
+                  >
+                    <div className="veil-conversation-info">
+                      <div className="veil-conversation-top">
+                        <span className="veil-conversation-name">{res.title}</span>
+                        <Badge variant="neutral">Message</Badge>
+                      </div>
+                      <div className="veil-conversation-preview">{res.matchSnippet}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Empty Search State */}
+            {!hasAnySearchResults && !isSearchingDirectory && (
               <EmptyState
                 icon="🔍"
                 title="No Matches Found"
-                description="No messages, contacts, or groups match your search in this Space."
+                description={
+                  directoryError
+                    ? directoryError
+                    : `No local conversations, contacts, or public users found for "${searchQuery}".`
+                }
               />
-            ) : (
-              searchResults.map((res) => (
-                <div
-                  key={res.id}
-                  className="veil-conversation-item"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    if (res.conversationId) selectConversation(res.conversationId);
-                    setSearchQuery('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      if (res.conversationId) selectConversation(res.conversationId);
-                      setSearchQuery('');
-                    }
-                  }}
-                >
-                  <div className="veil-conversation-info">
-                    <div className="veil-conversation-top">
-                      <span className="veil-conversation-name">{res.title}</span>
-                      <Badge variant="secure">{res.type}</Badge>
-                    </div>
-                    <div className="veil-conversation-preview">{res.matchSnippet || res.subtitle}</div>
-                  </div>
-                </div>
-              ))
             )}
           </div>
         ) : activeTab === 'contacts' ? (
@@ -285,69 +468,55 @@ export const Sidebar: React.FC = () => {
               </div>
             )}
 
-            {contacts.length === 0 && pendingIncoming.length === 0 && (
+            {/* Contacts List */}
+            {contacts.length === 0 ? (
               <EmptyState
                 icon="👥"
                 title="No Contacts Added"
-                description="Add contacts by username search or import an invitation link."
-                action={
-                  <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
-                    + Find Users
-                  </Button>
-                }
-              />
-            )}
-
-            {contacts.map((contact) => (
-              <div
-                key={contact.identityId}
-                className="veil-conversation-item"
-                role="button"
-                tabIndex={0}
-                onClick={() => selectConversation(contact.identityId)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    selectConversation(contact.identityId);
-                  }
-                }}
-              >
-                <Avatar name={contact.name} size="md" />
-                <div className="veil-conversation-info">
-                  <div className="veil-conversation-top">
-                    <span className="veil-conversation-name">{contact.name}</span>
-                    <Badge variant={contact.verificationStatus === 'VERIFIED' ? 'secure' : 'warning'}>
-                      {contact.verificationStatus === 'VERIFIED' ? '✓ Verified' : 'Unverified'}
-                    </Badge>
-                  </div>
-                  <div className="veil-conversation-preview">ID: {contact.identityId.slice(0, 16)}...</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div>
-            {filteredConversations.length === 0 ? (
-              <EmptyState
-                icon="💬"
-                title="No Conversations"
-                description="Begin an end-to-end encrypted chat or create a secure group."
-                action={
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                    <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
-                      + Chat
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => openModal({ type: 'newGroup' })}>
-                      + Group
-                    </Button>
-                  </div>
-                }
+                description="Search for users by @handle above or invite friends with a cryptographic link."
               />
             ) : (
-              filteredConversations.map((conv) => (
+              contacts.map((contact) => (
+                <div
+                  key={contact.identityId}
+                  className="veil-conversation-item"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openModal({ type: 'profile', peerId: contact.identityId, peerUsername: contact.name })}
+                >
+                  <Avatar name={contact.name} size="md" />
+                  <div className="veil-conversation-info">
+                    <div className="veil-conversation-top">
+                      <span className="veil-conversation-name">{contact.name}</span>
+                      {contact.verificationStatus === 'VERIFIED' ? (
+                        <Badge variant="secure">✓ Verified</Badge>
+                      ) : (
+                        <Badge variant="neutral">Contact</Badge>
+                      )}
+                    </div>
+                    <div className="veil-conversation-preview" style={{ fontFamily: 'var(--veil-font-mono)', fontSize: '0.68rem' }}>
+                      {contact.fingerprint ? `${contact.fingerprint.slice(0, 16)}...` : 'E2EE Contact'}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          /* Normal Conversation List */
+          filteredConversations.length === 0 ? (
+            <EmptyState
+              icon="💬"
+              title={activeTab === 'group' ? 'No Encrypted Groups' : 'No Active Chats'}
+              description="Start a new conversation using the button below or search for @username."
+            />
+          ) : (
+            filteredConversations.map((conv) => {
+              const isSelected = activeChatId === conv.id;
+              return (
                 <div
                   key={conv.id}
-                  className={`veil-conversation-item ${activeChatId === conv.id ? 'active' : ''}`}
+                  className={`veil-conversation-item ${isSelected ? 'active' : ''}`}
                   role="button"
                   tabIndex={0}
                   onClick={() => selectConversation(conv.id)}
@@ -360,10 +529,10 @@ export const Sidebar: React.FC = () => {
                 >
                   <Avatar
                     name={conv.name}
-                    isGroup={conv.type === 'group'}
                     size="md"
+                    isGroup={conv.type === 'group'}
+                    aria-label={`${conv.name} avatar`}
                   />
-
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{conv.name}</span>
@@ -377,49 +546,43 @@ export const Sidebar: React.FC = () => {
                       {conv.lastMessage || (conv.type === 'group' ? 'Group created' : 'E2EE conversation')}
                     </div>
                   </div>
+                  {conv.unreadCount > 0 && (
+                    <Badge variant="warning">{conv.unreadCount}</Badge>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
+              );
+            })
+          )
         )}
       </div>
 
-      {/* Sidebar Footer Controls */}
+      {/* Action Footer */}
       <div className="veil-sidebar-footer">
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => openModal({ type: 'newChat' })}
-          >
-            + Chat
-          </Button>
+        <Button
+          variant="primary"
+          style={{ width: '100%' }}
+          onClick={() => openModal({ type: 'newChat' })}
+        >
+          + New Chat
+        </Button>
+        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
           <Button
             variant="secondary"
             size="sm"
+            style={{ flex: 1 }}
             onClick={() => openModal({ type: 'newGroup' })}
           >
-            + Group
+            👥 New Group
           </Button>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.35rem' }}>
           <Button
             variant="secondary"
             size="sm"
+            style={{ flex: 1 }}
             onClick={handleCopyInvite}
-            title="Copy Signed My Invitation"
+            title="Copy signed cryptographic invite link"
           >
-            {copiedInvite ? '✓ Copied!' : '🔗 Invite'}
+            {copiedInvite ? '✓ Copied' : '🔗 Invite'}
           </Button>
-
-          <IconButton
-            icon="⚙️"
-            variant="secondary"
-            onClick={() => openModal({ type: 'settings' })}
-            aria-label="Settings and Space Management"
-            title="Settings & Space Management"
-          />
         </div>
       </div>
     </aside>

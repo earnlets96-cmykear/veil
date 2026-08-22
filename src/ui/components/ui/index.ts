@@ -25,3 +25,4 @@ export * from './MessageBubble.tsx';
 export * from './ReplyPreview.tsx';
 export * from './MessageStatus.tsx';
 export * from './MessageTimestamp.tsx';
+export * from './UserSearchResult.tsx';

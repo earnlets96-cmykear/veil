@@ -45,8 +45,13 @@ export const App: React.FC = () => {
       {activeModal?.type === 'contactDetails' && (
         <ContactDetailsModal conversationId={activeModal.conversationId} />
       )}
-      {activeModal?.type === 'settings' && <SettingsModal />}
-      {activeModal?.type === 'profile' && <ProfileModal peerId={activeModal.peerId} />}
+      {activeModal?.type === 'profile' && (
+        <ProfileModal
+          peerId={activeModal.peerId}
+          peerUsername={activeModal.peerUsername}
+          searchResult={activeModal.searchResult}
+        />
+      )}
     </div>
   );
 };

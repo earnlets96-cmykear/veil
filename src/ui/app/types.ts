@@ -58,6 +58,8 @@ export interface UIMessage {
   };
 }
 
+import { DirectorySearchResult } from '../../server/types.ts';
+
 export interface UserPrivacySettings {
   phoneVisibility: 'nobody' | 'contacts' | 'everyone';
   profileVisibility: 'nobody' | 'contacts' | 'everyone';
@@ -77,6 +79,6 @@ export type ActiveModal =
   | { type: 'contactRequests' }
   | { type: 'findUser' }
   | { type: 'settings' }
-  | { type: 'profile'; peerId?: string }
+  | { type: 'profile'; peerId?: string; peerUsername?: string; searchResult?: DirectorySearchResult }
   | { type: 'panicLock' }
   | null;
