@@ -1,12 +1,20 @@
 /**
- * Dedicated Profile View & Management Modal for VEIL.
+ * Dedicated Profile View & Central Relationship Hub for VEIL Phase 33 Step 4.
  *
  * Implements Telegram-inspired profile presentation with VEIL's privacy architecture:
  * - Avatar selection, preview, replace, and fallback
  * - Display Name, @username handle, and Bio
- * - Relationship-aware actions (Add Contact, Accept, Decline, Block, Verify, Open Chat)
- * - Phone number with granular privacy visibility controls (Nobody, Contacts, Everyone)
- * - Cryptographic identity fingerprint & safety verification
+ * - Relationship-aware actions for all 8 states:
+ *   1. NOT_CONNECTED: Add Contact (with greeting input)
+ *   2. PENDING_OUTGOING: Request Pending
+ *   3. PENDING_INCOMING: Accept / Decline / Block
+ *   4. CONTACT_UNVERIFIED: Chat / Verify Safety Number / Remove Contact / Block
+ *   5. CONTACT_VERIFIED: Chat / Safety Number / Remove Contact / Block
+ *   6. KEY_CHANGED: Security Warning / Review & Re-verify / Block
+ *   7. BLOCKED: Unblock
+ *   8. SELF: Edit Profile
+ * - Formatted chunked safety number with one-click copy
+ * - Phone privacy visibility controls (Nobody, Contacts, Everyone)
  * - Safe UI error sanitization (no raw PostgreSQL/DB exceptions)
  */
 
@@ -48,6 +56,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     declineContactRequest,
     blockUser,
     unblockUser,
+    removeContact,
     selectConversation,
     openModal,
     directoryClient,
@@ -60,10 +69,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
 
   const isPeer = Boolean(peerId || peerUsername || searchResult);
   const peerConv = isPeer ? conversations.find((c) => c.id === peerId) : null;
-  const peerContact = isPeer ? contacts.find((c) => c.identityId === peerId || (peerUsername && c.name.toLowerCase() === peerUsername.toLowerCase())) : null;
+  const peerContact = isPeer
+    ? contacts.find((c) => c.identityId === peerId || (peerUsername && c.name.toLowerCase() === peerUsername.toLowerCase()))
+    : null;
 
   const [peerDoc, setPeerDoc] = useState<SignedProfileDocument | null>(null);
   const [loadingPeer, setLoadingPeer] = useState(false);
+  const [copiedFingerprint, setCopiedFingerprint] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Self Profile Form State
   const [isEditing, setIsEditing] = useState(false);
@@ -91,7 +104,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const effectiveIdentityId = peerId || searchResult?.identityId || peerContact?.identityId || peerDoc?.identityId;
   const effectiveUsername = searchResult?.username || peerUsername || peerContact?.name || peerConv?.name;
   const effectiveDisplayName = searchResult?.displayName || peerDoc?.displayName || peerContact?.name || peerConv?.name || effectiveUsername || 'User';
-  const effectiveAvatar = searchResult?.avatar || peerDoc?.avatar || peerDoc?.avatarUrl;
 
   // Determine relationship state
   const relState: RelationshipState = !isPeer
@@ -124,7 +136,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
             setPeerDoc(fetched);
           }
         } catch (_err) {
-          // Profile may be private or direct contact without directory entry
+          // Profile may be direct contact without directory entry
         } finally {
           if (isMounted) setLoadingPeer(false);
         }
@@ -137,12 +149,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     };
   }, [isPeer, effectiveUsername, directoryClient]);
 
-  const fingerprint = isPeer
+  const rawFingerprint = isPeer
     ? peerDoc?.prekeyBundle?.identityDocument?.fingerprint ||
       peerConv?.fingerprint ||
       peerContact?.fingerprint ||
       (effectiveIdentityId ? effectiveIdentityId.slice(0, 16).toUpperCase() : 'E2EE-IDENTITY')
     : loadedIdentity?.document.fingerprint || 'E2EE-IDENTITY';
+
+  // Format fingerprint into readable 4-character chunks (e.g. "8421 9630 4912 8841")
+  const formattedFingerprint = rawFingerprint.replace(/(.{4})/g, '$1 ').trim();
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,6 +175,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const handleRemovePhoto = () => {
     setAvatarPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCopyFingerprint = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(rawFingerprint);
+      setCopiedFingerprint(true);
+      showToast({ type: 'success', message: 'Safety number copied to clipboard' });
+      setTimeout(() => setCopiedFingerprint(false), 3000);
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -262,6 +286,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     }
   };
 
+  const handleRemoveContact = async () => {
+    if (!effectiveIdentityId) return;
+    try {
+      await removeContact(effectiveIdentityId);
+      showToast({ type: 'info', message: 'Contact removed from address book' });
+      closeModal();
+    } catch (err: any) {
+      showToast({ type: 'error', message: err.message || 'Failed to remove contact' });
+    }
+  };
+
   const handleOpenChat = () => {
     if (effectiveIdentityId) {
       selectConversation(effectiveIdentityId);
@@ -277,6 +312,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
         return <Badge variant="secure">✓ Verified E2EE Contact</Badge>;
       case 'CONTACT_UNVERIFIED':
         return <Badge variant="secure">🔒 E2EE Contact</Badge>;
+      case 'KEY_CHANGED':
+        return <Badge variant="danger">⚠️ Key Changed</Badge>;
       case 'PENDING_OUTGOING':
         return <Badge variant="warning">⏳ Request Pending</Badge>;
       case 'PENDING_INCOMING':
@@ -300,6 +337,28 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
         </div>
 
         <div className="veil-modal-body">
+          {/* Key Changed Security Alert */}
+          {relState === 'KEY_CHANGED' && (
+            <div
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid var(--veil-danger)',
+                borderRadius: 'var(--veil-radius-md)',
+                color: 'var(--veil-danger)',
+                fontSize: 'var(--veil-text-xs)',
+                marginBottom: '1rem',
+                lineHeight: 1.4,
+              }}
+              role="alert"
+            >
+              <strong>⚠️ Cryptographic Safety Warning:</strong>
+              <div style={{ marginTop: '0.25rem' }}>
+                This contact's identity key has changed since you last verified them. This could indicate a device reset or a potential interception attempt.
+              </div>
+            </div>
+          )}
+
           {/* Profile Hero */}
           <div className="veil-profile-hero">
             <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
@@ -450,8 +509,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                 </div>
               </div>
 
-              {/* Phone / Privacy (Self only) */}
-              {!isPeer && (
+              {/* Phone / Privacy */}
+              {!isPeer ? (
                 <div className="veil-profile-info-row">
                   <div>
                     <div className="veil-profile-info-label">Phone Number</div>
@@ -461,26 +520,52 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                     {privacySettings.phoneVisibility === 'nobody' ? '🔒 Nobody' : privacySettings.phoneVisibility === 'contacts' ? '👥 Contacts' : '🌐 Everyone'}
                   </Badge>
                 </div>
+              ) : (
+                /* Peer Phone Number Visibility Check */
+                (peerDoc?.phoneNumber && (peerDoc.phoneVisibility === 'everyone' || (relState.startsWith('CONTACT') && peerDoc.phoneVisibility === 'contacts'))) ? (
+                  <div className="veil-profile-info-row">
+                    <div>
+                      <div className="veil-profile-info-label">Phone Number</div>
+                      <div className="veil-profile-info-val">{peerDoc.phoneNumber}</div>
+                    </div>
+                    <Badge variant="neutral">Verified Phone</Badge>
+                  </div>
+                ) : null
               )}
 
-              {/* Cryptographic Identity Fingerprint */}
+              {/* Cryptographic Identity Safety Number */}
               <div style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--veil-border-subtle)' }}>
-                <div className="veil-profile-info-label" style={{ marginBottom: '0.35rem' }}>
-                  Cryptographic Safety Fingerprint
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <span className="veil-profile-info-label">Cryptographic Safety Number</span>
+                  <button
+                    type="button"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--veil-accent-secondary)',
+                      fontSize: '0.7rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                    onClick={handleCopyFingerprint}
+                  >
+                    {copiedFingerprint ? '✓ Copied' : '📋 Copy'}
+                  </button>
                 </div>
                 <div
                   style={{
                     fontFamily: 'var(--veil-font-mono)',
-                    fontSize: '0.72rem',
+                    fontSize: '0.75rem',
                     backgroundColor: 'var(--veil-bg-base)',
-                    padding: '0.45rem 0.6rem',
+                    padding: '0.5rem 0.65rem',
                     borderRadius: 'var(--veil-radius-sm)',
                     border: '1px solid var(--veil-border)',
                     wordBreak: 'break-all',
+                    letterSpacing: '0.04em',
                     color: 'var(--veil-text-primary)',
                   }}
                 >
-                  {fingerprint}
+                  {formattedFingerprint}
                 </div>
               </div>
 
@@ -505,6 +590,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                     </Button>
                   </div>
                 </form>
+              )}
+
+              {/* Delete Contact Confirmation Box */}
+              {showDeleteConfirm && (
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.75rem',
+                    backgroundColor: 'var(--veil-danger-bg)',
+                    border: '1px solid var(--veil-danger-border)',
+                    borderRadius: 'var(--veil-radius-md)',
+                  }}
+                >
+                  <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-danger)', fontWeight: 600, marginBottom: '0.5rem' }}>
+                    Remove @{effectiveUsername} from contacts?
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <Button type="button" variant="danger" size="sm" style={{ flex: 1 }} onClick={handleRemoveContact}>
+                      Yes, Remove
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Contextual Actions Footer */}
@@ -545,31 +655,62 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                       </Button>
                     )}
                   </div>
-                ) : relState === 'CONTACT_VERIFIED' || relState === 'CONTACT_UNVERIFIED' ? (
+                ) : relState === 'KEY_CHANGED' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <Button type="button" variant="primary" style={{ flex: 1 }} onClick={handleOpenChat}>
-                        💬 Open Chat
-                      </Button>
-                      {effectiveIdentityId && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => {
-                            closeModal();
-                            openModal({ type: 'contactDetails', conversationId: effectiveIdentityId });
-                          }}
-                        >
-                          🛡️ Safety Number
-                        </Button>
-                      )}
-                    </div>
                     {effectiveIdentityId && (
-                      <Button type="button" variant="danger" size="sm" onClick={handleBlock}>
-                        🚫 Block User
+                      <Button
+                        type="button"
+                        variant="primary"
+                        style={{ width: '100%' }}
+                        onClick={() => {
+                          closeModal();
+                          openModal({ type: 'contactDetails', conversationId: effectiveIdentityId });
+                        }}
+                      >
+                        🛡️ Review Identity & Re-verify
                       </Button>
                     )}
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <Button type="button" variant="danger" style={{ flex: 1 }} onClick={handleBlock}>
+                        🚫 Block User
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={closeModal}>
+                        Close
+                      </Button>
+                    </div>
                   </div>
+                ) : relState === 'CONTACT_VERIFIED' || relState === 'CONTACT_UNVERIFIED' ? (
+                  !showDeleteConfirm && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <Button type="button" variant="primary" style={{ flex: 1 }} onClick={handleOpenChat}>
+                          💬 Open Chat
+                        </Button>
+                        {effectiveIdentityId && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              closeModal();
+                              openModal({ type: 'contactDetails', conversationId: effectiveIdentityId });
+                            }}
+                          >
+                            🛡️ Safety Number
+                          </Button>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <Button type="button" variant="secondary" size="sm" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(true)}>
+                          🗑️ Remove Contact
+                        </Button>
+                        {effectiveIdentityId && (
+                          <Button type="button" variant="danger" size="sm" onClick={handleBlock}>
+                            🚫 Block
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )
                 ) : relState === 'BLOCKED' ? (
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <Button type="button" variant="secondary" style={{ flex: 1 }} onClick={handleUnblock}>

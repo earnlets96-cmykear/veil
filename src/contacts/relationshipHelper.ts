@@ -6,6 +6,7 @@
  * - BLOCKED: User is in Space blocklist or blocked contact
  * - CONTACT_VERIFIED: Added contact with verified cryptographic safety number
  * - CONTACT_UNVERIFIED: Added contact with unverified safety number
+ * - KEY_CHANGED: Contact whose cryptographic identity key changed unexpectedly
  * - PENDING_INCOMING: Peer sent a contact request to local user
  * - PENDING_OUTGOING: Local user sent a contact request to peer
  * - NOT_CONNECTED: No established relationship or pending request
@@ -19,6 +20,7 @@ export type RelationshipState =
   | 'BLOCKED'
   | 'CONTACT_VERIFIED'
   | 'CONTACT_UNVERIFIED'
+  | 'KEY_CHANGED'
   | 'PENDING_INCOMING'
   | 'PENDING_OUTGOING'
   | 'NOT_CONNECTED';
@@ -62,6 +64,9 @@ export function getRelationshipState(
   if (matchedContact) {
     if (matchedContact.status === 'BLOCKED') {
       return 'BLOCKED';
+    }
+    if (matchedContact.verificationStatus === 'FAILED') {
+      return 'KEY_CHANGED';
     }
     if (matchedContact.verificationStatus === 'VERIFIED') {
       return 'CONTACT_VERIFIED';

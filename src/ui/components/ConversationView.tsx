@@ -466,27 +466,50 @@ export const ConversationView: React.FC = () => {
               title="Back to conversations"
             />
 
-            <Avatar
-              name={activeConv.name}
-              isGroup={activeConv.type === 'group'}
-              size="md"
-            />
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-                  {activeConv.name}
-                </span>
-                {activeConv.isVerified && (
-                  <Badge variant="secure">
-                    ✓ Verified Identity
-                  </Badge>
-                )}
-              </div>
-              <StatusIndicator
-                status="secure"
-                label={activeConv.type === 'group' ? 'Encrypted Group Ratchet' : '🔒 Double Ratchet E2EE'}
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}
+              onClick={() => {
+                if (activeConv.type === 'direct') {
+                  openModal({ type: 'profile', peerId: activeConv.id });
+                } else {
+                  openModal({ type: 'groupDetails', conversationId: activeConv.id });
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  if (activeConv.type === 'direct') {
+                    openModal({ type: 'profile', peerId: activeConv.id });
+                  } else {
+                    openModal({ type: 'groupDetails', conversationId: activeConv.id });
+                  }
+                }
+              }}
+              title={`View ${activeConv.name} Profile`}
+            >
+              <Avatar
+                name={activeConv.name}
+                isGroup={activeConv.type === 'group'}
+                size="md"
               />
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
+                    {activeConv.name}
+                  </span>
+                  {activeConv.isVerified && (
+                    <Badge variant="secure">
+                      ✓ Verified Identity
+                    </Badge>
+                  )}
+                </div>
+                <StatusIndicator
+                  status="secure"
+                  label={activeConv.type === 'group' ? 'Encrypted Group Ratchet' : '🔒 Double Ratchet E2EE'}
+                />
+              </div>
             </div>
           </div>
 

@@ -120,6 +120,7 @@ export interface AppContextType {
   declineContactRequest: (requestId: string) => Promise<void>;
   blockUser: (identityId: string) => Promise<void>;
   unblockUser: (identityId: string) => Promise<void>;
+  removeContact: (identityId: string) => Promise<void>;
 
   sessionController: SessionController;
   idMgr: SpaceIdentityManager;
@@ -1602,6 +1603,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession]
   );
 
+  const removeContact = useCallback(
+    async (identityId: string) => {
+      if (!activeSession) return;
+      await contactManager.deleteContact(activeSession, identityId);
+      setContacts(await contactManager.listContacts(activeSession));
+    },
+    [activeSession]
+  );
+
   const value: AppContextType = {
     storageReady,
     storageError,
@@ -1652,6 +1662,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     declineContactRequest,
     blockUser,
     unblockUser,
+    removeContact,
     sessionController,
     idMgr,
     store,
