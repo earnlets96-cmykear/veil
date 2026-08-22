@@ -172,7 +172,10 @@ export function verifySignedProfile(doc: SignedProfileDocument, expectedPublicKe
     return false;
   }
 
-  const pubKeyBase64 = expectedPublicKeyBase64 || doc.prekeyBundle?.identityDocument?.signingPublicKey;
+  const pubKeyBase64 =
+    expectedPublicKeyBase64 ||
+    doc.prekeyBundle?.identityDocument?.signingPublicKey ||
+    doc.signingPublicKey;
   if (!pubKeyBase64) return false;
 
   try {

@@ -372,7 +372,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           username,
           storedProfile?.displayName || session.name,
           binding.mailboxId,
-          prekeyBundle
+          prekeyBundle,
+          storedProfile?.avatar || undefined
         );
         await directoryClient.registerProfile(autoProfile);
         await store.setAsync(session, 'veil:user:profile', autoProfile);
@@ -1246,16 +1247,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
 
       try {
-        const prekeyBundle = prekeyManager.generatePrekeyBundle(session);
-        const signedProfile = createSignedProfile(
-          username,
-          identityDoc,
-          session.spaceId,
-          prekeyBundle,
-          identityDoc.signingPrivateKey ? base64ToBytes(identityDoc.signingPrivateKey) : undefined
-        );
-        await directoryClient.publishProfile(signedProfile);
-        setMyProfile(signedProfile);
+        const loadedIdentity = idMgr.loadIdentity(session, store);
+        const binding = await netManager.getOrCreateMailbox(session);
+        if (loadedIdentity && binding) {
+          const prekeyBundle = prekeyManager.createPrekeyBundle(session);
+          const signedProfile = createSignedProfile(
+            loadedIdentity.document.identityId,
+            loadedIdentity.signingPrivateKey,
+            username,
+            session.name,
+            binding.mailboxId,
+            prekeyBundle
+          );
+          await directoryClient.registerProfile(signedProfile);
+          await store.setAsync(session, 'veil:user:profile', signedProfile);
+          setMyProfile(signedProfile);
+        }
       } catch (_e) {}
     },
     []

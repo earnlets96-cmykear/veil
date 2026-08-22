@@ -213,6 +213,7 @@ export class PostgresRelayStore implements IRelayStore {
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT (username) DO UPDATE SET
+        identity_id = EXCLUDED.identity_id,
         display_name = EXCLUDED.display_name,
         avatar_url = EXCLUDED.avatar_url,
         signing_public_key = EXCLUDED.signing_public_key,
@@ -220,6 +221,7 @@ export class PostgresRelayStore implements IRelayStore {
         mailbox_id = EXCLUDED.mailbox_id,
         prekey_bundle_json = EXCLUDED.prekey_bundle_json,
         signature = EXCLUDED.signature,
+        created_at = EXCLUDED.created_at,
         updated_at = EXCLUDED.updated_at
     `;
 
