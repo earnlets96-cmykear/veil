@@ -7,8 +7,16 @@
 
 import { AppConfig, AppEnvironment } from './types.ts';
 
-export const PRODUCTION_RELAY_URL = 'https://relay.veil.chat';
-export const PRODUCTION_RELAY_WS_URL = 'wss://relay.veil.chat/v1/ws';
+export const PRODUCTION_RELAY_URL =
+  (typeof process !== 'undefined' && process.env?.VITE_RELAY_URL) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RELAY_URL) ||
+  'https://veil-rga0.onrender.com';
+
+export const PRODUCTION_RELAY_WS_URL =
+  (typeof process !== 'undefined' && process.env?.VITE_RELAY_WS_URL) ||
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_RELAY_WS_URL) ||
+  PRODUCTION_RELAY_URL.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:') + '/v1/ws';
+
 
 const DEV_CONFIG: AppConfig = {
   env: 'development',

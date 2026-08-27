@@ -13,12 +13,12 @@ import { PRODUCTION_RELAY_URL, PRODUCTION_RELAY_WS_URL, ConfigManager } from '..
 
 describe('Phase 31: Production Continuity & Security Boundary Verification', () => {
   it('enforces authoritative production relay URLs', () => {
-    expect(PRODUCTION_RELAY_URL).toBe('https://relay.veil.chat');
-    expect(PRODUCTION_RELAY_WS_URL).toBe('wss://relay.veil.chat/v1/ws');
+    expect(PRODUCTION_RELAY_URL).toBe('https://veil-rga0.onrender.com');
+    expect(PRODUCTION_RELAY_WS_URL).toBe('wss://veil-rga0.onrender.com/v1/ws');
 
     const prodConfig = ConfigManager.getConfig('production');
-    expect(prodConfig.relayHttpUrl).toBe('https://relay.veil.chat');
-    expect(prodConfig.relayWsUrl).toBe('wss://relay.veil.chat/v1/ws');
+    expect(prodConfig.relayHttpUrl).toBe('https://veil-rga0.onrender.com');
+    expect(prodConfig.relayWsUrl).toBe('wss://veil-rga0.onrender.com/v1/ws');
     expect(prodConfig.enforceTls).toBe(true);
   });
 

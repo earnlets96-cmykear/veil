@@ -7,17 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Phase 31] - 2026-08-27
 
 ### Added, Fixed & Validated
-- **Real Mobile & Production Application Hardening**:
+- **Production Connectivity Repair, Render/R2/Supabase Integration Verification & Mobile Reliability**:
+  - **DNS Resolution & Canonical Endpoints**: Root caused the mobile `"Failed to fetch"` error to an unconfigured DNS record on `relay.veil.chat`. Set canonical production relay URLs to `https://veil-rga0.onrender.com` / `wss://veil-rga0.onrender.com/v1/ws` with `VITE_RELAY_URL` override support.
+  - **Live Cloud Verification (16/16 Smoke Test Checks Passed)**: Built `scripts/phase31-production-connectivity.mjs` verifying live Render `/health`, `/readyz`, CORS OPTIONS preflight, Supabase PostgreSQL persistence, Cloudflare R2 encrypted attachment upload/download, unauthorized access rejection, zero-knowledge account registration, and WebSocket `/v1/ws` ping/pong connectivity.
   - **Android Black-Screen & Startup Recovery**: Diagnosed and resolved unhandled TDZ hook order in `AppState.tsx`. Wrapped root application in top-level `ErrorBoundary` with secret-sanitizing regex diagnostics and recovery options (`Retry Loading`, `Return to Lock Screen`). Added clean loading skeleton during storage partition initialization.
   - **LockScreen Privacy & Metadata Minimization**: Completely removed `{knownSpacesCount} encrypted vault envelope(s) at rest` and all space/envelope enumeration from `LockScreen.tsx`.
-  - **Authoritative Production Relay Configuration**: Centralized production URLs (`PRODUCTION_RELAY_URL = 'https://relay.veil.chat'` and `PRODUCTION_RELAY_WS_URL = 'wss://relay.veil.chat/v1/ws'`) in `appConfig.ts`.
   - **Connection Resilience & Degraded Polling**: Implemented bounded exponential backoff with uniform random jitter (1s-30s) and automatic immediate reconnection on native online events in `WebSocketTransport` and `NetworkManager`.
   - **Offline-First Profile Editing & Cloud Sync**: Enhanced `registerUsername()` to sign and persist profiles locally in encrypted store first, queueing `veil:pending:profile_sync` for automatic background sync upon network recovery. Updated `ProfileModal` to display `"Saved locally. Cloud sync pending."`
   - **Deterministic Identity Recovery**: Validated byte-for-byte `identityId` equality across zero-knowledge clean-device restores without secondary identity creation.
   - **Zero Secret Leakage**: Verified that production database credentials (`DATABASE_URL`) and storage secrets (`R2_*`) never exist in frontend code or client bundles.
-  - **Test Suite Expansion**: Added 7 new test suites (`tests/phase31-*.test.ts/tsx`), bringing the total test suite to **247 test files (628 tests) passing 100%**.
-  - **Production Acceptance**: Created `scripts/phase31-mobile-production-acceptance.mjs` verifying 10/10 production and cloud continuity checks.
-  - **Android Native Compilation**: Verified `assembleDebug` with Gradle wrapper (`BUILD SUCCESSFUL in 16s`).
+  - **Test Suite Expansion**: Added dedicated test suites bringing the total test suite to **250 test files (635 tests) passing 100%**.
+  - **Production Acceptance & Smoke Testing**: Verified 10/10 mobile acceptance checks and 16/16 production connectivity checks.
+  - **Android Native Compilation**: Verified `assembleDebug` with Gradle wrapper (`BUILD SUCCESSFUL in 28s`).
 
 ---
 

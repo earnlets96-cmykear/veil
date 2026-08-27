@@ -54,17 +54,17 @@ describe('VEIL Phase 28: Production Cloud Deployment & Infrastructure', () => {
   // 1. CONFIGURATION & TLS ENFORCEMENT
   // ===========================================================================
 
-  it('CONFIG VALIDATION: Production config enforces HTTPS and WSS for relay.veil.chat', () => {
+  it('CONFIG VALIDATION: Production config enforces HTTPS and WSS for production relay', () => {
     const prodConfig = ConfigManager.getConfig('production');
-    expect(prodConfig.relayHttpUrl).toBe('https://relay.veil.chat');
-    expect(prodConfig.relayWsUrl).toBe('wss://relay.veil.chat/v1/ws');
+    expect(prodConfig.relayHttpUrl.startsWith('https://')).toBe(true);
+    expect(prodConfig.relayWsUrl.startsWith('wss://')).toBe(true);
     expect(prodConfig.enforceTls).toBe(true);
 
     // Validation passes for valid prod config
     expect(() => ConfigManager.validateConfig(prodConfig)).not.toThrow();
 
     // Rejects cleartext HTTP when enforceTls is active
-    const badConfig = { ...prodConfig, relayHttpUrl: 'http://relay.veil.chat' };
+    const badConfig = { ...prodConfig, relayHttpUrl: 'http://veil-rga0.onrender.com' };
     expect(() => ConfigManager.validateConfig(badConfig)).toThrow(/Production config violation/i);
   });
 
