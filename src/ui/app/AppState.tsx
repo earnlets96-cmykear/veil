@@ -569,7 +569,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const handleOnline = async () => {
       if (activeSession && activeSession.isActive()) {
         try {
+          await netManager.reconnect(activeSession);
           await loadSpaceData(activeSession);
+          const pending = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:pending:profile_sync');
+          if (pending) {
+            try {
+              await directoryClient.registerProfile(pending);
+              await store.deleteAsync(activeSession, 'veil:pending:profile_sync');
+            } catch (_e) {}
+          }
         } catch (_e) {
           setNetworkState('degraded');
         }
@@ -592,17 +600,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     };
   }, [activeSession, loadSpaceData]);
-
-  // Continuous mailbox polling heartbeat when a Space is active
-  useEffect(() => {
-    if (!activeSession) return;
-    const interval = setInterval(async () => {
-      try {
-        await netManager.syncMailbox(activeSession);
-      } catch (_e) {}
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [activeSession]);
 
   // Listen for lock events
   useEffect(() => {
@@ -637,9 +634,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         if (activeSession && activeSession.isActive()) {
           await netManager.syncMailbox(activeSession);
+          const pending = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:pending:profile_sync');
+          if (pending) {
+            try {
+              await directoryClient.registerProfile(pending);
+              await store.deleteAsync(activeSession, 'veil:pending:profile_sync');
+            } catch (_e) {}
+          }
         }
       } catch (_e) {}
-    }, 2500);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [activeSession]);
@@ -1519,8 +1523,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         avatarToUse
       );
 
+      // 1. Always persist profile and privacy settings locally first (offline-first resilience)
+      await store.setAsync(activeSession, 'veil:user:profile', profile);
+      if (bio !== undefined || avatar !== undefined) {
+        await updatePrivacySettings({ bio, avatar });
+      }
+      setMyProfile(profile);
+
+      // 2. Attempt cloud directory registration
+      let cloudSyncPending = false;
       try {
         await directoryClient.registerProfile(profile);
+        await store.deleteAsync(activeSession, 'veil:pending:profile_sync');
       } catch (err: any) {
         const msg = err.message || '';
         if (msg.includes('CONFLICT') || msg.includes('already registered')) {
@@ -1529,15 +1543,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (msg.includes('Invalid') || msg.includes('format')) {
           throw new Error(`Invalid username format: ${msg}`);
         }
-        throw new Error("Couldn't publish your profile. Please check your connection and try again.");
+        // Network / relay unavailable -> record pending sync for automatic retry
+        cloudSyncPending = true;
+        await store.setAsync(activeSession, 'veil:pending:profile_sync', profile);
       }
 
-      await store.setAsync(activeSession, 'veil:user:profile', profile);
-      if (bio !== undefined || avatar !== undefined) {
-        await updatePrivacySettings({ bio, avatar });
-      }
-      setMyProfile(profile);
-      return profile;
+      return {
+        ...profile,
+        cloudSyncPending,
+      };
     },
     [activeSession, myProfile, privacySettings, updatePrivacySettings]
   );

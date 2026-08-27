@@ -7,6 +7,9 @@
 
 import { AppConfig, AppEnvironment } from './types.ts';
 
+export const PRODUCTION_RELAY_URL = 'https://relay.veil.chat';
+export const PRODUCTION_RELAY_WS_URL = 'wss://relay.veil.chat/v1/ws';
+
 const DEV_CONFIG: AppConfig = {
   env: 'development',
   relayHttpUrl: 'http://127.0.0.1:8787',
@@ -33,8 +36,8 @@ const TEST_CONFIG: AppConfig = {
 
 const PROD_CONFIG: AppConfig = {
   env: 'production',
-  relayHttpUrl: 'https://relay.veil.chat',
-  relayWsUrl: 'wss://relay.veil.chat/v1/ws',
+  relayHttpUrl: PRODUCTION_RELAY_URL,
+  relayWsUrl: PRODUCTION_RELAY_WS_URL,
   enforceTls: true,
   requestTimeoutMs: 15000,
   maxOutboundQueueSize: 1000,
@@ -42,6 +45,7 @@ const PROD_CONFIG: AppConfig = {
   defaultNotificationMode: 'SENDER_ONLY',
   logLevel: 'error',
 };
+
 
 export class ConfigManager {
   public static getConfig(env?: AppEnvironment): AppConfig {

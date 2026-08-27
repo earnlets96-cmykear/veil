@@ -4,6 +4,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ErrorBoundary } from './ui/components/ErrorBoundary.tsx';
 import { AppProvider } from './ui/app/AppState.tsx';
 import { ToastProvider } from './ui/components/ui/index.ts';
 import { App } from './ui/App.tsx';
@@ -15,11 +16,14 @@ if (rootEl) {
   const root = ReactDOM.createRoot(rootEl);
   root.render(
     <React.StrictMode>
-      <AppProvider>
-        <ToastProvider>
-          <App />
-        </ToastProvider>
-      </AppProvider>
+      <ErrorBoundary>
+        <AppProvider>
+          <ToastProvider>
+            <App />
+          </ToastProvider>
+        </AppProvider>
+      </ErrorBoundary>
     </React.StrictMode>
   );
 }
+

@@ -196,6 +196,18 @@ export class WebSocketTransport {
     });
   }
 
+  /**
+   * Immediately resets retry count and attempts reconnection without waiting for backoff.
+   */
+  public reconnectNow(): void {
+    this.clearTimers();
+    this.retryCount = 0;
+    this.isExplicitlyClosed = false;
+    if (this.mailboxId && this.capabilityToken) {
+      this.establishConnection().catch(() => {});
+    }
+  }
+
   private handleConnectionFailure(): void {
     if (this.isExplicitlyClosed) return;
 
@@ -207,7 +219,7 @@ export class WebSocketTransport {
       return;
     }
 
-    // Compute exponential backoff with jitter
+    // Compute exponential backoff with jitter: 1s, 2s, 4s, 8s, 16s, max 30s
     const baseDelay = this.config.initialRetryDelayMs * Math.pow(this.config.retryBackoffMultiplier, this.retryCount - 1);
     const jitter = Math.random() * 500;
     const delay = Math.min(baseDelay + jitter, this.config.maxRetryDelayMs);

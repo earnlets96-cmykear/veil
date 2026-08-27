@@ -271,6 +271,27 @@ export class NetworkManager {
   }
 
   /**
+   * Re-establishes networking for an active session upon network recovery.
+   */
+  public async reconnect(session?: SpaceSession): Promise<void> {
+    if (session && session.isActive()) {
+      const wsTransport = this.activeWsTransports.get(session.spaceId);
+      if (wsTransport) {
+        wsTransport.reconnectNow();
+      } else {
+        const handler = this.messageHandlers.get(session.spaceId);
+        await this.startListening(session, handler);
+      }
+      await this.syncMailbox(session);
+    } else {
+      for (const [spaceId, wsTransport] of this.activeWsTransports.entries()) {
+        wsTransport.reconnectNow();
+      }
+    }
+  }
+
+
+  /**
    * Manually fetches pending envelopes from relay over HTTP and processes them.
    */
   public async syncMailbox(

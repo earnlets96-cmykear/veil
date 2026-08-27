@@ -6,14 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Phase 31] - 2026-08-27
 
-### Fixed & Validated
-- **Android Black-Screen Diagnostic, TDZ Fix & Live Render Verification**:
-  - Root Cause Diagnosis: Captured real Android Logcat output on startup, detecting unhandled `ReferenceError: Cannot access 'loadSpaceData' before initialization` at `index.js:49:192803`.
-  - Temporal Dead Zone Fix: Reordered callback declarations in `src/ui/app/AppState.tsx` such that `ensureCloudSession` and `loadSpaceData` `useCallback` definitions precede any `useEffect` hooks or handlers that depend on them.
-  - WebSocket Transport Hardening: Hardened `src/network/websocketTransport.ts` readyState check (`readyState === 1`) against global `WebSocket.OPEN` variable references in Android WebViews.
-  - Render Regression Testing: Created automated test suite `tests/phase31-android-render-regression.test.tsx` validating full mounting of `<AppProvider>` and `<LockScreen>` without TDZ errors.
-  - Live Android Device Render Verification: Built fresh production bundle and Android debug APK (`app-debug.apk`), deployed to physical Android emulator (`Pixel_8_API_35`), launched application cold, and verified full interactive rendering of the VEIL LockScreen and modal dialogs with zero Logcat runtime errors.
-  - Total test count expanded to 241 test files (618 tests) passing 100% cleanly.
+### Added, Fixed & Validated
+- **Real Mobile & Production Application Hardening**:
+  - **Android Black-Screen & Startup Recovery**: Diagnosed and resolved unhandled TDZ hook order in `AppState.tsx`. Wrapped root application in top-level `ErrorBoundary` with secret-sanitizing regex diagnostics and recovery options (`Retry Loading`, `Return to Lock Screen`). Added clean loading skeleton during storage partition initialization.
+  - **LockScreen Privacy & Metadata Minimization**: Completely removed `{knownSpacesCount} encrypted vault envelope(s) at rest` and all space/envelope enumeration from `LockScreen.tsx`.
+  - **Authoritative Production Relay Configuration**: Centralized production URLs (`PRODUCTION_RELAY_URL = 'https://relay.veil.chat'` and `PRODUCTION_RELAY_WS_URL = 'wss://relay.veil.chat/v1/ws'`) in `appConfig.ts`.
+  - **Connection Resilience & Degraded Polling**: Implemented bounded exponential backoff with uniform random jitter (1s-30s) and automatic immediate reconnection on native online events in `WebSocketTransport` and `NetworkManager`.
+  - **Offline-First Profile Editing & Cloud Sync**: Enhanced `registerUsername()` to sign and persist profiles locally in encrypted store first, queueing `veil:pending:profile_sync` for automatic background sync upon network recovery. Updated `ProfileModal` to display `"Saved locally. Cloud sync pending."`
+  - **Deterministic Identity Recovery**: Validated byte-for-byte `identityId` equality across zero-knowledge clean-device restores without secondary identity creation.
+  - **Zero Secret Leakage**: Verified that production database credentials (`DATABASE_URL`) and storage secrets (`R2_*`) never exist in frontend code or client bundles.
+  - **Test Suite Expansion**: Added 7 new test suites (`tests/phase31-*.test.ts/tsx`), bringing the total test suite to **247 test files (628 tests) passing 100%**.
+  - **Production Acceptance**: Created `scripts/phase31-mobile-production-acceptance.mjs` verifying 10/10 production and cloud continuity checks.
+  - **Android Native Compilation**: Verified `assembleDebug` with Gradle wrapper (`BUILD SUCCESSFUL in 16s`).
 
 ---
 

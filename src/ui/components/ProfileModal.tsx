@@ -214,14 +214,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
         avatar: avatarPreview || undefined,
       });
 
-      await registerUsername(
+      const res = await registerUsername(
         usernameInput.trim(),
         displayNameInput.trim() || undefined,
         bioInput.trim() || undefined,
         avatarPreview || undefined
       );
 
-      showToast({ type: 'success', message: 'Profile updated successfully' });
+      if ((res as any)?.cloudSyncPending) {
+        showToast({ type: 'info', message: 'Saved locally. Cloud sync pending.' });
+      } else {
+        showToast({ type: 'success', message: 'Profile updated successfully' });
+      }
       setIsEditing(false);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to update profile');

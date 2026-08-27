@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 
 export const LockScreen: React.FC = () => {
-  const { unlockSpace, openModal, panicLock, storageReady, storageError, knownSpacesCount } = useApp();
+  const { unlockSpace, openModal, panicLock, storageReady, storageError } = useApp();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,17 +32,57 @@ export const LockScreen: React.FC = () => {
   };
 
   if (!storageReady) {
+    if (storageError) {
+      return (
+        <div className="veil-modal-overlay" style={{ background: 'var(--veil-bg-base)' }}>
+          <div className="veil-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚠️</div>
+            <h2 style={{ fontSize: 'var(--veil-text-xl)', marginBottom: '0.5rem' }}>Storage Unavailable</h2>
+            <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1rem' }}>
+              {storageError}
+            </p>
+            <button className="veil-btn veil-btn-danger" onClick={() => window.location.reload()}>
+              Retry Initialization
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="veil-modal-overlay" style={{ background: 'var(--veil-bg-base)' }}>
-        <div className="veil-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚠️</div>
-          <h2 style={{ fontSize: 'var(--veil-text-xl)', marginBottom: '0.5rem' }}>Storage Unavailable</h2>
-          <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1rem' }}>
-            {storageError || 'Persistent IndexedDB storage could not be initialized. VEIL has failed closed for security.'}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          width: '100vw',
+          background: 'radial-gradient(ellipse at top, #141b2d 0%, #090c13 100%)',
+          color: '#f8fafc',
+        }}
+      >
+        <div className="veil-card-glass" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem', textAlign: 'center' }}>
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: 'var(--veil-radius-lg)',
+              background: 'linear-gradient(135deg, var(--veil-accent-primary), #a855f7)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.75rem',
+              color: '#ffffff',
+              boxShadow: '0 0 24px var(--veil-accent-glow)',
+              marginBottom: '1rem',
+            }}
+          >
+            🛡️
+          </div>
+          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600, marginBottom: '0.5rem' }}>Initializing VEIL</h2>
+          <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)' }}>
+            Securing isolated cryptographic partitions...
           </p>
-          <button className="veil-btn veil-btn-danger" onClick={() => window.location.reload()}>
-            Retry Initialization
-          </button>
         </div>
       </div>
     );
@@ -193,10 +233,6 @@ export const LockScreen: React.FC = () => {
           >
             🚨 Panic
           </button>
-        </div>
-
-        <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
-          {knownSpacesCount} encrypted vault envelope(s) at rest
         </div>
       </div>
     </div>

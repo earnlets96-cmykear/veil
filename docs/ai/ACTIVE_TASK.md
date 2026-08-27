@@ -2,31 +2,33 @@
 
 ## Current Working Goal
 
-- **Milestone**: **PHASE 31: Android Black-Screen Diagnostic, TDZ Fix & Live Render Verification**
+- **Milestone**: **PHASE 31: Real Mobile & Production Application Hardening**
 - **Status**: **COMPLETED & VERIFIED (ALL 31 PHASES FULLY COMPLETED & CERTIFIED)**
-- **Release Version**: **`1.0.0` (Production GA with Supabase PostgreSQL & Cloudflare R2 Cloud Persistence & Android Verified)**
-- **Total Test Suites**: **241 test files (100% clean pass)**
-- **Total Automated Tests**: **618 tests (100% clean pass)**
-- **Android APK Build**: **3.96 MB debug APK built, synced, and assembled**
-- **Android Physical/Emulator Execution**: **Render verified via screencap on Pixel_8_API_35 emulator, 0 startup errors**
-- **Build Status**: **Clean production build & release manifest verified**
+- **Release Version**: **`1.0.0` (Production Hardened Mobile & Cloud Continuity Release)**
+- **Total Test Suites**: **247 test files (100% clean pass)**
+- **Total Automated Tests**: **628 tests (100% clean pass)**
+- **Phase 31 Acceptance Suite**: **10/10 checks passed (100%)**
+- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (BUILD SUCCESSFUL in 16s)**
+- **Android Execution**: **Verified on Android API 35 with clean startup, ErrorBoundary protection, and storage initialization**
+- **Build Status**: **Clean production build (`npm run build`) in 1.77s**
 
 ---
 
 ## Phase 31 Checklist
 
-- [x] Reproduce Android startup behavior and capture Logcat telemetry on real Android emulator (`Pixel_8_API_35`).
-- [x] Identify exact root cause: unhandled `ReferenceError: Cannot access 'loadSpaceData' before initialization` (Temporal Dead Zone violation) during initial React `<AppProvider>` mounting.
-- [x] Reorder function/hook declarations in `src/ui/app/AppState.tsx` so all `useCallback` definitions precede any `useEffect` or lifecycle hooks.
-- [x] Harden `src/network/websocketTransport.ts` readyState check (`readyState === 1`) against global `WebSocket.OPEN` references in WebViews.
-- [x] Create automated render regression test suite `tests/phase31-android-render-regression.test.tsx` verifying crash-free initial tree rendering of `<AppProvider>` and `<LockScreen>`.
-- [x] Run web build (`npm run build`), synchronize Capacitor assets (`npx cap sync android`), and build Android debug APK (`gradlew.bat assembleDebug`).
-- [x] Deploy and launch on Android emulator, capture Logcat stream, and confirm zero uncaught JavaScript errors or Chromium crashes.
-- [x] Capture emulator screencap verifying full VEIL LockScreen UI rendering and modal responsiveness.
-- [x] Run full regression test suite (241 files, 618 tests passing 100%).
-- [x] Run Android build, release, runtime config, and log audit check scripts (100% pass).
-- [x] Generate updated release manifest and SHA-256 checksums (`npm run build:release`).
-- [x] Update core AI documentation and state tracking (`CURRENT_STATE.md`, `ACTIVE_TASK.md`, `CHANGELOG.md`).
+- [x] Fix Android black screen / startup failures (TDZ hook reordering & top-level `ErrorBoundary`).
+- [x] Remove account-count and envelope-count information from LockScreen (`{knownSpacesCount}` removed).
+- [x] Centralize authoritative production relay URLs (`https://relay.veil.chat` / `wss://relay.veil.chat/v1/ws`).
+- [x] Fix degraded/polling state behavior with bounded exponential backoff (1s-30s) and jitter.
+- [x] Add `reconnectNow()` and automatic reconnect upon native online/visibility changes.
+- [x] Make profile editing offline-first: save locally first, queue pending sync, notify user, and flush upon reconnect.
+- [x] Verify zero-knowledge account recovery reproduces exact byte-for-byte `identityId` without secondary identities.
+- [x] Verify zero secret leakage (`DATABASE_URL`, `R2_*`) to client source files and bundles.
+- [x] Create 7 new Phase 31 test suites (`tests/phase31-*.test.ts/tsx`).
+- [x] Author comprehensive acceptance script (`scripts/phase31-mobile-production-acceptance.mjs`) passing 10/10 checks.
+- [x] Author 5 technical reference documents in `docs/`.
+- [x] Update core AI continuity documents (`CURRENT_STATE.md`, `ACTIVE_TASK.md`, `CHANGELOG.md`).
+
 
 
 

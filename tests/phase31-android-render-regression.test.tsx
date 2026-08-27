@@ -27,8 +27,8 @@ describe('VEIL Android Startup & React Bootstrap Regression', () => {
 
     // Verify it renders cleanly without ReferenceError
     expect(html).toBeDefined();
-    expect(html).toContain('Storage Unavailable');
-    expect(html).toContain('Retry Initialization');
+    expect(html).toContain('Initializing VEIL');
+    expect(html).toContain('Securing isolated cryptographic partitions...');
   });
 
   it('renders LockScreen cleanly when storage is ready', () => {

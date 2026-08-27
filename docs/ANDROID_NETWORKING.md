@@ -1,15 +1,37 @@
-# Android Networking Architecture
+# Android Networking & WebView Lifecycle Guide
 
-## 1. Transport & TLS Enforcement
+## 1. WebView & Android Network Constraints
+On Android (via Capacitor / Chrome WebView), network connections behave differently than in desktop browser tabs:
+1. **Aggressive Background Suspension**: The Android OS can suspend TCP sockets and timers when the application is backgrounded or when battery optimization triggers.
+2. **Network State Switching**: Seamless transitions between Wi-Fi and Cellular (LTE/5G) drop existing WebSocket connections.
+3. **Capacitor Lifecycle Events**: The app receives native `appStateChange`, `online`, and `offline` events.
 
-Android network communication adheres strictly to the VEIL blind relay protocol:
-- **HTTPS (`/v1/mailboxes`, `/v1/send`, `/v1/fetch`, `/v1/ack`)** for REST operations.
-- **WSS (`/v1/ws`)** for real-time bidirectional push notifications and live envelope synchronization.
-- **Network Security Config**: Configured with `cleartextTrafficPermitted="false"`, enforcing TLS 1.3 for all endpoints.
+## 2. VEIL Multi-Tier Transport Architecture
 
----
+```
+                 +--------------------------+
+                 |       AppProvider        |
+                 |  (Native Online Handler) |
+                 +------------+-------------+
+                              |
+                     +--------v--------+
+                     |  NetworkManager |
+                     +---+---------+---+
+                         |         |
+           +-------------+         +-------------+
+           |                                     |
++----------v-----------+             +-----------v-----------+
+|  WebSocketTransport  |             |     HttpTransport     |
+|   (Push envelopes)   |             | (Polling & Rest Fall) |
++----------------------+             +-----------------------+
+```
 
-## 2. Reconnection & Offline Strategy
+### A. Dual Connection Strategy (Push + Degraded Fallback)
+1. **Primary**: Real-time bidirectional WebSocket connection to `/v1/ws`. Heartbeats sent every 30 seconds.
+2. **Secondary**: HTTP long-polling catch-up every 3000ms if WebSocket is disconnected or in degraded state.
+3. **Recovery**: Native `window.addEventListener('online')` triggers `netManager.reconnect(activeSession)` immediately resetting backoff retries.
 
-- **Network Transition**: Automatically switches between Wi-Fi and Mobile Data (cellular) with exponential backoff (`100ms` $\rightarrow$ `5s`).
-- **Offline Queue**: Encrypted outbound messages are queued locally in `EncryptedSpaceStore` and drained automatically upon socket re-establishment.
+### B. Outbound Envelope Queueing
+- Messages sent while offline or degraded are enqueued in `EncryptedSpaceStore` (IndexedDB).
+- `NetworkManager.flushOutboundQueue()` executes automatically upon successful HTTP sync or WebSocket reconnection.
+- Zero message loss during intermittent cellular handoffs.
