@@ -1,9 +1,9 @@
 /**
- * Telegram-Inspired Conversation View Component for VEIL.
+ * Telegram-Inspired Conversation View Component for VEIL Phase 33.
  *
  * Implements:
- * - Telegram-style message bubbles (rounded geometry, delivery ticks, media embeds)
- * - In-app Fullscreen Media Viewer for photos & videos (zoom, pan, gallery nav)
+ * - Direct inline decrypted image & video thumbnails with smooth loading skeleton
+ * - Fullscreen Media Viewer for photos & videos (zoom, pan, gallery nav, HTML5 video player)
  * - In-chat Shared Media Gallery browser (Photos, Videos, Files, Voice Notes)
  * - Native Android & Web file saving via FileSaver utility
  * - Interactive voice note playback with animated waveform scrubber
@@ -20,6 +20,7 @@ import type { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachm
 import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
+import { MediaCache } from '../utils/mediaCache.ts';
 import {
   Avatar,
   Badge,
@@ -29,6 +30,7 @@ import {
   AttachmentCard,
   VoiceNoteCard,
   MessageBubble,
+  MessageStatus,
   useToast,
 } from './ui/index.ts';
 import {
@@ -47,9 +49,11 @@ import {
   VideoIcon,
   FileIcon,
   ShareIcon,
+  ShieldIcon,
+  AlertCircleIcon,
+  InfoIcon,
 } from './icons/index.ts';
-import { MediaViewer, MediaViewerItem } from './media/MediaViewer.tsx';
-import { MediaGalleryModal } from './media/MediaGalleryModal.tsx';
+import { MediaViewer, MediaViewerItem, MediaGalleryModal, MediaImage } from './media/index.ts';
 
 interface ContextMenuState {
   isOpen: boolean;
@@ -60,20 +64,19 @@ interface ContextMenuState {
 
 export const ConversationView: React.FC = () => {
   const {
+    activeSession,
+    activeChatId,
     conversations,
     contacts,
-    activeChatId,
     messages,
-    openModal,
+    sendMessage,
+    sendAttachment,
     selectConversation,
-    setReplyTarget,
-    activeSession,
+    openModal,
     cloudClient,
     ensureCloudSession,
-    deleteMessageLocally,
-    deleteMessagesLocally,
-    retryFailedMessage,
-    markConversationAsRead,
+    setReplyTarget,
+    deleteMessage,
   } = useApp();
 
   const { showToast } = useToast();
@@ -81,28 +84,21 @@ export const ConversationView: React.FC = () => {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineEndRef = useRef<HTMLDivElement>(null);
   const unreadRef = useRef<HTMLDivElement>(null);
-  const hasAutoScrolledUnreadRef = useRef<string | null>(null);
 
+  // Search & Navigation State
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [isSearchingInChat, setIsSearchingInChat] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
-  const audioElementsRef = useRef<Record<string, HTMLAudioElement>>({});
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
-  const [retryingMessageIds, setRetryingMessageIds] = useState<Set<string>>(new Set());
-
-  // In-Conversation Search State
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [inChatSearchQuery, setInChatSearchQuery] = useState('');
-  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
-
-  // Selection Mode State
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
 
   // Fullscreen Media Viewer State
   const [viewerItem, setViewerItem] = useState<MediaViewerItem | null>(null);
   const [viewerMediaList, setViewerMediaList] = useState<MediaViewerItem[]>([]);
 
-  // Shared Media Gallery Modal State
-  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  // Selection Mode State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -112,176 +108,125 @@ export const ConversationView: React.FC = () => {
     message: null,
   });
 
-  // Highlighted Message State (for jump-to-message)
-  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  // Current Active Conversation Info
+  const activeConversation = useMemo(() => {
+    if (!activeChatId) return null;
+    return conversations.find((c) => c.id === activeChatId) || null;
+  }, [activeChatId, conversations]);
 
-  // Scroll State
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
-
-  const activeConv = conversations.find((c) => c.id === activeChatId);
   const activeContact = useMemo(() => {
-    if (!activeConv || activeConv.type !== 'direct') return null;
-    return contacts.find((c) => c.identityId === activeConv.id) || null;
-  }, [activeConv, contacts]);
+    if (!activeChatId) return null;
+    return (
+      contacts.find((c) => c.identityId === activeChatId) ||
+      contacts.find((c) => c.name === activeChatId) ||
+      null
+    );
+  }, [activeChatId, contacts]);
 
-  const activeMessages = useMemo(() => {
+  const conversationName =
+    activeConversation?.name || activeContact?.name || activeChatId || 'Encrypted Chat';
+  const isGroup = activeConversation?.type === 'group';
+
+  // Active Messages
+  const activeMessages: UIMessage[] = useMemo(() => {
     if (!activeChatId) return [];
-    return messages[activeChatId] || (activeConv?.peerDoc?.identityId ? messages[activeConv.peerDoc.identityId] : []) || [];
-  }, [activeChatId, activeConv, messages]);
+    const directList = messages[activeChatId] || [];
+    if (directList.length > 0) return directList;
 
-  // First unread message calculation
-  const unreadCount = activeConv?.unreadCount || 0;
+    if (activeContact?.name && messages[activeContact.name]) {
+      return messages[activeContact.name];
+    }
+    if (activeContact?.identityId && messages[activeContact.identityId]) {
+      return messages[activeContact.identityId];
+    }
+    return [];
+  }, [activeChatId, activeContact, messages]);
+
+  // First Unread Index for Divider
   const firstUnreadIndex = useMemo(() => {
+    const unreadCount = activeConversation?.unreadCount || 0;
     if (unreadCount <= 0 || activeMessages.length === 0) return -1;
     return Math.max(0, activeMessages.length - unreadCount);
-  }, [unreadCount, activeMessages.length]);
+  }, [activeConversation, activeMessages]);
 
-  // Auto-scroll to first unread message or timeline end on chat selection
+  // Auto-scroll to bottom or unread divider
   useEffect(() => {
-    if (!activeChatId) return;
-
-    if (hasAutoScrolledUnreadRef.current !== activeChatId) {
-      hasAutoScrolledUnreadRef.current = activeChatId;
-      if (firstUnreadIndex > 0 && unreadRef.current) {
-        unreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }
+    if (unreadRef.current) {
+      unreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (timelineEndRef.current) {
+      timelineEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [activeChatId, firstUnreadIndex]);
+  }, [activeChatId, activeMessages.length]);
 
-  // New message auto-scroll when at bottom
-  useEffect(() => {
-    if (!showScrollBottom) {
-      timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [activeMessages.length, showScrollBottom]);
-
-  // Handle timeline scroll detection & mark as read at bottom
-  const handleTimelineScroll = () => {
-    if (!timelineRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = timelineRef.current;
-    const isScrolledUp = scrollHeight - scrollTop - clientHeight > 180;
-    setShowScrollBottom(isScrolledUp);
-
-    // Mark as read when scrolled near bottom
-    if (!isScrolledUp && activeChatId && activeConv && activeConv.unreadCount > 0) {
-      markConversationAsRead(activeChatId);
-    }
-  };
-
-  // Close context menu on outside click
-  useEffect(() => {
-    const handleOutsideClick = () => {
-      if (contextMenu.isOpen) {
-        setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-      }
-    };
-    window.addEventListener('click', handleOutsideClick);
-    return () => window.removeEventListener('click', handleOutsideClick);
-  }, [contextMenu.isOpen]);
-
-  // Voice note play/pause handler
+  // Handle Voice Note Playback
   const handleToggleVoice = async (msg: UIMessage) => {
-    if (!msg.voice || !activeSession) return;
+    if (!msg.voice) return;
 
-    // Pause currently playing audio if it's the same
     if (playingAudioId === msg.id) {
-      const existing = audioElementsRef.current[msg.id];
-      if (existing) {
-        existing.pause();
-        setPlayingAudioId(null);
-      }
+      VoiceRecorder.stopPlayback();
+      setPlayingAudioId(null);
       return;
     }
 
-    // Stop any other playing audio
-    if (playingAudioId && audioElementsRef.current[playingAudioId]) {
-      audioElementsRef.current[playingAudioId].pause();
+    try {
+      setPlayingAudioId(msg.id);
+      await VoiceRecorder.playVoiceNote(msg.voice.ciphertextChunks);
+    } catch (err: any) {
+      showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
+    } finally {
+      setPlayingAudioId(null);
     }
-
-    let audio = audioElementsRef.current[msg.id];
-    if (!audio) {
-      try {
-        if (!cloudClient.getSessionToken()) {
-          await ensureCloudSession(activeSession);
-        }
-        const audioUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice as any);
-        audio = new Audio(audioUrl);
-        audioElementsRef.current[msg.id] = audio;
-
-        audio.onended = () => setPlayingAudioId(null);
-        audio.onerror = () => {
-          showToast({ type: 'error', message: 'Could not play voice note' });
-          setPlayingAudioId(null);
-        };
-      } catch (err: any) {
-        showToast({ type: 'error', message: `Voice playback error: ${err.message || 'Decryption failed'}` });
-        return;
-      }
-    }
-
-    audio.play();
-    setPlayingAudioId(msg.id);
   };
 
-  // Unified File Download & Android Saving Handler
+  // Handle Attachment Download & Local Storage Save
   const handleDownloadAttachment = async (msg: UIMessage) => {
     if (!msg.attachment || !activeSession) return;
-    if (msg.attachment.objectId) {
-      setDownloadingAttachmentId(msg.id);
-      try {
-        if (!cloudClient.getSessionToken()) {
-          await ensureCloudSession(activeSession);
-        }
-        const rawCiphertext = await cloudClient.downloadAttachment(msg.attachment.objectId);
-        let plaintextBytes: Uint8Array;
+    setDownloadingAttachmentId(msg.id);
 
-        if (msg.attachment.encryptionKeyBase64) {
-          const encryptionKey = base64ToBytes(msg.attachment.encryptionKeyBase64);
-          const chunks: EncryptedAttachmentChunk[] = JSON.parse(new TextDecoder().decode(rawCiphertext));
-          const meta: AttachmentMetadata = {
-            attachmentId: msg.attachment.attachmentId || msg.attachment.objectId,
-            name: msg.attachment.name,
-            mimeType: msg.attachment.mimeType,
-            sizeBytes: msg.attachment.sizeBytes,
-            chunkCount: msg.attachment.chunkCount || chunks.length,
-            chunkSize: msg.attachment.chunkSize || (64 * 1024),
-            sha256Hash: msg.attachment.sha256Hash || '',
-          };
-          plaintextBytes = AttachmentPipeline.decryptAndReassemble(meta, chunks, encryptionKey);
-        } else {
-          plaintextBytes = rawCiphertext;
-        }
+    try {
+      if (!cloudClient.getSessionToken()) {
+        await ensureCloudSession(activeSession);
+      }
 
-        // Save via unified FileSaver engine
-        const saveResult = await FileSaver.saveFile({
-          filename: msg.attachment.name,
-          data: plaintextBytes,
-          mimeType: msg.attachment.mimeType,
-          triggerShare: true,
+      // Check MediaCache first
+      const key = msg.attachment.objectId || msg.attachment.attachmentId || msg.attachment.name;
+      let plaintextBytes: Uint8Array;
+
+      const cached = MediaCache.get(key);
+      if (cached && cached.data && cached.data.length > 0) {
+        plaintextBytes = cached.data;
+      } else {
+        const decrypted = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
+        plaintextBytes = decrypted.data;
+      }
+
+      // Save via unified FileSaver engine
+      const saveResult = await FileSaver.saveFile({
+        filename: msg.attachment.name,
+        data: plaintextBytes,
+        mimeType: msg.attachment.mimeType,
+        triggerShare: true,
+      });
+
+      if (saveResult.success) {
+        showToast({
+          type: 'success',
+          title: 'File Saved',
+          message: `Saved ${msg.attachment.name} to ${saveResult.location}`,
         });
-
-        if (saveResult.success) {
-          showToast({
-            type: 'success',
-            title: 'File Saved',
-            message: `Saved ${msg.attachment.name} to ${saveResult.location}`,
-          });
-        } else {
-          showToast({
-            type: 'error',
-            message: saveResult.error || 'Failed to save file',
-          });
-        }
-      } catch (err: any) {
+      } else {
         showToast({
           type: 'error',
-          message: `Attachment download error: ${err.message || 'Failed to download file'}`,
+          message: saveResult.error || 'Failed to save file',
         });
-      } finally {
-        setDownloadingAttachmentId(null);
       }
+    } catch (err: any) {
+      showToast({
+        type: 'error',
+        message: `Attachment download error: ${err.message || 'Failed to download file'}`,
+      });
+    } finally {
+      setDownloadingAttachmentId(null);
     }
   };
 
@@ -290,19 +235,26 @@ export const ConversationView: React.FC = () => {
     if (!msg.attachment) return;
 
     const allMediaMessages = activeMessages.filter(
-      (m) => m.attachment && (m.attachment.mimeType?.startsWith('image/') || m.attachment.mimeType?.startsWith('video/'))
+      (m) =>
+        m.attachment &&
+        (m.attachment.mimeType?.startsWith('image/') || m.attachment.mimeType?.startsWith('video/'))
     );
 
-    const items: MediaViewerItem[] = allMediaMessages.map((m) => ({
-      id: m.id,
-      type: m.attachment!.mimeType?.startsWith('video/') ? 'video' : 'image',
-      url: m.attachment!.previewUrl || m.attachment!.url || '',
-      name: m.attachment!.name,
-      sizeBytes: m.attachment!.sizeBytes,
-      mimeType: m.attachment!.mimeType,
-      timestamp: m.timestamp,
-      senderName: m.senderName,
-    }));
+    const items: MediaViewerItem[] = allMediaMessages.map((m) => {
+      const key = m.attachment!.objectId || m.attachment!.attachmentId || m.attachment!.name;
+      const cached = MediaCache.get(key);
+      return {
+        id: m.id,
+        type: m.attachment!.mimeType?.startsWith('video/') ? 'video' : 'image',
+        url: cached?.blobUrl || m.attachment!.previewUrl || m.attachment!.url || '',
+        name: m.attachment!.name,
+        sizeBytes: m.attachment!.sizeBytes,
+        mimeType: m.attachment!.mimeType,
+        timestamp: m.timestamp,
+        senderName: m.senderName,
+        data: cached?.data,
+      };
+    });
 
     const currentIdx = items.findIndex((i) => i.id === msg.id);
     setViewerMediaList(items);
@@ -330,189 +282,181 @@ export const ConversationView: React.FC = () => {
     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
   };
 
-  const handleReplyMessage = (msg: UIMessage) => {
+  const handleReplyToMessage = (msg: UIMessage) => {
     setReplyTarget(msg);
     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
   };
 
-  const handleDeleteMessage = (msg: UIMessage) => {
+  const handleDeleteContextMessage = (msg: UIMessage) => {
     if (activeChatId) {
-      deleteMessageLocally(activeChatId, msg.id);
-      showToast({ type: 'info', message: 'Message deleted from local device' });
+      deleteMessage(activeChatId, msg.id);
+      showToast({ type: 'info', message: 'Message deleted' });
     }
     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
   };
 
-  const handleEnterSelectionMode = (initialId?: string) => {
-    setIsSelectionMode(true);
-    if (initialId) {
-      setSelectedMessageIds(new Set([initialId]));
-    }
-    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-  };
-
+  // Selection Mode Actions
   const handleToggleSelectMessage = (msgId: string) => {
     setSelectedMessageIds((prev) => {
       const next = new Set(prev);
-      if (next.has(msgId)) next.delete(msgId);
-      else next.add(msgId);
-      if (next.size === 0) setIsSelectionMode(false);
+      if (next.has(msgId)) {
+        next.delete(msgId);
+      } else {
+        next.add(msgId);
+      }
       return next;
     });
   };
 
   const handleBatchDelete = () => {
-    if (activeChatId && selectedMessageIds.size > 0) {
-      deleteMessagesLocally(activeChatId, Array.from(selectedMessageIds));
-      showToast({ type: 'info', message: `Deleted ${selectedMessageIds.size} messages` });
-      setIsSelectionMode(false);
-      setSelectedMessageIds(new Set());
+    if (!activeChatId) return;
+    for (const id of selectedMessageIds) {
+      deleteMessage(activeChatId, id);
     }
+    showToast({ type: 'info', message: `Deleted ${selectedMessageIds.size} messages` });
+    setIsSelectionMode(false);
+    setSelectedMessageIds(new Set());
   };
 
   const handleBatchCopy = () => {
-    const selectedMsgs = activeMessages.filter((m) => selectedMessageIds.has(m.id));
-    const combined = selectedMsgs.map((m) => m.text).filter(Boolean).join('\n');
-    if (combined && navigator.clipboard) {
-      navigator.clipboard.writeText(combined);
-      showToast({ type: 'success', message: `Copied ${selectedMsgs.length} messages` });
+    const selectedTexts = activeMessages
+      .filter((m) => selectedMessageIds.has(m.id))
+      .map((m) => `${m.senderName || 'User'}: ${m.text || m.attachment?.name || 'Media'}`)
+      .join('\n');
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(selectedTexts);
+      showToast({ type: 'success', message: `Copied ${selectedMessageIds.size} messages` });
     }
     setIsSelectionMode(false);
     setSelectedMessageIds(new Set());
   };
 
-  if (!activeChatId || !activeConv) {
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (contextMenu.isOpen) {
+        setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+      }
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [contextMenu.isOpen]);
+
+  if (!activeChatId) {
     return (
-      <main className="veil-conversation-empty" role="main">
+      <div className="veil-conversation-empty">
         <EmptyState
-          title="No Conversation Selected"
-          description="Select a chat from the sidebar or start a new encrypted direct/group message."
-          action={
-            <Button variant="primary" size="md" onClick={() => openModal({ type: 'newChat' })}>
-              New Chat
-            </Button>
-          }
+          icon={<ShieldIcon size={56} color="var(--veil-accent-primary)" />}
+          title="End-to-End Encrypted Messaging"
+          description="Select a conversation or start a new encrypted chat to begin private communication."
         />
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="veil-conversation" role="main">
-      {/* Fullscreen Media Viewer Overlay */}
-      {viewerItem && (
-        <MediaViewer
-          items={viewerMediaList}
-          initialIndex={viewerMediaList.findIndex((i) => i.id === viewerItem.id)}
-          onClose={() => setViewerItem(null)}
-          onDownload={(item) => {
-            const originalMsg = activeMessages.find((m) => m.id === item.id);
-            if (originalMsg) handleDownloadAttachment(originalMsg);
-          }}
-        />
-      )}
-
-      {/* Shared Media Gallery Modal */}
-      {isGalleryOpen && (
-        <MediaGalleryModal
-          conversationName={activeConv.name}
-          messages={activeMessages}
-          onClose={() => setIsGalleryOpen(false)}
-          onOpenMedia={(item, allItems) => {
-            setIsGalleryOpen(false);
-            setViewerMediaList(allItems);
-            setViewerItem(item);
-          }}
-          onDownloadFile={(msg) => handleDownloadAttachment(msg)}
-        />
-      )}
-
-      {/* Selection Mode Action Bar */}
+    <div className="veil-conversation" role="main" aria-label={`Conversation with ${conversationName}`}>
+      {/* Selection Mode Header Toolbar */}
       {isSelectionMode ? (
-        <div className="veil-selection-bar" role="toolbar" aria-label="Selection Actions">
-          <div className="veil-selection-count">
-            {selectedMessageIds.size} Selected
+        <div className="veil-selection-toolbar" role="toolbar" aria-label="Selection toolbar">
+          <div className="veil-selection-info">
+            <IconButton
+              icon={<CloseIcon size={18} />}
+              onClick={() => {
+                setIsSelectionMode(false);
+                setSelectedMessageIds(new Set());
+              }}
+              aria-label="Cancel selection"
+              variant="ghost"
+            />
+            <span style={{ fontWeight: 600 }}>{selectedMessageIds.size} selected</span>
           </div>
           <div className="veil-selection-actions">
-            <Button variant="secondary" size="sm" onClick={handleBatchCopy} disabled={selectedMessageIds.size === 0}>
-              <CopyIcon size={16} />
-              <span>Copy</span>
-            </Button>
-            <Button variant="danger" size="sm" onClick={handleBatchDelete} disabled={selectedMessageIds.size === 0}>
-              <TrashIcon size={16} />
-              <span>Delete</span>
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => { setIsSelectionMode(false); setSelectedMessageIds(new Set()); }}>
-              <CloseIcon size={16} />
-            </Button>
+            <IconButton
+              icon={<CopyIcon size={18} />}
+              onClick={handleBatchCopy}
+              disabled={selectedMessageIds.size === 0}
+              aria-label="Copy selected"
+              variant="ghost"
+            />
+            <IconButton
+              icon={<TrashIcon size={18} />}
+              onClick={handleBatchDelete}
+              disabled={selectedMessageIds.size === 0}
+              aria-label="Delete selected"
+              variant="danger"
+            />
           </div>
         </div>
       ) : (
-        /* Standard Conversation Header */
+        /* Standard Telegram-Style Conversation Header */
         <div className="veil-conversation-header">
-          <div className="veil-header-left">
-            <button
-              className="veil-btn veil-btn-ghost veil-btn-sm veil-mobile-back"
-              onClick={() => selectConversation(null as any)}
-              aria-label="Back to conversations"
-            >
-              <ArrowLeftIcon size={20} />
-            </button>
+          <div className="veil-conversation-header-left">
+            <IconButton
+              icon={<ArrowLeftIcon size={20} />}
+              className="veil-btn-mobile-back"
+              onClick={() => selectConversation(null)}
+              aria-label="Back to conversations list"
+              variant="ghost"
+            />
 
             <div
-              className="veil-header-peer-info"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
               onClick={() => {
-                if (activeConv.type === 'group') {
-                  openModal({ type: 'groupDetails', conversationId: activeConv.id });
+                if (isGroup) {
+                  openModal({ type: 'groupDetails', conversationId: activeChatId });
                 } else {
-                  openModal({ type: 'contactDetails', conversationId: activeConv.id });
+                  openModal({ type: 'contactDetails', conversationId: activeChatId });
                 }
               }}
               role="button"
               tabIndex={0}
+              title="View details"
             >
               <Avatar
-                name={activeConv.name}
+                name={conversationName}
                 size="md"
-                isGroup={activeConv.type === 'group'}
+                isGroup={isGroup}
+                aria-label={`${conversationName} profile`}
               />
-              <div className="veil-header-peer-details">
-                <div className="veil-header-peer-name-row">
-                  <span className="veil-header-peer-name">{activeConv.name}</span>
-                  {activeContact?.verificationStatus === 'MISMATCH' && <Badge variant="danger">Key Changed</Badge>}
-                  {(activeConv.isVerified || activeContact?.verificationStatus === 'VERIFIED') && activeContact?.verificationStatus !== 'MISMATCH' && (
-                    <Badge variant="secure">Verified</Badge>
+              <div className="veil-header-text">
+                <div className="veil-header-title">{conversationName}</div>
+                <div className="veil-header-subtitle">
+                  {isGroup ? (
+                    'End-to-End Encrypted (Group Ratchet)'
+                  ) : activeContact?.verificationStatus === 'MISMATCH' ? (
+                    <span style={{ color: 'var(--veil-danger)' }}>Key Changed (Review Key)</span>
+                  ) : activeContact?.verificationStatus === 'VERIFIED' || activeConversation?.isVerified || activeContact?.verified ? (
+                    <span style={{ color: 'var(--veil-success)' }}>Verified (Ed25519)</span>
+                  ) : (
+                    'End-to-End Encrypted Double Ratchet'
                   )}
-                </div>
-                <div className="veil-header-peer-meta">
-                  {activeConv.type === 'group'
-                    ? `${activeConv.participants?.length || 0} members • End-to-End Encrypted`
-                    : 'End-to-End Encrypted Double Ratchet'}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="veil-header-actions">
+          <div className="veil-conversation-header-right">
             <IconButton
-              icon={<SearchIcon size={20} />}
-              onClick={() => setIsSearchOpen((prev) => !prev)}
-              aria-label="Search in conversation"
+              icon={<SearchIcon size={18} />}
+              onClick={() => setIsSearchingInChat(!isSearchingInChat)}
+              aria-label="Search inside chat"
               variant="ghost"
             />
             <IconButton
-              icon={<GridIcon size={20} />}
-              onClick={() => setIsGalleryOpen(true)}
+              icon={<GridIcon size={18} />}
+              onClick={() => setShowGallery(true)}
               aria-label="Shared media gallery"
               variant="ghost"
             />
             <IconButton
-              icon={<MoreVerticalIcon size={20} />}
+              icon={<InfoIcon size={18} />}
               onClick={() => {
-                if (activeConv.type === 'group') {
-                  openModal({ type: 'groupDetails', conversationId: activeConv.id });
+                if (isGroup) {
+                  openModal({ type: 'groupDetails', conversationId: activeChatId });
                 } else {
-                  openModal({ type: 'contactDetails', conversationId: activeConv.id });
+                  openModal({ type: 'contactDetails', conversationId: activeChatId });
                 }
               }}
               aria-label="Conversation details"
@@ -522,18 +466,41 @@ export const ConversationView: React.FC = () => {
         </div>
       )}
 
+      {/* In-Chat Search Bar */}
+      {isSearchingInChat && (
+        <div className="veil-chat-search-bar" role="search">
+          <input
+            type="text"
+            value={localSearchQuery}
+            onChange={(e) => setLocalSearchQuery(e.target.value)}
+            placeholder="Search messages in this chat..."
+            className="veil-chat-search-input"
+            autoFocus
+          />
+          <IconButton
+            icon={<CloseIcon size={16} />}
+            onClick={() => {
+              setIsSearchingInChat(false);
+              setLocalSearchQuery('');
+            }}
+            aria-label="Close chat search"
+            variant="ghost"
+            size="sm"
+          />
+        </div>
+      )}
+
       {/* Message Timeline */}
       <div
         ref={timelineRef}
         className="veil-timeline"
-        onScroll={handleTimelineScroll}
         role="log"
         aria-label="Message history"
       >
         {activeMessages.length === 0 ? (
           <div className="veil-timeline-empty">
             <div className="veil-timeline-encryption-shield">
-              <span style={{ fontSize: '1.75rem' }}>🛡️</span>
+              <ShieldIcon size={44} color="var(--veil-accent-primary)" />
             </div>
             <h3>End-to-End Encrypted Conversation</h3>
             <p>Messages, photos, videos, files, and voice notes are cryptographically protected.</p>
@@ -542,6 +509,10 @@ export const ConversationView: React.FC = () => {
           activeMessages.map((msg, index) => {
             const isUnreadFirst = index === firstUnreadIndex;
             const isSelected = selectedMessageIds.has(msg.id);
+            const isMedia =
+              msg.attachment &&
+              (msg.attachment.mimeType?.startsWith('image/') ||
+                msg.attachment.mimeType?.startsWith('video/'));
 
             return (
               <React.Fragment key={msg.id}>
@@ -552,7 +523,9 @@ export const ConversationView: React.FC = () => {
                 )}
 
                 <div
-                  className={`veil-msg-row ${msg.isOutgoing ? 'outgoing' : 'incoming'} ${isSelectionMode ? 'veil-msg-selectable' : ''}`}
+                  className={`veil-msg-row ${msg.isOutgoing ? 'outgoing' : 'incoming'} ${
+                    isSelectionMode ? 'veil-msg-selectable' : ''
+                  }`}
                   onClick={() => {
                     if (isSelectionMode) handleToggleSelectMessage(msg.id);
                   }}
@@ -570,38 +543,30 @@ export const ConversationView: React.FC = () => {
 
                   <div className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}>
                     {/* Media Image / Video Card */}
-                    {msg.attachment && (msg.attachment.mimeType?.startsWith('image/') || msg.attachment.mimeType?.startsWith('video/')) ? (
-                      <div
-                        className="veil-media-bubble"
-                        onClick={(e) => {
-                          if (!isSelectionMode) {
-                            e.stopPropagation();
-                            handleOpenMedia(msg);
-                          }
-                        }}
-                      >
-                        {msg.attachment.previewUrl ? (
-                          <img
-                            src={msg.attachment.previewUrl}
-                            alt={msg.attachment.name}
-                            className="veil-media-bubble-img"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="veil-media-bubble-placeholder">
-                            {msg.attachment.mimeType?.startsWith('video/') ? <VideoIcon size={32} /> : <ImageIcon size={32} />}
-                          </div>
-                        )}
-                        {msg.attachment.mimeType?.startsWith('video/') && (
-                          <div className="veil-media-play-overlay">
-                            <PlayIcon size={24} />
-                          </div>
-                        )}
+                    {isMedia && msg.attachment && (
+                      <div className="veil-media-bubble-container">
+                        <MediaImage
+                          attachment={msg.attachment}
+                          isVideo={msg.attachment.mimeType?.startsWith('video/')}
+                          onClick={() => {
+                            if (!isSelectionMode) handleOpenMedia(msg);
+                          }}
+                          alt={msg.attachment.name}
+                        />
+                        <div className="veil-media-meta-overlay">
+                          <span className="veil-media-time">
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          {msg.isOutgoing && <MessageStatus status={msg.deliveryStatus as any} />}
+                        </div>
                       </div>
-                    ) : null}
+                    )}
 
                     {/* Standard File Attachment Card */}
-                    {msg.attachment && !msg.attachment.mimeType?.startsWith('image/') && !msg.attachment.mimeType?.startsWith('video/') ? (
+                    {msg.attachment && !isMedia && (
                       <AttachmentCard
                         name={msg.attachment.name}
                         sizeBytes={msg.attachment.sizeBytes}
@@ -609,19 +574,19 @@ export const ConversationView: React.FC = () => {
                         status={downloadingAttachmentId === msg.id ? 'downloading' : 'ready'}
                         onDownload={() => handleDownloadAttachment(msg)}
                       />
-                    ) : null}
+                    )}
 
                     {/* Voice Note Card */}
-                    {msg.voice ? (
+                    {msg.voice && (
                       <VoiceNoteCard
                         durationSeconds={msg.voice.durationSeconds}
                         playbackState={playingAudioId === msg.id ? 'playing' : 'idle'}
                         onPlayToggle={() => handleToggleVoice(msg)}
                       />
-                    ) : null}
+                    )}
 
-                    {/* Text Message Bubble */}
-                    {msg.text && (
+                    {/* Text Message Bubble (Rendered if message has text and isn't raw media placeholder) */}
+                    {msg.text && !msg.text.startsWith('📎 Attachment:') && (
                       <MessageBubble
                         messageId={msg.id}
                         senderName={msg.senderName}
@@ -649,42 +614,94 @@ export const ConversationView: React.FC = () => {
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
-          <button className="veil-context-item" onClick={() => handleReplyMessage(contextMenu.message!)}>
+          <button
+            type="button"
+            className="veil-context-item"
+            onClick={() => handleReplyToMessage(contextMenu.message!)}
+          >
             <ReplyIcon size={16} />
             <span>Reply</span>
           </button>
 
           {contextMenu.message.text && (
-            <button className="veil-context-item" onClick={() => handleCopyText(contextMenu.message!.text)}>
+            <button
+              type="button"
+              className="veil-context-item"
+              onClick={() => handleCopyText(contextMenu.message!.text)}
+            >
               <CopyIcon size={16} />
               <span>Copy Text</span>
             </button>
           )}
 
           {contextMenu.message.attachment && (
-            <button className="veil-context-item" onClick={() => {
-              handleDownloadAttachment(contextMenu.message!);
-              setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-            }}>
+            <button
+              type="button"
+              className="veil-context-item"
+              onClick={() => handleDownloadAttachment(contextMenu.message!)}
+            >
               <DownloadIcon size={16} />
-              <span>Download File</span>
+              <span>Save to Device</span>
             </button>
           )}
 
-          <button className="veil-context-item" onClick={() => handleEnterSelectionMode(contextMenu.message!.id)}>
+          <button
+            type="button"
+            className="veil-context-item"
+            onClick={() => {
+              setIsSelectionMode(true);
+              setSelectedMessageIds(new Set([contextMenu.message!.id]));
+              setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+            }}
+          >
             <CheckIcon size={16} />
             <span>Select Messages</span>
           </button>
 
-          <button className="veil-context-item veil-context-item-danger" onClick={() => handleDeleteMessage(contextMenu.message!)}>
+          <button
+            type="button"
+            className="veil-context-item veil-context-item-danger"
+            onClick={() => handleDeleteContextMessage(contextMenu.message!)}
+          >
             <TrashIcon size={16} />
-            <span>Delete</span>
+            <span>Delete Message</span>
           </button>
         </div>
       )}
 
-      {/* Message Composer Footer */}
+      {/* Message Composer */}
       <MessageComposer conversationId={activeChatId} />
-    </main>
+
+      {/* Fullscreen Media Viewer Modal */}
+      {viewerItem && (
+        <MediaViewer
+          items={viewerMediaList}
+          initialIndex={viewerMediaList.findIndex((i) => i.id === viewerItem.id)}
+          onClose={() => setViewerItem(null)}
+          onDownload={(item) => {
+            const targetMsg = activeMessages.find((m) => m.id === item.id);
+            if (targetMsg) handleDownloadAttachment(targetMsg);
+          }}
+          onShare={async (item) => {
+            const targetMsg = activeMessages.find((m) => m.id === item.id);
+            if (targetMsg) handleDownloadAttachment(targetMsg);
+          }}
+        />
+      )}
+
+      {/* Shared Media Gallery Modal */}
+      {showGallery && (
+        <MediaGalleryModal
+          conversationName={conversationName}
+          messages={activeMessages}
+          onClose={() => setShowGallery(false)}
+          onOpenMedia={(item, allItems) => {
+            setViewerMediaList(allItems);
+            setViewerItem(item);
+          }}
+          onDownloadFile={(msg) => handleDownloadAttachment(msg)}
+        />
+      )}
+    </div>
   );
 };

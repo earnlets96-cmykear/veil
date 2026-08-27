@@ -35,6 +35,7 @@ export const App: React.FC = () => {
       <ConversationView />
 
       {/* Modals */}
+      {activeModal?.type === 'settings' && <SettingsModal />}
       {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
       {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
       {activeModal?.type === 'newChat' && <NewChatModal />}

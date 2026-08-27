@@ -40,6 +40,7 @@ import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { randomBytes, bytesToBase64, bytesToHex } from '../../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha256.js';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
+import { MediaCache } from '../utils/mediaCache.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -621,6 +622,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSearchResults([]);
       searchEngine.clear();
       AttachmentPipeline.revokeAllEphemeralBlobUrls();
+      MediaCache.clear();
       notificationDispatcher.setLocked(true);
     });
     return unsub;
@@ -926,6 +928,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
 
+      let previewUrl: string | undefined;
+      if (metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/')) {
+        previewUrl = AttachmentPipeline.createEphemeralBlobUrl(fileBytes, metadata.mimeType);
+      }
+
       const attachmentPayload = {
         attachmentId: metadata.attachmentId,
         objectId,
@@ -937,7 +944,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sha256Hash: metadata.sha256Hash,
         ciphertextHash,
         encryptionKeyBase64: bytesToBase64(ephemeralKey),
+        previewUrl,
       };
+
+      const cacheKey = objectId || metadata.attachmentId;
+      MediaCache.set(cacheKey, {
+        id: cacheKey,
+        blobUrl: previewUrl || '',
+        data: fileBytes,
+        mimeType: metadata.mimeType,
+        name: metadata.name,
+        sizeBytes: fileBytes.length,
+      });
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const activeReply = replyTarget ? {
@@ -951,7 +969,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: msgId,
         conversationId,
         senderId: activeSession.spaceId,
-        text: `📎 Attachment: ${file.name}`,
+        text: metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/') ? '' : `Attachment: ${file.name}`,
         isOutgoing: true,
         timestamp: Date.now(),
         status: 'SENDING',

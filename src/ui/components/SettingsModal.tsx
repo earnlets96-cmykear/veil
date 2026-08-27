@@ -1,24 +1,21 @@
 /**
- * Redesigned Settings & Space Management Modal for VEIL Phase 32.
+ * Telegram-Inspired Settings & Privacy Management Modal for VEIL.
  *
- * Implements Telegram-inspired information architecture:
- * 1. My Profile
- * 2. Account & Identity
- * 3. Privacy & Security
- * 4. Notifications
- * 5. Appearance
- * 6. Storage & Data
- * 7. Spaces
- * 8. About VEIL
- *
- * Features two-column desktop navigation and mobile drill-down navigation
- * with touch targets >= 44px and safe-area compatibility.
+ * Implements clean categorized settings architecture:
+ * - Profile Header Card (Avatar, Name, @username, Space Status)
+ * - ACCOUNT (Profile, Username & Identity, Linked Devices & Key Export)
+ * - PRIVACY & SECURITY (Argon2id Master Key, Auto-Lock, Panic Lock, Space Isolation)
+ * - APPEARANCE (Theme, Message Density, Visual Effects)
+ * - NOTIFICATIONS (Privacy Modes, Sound & Alerts)
+ * - STORAGE & DATA (Encrypted Storage, Ephemeral Media Cache, Cloud Sync)
+ * - ABOUT VEIL (Version 1.0.0, Post-RC Security Freeze Active)
  */
 
 import React, { useState, useRef, ReactNode } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { NotificationPrivacyMode } from '../../notifications/types.ts';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
+import { MediaCache } from '../utils/mediaCache.ts';
 import {
   Avatar,
   Badge,
@@ -44,16 +41,17 @@ import {
   CheckIcon,
   RefreshCwIcon,
   TrashIcon,
+  ChevronRightIcon,
 } from './icons/index.ts';
 
 type SettingsCategory =
+  | 'overview'
   | 'profile'
   | 'account'
   | 'privacy'
   | 'notifications'
   | 'appearance'
   | 'storage'
-  | 'spaces'
   | 'about';
 
 export const SettingsModal: React.FC = () => {
@@ -71,14 +69,12 @@ export const SettingsModal: React.FC = () => {
     updatePrivacySettings,
     registerUsername,
     lockSpace,
-    knownSpacesCount,
   } = useApp();
 
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('profile');
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('overview');
 
   // Profile Form State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -99,7 +95,7 @@ export const SettingsModal: React.FC = () => {
   const [densityVal, setDensityVal] = useState('normal');
   const [cacheCleared, setCacheCleared] = useState(false);
 
-  const [devices, setDevices] = useState<{ id: string; name: string; lastSeen: number }[]>([
+  const [devices] = useState<{ id: string; name: string; lastSeen: number }[]>([
     { id: 'dev_primary', name: 'Primary Device (This Client)', lastSeen: Date.now() },
   ]);
 
@@ -148,659 +144,550 @@ export const SettingsModal: React.FC = () => {
       setIsEditingProfile(false);
     } catch (err: any) {
       setProfileError(err.message || "Couldn't publish your profile. Please try again.");
-      showToast({ type: 'error', message: err.message || 'Failed to update profile' });
     } finally {
       setProfileSaving(false);
     }
   };
 
-  const handleAutoLockChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const mins = parseInt(e.target.value, 10);
-    setAutoLockVal(e.target.value);
-    sessionController.setAutoLockMinutes(mins);
-    showToast({ type: 'info', message: `Auto-lock updated to ${mins === 0 ? 'Immediate' : `${mins} minutes`}` });
-  };
-
-  const handleNotifModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const mode = e.target.value as NotificationPrivacyMode;
-    setNotifLevel(mode);
-    notificationDispatcher.setPrivacyMode(mode);
-    showToast({ type: 'info', message: `Notification privacy set to ${mode}` });
-  };
-
-  const handleCopyInvitation = () => {
-    if (invitationLink && navigator.clipboard) {
-      navigator.clipboard.writeText(invitationLink);
-      setCopiedInvite(true);
-      showToast({ type: 'success', message: 'Signed invitation copied to clipboard' });
-      setTimeout(() => setCopiedInvite(false), 3000);
-    }
+  const handleCopyInvite = () => {
+    navigator.clipboard.writeText(invitationLink);
+    setCopiedInvite(true);
+    showToast({ type: 'success', message: 'Invitation link copied to clipboard' });
+    setTimeout(() => setCopiedInvite(false), 2500);
   };
 
   const handleClearCache = () => {
+    MediaCache.clear();
     setCacheCleared(true);
-    showToast({ type: 'success', message: 'Local cache cleared successfully' });
+    showToast({ type: 'info', message: 'Decrypted media cache zeroized from memory' });
     setTimeout(() => setCacheCleared(false), 3000);
   };
 
-  const selectNavCategory = (cat: SettingsCategory) => {
-    setActiveCategory(cat);
-    setMobileDetailOpen(true);
-  };
-
-  const navCategories: { id: SettingsCategory; label: string; icon: ReactNode }[] = [
-    { id: 'profile', label: 'My Profile', icon: <UserIcon size={18} /> },
-    { id: 'account', label: 'Account & Identity', icon: <KeyIcon size={18} /> },
-    { id: 'privacy', label: 'Privacy & Security', icon: <ShieldIcon size={18} /> },
-    { id: 'notifications', label: 'Notifications', icon: <AlertCircleIcon size={18} /> },
-    { id: 'appearance', label: 'Appearance', icon: <SunIcon size={18} /> },
-    { id: 'storage', label: 'Storage & Data', icon: <FolderIcon size={18} /> },
-    { id: 'spaces', label: 'Spaces & Vault', icon: <LockIcon size={18} /> },
-    { id: 'about', label: 'About VEIL', icon: <InfoIcon size={18} /> },
-  ];
-
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <div className="veil-modal-card veil-settings-modal-card">
-        {/* Header */}
-        <div className="veil-modal-header" style={{ padding: 'var(--veil-space-3) var(--veil-space-4)', borderBottom: '1px solid var(--veil-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {mobileDetailOpen && (
+    <div
+      className="veil-modal-overlay"
+      onClick={closeModal}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
+    >
+      <div className="veil-settings-modal-container" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div className="veil-settings-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {activeCategory !== 'overview' && (
               <IconButton
                 icon={<ArrowLeftIcon size={18} />}
+                onClick={() => setActiveCategory('overview')}
                 aria-label="Back to settings menu"
-                className="veil-back-btn"
-                onClick={() => setMobileDetailOpen(false)}
+                variant="ghost"
               />
             )}
-            <h2 id="settings-title" style={{ fontSize: 'var(--veil-text-base)', fontWeight: 600 }}>
-              Settings
+            <h2 className="veil-settings-header-title">
+              {activeCategory === 'overview' && 'Settings'}
+              {activeCategory === 'profile' && 'My Profile'}
+              {activeCategory === 'account' && 'Account & Identity'}
+              {activeCategory === 'privacy' && 'Privacy & Security'}
+              {activeCategory === 'appearance' && 'Appearance'}
+              {activeCategory === 'notifications' && 'Notifications'}
+              {activeCategory === 'storage' && 'Storage & Data'}
+              {activeCategory === 'about' && 'About VEIL'}
             </h2>
           </div>
           <IconButton
             icon={<CloseIcon size={18} />}
-            aria-label="Close settings"
             onClick={closeModal}
+            aria-label="Close Settings"
+            variant="ghost"
           />
         </div>
 
-        <div className="veil-settings-layout">
-          {/* Sidebar Category Navigation */}
-          <nav
-            className={`veil-settings-sidebar ${mobileDetailOpen ? 'hide-mobile' : ''}`}
-            aria-label="Settings Categories"
-          >
-            {navCategories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                className={`veil-settings-nav-item ${activeCategory === cat.id ? 'active' : ''}`}
-                onClick={() => selectNavCategory(cat.id)}
+        {/* Modal Body */}
+        <div className="veil-settings-modal-body">
+          {/* 1. OVERVIEW SCREEN (TELEGRAM-STYLE PROFILE HEADER + GROUPED SECTIONS) */}
+          {activeCategory === 'overview' && (
+            <div className="veil-settings-overview">
+              {/* Profile Header Card */}
+              <div
+                className="veil-settings-profile-card"
+                onClick={() => setActiveCategory('profile')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setActiveCategory('profile');
+                }}
               >
-                <span className="veil-settings-nav-icon">{cat.icon}</span>
-                <span>{cat.label}</span>
-              </button>
-            ))}
-          </nav>
-
-          {/* Settings Detail Content Panel */}
-          <main className={`veil-settings-detail ${!mobileDetailOpen ? 'hide-mobile' : ''}`}>ilOpen ? 'hide-mobile' : ''}`}>
-            {/* 1. MY PROFILE */}
-            {activeCategory === 'profile' && (
-              <div>
-                <div className="veil-profile-hero">
-                  <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
-                    <Avatar
-                      name={displayNameInput || activeSession?.name || 'User'}
-                      size="xl"
-                    />
-                    {isEditingProfile && (
-                      <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          style={{ display: 'none' }}
-                          onChange={handlePhotoSelect}
-                          aria-label="Upload profile photo"
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <ImageIcon size={14} />
-                          <span>Change</span>
-                        </Button>
-                        {avatarPreview && (
-                          <Button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            onClick={() => setAvatarPreview(null)}
-                          >
-                            <CloseIcon size={14} />
-                            <span>Remove</span>
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                <Avatar
+                  name={displayNameInput || activeSession?.name || 'User'}
+                  imageUrl={avatarPreview || undefined}
+                  size="xl"
+                  aria-label="Profile Avatar"
+                />
+                <div className="veil-settings-profile-info">
+                  <div className="veil-settings-profile-name">
+                    {displayNameInput || activeSession?.name || 'Active User'}
                   </div>
-
-                  <div style={{ fontSize: 'var(--veil-text-base)', fontWeight: 700 }}>
-                    {myProfile?.displayName || displayNameInput || activeSession?.name}
+                  <div className="veil-settings-profile-handle">
+                    {myProfile?.username ? `@${myProfile.username}` : 'No username set (Tap to configure)'}
                   </div>
-                  <div style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-accent-secondary)' }}>
-                    @{myProfile?.username || usernameInput || 'username'}
+                  <div className="veil-settings-profile-space">
+                    <span className="veil-status-dot online" />
+                    <span>Space: {activeSession?.name || 'Primary'} (Argon2id Encrypted)</span>
                   </div>
+                </div>
+                <ChevronRightIcon size={20} color="var(--veil-text-muted)" />
+              </div>
 
-                  {!isEditingProfile && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <Badge variant="secure">Public Profile Active</Badge>
-                    </div>
-                  )}
+              {/* Group 1: ACCOUNT */}
+              <div className="veil-settings-group">
+                <div className="veil-settings-group-header">ACCOUNT</div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('profile')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-blue">
+                    <UserIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Edit Profile</div>
+                    <div className="veil-settings-row-sub">Display name, bio, profile photo</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
                 </div>
 
-                {profileError && (
-                  <div
-                    style={{
-                      padding: '0.65rem',
-                      backgroundColor: 'var(--veil-danger-bg)',
-                      border: '1px solid var(--veil-danger-border)',
-                      borderRadius: 'var(--veil-radius-md)',
-                      color: 'var(--veil-danger)',
-                      fontSize: 'var(--veil-text-xs)',
-                      marginBottom: '1rem',
-                    }}
-                    role="alert"
-                  >
-                    {profileError}
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('account')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-indigo">
+                    <KeyIcon size={18} color="#ffffff" />
                   </div>
-                )}
-
-                {isEditingProfile ? (
-                  <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.2rem' }}>
-                        Display Name
-                      </label>
-                      <Input
-                        value={displayNameInput}
-                        onChange={(e) => setDisplayNameInput(e.target.value)}
-                        placeholder="Display name"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.2rem' }}>
-                        Public Handle (@username)
-                      </label>
-                      <Input
-                        value={usernameInput}
-                        onChange={(e) => setUsernameInput(e.target.value)}
-                        placeholder="username"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.2rem' }}>
-                        Bio
-                      </label>
-                      <textarea
-                        className="veil-input"
-                        rows={2}
-                        style={{ width: '100%', resize: 'none', fontSize: 'var(--veil-text-xs)' }}
-                        placeholder="About you..."
-                        value={bioInput}
-                        onChange={(e) => setBioInput(e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.2rem' }}>
-                        Phone / Contact Number
-                      </label>
-                      <Input
-                        value={phoneInput}
-                        onChange={(e) => setPhoneInput(e.target.value)}
-                        placeholder="+1 (555) 000-0000"
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        style={{ flex: 1 }}
-                        onClick={() => setIsEditingProfile(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        style={{ flex: 1 }}
-                        disabled={profileSaving || !usernameInput.trim()}
-                      >
-                        {profileSaving ? (
-                          <>
-                            <Spinner size="sm" />
-                            <span>Publishing...</span>
-                          </>
-                        ) : (
-                          'Save & Publish'
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div>
-                    <div className="veil-profile-info-row">
-                      <div>
-                        <div className="veil-profile-info-label">Bio</div>
-                        <div className="veil-profile-info-val">{privacySettings.bio || 'No bio provided'}</div>
-                      </div>
-                    </div>
-                    <div className="veil-profile-info-row">
-                      <div>
-                        <div className="veil-profile-info-label">Phone</div>
-                        <div className="veil-profile-info-val">{privacySettings.phoneNumber || 'Hidden / None'}</div>
-                      </div>
-                      <Badge variant="neutral">
-                        {privacySettings.phoneVisibility === 'nobody' ? 'Private' : privacySettings.phoneVisibility}
-                      </Badge>
-                    </div>
-
-                    <div style={{ marginTop: '1rem' }}>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        style={{ width: '100%' }}
-                        onClick={() => setIsEditingProfile(true)}
-                      >
-                        Edit Profile
-                      </Button>
-                    </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Username & Identity</div>
+                    <div className="veil-settings-row-sub">Public handle, device linking & keys</div>
                   </div>
-                )}
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
               </div>
-            )}
 
-            {/* 2. ACCOUNT & IDENTITY */}
-            {activeCategory === 'account' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Account & Cryptographic Identity
-                </h3>
+              {/* Group 2: PRIVACY & SECURITY */}
+              <div className="veil-settings-group">
+                <div className="veil-settings-group-header">PRIVACY & SECURITY</div>
 
-                <div className="veil-card" style={{ marginBottom: '1rem' }}>
-                  <div className="veil-profile-info-label" style={{ marginBottom: '0.25rem' }}>
-                    Active Identity Fingerprint
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('privacy')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-emerald">
+                    <ShieldIcon size={18} color="#ffffff" />
                   </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--veil-font-mono)',
-                      fontSize: '0.72rem',
-                      backgroundColor: 'var(--veil-bg-base)',
-                      padding: '0.45rem 0.6rem',
-                      borderRadius: 'var(--veil-radius-sm)',
-                      border: '1px solid var(--veil-border)',
-                      wordBreak: 'break-all',
-                      color: 'var(--veil-text-primary)',
-                      marginBottom: '0.75rem',
-                    }}
-                  >
-                    {fingerprint}
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Security & Cryptography</div>
+                    <div className="veil-settings-row-sub">Auto-lock timer, panic lock, master key</div>
                   </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('notifications')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-amber">
+                    <SunIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Notification Privacy</div>
+                    <div className="veil-settings-row-sub">Preview content, sender-only alerts</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+              </div>
+
+              {/* Group 3: APP SETTINGS */}
+              <div className="veil-settings-group">
+                <div className="veil-settings-group-header">APP SETTINGS</div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('appearance')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-purple">
+                    <SunIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Appearance</div>
+                    <div className="veil-settings-row-sub">Theme, message density, typography</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('storage')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-cyan">
+                    <FolderIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Storage & Data</div>
+                    <div className="veil-settings-row-sub">IndexedDB encrypted store, media cache</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+              </div>
+
+              {/* Group 4: ABOUT */}
+              <div className="veil-settings-group">
+                <div className="veil-settings-group-header">ABOUT</div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('about')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-rose">
+                    <InfoIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">About VEIL</div>
+                    <div className="veil-settings-row-sub">Version 1.0.0 • Post-RC Security Freeze</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+              </div>
+
+              {/* Quick Action Footer */}
+              <div className="veil-settings-footer-actions">
+                <Button
+                  variant="secondary"
+                  onClick={lockSpace}
+                  icon={<LockIcon size={16} />}
+                  fullWidth
+                >
+                  Lock Active Space
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={panicLock}
+                  icon={<AlertCircleIcon size={16} />}
+                  fullWidth
+                >
+                  Emergency Panic Lock
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. PROFILE EDITING SUB-PAGE */}
+          {activeCategory === 'profile' && (
+            <div className="veil-settings-subpage">
+              <form onSubmit={handleSaveProfile} className="veil-settings-form">
+                <div className="veil-avatar-upload-section">
+                  <Avatar
+                    name={displayNameInput || activeSession?.name || 'Profile'}
+                    imageUrl={avatarPreview || undefined}
+                    size="xl"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoSelect}
+                    style={{ display: 'none' }}
+                  />
                   <Button
+                    type="button"
                     variant="secondary"
                     size="sm"
-                    style={{ width: '100%' }}
-                    onClick={handleCopyInvitation}
+                    onClick={() => fileInputRef.current?.click()}
                   >
-                    {copiedInvite ? (
-                      <>
-                        <CheckIcon size={16} color="var(--veil-success)" />
-                        <span>Link Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShareIcon size={16} />
-                        <span>Copy Cryptographic Invitation Link</span>
-                      </>
-                    )}
+                    Change Photo
                   </Button>
                 </div>
 
-                <div className="veil-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-xs)' }}>Linked Devices</span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowPairingSas(true)}
-                    >
-                      <PlusIcon size={14} />
-                      <span>Link Device</span>
-                    </Button>
+                {profileError && (
+                  <div className="veil-alert veil-alert-danger" role="alert">
+                    <AlertCircleIcon size={16} />
+                    <span>{profileError}</span>
                   </div>
+                )}
 
-                  {showPairingSas && (
-                    <div
-                      style={{
-                        padding: '0.75rem',
-                        backgroundColor: 'var(--veil-bg-base)',
-                        border: '1px solid var(--veil-accent-primary)',
-                        borderRadius: 'var(--veil-radius-md)',
-                        textAlign: 'center',
-                        marginBottom: '0.5rem',
-                      }}
-                    >
-                      <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>
-                        SAS Trust Code:
+                <Input
+                  label="Display Name"
+                  value={displayNameInput}
+                  onChange={(e) => setDisplayNameInput(e.target.value)}
+                  placeholder="How contacts see you"
+                />
+
+                <Input
+                  label="Unique Username"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="e.g. alice"
+                  helperText="Required for peer discovery on the zero-knowledge directory"
+                />
+
+                <Input
+                  label="Bio"
+                  value={bioInput}
+                  onChange={(e) => setBioInput(e.target.value)}
+                  placeholder="Tell contacts about yourself"
+                />
+
+                <Input
+                  label="Phone Number (Optional)"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  placeholder="+1 (555) 000-0000"
+                />
+
+                <div className="veil-settings-form-actions">
+                  <Button type="submit" variant="primary" loading={profileSaving}>
+                    Save & Publish Profile
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* 3. ACCOUNT & IDENTITY SUB-PAGE */}
+          {activeCategory === 'account' && (
+            <div className="veil-settings-subpage">
+              <div className="veil-card">
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Cryptographic Space Fingerprint
+                </h3>
+                <code className="veil-key-display">{fingerprint}</code>
+              </div>
+
+              <div className="veil-card" style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Signed Invitation Link
+                </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  Share this cryptographic link with trusted contacts to establish an end-to-end encrypted session.
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <Button
+                    variant="primary"
+                    onClick={handleCopyInvite}
+                    icon={copiedInvite ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+                  >
+                    {copiedInvite ? 'Copied Link!' : 'Copy Invitation Link'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="veil-card" style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Linked Devices ({devices.length})
+                </h3>
+                {devices.map((dev) => (
+                  <div key={dev.id} className="veil-device-row">
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{dev.name}</div>
+                      <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
+                        Active Now • E2EE Ratchet Synchronized
                       </div>
-                      <div style={{ fontFamily: 'var(--veil-font-mono)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--veil-accent-secondary)' }}>
-                        842 196
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        style={{ marginTop: '0.35rem' }}
-                        onClick={() => setShowPairingSas(false)}
-                      >
-                        Done
-                      </Button>
                     </div>
-                  )}
+                    <Badge variant="success">Verified</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  {devices.map((d) => (
-                    <div
-                      key={d.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: 'var(--veil-text-xs)',
-                        padding: '0.35rem 0',
-                        borderBottom: '1px solid var(--veil-border-subtle)',
-                      }}
-                    >
+          {/* 4. PRIVACY & SECURITY SUB-PAGE */}
+          {activeCategory === 'privacy' && (
+            <div className="veil-settings-subpage">
+              <div className="veil-card">
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Inactivity Auto-Lock
+                </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  Zeroizes decrypted session keys from RAM after the specified period of inactivity.
+                </p>
+                <select
+                  value={autoLockVal}
+                  onChange={(e) => setAutoLockVal(e.target.value)}
+                  className="veil-select"
+                >
+                  <option value="1">1 minute</option>
+                  <option value="5">5 minutes (Recommended)</option>
+                  <option value="15">15 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="never">Never (Not Recommended)</option>
+                </select>
+              </div>
+
+              <div className="veil-card" style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Emergency Panic Lock
+                </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  Instantly wipes all ephemeral keys, decrypted media buffers, and session states from memory.
+                </p>
+                <Button variant="danger" onClick={panicLock} icon={<AlertCircleIcon size={16} />}>
+                  Trigger Panic Lock
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 5. NOTIFICATIONS SUB-PAGE */}
+          {activeCategory === 'notifications' && (
+            <div className="veil-settings-subpage">
+              <div className="veil-card">
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Notification Privacy Mode
+                </h3>
+                <div className="veil-radio-group">
+                  {[
+                    { id: 'full', label: 'Full Preview', desc: 'Shows sender name and message snippet' },
+                    { id: 'sender-only', label: 'Sender Only', desc: 'Shows sender name without message content' },
+                    { id: 'minimal-alert', label: 'Minimal Alert', desc: 'Shows "New encrypted message received"' },
+                    { id: 'silent-counter', label: 'Silent Counter', desc: 'Only updates unread badge counter' },
+                  ].map((mode) => (
+                    <label key={mode.id} className="veil-radio-label">
+                      <input
+                        type="radio"
+                        name="notifPrivacy"
+                        checked={notifLevel === mode.id}
+                        onChange={() => setNotifLevel(mode.id as NotificationPrivacyMode)}
+                      />
                       <div>
-                        <div style={{ fontWeight: 600 }}>{d.name}</div>
-                        <div style={{ color: 'var(--veil-text-muted)', fontSize: '0.7rem' }}>
-                          ID: {d.id} • Active now
+                        <div style={{ fontWeight: 600 }}>{mode.label}</div>
+                        <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
+                          {mode.desc}
                         </div>
                       </div>
-                      <Badge variant="secure">Verified</Badge>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 6. APPEARANCE SUB-PAGE */}
+          {activeCategory === 'appearance' && (
+            <div className="veil-settings-subpage">
+              <div className="veil-card">
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Theme
+                </h3>
+                <div className="veil-theme-grid">
+                  {[
+                    { id: 'onyx-dark', name: 'Onyx Dark', color: '#0b0e14' },
+                    { id: 'slate-dark', name: 'Slate Dark', color: '#0f172a' },
+                    { id: 'obsidian', name: 'Obsidian Black', color: '#000000' },
+                    { id: 'cyberpunk', name: 'Cyberpunk Neon', color: '#080811' },
+                  ].map((t) => (
+                    <div
+                      key={t.id}
+                      className={`veil-theme-card ${themeVal === t.id ? 'active' : ''}`}
+                      onClick={() => setThemeVal(t.id)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="veil-theme-swatch" style={{ background: t.color }} />
+                      <div className="veil-theme-name">{t.name}</div>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* 3. PRIVACY & SECURITY */}
-            {activeCategory === 'privacy' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Privacy & Cryptographic Security
+              <div className="veil-card" style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Message Density
                 </h3>
-
-                <div className="veil-card" style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Phone Number Visibility
-                    </label>
-                    <select
-                      className="veil-input"
-                      style={{ fontSize: 'var(--veil-text-xs)' }}
-                      value={privacySettings.phoneVisibility}
-                      onChange={(e) => updatePrivacySettings({ phoneVisibility: e.target.value as any })}
-                    >
-                      <option value="nobody">Nobody (Maximum Privacy)</option>
-                      <option value="contacts">My Contacts Only</option>
-                      <option value="everyone">Everyone</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Directory Profile Visibility
-                    </label>
-                    <select
-                      className="veil-input"
-                      style={{ fontSize: 'var(--veil-text-xs)' }}
-                      value={privacySettings.profileVisibility}
-                      onChange={(e) => updatePrivacySettings({ profileVisibility: e.target.value as any })}
-                    >
-                      <option value="everyone">Public (Searchable in Directory)</option>
-                      <option value="contacts">Contacts Only</option>
-                      <option value="nobody">Hidden (Direct Invitation Only)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Space Inactivity Auto-Lock
-                    </label>
-                    <select
-                      className="veil-input"
-                      style={{ fontSize: 'var(--veil-text-xs)' }}
-                      value={autoLockVal}
-                      onChange={handleAutoLockChange}
-                    >
-                      <option value="0">Immediate (On Blur)</option>
-                      <option value="1">1 Minute</option>
-                      <option value="5">5 Minutes (Recommended)</option>
-                      <option value="15">15 Minutes</option>
-                      <option value="30">30 Minutes</option>
-                      <option value="60">1 Hour</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="veil-card">
-                  <h4 style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-danger)', marginBottom: '0.4rem' }}>
-                    Emergency Panic Lock
-                  </h4>
-                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.6rem' }}>
-                    Instantly wipes all decrypted keys, active sessions, and sensitive state from volatile memory.
-                  </p>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    style={{ width: '100%' }}
-                    onClick={panicLock}
-                  >
-                    <AlertCircleIcon size={16} />
-                    <span>Trigger Emergency Panic Lock</span>
-                  </Button>
-                </div>
+                <select
+                  value={densityVal}
+                  onChange={(e) => setDensityVal(e.target.value)}
+                  className="veil-select"
+                >
+                  <option value="compact">Compact</option>
+                  <option value="normal">Normal (Default)</option>
+                  <option value="spacious">Spacious</option>
+                </select>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* 4. NOTIFICATIONS */}
-            {activeCategory === 'notifications' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Notification Privacy & Alerts
+          {/* 7. STORAGE SUB-PAGE */}
+          {activeCategory === 'storage' && (
+            <div className="veil-settings-subpage">
+              <div className="veil-card">
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Decrypted Media Cache
                 </h3>
-
-                <div className="veil-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Notification Content Privacy Mode
-                    </label>
-                    <select
-                      className="veil-input"
-                      style={{ fontSize: 'var(--veil-text-xs)' }}
-                      value={notifLevel}
-                      onChange={handleNotifModeChange}
-                    >
-                      <option value="DETAILED">Detailed (Sender & Message Snippet)</option>
-                      <option value="SENDER_ONLY">Sender Only (Hide Content Preview)</option>
-                      <option value="MINIMAL_ALERT">Minimal Alert ("New Encrypted Message")</option>
-                      <option value="SILENT_COUNTER">Silent (Badge Counter Only)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 5. APPEARANCE */}
-            {activeCategory === 'appearance' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Appearance & Design
-                </h3>
-
-                <div className="veil-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Theme
-                    </label>
-                    <select
-                      className="veil-input"
-                      style={{ fontSize: 'var(--veil-text-xs)' }}
-                      value={themeVal}
-                      onChange={(e) => {
-                        setThemeVal(e.target.value);
-                        showToast({ type: 'info', message: `Theme set to ${e.target.value}` });
-                      }}
-                    >
-                      <option value="onyx-dark">Onyx Dark (Default)</option>
-                      <option value="slate-dark">Slate Dark</option>
-                      <option value="obsidian">Obsidian</option>
-                      <option value="cyberpunk">Cyberpunk Neon</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      Message Density
-                    </label>
-                    <select
-                      className="veil-input"
-                      style={{ fontSize: 'var(--veil-text-xs)' }}
-                      value={densityVal}
-                      onChange={(e) => setDensityVal(e.target.value)}
-                    >
-                      <option value="compact">Compact</option>
-                      <option value="normal">Normal</option>
-                      <option value="relaxed">Relaxed</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 6. STORAGE & DATA */}
-            {activeCategory === 'storage' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Storage & Local Cache
-                </h3>
-
-                <div className="veil-card" style={{ marginBottom: '1rem' }}>
-                  <div className="veil-profile-info-row">
-                    <span>Encrypted Space Store</span>
-                    <span style={{ fontWeight: 600 }}>IndexedDB (Active)</span>
-                  </div>
-                  <div className="veil-profile-info-row">
-                    <span>Attachment Cache</span>
-                    <span style={{ fontWeight: 600 }}>Ephemeral Memory</span>
-                  </div>
-                  <div className="veil-profile-info-row">
-                    <span>Active Envelopes</span>
-                    <span style={{ fontWeight: 600 }}>{knownSpacesCount} Spaces</span>
-                  </div>
-                </div>
-
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  In-memory cache of decrypted photos, videos, and audio notes. Zeroizing cache will require re-decrypting media on view.
+                </p>
                 <Button
                   variant="secondary"
-                  size="sm"
-                  style={{ width: '100%' }}
                   onClick={handleClearCache}
+                  icon={cacheCleared ? <CheckIcon size={16} /> : <TrashIcon size={16} />}
                 >
-                  {cacheCleared ? (
-                    <>
-                      <CheckIcon size={16} color="var(--veil-success)" />
-                      <span>Local Cache Cleared</span>
-                    </>
-                  ) : (
-                    <>
-                      <TrashIcon size={16} />
-                      <span>Clear Ephemeral Attachment Cache</span>
-                    </>
-                  )}
+                  {cacheCleared ? 'Cache Zeroized!' : 'Clear In-Memory Media Cache'}
                 </Button>
               </div>
-            )}
 
-            {/* 7. SPACES & VAULT */}
-            {activeCategory === 'spaces' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Active Space & Vault
+              <div className="veil-card" style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Encrypted Space Storage
                 </h3>
-
-                <div className="veil-card" style={{ marginBottom: '1rem' }}>
-                  <div className="veil-profile-info-row">
-                    <span>Space Name</span>
-                    <span style={{ fontWeight: 600 }}>{activeSession?.name}</span>
-                  </div>
-                  <div className="veil-profile-info-row">
-                    <span>Space ID</span>
-                    <code style={{ fontSize: '0.75rem' }}>{activeSession?.spaceId.slice(0, 16)}...</code>
-                  </div>
-                  <div className="veil-profile-info-row">
-                    <span>Storage Status</span>
-                    <Badge variant="secure">Argon2id Encrypted</Badge>
-                  </div>
-                </div>
-
-                <Button
-                  variant="secondary"
-                  style={{ width: '100%' }}
-                  onClick={() => {
-                    closeModal();
-                    lockSpace();
-                  }}
-                >
-                  <LockIcon size={16} />
-                  <span>Lock Active Space</span>
-                </Button>
-              </div>
-            )}
-
-            {/* 8. ABOUT VEIL */}
-            {activeCategory === 'about' && (
-              <div>
-                <h3 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  About VEIL
-                </h3>
-
-                <div className="veil-card" style={{ textAlign: 'center', padding: '1.25rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
-                    <ShieldIcon size={40} color="var(--veil-accent-primary)" />
-                  </div>
-                  <h4 style={{ fontSize: '1.1rem', fontWeight: 700 }}>VEIL Messaging</h4>
-                  <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.75rem' }}>
-                    Version 1.0.0 (Release Candidate)
-                  </div>
-                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', lineHeight: 1.5 }}>
-                    Zero-knowledge, privacy-preserving encrypted communications platform.
-                    Protected by Double Ratchet, Argon2id, XChaCha20-Poly1305, and blind relay routing.
-                  </p>
-                  <div style={{ marginTop: '0.75rem' }}>
-                    <Badge variant="secure">Post-RC Security Freeze Active</Badge>
-                  </div>
+                <div style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-secondary)' }}>
+                  IndexedDB AES-GCM local database storage: Active
                 </div>
               </div>
-            )}
-          </main>
+            </div>
+          )}
+
+          {/* 8. ABOUT VEIL SUB-PAGE */}
+          {activeCategory === 'about' && (
+            <div className="veil-settings-subpage">
+              <div className="veil-card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                <div className="veil-shield-badge-lg" style={{ margin: '0 auto 1rem auto' }}>
+                  <ShieldIcon size={36} color="var(--veil-accent-primary)" />
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>VEIL Secure Messenger</h3>
+                <p style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-muted)' }}>
+                  Version 1.0.0 (Phase 33 Production)
+                </p>
+                <div style={{ marginTop: '1rem' }}>
+                  <Badge variant="success">Post-RC Security Freeze Active</Badge>
+                </div>
+              </div>
+
+              <div className="veil-card" style={{ marginTop: '1rem' }}>
+                <h4 style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, marginBottom: '0.5rem' }}>
+                  Cryptographic Architecture
+                </h4>
+                <ul style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', paddingLeft: '1.2rem', lineHeight: '1.6' }}>
+                  <li><strong>Key Derivation:</strong> Argon2id (memory-hard password hashing)</li>
+                  <li><strong>Envelope Encryption:</strong> XChaCha20-Poly1305 AEAD</li>
+                  <li><strong>Identity & Signatures:</strong> Ed25519 (RFC 8032)</li>
+                  <li><strong>Key Exchange:</strong> X25519 ECDH + X3DH</li>
+                  <li><strong>End-to-End Ratchet:</strong> Double Ratchet (Signal Protocol)</li>
+                  <li><strong>Multi-Space Isolation:</strong> Cryptographic per-Space Envelope Store</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

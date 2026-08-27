@@ -20,6 +20,8 @@ import {
 } from '../icons/index.ts';
 import { IconButton } from '../ui/IconButton.tsx';
 import { MediaViewerItem } from './MediaViewer.tsx';
+import { MediaImage } from './MediaImage.tsx';
+import { MediaCache } from '../../utils/mediaCache.ts';
 
 export interface MediaGalleryModalProps {
   conversationName: string;
@@ -52,16 +54,23 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
 
   const voiceMessages = messages.filter((m) => m.voice);
 
-  const mediaViewerItems: MediaViewerItem[] = mediaMessages.map((m) => ({
-    id: m.id,
-    type: m.attachment.mimeType?.startsWith('video/') ? 'video' : 'image',
-    url: m.attachment.previewUrl || m.attachment.url || '',
-    name: m.attachment.name || 'Attachment',
-    sizeBytes: m.attachment.sizeBytes,
-    mimeType: m.attachment.mimeType,
-    timestamp: m.timestamp,
-    senderName: m.senderName,
-  }));
+  const getMediaViewerItems = (): MediaViewerItem[] => {
+    return mediaMessages.map((m) => {
+      const key = m.attachment.objectId || m.attachment.attachmentId || m.attachment.name;
+      const cached = MediaCache.get(key);
+      return {
+        id: m.id,
+        type: m.attachment.mimeType?.startsWith('video/') ? 'video' : 'image',
+        url: cached?.blobUrl || m.attachment.previewUrl || m.attachment.url || '',
+        name: m.attachment.name || 'Attachment',
+        sizeBytes: m.attachment.sizeBytes,
+        mimeType: m.attachment.mimeType,
+        timestamp: m.timestamp,
+        senderName: m.senderName,
+        data: cached?.data,
+      };
+    });
+  };
 
   const getFileIcon = (mimeType?: string, name?: string) => {
     const n = (name || '').toLowerCase();
@@ -105,12 +114,13 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
             <h2 className="veil-gallery-title">Shared Media</h2>
             <p className="veil-gallery-subtitle">{conversationName}</p>
           </div>
-          <IconButton icon={<CloseIcon />} onClick={onClose} ariaLabel="Close gallery" variant="ghost" />
+          <IconButton icon={<CloseIcon size={20} />} onClick={onClose} aria-label="Close gallery" variant="ghost" />
         </div>
 
         {/* Tab Selector */}
         <div className="veil-gallery-tabs">
           <button
+            type="button"
             className={`veil-gallery-tab ${activeTab === 'media' ? 'veil-gallery-tab-active' : ''}`}
             onClick={() => setActiveTab('media')}
           >
@@ -119,6 +129,7 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
           </button>
 
           <button
+            type="button"
             className={`veil-gallery-tab ${activeTab === 'files' ? 'veil-gallery-tab-active' : ''}`}
             onClick={() => setActiveTab('files')}
           >
@@ -127,6 +138,7 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
           </button>
 
           <button
+            type="button"
             className={`veil-gallery-tab ${activeTab === 'voice' ? 'veil-gallery-tab-active' : ''}`}
             onClick={() => setActiveTab('voice')}
           >
@@ -149,32 +161,28 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
                 <div className="veil-gallery-grid">
                   {mediaMessages.map((m, idx) => {
                     const isVideo = m.attachment.mimeType?.startsWith('video/');
-                    const item = mediaViewerItems[idx];
+                    const allItems = getMediaViewerItems();
+                    const item = allItems[idx];
                     return (
                       <div
                         key={m.id}
                         className="veil-gallery-item"
-                        onClick={() => onOpenMedia(item, mediaViewerItems)}
+                        onClick={() => onOpenMedia(item, allItems)}
                         role="button"
                         tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onOpenMedia(item, allItems);
+                          }
+                        }}
                       >
-                        {m.attachment.previewUrl ? (
-                          <img
-                            src={m.attachment.previewUrl}
-                            alt={m.attachment.name}
-                            className="veil-gallery-thumb"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="veil-gallery-thumb-placeholder">
-                            {isVideo ? <VideoIcon size={32} /> : <ImageIcon size={32} />}
-                          </div>
-                        )}
-                        {isVideo && (
-                          <div className="veil-gallery-video-badge">
-                            <PlayIcon size={12} />
-                          </div>
-                        )}
+                        <MediaImage
+                          attachment={m.attachment}
+                          isVideo={isVideo}
+                          alt={m.attachment.name}
+                          className="veil-gallery-thumb-custom"
+                        />
                       </div>
                     );
                   })}
@@ -207,7 +215,7 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
                       <IconButton
                         icon={<DownloadIcon size={18} />}
                         onClick={() => onDownloadFile(m)}
-                        ariaLabel={`Download ${m.attachment.name}`}
+                        aria-label={`Download ${m.attachment.name}`}
                         variant="secondary"
                         size="sm"
                       />

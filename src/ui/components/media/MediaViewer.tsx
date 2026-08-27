@@ -12,13 +12,13 @@ import {
   ChevronRightIcon,
   ZoomInIcon,
   ZoomOutIcon,
-  MaximizeIcon,
   DownloadIcon,
   ShareIcon,
   PlayIcon,
   PauseIcon,
   VolumeIcon,
   VolumeXIcon,
+  MaximizeIcon,
 } from '../icons/index.ts';
 import { IconButton } from '../ui/IconButton.tsx';
 
@@ -31,6 +31,7 @@ export interface MediaViewerItem {
   mimeType?: string;
   timestamp?: number;
   senderName?: string;
+  data?: Uint8Array;
 }
 
 export interface MediaViewerProps {
@@ -59,6 +60,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   const [videoDuration, setVideoDuration] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const currentItem = items[currentIndex] || items[0];
 
   // Reset zoom and pan when navigating items
@@ -66,6 +68,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setIsPlaying(false);
+    setVideoProgress(0);
   }, [currentIndex]);
 
   const handlePrev = useCallback(() => {
@@ -96,15 +99,24 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   }, [onClose, handlePrev, handleNext]);
 
   const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.5, 4));
+    setZoom((prev) => Math.min(prev + 0.75, 4));
   };
 
   const handleZoomOut = () => {
     setZoom((prev) => {
-      const next = Math.max(prev - 0.5, 1);
+      const next = Math.max(prev - 0.75, 1);
       if (next === 1) setPan({ x: 0, y: 0 });
       return next;
     });
+  };
+
+  const handleDoubleClick = () => {
+    if (zoom > 1) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    } else {
+      setZoom(2.5);
+    }
   };
 
   // Pan interaction
@@ -185,17 +197,15 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
           {currentItem.type === 'image' && (
             <>
               <IconButton
-                icon={<ZoomInIcon />}
+                icon={<ZoomInIcon size={20} />}
                 onClick={handleZoomIn}
-                ariaLabel="Zoom In"
-                size="md"
+                aria-label="Zoom In"
                 variant="ghost"
               />
               <IconButton
-                icon={<ZoomOutIcon />}
+                icon={<ZoomOutIcon size={20} />}
                 onClick={handleZoomOut}
-                ariaLabel="Zoom Out"
-                size="md"
+                aria-label="Zoom Out"
                 variant="ghost"
                 disabled={zoom <= 1}
               />
@@ -204,29 +214,26 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
 
           {onShare && (
             <IconButton
-              icon={<ShareIcon />}
+              icon={<ShareIcon size={20} />}
               onClick={() => onShare(currentItem)}
-              ariaLabel="Share media"
-              size="md"
+              aria-label="Share media"
               variant="ghost"
             />
           )}
 
           {onDownload && (
             <IconButton
-              icon={<DownloadIcon />}
+              icon={<DownloadIcon size={20} />}
               onClick={() => onDownload(currentItem)}
-              ariaLabel="Download file"
-              size="md"
+              aria-label="Download file"
               variant="ghost"
             />
           )}
 
           <IconButton
-            icon={<CloseIcon />}
+            icon={<CloseIcon size={20} />}
             onClick={onClose}
-            ariaLabel="Close viewer"
-            size="md"
+            aria-label="Close viewer"
             variant="ghost"
           />
         </div>
@@ -234,8 +241,10 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
 
       {/* Main Content Stage */}
       <div
+        ref={stageRef}
         className="veil-media-viewer-stage"
         onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
         style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
       >
         {currentItem.type === 'image' && (
@@ -271,10 +280,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
             {/* Custom Sleek Video Controls Bar */}
             <div className="veil-media-viewer-video-controls">
               <IconButton
-                icon={isPlaying ? <PauseIcon /> : <PlayIcon />}
+                icon={isPlaying ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
                 onClick={togglePlay}
-                ariaLabel={isPlaying ? 'Pause video' : 'Play video'}
-                size="sm"
+                aria-label={isPlaying ? 'Pause video' : 'Play video'}
                 variant="primary"
               />
 
@@ -300,10 +308,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
               </div>
 
               <IconButton
-                icon={isMuted ? <VolumeXIcon /> : <VolumeIcon />}
+                icon={isMuted ? <VolumeXIcon size={18} /> : <VolumeIcon size={18} />}
                 onClick={toggleMute}
-                ariaLabel={isMuted ? 'Unmute' : 'Mute'}
-                size="sm"
+                aria-label={isMuted ? 'Unmute' : 'Mute'}
                 variant="ghost"
               />
             </div>
@@ -313,6 +320,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         {/* Previous Navigation Button */}
         {currentIndex > 0 && (
           <button
+            type="button"
             className="veil-media-viewer-nav veil-media-viewer-nav-prev"
             onClick={handlePrev}
             aria-label="Previous media"
@@ -324,6 +332,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         {/* Next Navigation Button */}
         {currentIndex < items.length - 1 && (
           <button
+            type="button"
             className="veil-media-viewer-nav veil-media-viewer-nav-next"
             onClick={handleNext}
             aria-label="Next media"

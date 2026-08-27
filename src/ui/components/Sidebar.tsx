@@ -1,10 +1,9 @@
 /**
- * Modernized Conversation Sidebar Component for VEIL Phase 31/32.
+ * Modernized Conversation Sidebar Component for VEIL Phase 33.
  *
- * Implements unified instant search (local conversations, contacts, messages,
- * and debounced global directory discovery), active Space identity header,
- * tabbed filtering (All, Chats, Groups, Contacts), contact request actions,
- * and invitation sharing using 100% SVG vector iconography and reusable primitives.
+ * Implements Telegram-inspired conversation list, active Space identity header,
+ * tabbed filtering (All, Chats, Groups, Contacts), SVG snippet indicators (Photo,
+ * Video, File, Voice), and unread badge counters with zero emojis.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -31,6 +30,10 @@ import {
   CheckIcon,
   SettingsIcon,
   UserIcon,
+  ImageIcon,
+  VideoIcon,
+  FileIcon,
+  MicIcon,
 } from './icons/index.ts';
 
 export const Sidebar: React.FC = () => {
@@ -58,95 +61,149 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
-  const [copiedInvite, setCopiedInvite] = useState(false);
-
-  // Global Directory Search State
+  const [copiedLink, setCopiedLink] = useState(false);
   const [globalResults, setGlobalResults] = useState<DirectorySearchResult[]>([]);
   const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
-  const lastQueriedRef = useRef<string>('');
 
-  const pendingIncoming = contactRequests.filter((r) => r.status === 'INCOMING_PENDING');
-  const pendingOutgoing = contactRequests.filter((r) => r.status === 'OUTGOING_PENDING');
+  const debounceTimerRef = useRef<any>(null);
 
   // Debounced Global Directory Search
   useEffect(() => {
-    const raw = searchQuery.trim();
-    const cleanQuery = raw.replace(/^@/, '').trim();
-
-    if (cleanQuery.length < 2) {
+    const q = searchQuery.trim();
+    if (!q || q.length < 2) {
       setGlobalResults([]);
       setIsSearchingDirectory(false);
       setDirectoryError(null);
-      lastQueriedRef.current = '';
       return;
     }
 
-    if (lastQueriedRef.current === cleanQuery) {
-      return;
-    }
-
-    let isMounted = true;
     setIsSearchingDirectory(true);
     setDirectoryError(null);
 
-    const timer = setTimeout(async () => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(async () => {
       try {
-        lastQueriedRef.current = cleanQuery;
-        const results = await searchDirectory(cleanQuery);
-        if (isMounted) {
-          setGlobalResults(results || []);
-          setIsSearchingDirectory(false);
-        }
-      } catch (_err: any) {
-        if (isMounted) {
-          setDirectoryError("Couldn't search directory right now.");
-          setIsSearchingDirectory(false);
-        }
+        const results = await searchDirectory(q);
+        setGlobalResults(results);
+      } catch (err: any) {
+        setDirectoryError(err?.message || 'Directory search unavailable');
+        setGlobalResults([]);
+      } finally {
+        setIsSearchingDirectory(false);
       }
-    }, 280);
+    }, 300);
 
     return () => {
-      isMounted = false;
-      clearTimeout(timer);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
   }, [searchQuery, searchDirectory]);
 
-  const handleCopyInvite = () => {
-    const invite = exportMyInvitation();
-    if (invite && navigator.clipboard) {
-      navigator.clipboard.writeText(invite);
-      setCopiedInvite(true);
-      setTimeout(() => setCopiedInvite(false), 3000);
-    }
+  const handleCopyInvitation = () => {
+    const link = exportMyInvitation();
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
   };
 
+  const formatConversationTime = (timestamp?: number) => {
+    if (!timestamp) return '';
+    const now = new Date();
+    const date = new Date(timestamp);
+
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    if (isYesterday) {
+      return 'Yesterday';
+    }
+
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  };
+
+  const renderMessageSnippet = (lastMessage?: string) => {
+    if (!lastMessage) return 'E2EE encrypted conversation';
+    const msg = lastMessage.trim();
+
+    if (msg.includes('📎 Attachment:') || msg.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+      return (
+        <span className="veil-snippet-with-icon">
+          <ImageIcon size={14} color="var(--veil-accent-primary)" />
+          <span>Photo</span>
+        </span>
+      );
+    }
+
+    if (msg.match(/\.(mp4|webm|mov|mkv)$/i)) {
+      return (
+        <span className="veil-snippet-with-icon">
+          <VideoIcon size={14} color="var(--veil-accent-primary)" />
+          <span>Video</span>
+        </span>
+      );
+    }
+
+    if (msg.toLowerCase().includes('voice note') || msg.toLowerCase().includes('voice message')) {
+      return (
+        <span className="veil-snippet-with-icon">
+          <MicIcon size={14} color="var(--veil-accent-primary)" />
+          <span>Voice message</span>
+        </span>
+      );
+    }
+
+    if (msg.includes('📎') || msg.includes('Attachment:')) {
+      const cleanName = msg.replace(/^📎\s*Attachment:\s*/i, '');
+      return (
+        <span className="veil-snippet-with-icon">
+          <FileIcon size={14} color="var(--veil-accent-primary)" />
+          <span>{cleanName}</span>
+        </span>
+      );
+    }
+
+    return msg;
+  };
+
+  // Filter conversations
   const filteredConversations = conversations.filter((c) => {
+    if (activeTab === 'all') return true;
     if (activeTab === 'direct') return c.type === 'direct';
     if (activeTab === 'group') return c.type === 'group';
     return true;
   });
 
-  const queryLower = searchQuery.trim().toLowerCase().replace(/^@/, '');
-  const localMatchingContacts = queryLower
-    ? contacts.filter(
-        (c) =>
-          c.name.toLowerCase().includes(queryLower) ||
-          c.identityId.toLowerCase().includes(queryLower)
-      )
-    : [];
+  const pendingIncoming = contactRequests.filter((r) => r.direction === 'inbound' && r.status === 'pending');
 
-  const localConvResults = searchResults.filter((r) => r.type === 'contact' || r.type === 'group');
-  const localMessageResults = searchResults.filter((r) => r.type === 'message');
+  const localConvResults = searchResults.filter((r) => r.type === 'conversation' || r.type === 'message');
+  const localMatchingContacts = contacts.filter((c) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return false;
+    return c.name.toLowerCase().includes(q) || c.identityId.toLowerCase().includes(q);
+  });
 
-  const hasAnySearchResults =
-    localConvResults.length > 0 ||
-    localMatchingContacts.length > 0 ||
-    globalResults.length > 0 ||
-    localMessageResults.length > 0;
+  const hasAnySearchResults = localConvResults.length > 0 || localMatchingContacts.length > 0 || globalResults.length > 0;
 
   return (
-    <aside className="veil-sidebar" role="complementary" aria-label="Sidebar Navigation">
+    <div className="veil-sidebar" role="region" aria-label="Conversation List">
       {/* Space Header */}
       <div className="veil-sidebar-header">
         <div
@@ -163,14 +220,14 @@ export const Sidebar: React.FC = () => {
           }}
         >
           <Avatar
-            name={activeSession?.name || 'Active Space'}
+            name={myProfile?.displayName || activeSession?.name || 'Active Space'}
+            imageUrl={myProfile?.avatar}
             size="md"
-            isSquare
             aria-label="Current Space Profile"
           />
           <div>
             <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-              {activeSession?.name || 'Active Space'}
+              {myProfile?.displayName || activeSession?.name || 'Active Space'}
             </div>
             <StatusIndicator
               status={
@@ -203,21 +260,18 @@ export const Sidebar: React.FC = () => {
             variant="ghost"
             onClick={() => openModal({ type: 'settings' as any })}
             aria-label="Settings"
-            title="Settings"
           />
           <IconButton
             icon={<LockIcon size={18} />}
             variant="secondary"
             onClick={lockSpace}
             aria-label="Lock Space"
-            title="Lock Space"
           />
           <IconButton
             icon={<AlertCircleIcon size={18} />}
             variant="danger"
             onClick={panicLock}
             aria-label="Panic Lock: Instant Memory Wipe"
-            title="Panic Lock: Instant Memory Wipe"
           />
         </div>
       </div>
@@ -228,7 +282,7 @@ export const Sidebar: React.FC = () => {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onClear={() => setSearchQuery('')}
-          placeholder="Search contacts, messages or @username..."
+          placeholder="Search chats, messages, @username..."
           aria-label="Search conversation history and directory"
         />
       </div>
@@ -237,6 +291,7 @@ export const Sidebar: React.FC = () => {
       {!searchQuery.trim() && (
         <div className="veil-sidebar-tabs" role="tablist">
           <button
+            type="button"
             role="tab"
             aria-selected={activeTab === 'all'}
             className={`veil-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
@@ -245,6 +300,7 @@ export const Sidebar: React.FC = () => {
             All
           </button>
           <button
+            type="button"
             role="tab"
             aria-selected={activeTab === 'direct'}
             className={`veil-tab-btn ${activeTab === 'direct' ? 'active' : ''}`}
@@ -253,6 +309,7 @@ export const Sidebar: React.FC = () => {
             Chats
           </button>
           <button
+            type="button"
             role="tab"
             aria-selected={activeTab === 'group'}
             className={`veil-tab-btn ${activeTab === 'group' ? 'active' : ''}`}
@@ -261,6 +318,7 @@ export const Sidebar: React.FC = () => {
             Groups
           </button>
           <button
+            type="button"
             role="tab"
             aria-selected={activeTab === 'contacts'}
             className={`veil-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
@@ -480,16 +538,16 @@ export const Sidebar: React.FC = () => {
                       <span className="veil-conversation-name">{conv.name}</span>
                       {conv.timestamp && (
                         <span className="veil-conversation-time">
-                          {new Date(conv.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatConversationTime(conv.timestamp)}
                         </span>
                       )}
                     </div>
                     <div className="veil-conversation-preview">
-                      {conv.lastMessage || (conv.type === 'group' ? 'Group created' : 'E2EE conversation')}
+                      {renderMessageSnippet(conv.lastMessage)}
                     </div>
                   </div>
                   {conv.unreadCount > 0 && (
-                    <Badge variant="warning">{conv.unreadCount}</Badge>
+                    <span className="veil-unread-pill">{conv.unreadCount}</span>
                   )}
                 </div>
               );
@@ -498,38 +556,25 @@ export const Sidebar: React.FC = () => {
         )}
       </div>
 
-      {/* Action Footer */}
+      {/* Floating / Action Footer */}
       <div className="veil-sidebar-footer">
         <Button
           variant="primary"
-          style={{ width: '100%' }}
           onClick={() => openModal({ type: 'newChat' })}
+          icon={<PlusIcon size={16} />}
+          fullWidth
         >
-          <PlusIcon size={18} />
-          <span>New Chat</span>
+          New Chat
         </Button>
-        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            style={{ flex: 1 }}
-            onClick={() => openModal({ type: 'newGroup' })}
-          >
-            <UsersIcon size={16} />
-            <span>New Group</span>
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            style={{ flex: 1 }}
-            onClick={handleCopyInvite}
-            title="Copy signed cryptographic invite link"
-          >
-            {copiedInvite ? <CheckIcon size={16} color="var(--veil-success)" /> : <ShareIcon size={16} />}
-            <span>{copiedInvite ? 'Copied' : 'Invite'}</span>
-          </Button>
-        </div>
+        <Button
+          variant="secondary"
+          onClick={() => openModal({ type: 'newGroup' })}
+          icon={<UsersIcon size={16} />}
+          fullWidth
+        >
+          New Group
+        </Button>
       </div>
-    </aside>
+    </div>
   );
 };
