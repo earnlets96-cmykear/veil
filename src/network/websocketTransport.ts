@@ -225,7 +225,7 @@ export class WebSocketTransport {
 
   private startHeartbeat(): void {
     this.heartbeatTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      if (this.ws && this.ws.readyState === 1) {
         const ping: ClientWsMessage = { type: 'ping' };
         this.ws.send(JSON.stringify(ping));
       }

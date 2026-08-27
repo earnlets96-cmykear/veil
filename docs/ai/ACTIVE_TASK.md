@@ -2,34 +2,31 @@
 
 ## Current Working Goal
 
-- **Milestone**: **PHASE 30: Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence Migration**
-- **Status**: **COMPLETED & VERIFIED (ALL 30 PHASES FULLY COMPLETED & CERTIFIED)**
-- **Release Version**: **`1.0.0` (Production GA with Supabase PostgreSQL & Cloudflare R2 Cloud Persistence)**
-- **Total Test Suites**: **222 test files (100% clean pass)**
-- **Total Automated Tests**: **453 tests (100% clean pass)**
-- **Production Smoke**: **9/9 automated persistence smoke tests passed (100%)**
+- **Milestone**: **PHASE 31: Android Black-Screen Diagnostic, TDZ Fix & Live Render Verification**
+- **Status**: **COMPLETED & VERIFIED (ALL 31 PHASES FULLY COMPLETED & CERTIFIED)**
+- **Release Version**: **`1.0.0` (Production GA with Supabase PostgreSQL & Cloudflare R2 Cloud Persistence & Android Verified)**
+- **Total Test Suites**: **241 test files (100% clean pass)**
+- **Total Automated Tests**: **618 tests (100% clean pass)**
+- **Android APK Build**: **3.96 MB debug APK built, synced, and assembled**
+- **Android Physical/Emulator Execution**: **Render verified via screencap on Pixel_8_API_35 emulator, 0 startup errors**
 - **Build Status**: **Clean production build & release manifest verified**
 
 ---
 
-## Phase 30 Checklist
+## Phase 31 Checklist
 
-- [x] Install and configure genuine PostgreSQL client `pg` and `@types/pg`.
-- [x] Implement `PostgresClient` with connection pooling, automatic retries, transaction handling, and health check.
-- [x] Create migration `002_relay_and_directory_persistence` covering mailboxes, envelopes, directory profiles, and contact requests.
-- [x] Implement `PostgresRelayStore` backed by Supabase PostgreSQL for persistent relay data.
-- [x] Upgrade `SqlCloudDatabase` to support PostgreSQL connection strings via `PostgresClient`.
-- [x] Upgrade `S3ObjectStorage` with Cloudflare R2 variable bindings (`R2_*`) and opaque key prefixes.
-- [x] Fix attachment download authorization for uploader and legitimate conversation peers.
-- [x] Wire server CLI `src/server/cli.ts` to instantiate `PostgresRelayStore` and `SqlCloudDatabase` with fail-closed production checks.
-- [x] Author deployment configurations (`render.yaml`, `.env.example`).
-- [x] Add 10 dedicated Phase 30 Vitest test suites.
-- [x] Author and verify 9-step production persistence smoke script `scripts/phase30-production-smoke.mjs`.
-- [x] Author comprehensive 10-document documentation suite in `docs/`.
-- [x] Implement fail-closed production safeguards and strict TLS CA support in `postgresClient.ts` and `cli.ts`.
-- [x] Execute and verify Phase 30 Live Production Acceptance Suite (`scripts/phase30-live-acceptance.mjs`) with 12/12 checks passing.
-- [x] Verify all 222 test suites (453 tests) pass cleanly.
-- [x] Verify production build and release manifest integrity.
+- [x] Reproduce Android startup behavior and capture Logcat telemetry on real Android emulator (`Pixel_8_API_35`).
+- [x] Identify exact root cause: unhandled `ReferenceError: Cannot access 'loadSpaceData' before initialization` (Temporal Dead Zone violation) during initial React `<AppProvider>` mounting.
+- [x] Reorder function/hook declarations in `src/ui/app/AppState.tsx` so all `useCallback` definitions precede any `useEffect` or lifecycle hooks.
+- [x] Harden `src/network/websocketTransport.ts` readyState check (`readyState === 1`) against global `WebSocket.OPEN` references in WebViews.
+- [x] Create automated render regression test suite `tests/phase31-android-render-regression.test.tsx` verifying crash-free initial tree rendering of `<AppProvider>` and `<LockScreen>`.
+- [x] Run web build (`npm run build`), synchronize Capacitor assets (`npx cap sync android`), and build Android debug APK (`gradlew.bat assembleDebug`).
+- [x] Deploy and launch on Android emulator, capture Logcat stream, and confirm zero uncaught JavaScript errors or Chromium crashes.
+- [x] Capture emulator screencap verifying full VEIL LockScreen UI rendering and modal responsiveness.
+- [x] Run full regression test suite (241 files, 618 tests passing 100%).
+- [x] Run Android build, release, runtime config, and log audit check scripts (100% pass).
+- [x] Generate updated release manifest and SHA-256 checksums (`npm run build:release`).
+- [x] Update core AI documentation and state tracking (`CURRENT_STATE.md`, `ACTIVE_TASK.md`, `CHANGELOG.md`).
 
 
 

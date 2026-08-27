@@ -156,110 +156,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchQuery, setSearchQueryState] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-  // Initialize persistent IndexedDB storage
-  useEffect(() => {
-    async function initStorage() {
-      try {
-        await storageAdapter.init();
-        await vault.loadEnvelopesFromStorage(storageAdapter);
-        setKnownSpacesCount(vault.listEnvelopes().length);
-        setStorageReady(true);
-      } catch (err: any) {
-        setStorageReady(false);
-        setStorageError(err.message || 'IndexedDB failed to initialize');
-      }
-    }
-    initStorage();
-  }, []);
-
-  // Listen for real-time network state changes from NetworkManager
-  useEffect(() => {
-    const unsub = netManager.onStateChange((state) => {
-      setNetworkState(state);
-    });
-    return unsub;
-  }, []);
-
-  // Listen for native online/offline browser & Capacitor events
-  useEffect(() => {
-    const handleOnline = async () => {
-      if (activeSession && activeSession.isActive()) {
-        try {
-          await loadSpaceData(activeSession);
-        } catch (_e) {
-          setNetworkState('degraded');
-        }
-      }
-    };
-
-    const handleOffline = () => {
-      setNetworkState('offline');
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      }
-    };
-  }, [activeSession, loadSpaceData]);
-
-  // Continuous mailbox polling heartbeat when a Space is active
-  useEffect(() => {
-    if (!activeSession) return;
-    const interval = setInterval(async () => {
-      try {
-        await netManager.syncMailbox(activeSession);
-      } catch (_e) {}
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [activeSession]);
-
-  // Listen for lock events
-  useEffect(() => {
-    const unsub = sessionController.onLock(() => {
-      cloudClient.setSession(null, null, null);
-      setActiveSession(null);
-      setConversations([]);
-      setContacts([]);
-      setContactRequests([]);
-      setMyProfile(null);
-      setPrivacySettings({
-        phoneVisibility: 'contacts',
-        profileVisibility: 'everyone',
-      });
-      setMessages({});
-      setActiveChatId(null);
-      setActiveModal(null);
-      setSearchQueryState('');
-      setSearchResults([]);
-      searchEngine.clear();
-      AttachmentPipeline.revokeAllEphemeralBlobUrls();
-      notificationDispatcher.setLocked(true);
-    });
-    return unsub;
-  }, []);
-
-  // Periodic mailbox background sync while Space is unlocked
-  useEffect(() => {
-    if (!activeSession || !activeSession.isActive()) return;
-
-    const interval = setInterval(async () => {
-      try {
-        if (activeSession && activeSession.isActive()) {
-          await netManager.syncMailbox(activeSession);
-        }
-      } catch (_e) {}
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [activeSession]);
-
   const ensureCloudSession = useCallback(async (session: SpaceSession) => {
     if (cloudClient.getSessionToken()) return;
 
@@ -642,7 +538,111 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (_err) {
       setNetworkState('degraded');
     }
+  }, [ensureCloudSession]);
+
+  // Initialize persistent IndexedDB storage
+  useEffect(() => {
+    async function initStorage() {
+      try {
+        await storageAdapter.init();
+        await vault.loadEnvelopesFromStorage(storageAdapter);
+        setKnownSpacesCount(vault.listEnvelopes().length);
+        setStorageReady(true);
+      } catch (err: any) {
+        setStorageReady(false);
+        setStorageError(err.message || 'IndexedDB failed to initialize');
+      }
+    }
+    initStorage();
   }, []);
+
+  // Listen for real-time network state changes from NetworkManager
+  useEffect(() => {
+    const unsub = netManager.onStateChange((state) => {
+      setNetworkState(state);
+    });
+    return unsub;
+  }, []);
+
+  // Listen for native online/offline browser & Capacitor events
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (activeSession && activeSession.isActive()) {
+        try {
+          await loadSpaceData(activeSession);
+        } catch (_e) {
+          setNetworkState('degraded');
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      setNetworkState('offline');
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      }
+    };
+  }, [activeSession, loadSpaceData]);
+
+  // Continuous mailbox polling heartbeat when a Space is active
+  useEffect(() => {
+    if (!activeSession) return;
+    const interval = setInterval(async () => {
+      try {
+        await netManager.syncMailbox(activeSession);
+      } catch (_e) {}
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  // Listen for lock events
+  useEffect(() => {
+    const unsub = sessionController.onLock(() => {
+      cloudClient.setSession(null, null, null);
+      setActiveSession(null);
+      setConversations([]);
+      setContacts([]);
+      setContactRequests([]);
+      setMyProfile(null);
+      setPrivacySettings({
+        phoneVisibility: 'contacts',
+        profileVisibility: 'everyone',
+      });
+      setMessages({});
+      setActiveChatId(null);
+      setActiveModal(null);
+      setSearchQueryState('');
+      setSearchResults([]);
+      searchEngine.clear();
+      AttachmentPipeline.revokeAllEphemeralBlobUrls();
+      notificationDispatcher.setLocked(true);
+    });
+    return unsub;
+  }, []);
+
+  // Periodic mailbox background sync while Space is unlocked
+  useEffect(() => {
+    if (!activeSession || !activeSession.isActive()) return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (activeSession && activeSession.isActive()) {
+          await netManager.syncMailbox(activeSession);
+        }
+      } catch (_e) {}
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [activeSession]);
 
   const unlockSpace = useCallback(
     async (passphrase: string) => {

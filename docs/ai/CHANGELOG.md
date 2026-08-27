@@ -4,6 +4,19 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 31] - 2026-08-27
+
+### Fixed & Validated
+- **Android Black-Screen Diagnostic, TDZ Fix & Live Render Verification**:
+  - Root Cause Diagnosis: Captured real Android Logcat output on startup, detecting unhandled `ReferenceError: Cannot access 'loadSpaceData' before initialization` at `index.js:49:192803`.
+  - Temporal Dead Zone Fix: Reordered callback declarations in `src/ui/app/AppState.tsx` such that `ensureCloudSession` and `loadSpaceData` `useCallback` definitions precede any `useEffect` hooks or handlers that depend on them.
+  - WebSocket Transport Hardening: Hardened `src/network/websocketTransport.ts` readyState check (`readyState === 1`) against global `WebSocket.OPEN` variable references in Android WebViews.
+  - Render Regression Testing: Created automated test suite `tests/phase31-android-render-regression.test.tsx` validating full mounting of `<AppProvider>` and `<LockScreen>` without TDZ errors.
+  - Live Android Device Render Verification: Built fresh production bundle and Android debug APK (`app-debug.apk`), deployed to physical Android emulator (`Pixel_8_API_35`), launched application cold, and verified full interactive rendering of the VEIL LockScreen and modal dialogs with zero Logcat runtime errors.
+  - Total test count expanded to 241 test files (618 tests) passing 100% cleanly.
+
+---
+
 ## [Phase 30] - 2026-08-21
 
 ### Added & Enhanced
