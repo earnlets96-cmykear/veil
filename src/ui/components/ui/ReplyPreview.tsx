@@ -1,8 +1,10 @@
 /**
  * Reusable ReplyPreview Component for VEIL Message Quotes.
+ * Uses SVG vector iconography.
  */
 
 import React from 'react';
+import { MicIcon, PaperclipIcon, ImageIcon, CloseIcon } from '../icons/index.ts';
 
 export interface ReplyPreviewData {
   messageId: string;
@@ -25,9 +27,27 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
   className = '',
 }) => {
   const getPreviewSnippet = () => {
-    if (replyTo.attachmentType === 'voice') return '🎙️ Voice note';
-    if (replyTo.attachmentType === 'file') return '📎 File attachment';
-    if (replyTo.attachmentType === 'image') return '🖼️ Image';
+    if (replyTo.attachmentType === 'voice') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <MicIcon size={14} color="var(--veil-accent-primary)" /> Voice note
+        </span>
+      );
+    }
+    if (replyTo.attachmentType === 'file') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <PaperclipIcon size={14} color="var(--veil-accent-primary)" /> File attachment
+        </span>
+      );
+    }
+    if (replyTo.attachmentType === 'image') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <ImageIcon size={14} color="var(--veil-accent-primary)" /> Photo / Video
+        </span>
+      );
+    }
     return replyTo.text || '';
   };
 
@@ -60,7 +80,7 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
           }}
           aria-label="Cancel reply quote"
         >
-          ✕
+          <CloseIcon size={16} />
         </button>
       )}
     </div>

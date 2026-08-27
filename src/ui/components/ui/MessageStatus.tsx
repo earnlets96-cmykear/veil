@@ -1,8 +1,10 @@
 /**
  * Accessible Message Delivery Status Indicator Component for VEIL.
+ * Uses crisp SVG delivery ticks and status glyphs.
  */
 
 import React from 'react';
+import { ClockIcon, CheckIcon, CheckCheckIcon, AlertCircleIcon, RefreshCwIcon } from '../icons/index.ts';
 
 export type DeliveryStatus =
   | 'QUEUED'
@@ -16,56 +18,51 @@ export type DeliveryStatus =
 export interface MessageStatusProps {
   status: DeliveryStatus;
   className?: string;
+  size?: number;
 }
 
-export const MessageStatus: React.FC<MessageStatusProps> = ({ status, className = '' }) => {
+export const MessageStatus: React.FC<MessageStatusProps> = ({ status, className = '', size = 15 }) => {
   switch (status) {
     case 'QUEUED':
       return (
-        <span className={className} title="Queued locally (Offline)" aria-label="Queued locally">
-          ⏳
+        <span className={`veil-msg-status ${className}`.trim()} title="Queued locally (Offline)" aria-label="Queued locally">
+          <ClockIcon size={size} color="var(--veil-text-muted)" />
         </span>
       );
     case 'SENDING':
       return (
-        <span className={className} title="Encrypting & Sending" aria-label="Encrypting and sending">
-          🔄
+        <span className={`veil-msg-status ${className}`.trim()} title="Sending..." aria-label="Sending">
+          <RefreshCwIcon size={size} className="veil-spin" color="var(--veil-text-muted)" />
         </span>
       );
     case 'SENT_TO_RELAY':
       return (
-        <span className={className} title="Delivered to Relay" aria-label="Delivered to relay">
-          ✓
+        <span className={`veil-msg-status ${className}`.trim()} title="Sent to Relay" aria-label="Sent to relay">
+          <CheckIcon size={size} color="var(--veil-text-secondary)" />
         </span>
       );
     case 'DELIVERED_TO_RECIPIENT':
     case 'PROCESSED':
       return (
         <span
-          className={className}
-          title="Delivered & Decrypted by Peer"
-          aria-label="Delivered and decrypted"
-          style={{ color: 'var(--veil-success)', fontWeight: 'bold' }}
+          className={`veil-msg-status ${className}`.trim()}
+          title="Delivered & Read"
+          aria-label="Delivered and read"
         >
-          ✓✓
+          <CheckCheckIcon size={size} color="var(--veil-accent-secondary)" />
         </span>
       );
     case 'FAILED':
       return (
         <span
-          className={className}
+          className={`veil-msg-status ${className}`.trim()}
           title="Failed to deliver"
           aria-label="Failed to deliver"
-          style={{ color: 'var(--veil-danger)' }}
         >
-          ⚠️
+          <AlertCircleIcon size={size} color="var(--veil-danger)" />
         </span>
       );
     default:
-      return (
-        <span className={className} aria-hidden="true">
-          ✓
-        </span>
-      );
+      return null;
   }
 };

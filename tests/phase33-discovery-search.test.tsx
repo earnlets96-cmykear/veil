@@ -187,7 +187,7 @@ describe('Phase 33 Step 3: Unified Discovery & User Search UX', () => {
 
       expect(html).toContain('Bob Jones');
       expect(html).toContain('@bob');
-      expect(html).toContain('✓ Verified');
+      expect(html).toContain('Verified');
       expect(html).toContain('Direct E2EE Contact');
     });
 
@@ -202,7 +202,7 @@ describe('Phase 33 Step 3: Unified Discovery & User Search UX', () => {
 
       expect(html).toContain('Dave Inbound');
       expect(html).toContain('@dave');
-      expect(html).toContain('📩 Request');
+      expect(html).toContain('Request');
     });
 
     it('renders pending outgoing request badge', () => {
@@ -216,7 +216,7 @@ describe('Phase 33 Step 3: Unified Discovery & User Search UX', () => {
 
       expect(html).toContain('Eve Outbound');
       expect(html).toContain('@eve');
-      expect(html).toContain('⏳ Sent');
+      expect(html).toContain('Sent');
     });
 
     it('renders accessible touch target attributes', () => {

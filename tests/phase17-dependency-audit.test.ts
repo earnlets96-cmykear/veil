@@ -15,6 +15,8 @@ describe('VEIL Phase 17: Dependency & Supply Chain Integrity Audit', () => {
       'react-dom',
       'ws',
       'pg',
+      '@capacitor/filesystem',
+      '@capacitor/share',
     ];
 
     const prodDeps = Object.keys(pkg.dependencies || {});

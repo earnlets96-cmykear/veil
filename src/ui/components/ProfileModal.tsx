@@ -33,6 +33,17 @@ import {
   Spinner,
   useToast,
 } from './ui/index.ts';
+import {
+  CloseIcon,
+  CopyIcon,
+  CheckIcon,
+  ShieldIcon,
+  AlertCircleIcon,
+  LockIcon,
+  TrashIcon,
+  PlusIcon,
+  ImageIcon,
+} from './icons/index.ts';
 
 interface ProfileModalProps {
   peerId?: string;
@@ -335,21 +346,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const renderRelationshipBadge = () => {
     switch (relState) {
       case 'SELF':
-        return <Badge variant="secure">🔒 Your Active Profile</Badge>;
+        return <Badge variant="secure">Your Active Profile</Badge>;
       case 'CONTACT_VERIFIED':
-        return <Badge variant="secure">✓ Verified E2EE Contact</Badge>;
+        return <Badge variant="secure">Verified E2EE Contact</Badge>;
       case 'CONTACT_UNVERIFIED':
-        return <Badge variant="secure">🔒 E2EE Contact</Badge>;
+        return <Badge variant="secure">E2EE Contact</Badge>;
       case 'KEY_CHANGED':
-        return <Badge variant="danger">⚠️ Key Changed</Badge>;
+        return <Badge variant="danger">Key Changed</Badge>;
       case 'PENDING_OUTGOING':
-        return <Badge variant="warning">⏳ Request Pending</Badge>;
+        return <Badge variant="warning">Request Pending</Badge>;
       case 'PENDING_INCOMING':
-        return <Badge variant="warning">📩 Incoming Request</Badge>;
+        return <Badge variant="warning">Incoming Request</Badge>;
       case 'BLOCKED':
-        return <Badge variant="danger">🚫 Blocked</Badge>;
+        return <Badge variant="danger">Blocked</Badge>;
       default:
-        return <Badge variant="neutral">🌐 Discovered User</Badge>;
+        return <Badge variant="neutral">Discovered User</Badge>;
     }
   };
 
@@ -361,7 +372,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           <h2 id="profile-modal-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>
             {!isPeer ? (isEditing ? 'Edit Profile' : 'My Profile') : 'User Profile'}
           </h2>
-          <IconButton icon="✕" aria-label="Close profile" onClick={closeModal} />
+          <IconButton icon={<CloseIcon size={18} />} aria-label="Close profile" onClick={closeModal} />
         </div>
 
         <div className="veil-modal-body">
@@ -380,7 +391,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
               }}
               role="alert"
             >
-              <strong>⚠️ Cryptographic Safety Warning:</strong>
+              <strong>Cryptographic Safety Warning:</strong>
               <div style={{ marginTop: '0.25rem' }}>
                 This contact's identity key has changed since you last verified them. This could indicate a device reset or a potential interception attempt.
               </div>
@@ -406,11 +417,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                     aria-label="Upload profile photo"
                   />
                   <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-                    📷 Change
+                    <ImageIcon size={14} />
+                    <span>Change</span>
                   </Button>
                   {avatarPreview && (
                     <Button type="button" variant="danger" size="sm" onClick={handleRemovePhoto}>
-                      ✕ Remove
+                      <CloseIcon size={14} />
+                      <span>Remove</span>
                     </Button>
                   )}
                 </div>
@@ -545,7 +558,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                     <div className="veil-profile-info-val">{privacySettings.phoneNumber || 'Not configured'}</div>
                   </div>
                   <Badge variant="neutral">
-                    {privacySettings.phoneVisibility === 'nobody' ? '🔒 Nobody' : privacySettings.phoneVisibility === 'contacts' ? '👥 Contacts' : '🌐 Everyone'}
+                    {privacySettings.phoneVisibility === 'nobody' ? 'Nobody' : privacySettings.phoneVisibility === 'contacts' ? 'Contacts' : 'Everyone'}
                   </Badge>
                 </div>
               ) : (
@@ -574,10 +587,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                       fontSize: '0.7rem',
                       cursor: 'pointer',
                       fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}
                     onClick={handleCopyFingerprint}
                   >
-                    {copiedFingerprint ? '✓ Copied' : '📋 Copy'}
+                    {copiedFingerprint ? (
+                      <>
+                        <CheckIcon size={12} color="var(--veil-success)" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <CopyIcon size={12} />
+                        <span>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 <div
@@ -649,12 +675,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
               <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {!isPeer ? (
                   <Button type="button" variant="primary" style={{ width: '100%' }} onClick={() => setIsEditing(true)}>
-                    ✏️ Edit Profile
+                    Edit Profile
                   </Button>
                 ) : relState === 'NOT_CONNECTED' && !showAddGreeting ? (
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <Button type="button" variant="primary" style={{ flex: 1 }} onClick={() => setShowAddGreeting(true)}>
-                      + Add Contact
+                      <PlusIcon size={16} />
+                      <span>Add Contact</span>
                     </Button>
                     <Button type="button" variant="secondary" onClick={closeModal}>
                       Done
@@ -675,7 +702,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                           <span>Cancelling...</span>
                         </>
                       ) : (
-                        '✕ Cancel Request'
+                        'Cancel Request'
                       )}
                     </Button>
                     <Button type="button" variant="secondary" onClick={closeModal}>
@@ -685,14 +712,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                 ) : relState === 'PENDING_INCOMING' ? (
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     <Button type="button" variant="primary" style={{ flex: 1 }} onClick={handleAcceptIncoming}>
-                      ✓ Accept Request
+                      <CheckIcon size={16} />
+                      <span>Accept</span>
                     </Button>
                     <Button type="button" variant="secondary" onClick={handleDeclineIncoming}>
-                      ✕ Decline
+                      <CloseIcon size={16} />
+                      <span>Decline</span>
                     </Button>
                     {effectiveIdentityId && (
                       <Button type="button" variant="danger" onClick={handleBlock}>
-                        🚫 Block
+                        Block
                       </Button>
                     )}
                   </div>
@@ -708,12 +737,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                           openModal({ type: 'contactDetails', conversationId: effectiveIdentityId });
                         }}
                       >
-                        🛡️ Review Identity & Re-verify
+                        <ShieldIcon size={16} />
+                        <span>Review Identity & Re-verify</span>
                       </Button>
                     )}
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <Button type="button" variant="danger" style={{ flex: 1 }} onClick={handleBlock}>
-                        🚫 Block User
+                        Block User
                       </Button>
                       <Button type="button" variant="secondary" onClick={closeModal}>
                         Close
@@ -725,7 +755,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         <Button type="button" variant="primary" style={{ flex: 1 }} onClick={handleOpenChat}>
-                          💬 Open Chat
+                          Open Chat
                         </Button>
                         {effectiveIdentityId && (
                           <Button
@@ -736,17 +766,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                               openModal({ type: 'contactDetails', conversationId: effectiveIdentityId });
                             }}
                           >
-                            🛡️ Safety Number
+                            <ShieldIcon size={16} />
+                            <span>Safety Number</span>
                           </Button>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         <Button type="button" variant="secondary" size="sm" style={{ flex: 1 }} onClick={() => setShowDeleteConfirm(true)}>
-                          🗑️ Remove Contact
+                          <TrashIcon size={14} />
+                          <span>Remove Contact</span>
                         </Button>
                         {effectiveIdentityId && (
                           <Button type="button" variant="danger" size="sm" onClick={handleBlock}>
-                            🚫 Block
+                            Block
                           </Button>
                         )}
                       </div>

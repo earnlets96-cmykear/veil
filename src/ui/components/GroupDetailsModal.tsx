@@ -4,6 +4,8 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { Button, IconButton } from './ui/index.ts';
+import { CloseIcon, UsersIcon, ShieldIcon } from './icons/index.ts';
 
 export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const { conversations, closeModal } = useApp();
@@ -21,17 +23,11 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
   };
 
   return (
-    <div className="veil-modal-overlay">
+    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="group-details-title">
       <div className="veil-modal-card">
         <div className="veil-modal-header">
-          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Group Details & Security</h2>
-          <button
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
-            onClick={closeModal}
-          >
-            ✕
-          </button>
+          <h2 id="group-details-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Group Details & Security</h2>
+          <IconButton icon={<CloseIcon size={18} />} aria-label="Close dialog" onClick={closeModal} />
         </div>
 
         <div className="veil-modal-body">
@@ -45,12 +41,11 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '1.5rem',
                 color: '#ffffff',
                 marginBottom: '0.5rem',
               }}
             >
-              👥
+              <UsersIcon size={26} />
             </div>
             <h3 style={{ fontSize: 'var(--veil-text-base)', fontWeight: 600 }}>{group?.name}</h3>
             <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginTop: '0.2rem' }}>
@@ -80,9 +75,9 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
                 value={newMemberId}
                 onChange={(e) => setNewMemberId(e.target.value)}
               />
-              <button type="submit" className="veil-btn veil-btn-primary" disabled={!newMemberId.trim()}>
+              <Button type="submit" variant="primary" disabled={!newMemberId.trim()}>
                 Invite
-              </button>
+              </Button>
             </div>
           </form>
 
@@ -104,9 +99,9 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
         </div>
 
         <div className="veil-modal-footer">
-          <button type="button" className="veil-btn veil-btn-secondary" onClick={closeModal}>
+          <Button variant="secondary" onClick={closeModal} style={{ width: '100%' }}>
             Close
-          </button>
+          </Button>
         </div>
       </div>
     </div>

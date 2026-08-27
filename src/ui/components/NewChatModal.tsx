@@ -9,6 +9,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { InvitationManager } from '../../contacts/invitationManager.ts';
 import { DirectorySearchResult } from '../../server/types.ts';
+import { CloseIcon, SearchIcon, ShareIcon, CheckIcon } from './icons/index.ts';
 
 export const NewChatModal: React.FC = () => {
   const {
@@ -152,12 +153,11 @@ export const NewChatModal: React.FC = () => {
           </h2>
           <button
             type="button"
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
+            className="veil-icon-btn"
             onClick={closeModal}
             aria-label="Close dialog"
           >
-            ✕
+            <CloseIcon size={18} />
           </button>
         </div>
 
@@ -178,16 +178,21 @@ export const NewChatModal: React.FC = () => {
               fontSize: 'var(--veil-text-xs)',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === 'search' ? '2px solid var(--veil-accent)' : '2px solid transparent',
-              color: activeTab === 'search' ? 'var(--veil-accent)' : 'var(--veil-text-secondary)',
+              borderBottom: activeTab === 'search' ? '2px solid var(--veil-accent-primary)' : '2px solid transparent',
+              color: activeTab === 'search' ? 'var(--veil-accent-primary)' : 'var(--veil-text-secondary)',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
             }}
             onClick={() => {
               setActiveTab('search');
               setError(null);
             }}
           >
-            🔍 Find by @username
+            <SearchIcon size={14} />
+            <span>Find by @username</span>
           </button>
           <button
             type="button"
@@ -198,16 +203,21 @@ export const NewChatModal: React.FC = () => {
               fontSize: 'var(--veil-text-xs)',
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === 'invite' ? '2px solid var(--veil-accent)' : '2px solid transparent',
-              color: activeTab === 'invite' ? 'var(--veil-accent)' : 'var(--veil-text-secondary)',
+              borderBottom: activeTab === 'invite' ? '2px solid var(--veil-accent-primary)' : '2px solid transparent',
+              color: activeTab === 'invite' ? 'var(--veil-accent-primary)' : 'var(--veil-text-secondary)',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
             }}
             onClick={() => {
               setActiveTab('invite');
               setError(null);
             }}
           >
-            🔗 Import Invitation Link
+            <ShareIcon size={14} />
+            <span>Import Invitation Link</span>
           </button>
         </div>
 
@@ -316,11 +326,11 @@ export const NewChatModal: React.FC = () => {
 
                         {isExisting ? (
                           <span className="veil-badge veil-badge-secure" style={{ fontSize: '0.65rem' }}>
-                            ✓ Contact
+                            Contact
                           </span>
                         ) : pendingReq ? (
                           <span className="veil-badge veil-badge-warning" style={{ fontSize: '0.65rem' }}>
-                            ⏳ Pending
+                            Pending
                           </span>
                         ) : (
                           <button

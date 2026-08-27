@@ -1,12 +1,11 @@
 /**
  * Reusable Password Input with Show/Hide Toggle.
- *
- * Preserves zero-knowledge privacy: never logs or exposes passphrase memory.
- * Accessible with explicit aria-label for the visibility toggle.
+ * Uses SVG Eye/EyeOff icons.
  */
 
 import React, { useState, forwardRef } from 'react';
 import { Input, InputProps } from './Input.tsx';
+import { EyeIcon, EyeOffIcon } from '../icons/index.ts';
 
 export interface PasswordInputProps extends Omit<InputProps, 'type' | 'trailingAction'> {
   showToggle?: boolean;
@@ -26,14 +25,13 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({
   const toggleButton = showToggle ? (
     <button
       type="button"
-      className="veil-icon-btn"
-      style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', fontSize: '0.9rem' }}
+      className="veil-icon-btn veil-visibility-btn"
       onClick={toggleVisibility}
       aria-label={isVisible ? 'Hide passphrase' : 'Show passphrase'}
       title={isVisible ? 'Hide passphrase' : 'Show passphrase'}
       tabIndex={0}
     >
-      {isVisible ? '🙈' : '👁️'}
+      {isVisible ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
     </button>
   ) : undefined;
 

@@ -7,6 +7,7 @@
 
 import React, { useEffect, useRef, ReactNode, useId } from 'react';
 import { IconButton } from './IconButton.tsx';
+import { CloseIcon } from '../icons/index.ts';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -96,7 +97,7 @@ export const Modal: React.FC<ModalProps> = ({
             {title}
           </h2>
           <IconButton
-            icon="✕"
+            icon={<CloseIcon size={18} />}
             aria-label="Close dialog"
             onClick={onClose}
             style={{ width: '32px', height: '32px', minWidth: '32px', minHeight: '32px' }}

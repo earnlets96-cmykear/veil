@@ -2,10 +2,11 @@
  * Reusable Avatar Component for VEIL Design System.
  *
  * Supports deterministic initials, custom gradients, size scales,
- * space avatars, and privacy-preserving presence indicators.
+ * space avatars, and privacy-preserving presence indicators with SVG group icon.
  */
 
 import React from 'react';
+import { UsersIcon } from '../icons/index.ts';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
@@ -50,6 +51,17 @@ export const Avatar: React.FC<AvatarProps> = ({
     return `linear-gradient(135deg, hsl(${c1}, 70%, 55%), hsl(${c2}, 70%, 45%))`;
   };
 
+  const getGroupIconSize = () => {
+    switch (size) {
+      case 'xs': return 12;
+      case 'sm': return 14;
+      case 'lg': return 24;
+      case 'xl': return 32;
+      case 'md':
+      default: return 18;
+    }
+  };
+
   return (
     <div
       className={`veil-avatar ${sizeClass} ${shapeClass} ${className}`.trim()}
@@ -63,8 +75,8 @@ export const Avatar: React.FC<AvatarProps> = ({
       aria-label={ariaLabel || (isGroup ? 'Group Avatar' : 'Peer Avatar')}
     >
       {!imageUrl && (
-        <span aria-hidden="true">
-          {isGroup ? '👥' : getInitials(name)}
+        <span aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isGroup ? <UsersIcon size={getGroupIconSize()} color="#ffffff" /> : getInitials(name)}
         </span>
       )}
 

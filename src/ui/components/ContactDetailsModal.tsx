@@ -6,7 +6,7 @@
  * - High-contrast visual QR verification matrix
  * - Verification status toggle (Unverified, Verified, Key Changed)
  * - Space-isolated persistence via EncryptedSpaceStore
- * - Accessible keyboard navigation & mobile touch targets
+ * - 100% SVG vector iconography and accessible keyboard navigation.
  */
 
 import React, { useState } from 'react';
@@ -17,9 +17,15 @@ import {
   Badge,
   Button,
   IconButton,
-  StatusIndicator,
   useToast,
 } from './ui/index.ts';
+import {
+  CloseIcon,
+  CopyIcon,
+  CheckIcon,
+  ShieldIcon,
+  AlertCircleIcon,
+} from './icons/index.ts';
 
 interface ContactDetailsModalProps {
   conversationId: string;
@@ -59,7 +65,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
     if (navigator.clipboard) {
       navigator.clipboard.writeText(rawFingerprint);
       setCopiedSafetyNumber(true);
-      showToast({ type: 'success', message: 'Safety number copied to clipboard' });
+      showToast({ type: 'success', message: 'Safety Number copied to clipboard' });
       setTimeout(() => setCopiedSafetyNumber(false), 3000);
     }
   };
@@ -71,10 +77,14 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
       await updateContactVerification(conversationId, nextStatus);
       showToast({
         type: nextStatus === 'VERIFIED' ? 'success' : 'info',
-        message: nextStatus === 'VERIFIED' ? `Marked ${displayName} as verified` : 'Verification cleared',
+        title: nextStatus === 'VERIFIED' ? 'Identity Verified' : 'Verification Cleared',
+        message:
+          nextStatus === 'VERIFIED'
+            ? `Successfully marked ${displayName}'s safety number as verified.`
+            : `Cleared verification status for ${displayName}.`,
       });
-    } catch (err: any) {
-      showToast({ type: 'error', message: err.message || 'Failed to update verification status' });
+    } catch (_err) {
+      showToast({ type: 'error', message: 'Failed to update verification status' });
     } finally {
       setIsUpdating(false);
     }
@@ -86,10 +96,11 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
       await updateContactVerification(conversationId, 'VERIFIED');
       showToast({
         type: 'success',
-        message: `Acknowledged and verified new identity for ${displayName}`,
+        title: 'New Identity Verified',
+        message: `Acknowledged and verified ${displayName}'s updated cryptographic identity.`,
       });
-    } catch (err: any) {
-      showToast({ type: 'error', message: err.message || 'Failed to re-verify identity' });
+    } catch (_err) {
+      showToast({ type: 'error', message: 'Failed to acknowledge updated identity' });
     } finally {
       setIsUpdating(false);
     }
@@ -103,7 +114,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
           <h2 id="verify-modal-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>
             Verify Identity
           </h2>
-          <IconButton icon="✕" aria-label="Close verification modal" onClick={closeModal} />
+          <IconButton icon={<CloseIcon size={18} />} aria-label="Close verification modal" onClick={closeModal} />
         </div>
 
         <div className="veil-modal-body">
@@ -122,7 +133,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
               }}
               role="alert"
             >
-              <strong>🚨 Identity Mismatch Warning:</strong>
+              <strong>Identity Mismatch Warning:</strong>
               <div style={{ marginTop: '0.25rem' }}>
                 This contact's cryptographic identity key has changed since your last verification. Compare the safety number below through a trusted second channel before accepting.
               </div>
@@ -138,11 +149,11 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
               </div>
               <div style={{ marginTop: '0.25rem' }}>
                 {verificationStatus === 'VERIFIED' ? (
-                  <Badge variant="secure">✓ Verified Safety Number</Badge>
+                  <Badge variant="secure">Verified Safety Number</Badge>
                 ) : verificationStatus === 'MISMATCH' ? (
-                  <Badge variant="danger">🚨 Key Changed</Badge>
+                  <Badge variant="danger">Key Changed</Badge>
                 ) : (
-                  <Badge variant="warning">⚠️ Not Verified</Badge>
+                  <Badge variant="warning">Not Verified</Badge>
                 )}
               </div>
             </div>
@@ -160,7 +171,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
               className={`veil-tab-btn ${activeTab === 'numeric' ? 'active' : ''}`}
               onClick={() => setActiveTab('numeric')}
             >
-              123 Safety Number
+              Numeric Code
             </button>
             <button
               role="tab"
@@ -168,15 +179,15 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
               className={`veil-tab-btn ${activeTab === 'qr' ? 'active' : ''}`}
               onClick={() => setActiveTab('qr')}
             >
-              ▦ QR Code
+              QR Code
             </button>
           </div>
 
-          {/* Tab 1: Numeric Safety Number View */}
+          {/* Tab 1: Numeric Formatted Safety Number View */}
           {activeTab === 'numeric' ? (
             <div
               style={{
-                padding: '1.25rem',
+                padding: '1rem',
                 backgroundColor: 'var(--veil-bg-base)',
                 border: '1px solid var(--veil-border)',
                 borderRadius: 'var(--veil-radius-md)',
@@ -205,9 +216,22 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
                     fontSize: '0.75rem',
                     cursor: 'pointer',
                     fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
                   }}
                 >
-                  {copiedSafetyNumber ? '✓ Copied' : '📋 Copy'}
+                  {copiedSafetyNumber ? (
+                    <>
+                      <CheckIcon size={12} color="var(--veil-success)" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon size={12} />
+                      <span>Copy</span>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -271,7 +295,17 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
                 onClick={handleToggleVerification}
                 disabled={isUpdating}
               >
-                {verificationStatus === 'VERIFIED' ? '✕ Clear Verification' : '✓ Mark Identity as Verified'}
+                {verificationStatus === 'VERIFIED' ? (
+                  <>
+                    <CloseIcon size={16} />
+                    <span>Clear Verification</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldIcon size={16} />
+                    <span>Mark Identity as Verified</span>
+                  </>
+                )}
               </Button>
             )}
 

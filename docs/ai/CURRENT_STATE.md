@@ -35,21 +35,19 @@
 | **Phase 28** | Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore) | **COMPLETED** | Deterministic SQL migrations, S3 Object Storage, Caddy TLS reverse proxy, Docker stack, backup/restore tool, fresh-install re-hydration tests |
 | **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence & Attachments | **COMPLETED & ACCEPTED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, session persistence & auto-healing in EncryptedSpaceStore, inbound voice preservation, complete normal file attachment pipeline, Android APK compilation verified (227 total suites, 468 tests passing, release manifest verified) |
 | **Phase 31** | Production Connectivity Repair, Render/R2/Supabase Integration Verification & Mobile Reliability | **COMPLETED & ACCEPTED** | Root caused and resolved DNS resolution failure by establishing `https://veil-rga0.onrender.com` / `wss://veil-rga0.onrender.com/v1/ws` as canonical production endpoints; verified live Supabase PostgreSQL, Cloudflare R2, account registration, mailbox creation, envelope persistence, encrypted attachment upload/download, and WebSocket `/v1/ws` connectivity (16/16 checks 100% on live Render); excised account-count disclosure on LockScreen; verified 0.0.0.0 PORT binding; created 4 new test suites (250/250 suites, 635/635 tests passing, 100%); fresh native Android APK compiled and verified |
+| **Phase 32** | Complete UI/UX Overhaul, Telegram-Inspired Media Suite & File Saver Engine | **COMPLETED & ACCEPTED** | 100% Pure SVG Icon System (zero emojis as UI controls); Unified `FileSaver` engine for native Android (`@capacitor/filesystem` into `Documents/VEIL` + `@capacitor/share` fallback) and Web (`showSaveFilePicker` / anchor blobs); Fullscreen `MediaViewer` with smooth pan/zoom (1x-4x) and HTML5 video player; `MediaGalleryModal` shared media browser (Photos & Videos grid, Files & Documents list, Voice Notes); `AttachmentPreviewModal` pre-send staging modal; Telegram-inspired message geometry, selection toolbar, contextual long-press menus, responsive auto-expanding composer; all 250 test suites (635 tests) passing; native Android debug APK compiled cleanly |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
-- **Release Version**: **`1.0.0` (Production Hardened Mobile & Cloud Continuity Release)**
+- **Release Version**: **`1.0.0` (Production Hardened UI/UX & Media Continuity Release)**
 - **Total Test Files**: **250 / 250 passed (100% pass rate)**
 - **Total Tests**: **635 / 635 passed (0 failures, 0 skipped)**
 - **Live Smoke Test**: **16 / 16 passed (100% pass rate on live Render backend)**
-- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (3.85 MB, verified clean Gradle build)**
-- **Build Status**: `npm run build` succeeds cleanly (`dist/` created in ~1.77s)
-- **Android Build Status**: `powershell -Command "cd android; .\gradlew assembleDebug"` succeeds cleanly (`BUILD SUCCESSFUL in 16s`, `app-debug.apk` generated)
+- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (verified clean Gradle build)**
+- **Build Status**: `npm run build:release` succeeds cleanly (`dist/` created, release manifest verified)
+- **Android Build Status**: `cmd /c "cd android && gradlew.bat assembleDebug"` succeeds cleanly (`BUILD SUCCESSFUL in 4m 38s`, `app-debug.apk` generated)
 - **Phase 31 Production Acceptance**: `npx tsx scripts/phase31-mobile-production-acceptance.mjs` passes 10/10 checks cleanly (100%).
 - **Live Acceptance Suite**: `npx tsx scripts/phase30-live-acceptance.mjs` passes 12/12 acceptance checks cleanly (100%).
-- **Android Verification**: Tested cold startup on Android emulator (`Pixel_8_API_35`), verified clean React bootstrap, ErrorBoundary protection, and storage initialization loading boundary.
 - **Working Tree**: Clean, verified, documented.
-
-

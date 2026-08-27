@@ -99,7 +99,7 @@ describe('Phase 31: Reusable UI Component Layer Tests', () => {
         <SearchInput value="alice" onChange={() => {}} />
       );
       expect(html).toContain('type="search"');
-      expect(html).toContain('🔍');
+      expect(html).toContain('veil-input-has-leading');
     });
   });
 
@@ -243,8 +243,8 @@ describe('Phase 31: Reusable UI Component Layer Tests', () => {
       );
       expect(html).toContain('secret_plan.pdf');
       expect(html).toContain('500.0 KB');
-      expect(html).toContain('End-to-End Encrypted');
-      expect(html).toContain('📕');
+      expect(html).toContain('Encrypted File');
+      expect(html).toContain('veil-attachment-icon-wrapper');
     });
 
     it('renders VoiceNoteCard with duration and waveform container', () => {
@@ -271,7 +271,7 @@ describe('Phase 31: Reusable UI Component Layer Tests', () => {
       expect(html).toContain('Hello from E2EE space!');
       expect(html).toContain('Alice');
       expect(html).toContain('Original message');
-      expect(html).toContain('✓✓');
+      expect(html).toContain('Delivered &amp; Read');
     });
 
     it('renders ReplyPreview with snippet and dismiss button', () => {
@@ -288,13 +288,13 @@ describe('Phase 31: Reusable UI Component Layer Tests', () => {
 
     it('renders MessageStatus with correct receipts', () => {
       const queuedHtml = renderToStaticMarkup(<MessageStatus status="QUEUED" />);
-      expect(queuedHtml).toContain('⏳');
+      expect(queuedHtml).toContain('Queued locally');
 
       const deliveredHtml = renderToStaticMarkup(<MessageStatus status="DELIVERED_TO_RECIPIENT" />);
-      expect(deliveredHtml).toContain('✓✓');
+      expect(deliveredHtml).toContain('Delivered &amp; Read');
 
       const failedHtml = renderToStaticMarkup(<MessageStatus status="FAILED" />);
-      expect(failedHtml).toContain('⚠️');
+      expect(failedHtml).toContain('Failed to deliver');
     });
 
     it('renders MessageTimestamp with formatted time and iso datetime', () => {

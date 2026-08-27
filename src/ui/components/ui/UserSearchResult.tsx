@@ -38,15 +38,15 @@ export const UserSearchResult: React.FC<UserSearchResultProps> = ({
       case 'SELF':
         return <Badge variant="neutral">You</Badge>;
       case 'CONTACT_VERIFIED':
-        return <Badge variant="secure">✓ Verified</Badge>;
+        return <Badge variant="secure">Verified</Badge>;
       case 'CONTACT_UNVERIFIED':
         return <Badge variant="secure">Contact</Badge>;
       case 'PENDING_OUTGOING':
-        return <Badge variant="warning">⏳ Sent</Badge>;
+        return <Badge variant="warning">Sent</Badge>;
       case 'PENDING_INCOMING':
-        return <Badge variant="warning">📩 Request</Badge>;
+        return <Badge variant="warning">Request</Badge>;
       case 'BLOCKED':
-        return <Badge variant="danger">🚫 Blocked</Badge>;
+        return <Badge variant="danger">Blocked</Badge>;
       default:
         return null;
     }

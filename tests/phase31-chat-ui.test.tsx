@@ -66,7 +66,7 @@ describe('Phase 31: Main Chat UI Modernization Tests', () => {
       );
 
       expect(html).toContain('Core Team');
-      expect(html).toContain('👥');
+      expect(html).toContain('veil-avatar-square');
       expect(html).toContain('Encrypted Group Ratchet');
       expect(html).toContain('Group Info');
     });
@@ -96,7 +96,7 @@ describe('Phase 31: Main Chat UI Modernization Tests', () => {
       );
       expect(outgoingHtml).toContain('veil-message-row outgoing');
       expect(outgoingHtml).toContain('Yes, fully encrypted via Double Ratchet.');
-      expect(outgoingHtml).toContain('✓✓');
+      expect(outgoingHtml).toContain('Delivered &amp; Read');
     });
 
     it('renders MessageBubble with nested ReplyPreview quote', () => {
@@ -137,8 +137,8 @@ describe('Phase 31: Main Chat UI Modernization Tests', () => {
       );
       expect(html).toContain('audit_report.pdf');
       expect(html).toContain('250.0 KB');
-      expect(html).toContain('End-to-End Encrypted');
-      expect(html).toContain('📕');
+      expect(html).toContain('Encrypted File');
+      expect(html).toContain('veil-attachment-icon-wrapper');
     });
 
     it('renders MessageBubble with VoiceNoteCard audio player', () => {

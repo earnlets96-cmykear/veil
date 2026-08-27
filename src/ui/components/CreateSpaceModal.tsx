@@ -4,6 +4,8 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { Button, IconButton, PasswordInput } from './ui/index.ts';
+import { CloseIcon, PlusIcon } from './icons/index.ts';
 
 export const CreateSpaceModal: React.FC = () => {
   const { createSpace, closeModal } = useApp();
@@ -15,7 +17,7 @@ export const CreateSpaceModal: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !passphrase.trim()) return;
+    if (!name.trim() || !passphrase.trim() || isLoading) return;
 
     if (passphrase !== confirmPassphrase) {
       setError('Passphrases do not match.');
@@ -36,17 +38,11 @@ export const CreateSpaceModal: React.FC = () => {
   };
 
   return (
-    <div className="veil-modal-overlay">
+    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="create-space-title">
       <div className="veil-modal-card">
         <div className="veil-modal-header">
-          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Create Isolated Space</h2>
-          <button
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
-            onClick={closeModal}
-          >
-            ✕
-          </button>
+          <h2 id="create-space-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Create Isolated Space</h2>
+          <IconButton icon={<CloseIcon size={18} />} aria-label="Close dialog" onClick={closeModal} />
         </div>
 
         <form onSubmit={handleCreate}>
@@ -90,9 +86,7 @@ export const CreateSpaceModal: React.FC = () => {
               >
                 Space Passphrase
               </label>
-              <input
-                type="password"
-                className="veil-input"
+              <PasswordInput
                 placeholder="••••••••••••"
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
@@ -112,9 +106,7 @@ export const CreateSpaceModal: React.FC = () => {
               >
                 Confirm Passphrase
               </label>
-              <input
-                type="password"
-                className="veil-input"
+              <PasswordInput
                 placeholder="••••••••••••"
                 value={confirmPassphrase}
                 onChange={(e) => setConfirmPassphrase(e.target.value)}
@@ -133,6 +125,7 @@ export const CreateSpaceModal: React.FC = () => {
                   fontSize: 'var(--veil-text-xs)',
                   textAlign: 'center',
                 }}
+                role="alert"
               >
                 {error}
               </div>
@@ -140,12 +133,13 @@ export const CreateSpaceModal: React.FC = () => {
           </div>
 
           <div className="veil-modal-footer">
-            <button type="button" className="veil-btn veil-btn-secondary" onClick={closeModal} disabled={isLoading}>
+            <Button type="button" variant="secondary" onClick={closeModal} disabled={isLoading}>
               Cancel
-            </button>
-            <button type="submit" className="veil-btn veil-btn-primary" disabled={isLoading || !name || !passphrase}>
-              {isLoading ? 'Creating Envelope...' : 'Create Space'}
-            </button>
+            </Button>
+            <Button type="submit" variant="primary" disabled={isLoading || !name || !passphrase} loading={isLoading}>
+              <PlusIcon size={16} />
+              <span>{isLoading ? 'Creating Envelope...' : 'Create Space'}</span>
+            </Button>
           </div>
         </form>
       </div>

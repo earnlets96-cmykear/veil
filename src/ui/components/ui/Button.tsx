@@ -14,6 +14,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   isLoading?: boolean;
+  loading?: boolean;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
   fullWidth?: boolean;
@@ -24,6 +25,7 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
   isLoading = false,
+  loading = false,
   leftIcon,
   rightIcon,
   fullWidth = false,
@@ -32,6 +34,7 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   ...rest
 }) => {
+  const isBusy = isLoading || loading;
   const variantClass = `veil-btn-${variant}`;
   const sizeClass = `veil-btn-${size}`;
   const widthClass = fullWidth ? 'veil-btn-full' : '';
@@ -40,17 +43,17 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       type="button"
       className={`veil-btn ${variantClass} ${sizeClass} ${widthClass} ${className}`.trim()}
-      disabled={disabled || isLoading}
-      aria-busy={isLoading ? 'true' : undefined}
+      disabled={disabled || isBusy}
+      aria-busy={isBusy ? 'true' : undefined}
       {...rest}
     >
-      {isLoading ? (
+      {isBusy ? (
         <span className="veil-spinner veil-spinner-sm" aria-hidden="true" />
       ) : (
         leftIcon && <span className="veil-btn-icon-slot" aria-hidden="true">{leftIcon}</span>
       )}
       <span>{children}</span>
-      {!isLoading && rightIcon && (
+      {!isBusy && rightIcon && (
         <span className="veil-btn-icon-slot" aria-hidden="true">{rightIcon}</span>
       )}
     </button>

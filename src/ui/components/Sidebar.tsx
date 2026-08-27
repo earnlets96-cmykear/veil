@@ -1,10 +1,10 @@
 /**
- * Modernized Conversation Sidebar Component for VEIL Phase 33.
+ * Modernized Conversation Sidebar Component for VEIL Phase 31/32.
  *
  * Implements unified instant search (local conversations, contacts, messages,
  * and debounced global directory discovery), active Space identity header,
  * tabbed filtering (All, Chats, Groups, Contacts), contact request actions,
- * and invitation sharing using VEIL reusable component primitives.
+ * and invitation sharing using 100% SVG vector iconography and reusable primitives.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -22,6 +22,16 @@ import {
   Spinner,
   UserSearchResult,
 } from './ui/index.ts';
+import {
+  LockIcon,
+  AlertCircleIcon,
+  PlusIcon,
+  UsersIcon,
+  ShareIcon,
+  CheckIcon,
+  SettingsIcon,
+  UserIcon,
+} from './icons/index.ts';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -88,7 +98,7 @@ export const Sidebar: React.FC = () => {
           setGlobalResults(results || []);
           setIsSearchingDirectory(false);
         }
-      } catch (err: any) {
+      } catch (_err: any) {
         if (isMounted) {
           setDirectoryError("Couldn't search directory right now.");
           setIsSearchingDirectory(false);
@@ -189,14 +199,21 @@ export const Sidebar: React.FC = () => {
 
         <div style={{ display: 'flex', gap: '0.35rem' }}>
           <IconButton
-            icon="🔒"
+            icon={<SettingsIcon size={18} />}
+            variant="ghost"
+            onClick={() => openModal({ type: 'settings' as any })}
+            aria-label="Settings"
+            title="Settings"
+          />
+          <IconButton
+            icon={<LockIcon size={18} />}
             variant="secondary"
             onClick={lockSpace}
             aria-label="Lock Space"
             title="Lock Space"
           />
           <IconButton
-            icon="🚨"
+            icon={<AlertCircleIcon size={18} />}
             variant="danger"
             onClick={panicLock}
             aria-label="Panic Lock: Instant Memory Wipe"
@@ -298,163 +315,91 @@ export const Sidebar: React.FC = () => {
             {localMatchingContacts.length > 0 && (
               <div style={{ marginBottom: '0.75rem' }}>
                 <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
-                  Contacts
+                  My Contacts
                 </div>
-                {localMatchingContacts.map((c) => {
-                  const rel = getRelationshipState(c.identityId, c.name, {
-                    myIdentityId: myProfile?.identityId,
-                    myUsername: myProfile?.username,
-                    contacts,
-                    contactRequests,
-                  });
-                  return (
-                    <UserSearchResult
-                      key={c.identityId}
-                      displayName={c.name}
-                      username={c.name}
-                      relationshipState={rel}
-                      onClick={() => {
-                        openModal({ type: 'profile', peerId: c.identityId, peerUsername: c.name });
-                        setSearchQuery('');
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {/* 3. Global Public Directory Users */}
-            {(globalResults.length > 0 || isSearchingDirectory) && (
-              <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.5rem' }}>
-                  <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
-                    Global People (@directory)
-                  </span>
-                  {isSearchingDirectory && <Spinner size="sm" />}
-                </div>
-
-                {globalResults.map((user) => {
-                  const rel = getRelationshipState(user.identityId, user.username, {
-                    myIdentityId: myProfile?.identityId,
-                    myUsername: myProfile?.username,
-                    contacts,
-                    contactRequests,
-                  });
-                  return (
-                    <UserSearchResult
-                      key={user.identityId}
-                      displayName={user.displayName}
-                      username={user.username}
-                      avatarUrl={user.avatar}
-                      relationshipState={rel}
-                      onClick={() => {
-                        openModal({
-                          type: 'profile',
-                          peerId: user.identityId,
-                          peerUsername: user.username,
-                          searchResult: user,
-                        });
-                        setSearchQuery('');
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {/* 4. Local Decrypted Messages */}
-            {localMessageResults.length > 0 && (
-              <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
-                  Matching Messages
-                </div>
-                {localMessageResults.map((res) => (
+                {localMatchingContacts.map((contact) => (
                   <div
-                    key={res.id}
+                    key={contact.identityId}
                     className="veil-conversation-item"
                     role="button"
                     tabIndex={0}
                     onClick={() => {
-                      if (res.conversationId) selectConversation(res.conversationId);
+                      selectConversation(contact.identityId);
                       setSearchQuery('');
                     }}
                   >
+                    <Avatar name={contact.name} size="sm" />
                     <div className="veil-conversation-info">
-                      <div className="veil-conversation-top">
-                        <span className="veil-conversation-name">{res.title}</span>
-                        <Badge variant="neutral">Message</Badge>
-                      </div>
-                      <div className="veil-conversation-preview">{res.matchSnippet}</div>
+                      <div className="veil-conversation-name">{contact.name}</div>
+                      <div className="veil-conversation-preview">{contact.identityId.slice(0, 16)}...</div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {/* 3. Global Directory Results */}
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span>Global Directory Discovery</span>
+                {isSearchingDirectory && <Spinner size="sm" />}
+              </div>
+
+              {directoryError && (
+                <div style={{ padding: '0.5rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
+                  {directoryError}
+                </div>
+              )}
+
+              {globalResults.map((user) => {
+                const relationship = getRelationshipState(user.peerId, user.username, contacts, contactRequests);
+                return (
+                  <UserSearchResult
+                    key={user.peerId}
+                    result={user}
+                    relationship={relationship}
+                    onOpenProfile={(res) => openModal({ type: 'profile', peerId: res.peerId, peerUsername: res.username, searchResult: res })}
+                    onSendRequest={async (res) => {
+                      await (window as any).__veil_send_request?.(res.peerId);
+                    }}
+                    onMessageUser={(peerId) => {
+                      selectConversation(peerId);
+                      setSearchQuery('');
+                    }}
+                  />
+                );
+              })}
+            </div>
 
             {/* Empty Search State */}
             {!hasAnySearchResults && !isSearchingDirectory && (
               <EmptyState
-                icon="🔍"
-                title="No Matches Found"
-                description={
-                  directoryError
-                    ? directoryError
-                    : `No local conversations, contacts, or public users found for "${searchQuery}".`
-                }
+                icon={<UserIcon size={36} color="var(--veil-text-muted)" />}
+                title="No results found"
+                description={`No local conversations or directory users matched "${searchQuery}"`}
               />
             )}
           </div>
         ) : activeTab === 'contacts' ? (
+          /* Contacts View Tab */
           <div>
-            {/* Incoming Requests Section */}
+            {/* Pending Requests Banner */}
             {pendingIncoming.length > 0 && (
-              <div style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: 'var(--veil-accent-primary-subtle)', borderRadius: 'var(--veil-radius-md)' }}>
-                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-accent-primary)', marginBottom: '0.5rem' }}>
+              <div style={{ padding: '0.5rem', background: 'var(--veil-bg-surface-elevated)', borderRadius: 'var(--veil-radius-md)', marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-warning)', marginBottom: '0.25rem' }}>
                   Incoming Contact Requests ({pendingIncoming.length})
                 </div>
                 {pendingIncoming.map((req) => (
-                  <div
-                    key={req.requestId}
-                    style={{
-                      padding: '0.6rem',
-                      backgroundColor: 'var(--veil-bg-surface)',
-                      borderRadius: 'var(--veil-radius-sm)',
-                      marginBottom: '0.4rem',
-                      border: '1px solid var(--veil-border-subtle)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-xs)' }}>
-                        {req.peerDisplayName} <span style={{ color: 'var(--veil-accent-primary)' }}>@{req.peerUsername}</span>
-                      </span>
+                  <div key={req.requestId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0' }}>
+                    <div style={{ fontSize: 'var(--veil-text-xs)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      @{req.peerUsername || req.peerId.slice(0, 10)}
                     </div>
-                    {req.greeting && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--veil-text-secondary)', marginBottom: '0.4rem', fontStyle: 'italic' }}>
-                        "{req.greeting}"
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', gap: '0.35rem' }}>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => acceptContactRequest(req.requestId)}
-                      >
-                        ✓ Accept
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <Button variant="primary" size="sm" onClick={() => acceptContactRequest(req.requestId)}>
+                        Accept
                       </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => declineContactRequest(req.requestId)}
-                      >
-                        ✕ Decline
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => blockUser(req.peerIdentityId)}
-                        title="Block User"
-                      >
-                        🚫
+                      <Button variant="ghost" size="sm" onClick={() => declineContactRequest(req.requestId)}>
+                        Decline
                       </Button>
                     </div>
                   </div>
@@ -462,55 +407,11 @@ export const Sidebar: React.FC = () => {
               </div>
             )}
 
-            {/* Outgoing Requests Section */}
-            {pendingOutgoing.length > 0 && (
-              <div style={{ marginBottom: '0.75rem', padding: '0.5rem' }}>
-                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-muted)', marginBottom: '0.3rem' }}>
-                  Sent Requests ({pendingOutgoing.length})
-                </div>
-                {pendingOutgoing.map((req) => (
-                  <div
-                    key={req.requestId}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '0.35rem 0.5rem',
-                      fontSize: 'var(--veil-text-xs)',
-                      color: 'var(--veil-text-secondary)',
-                    }}
-                  >
-                    <span>@{req.peerUsername}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Badge variant="warning">Pending</Badge>
-                      <button
-                        type="button"
-                        onClick={() => cancelContactRequest(req.requestId)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--veil-danger)',
-                          fontSize: '0.7rem',
-                          cursor: 'pointer',
-                          padding: '2px 4px',
-                        }}
-                        title="Cancel Request"
-                        aria-label={`Cancel request to @${req.peerUsername}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Contacts List */}
             {contacts.length === 0 ? (
               <EmptyState
-                icon="👥"
-                title="No Contacts Added"
-                description="Search for users by @handle above or invite friends with a cryptographic link."
+                icon={<UsersIcon size={40} color="var(--veil-text-muted)" />}
+                title="No contacts yet"
+                description="Search users by @username above to send contact requests."
               />
             ) : (
               contacts.map((contact) => (
@@ -519,20 +420,18 @@ export const Sidebar: React.FC = () => {
                   className="veil-conversation-item"
                   role="button"
                   tabIndex={0}
-                  onClick={() => openModal({ type: 'profile', peerId: contact.identityId, peerUsername: contact.name })}
+                  onClick={() => selectConversation(contact.identityId)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') selectConversation(contact.identityId);
+                  }}
                 >
                   <Avatar name={contact.name} size="md" />
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{contact.name}</span>
-                      {contact.verificationStatus === 'VERIFIED' ? (
-                        <Badge variant="secure">✓ Verified</Badge>
-                      ) : (
-                        <Badge variant="neutral">Contact</Badge>
-                      )}
                     </div>
-                    <div className="veil-conversation-preview" style={{ fontFamily: 'var(--veil-font-mono)', fontSize: '0.68rem' }}>
-                      {contact.fingerprint ? `${contact.fingerprint.slice(0, 16)}...` : 'E2EE Contact'}
+                    <div className="veil-conversation-preview">
+                      {contact.identityId.slice(0, 14)}...
                     </div>
                   </div>
                 </div>
@@ -540,12 +439,18 @@ export const Sidebar: React.FC = () => {
             )}
           </div>
         ) : (
-          /* Normal Conversation List */
+          /* Normal Conversations List */
           filteredConversations.length === 0 ? (
             <EmptyState
-              icon="💬"
-              title={activeTab === 'group' ? 'No Encrypted Groups' : 'No Active Chats'}
-              description="Start a new conversation using the button below or search for @username."
+              icon={<UsersIcon size={40} color="var(--veil-text-muted)" />}
+              title={activeTab === 'group' ? 'No groups yet' : 'No conversations yet'}
+              description="Start a new chat with your contacts or search by @username."
+              action={
+                <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
+                  <PlusIcon size={16} />
+                  <span>Start Chat</span>
+                </Button>
+              }
             />
           ) : (
             filteredConversations.map((conv) => {
@@ -600,7 +505,8 @@ export const Sidebar: React.FC = () => {
           style={{ width: '100%' }}
           onClick={() => openModal({ type: 'newChat' })}
         >
-          + New Chat
+          <PlusIcon size={18} />
+          <span>New Chat</span>
         </Button>
         <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.35rem' }}>
           <Button
@@ -609,7 +515,8 @@ export const Sidebar: React.FC = () => {
             style={{ flex: 1 }}
             onClick={() => openModal({ type: 'newGroup' })}
           >
-            👥 New Group
+            <UsersIcon size={16} />
+            <span>New Group</span>
           </Button>
           <Button
             variant="secondary"
@@ -618,7 +525,8 @@ export const Sidebar: React.FC = () => {
             onClick={handleCopyInvite}
             title="Copy signed cryptographic invite link"
           >
-            {copiedInvite ? '✓ Copied' : '🔗 Invite'}
+            {copiedInvite ? <CheckIcon size={16} color="var(--veil-success)" /> : <ShareIcon size={16} />}
+            <span>{copiedInvite ? 'Copied' : 'Invite'}</span>
           </Button>
         </div>
       </div>

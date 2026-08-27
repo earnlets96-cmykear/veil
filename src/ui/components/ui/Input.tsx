@@ -6,6 +6,7 @@
  */
 
 import React, { InputHTMLAttributes, ReactNode, forwardRef, useId } from 'react';
+import { AlertCircleIcon } from '../icons/index.ts';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -74,7 +75,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
 
       {hasError ? (
         <div id={errorId} className="veil-input-error-text" role="alert">
-          <span aria-hidden="true">⚠️</span>
+          <AlertCircleIcon size={14} color="var(--veil-danger)" aria-hidden="true" />
           <span>{errorText}</span>
         </div>
       ) : helperText ? (

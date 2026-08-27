@@ -1,8 +1,10 @@
 /**
  * Accessible Empty State Component for VEIL.
+ * Uses SVG vector iconography.
  */
 
 import React, { ReactNode } from 'react';
+import { ShieldIcon } from '../icons/index.ts';
 
 export interface EmptyStateProps {
   icon?: ReactNode;
@@ -13,19 +15,19 @@ export interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon = '🛡️',
+  icon,
   title,
   description,
   action,
   className = '',
 }) => {
+  const defaultIcon = <ShieldIcon size={48} color="var(--veil-accent-primary)" />;
+
   return (
     <div className={`veil-empty-state ${className}`.trim()} role="region" aria-label={title}>
-      {icon && (
-        <div className="veil-empty-icon" aria-hidden="true">
-          {icon}
-        </div>
-      )}
+      <div className="veil-empty-icon" aria-hidden="true">
+        {icon || defaultIcon}
+      </div>
       <h3 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--veil-text-primary)' }}>
         {title}
       </h3>

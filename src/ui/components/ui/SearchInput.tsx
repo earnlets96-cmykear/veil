@@ -1,11 +1,11 @@
 /**
  * Reusable Search Input Component for VEIL.
- *
- * Includes magnifying search icon and accessible clear button.
+ * Uses SVG SearchIcon and CloseIcon.
  */
 
 import React, { forwardRef } from 'react';
 import { Input, InputProps } from './Input.tsx';
+import { SearchIcon, CloseIcon } from '../icons/index.ts';
 
 export interface SearchInputProps extends Omit<InputProps, 'type' | 'leadingIcon' | 'trailingAction'> {
   onClear?: () => void;
@@ -14,7 +14,7 @@ export interface SearchInputProps extends Omit<InputProps, 'type' | 'leadingIcon
 export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(({
   value,
   onClear,
-  placeholder = 'Search contacts, messages & groups...',
+  placeholder = 'Search contacts, messages & directory...',
   ...rest
 }, ref) => {
   const hasValue = Boolean(value && String(value).length > 0);
@@ -22,13 +22,12 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(({
   const clearButton = hasValue && onClear ? (
     <button
       type="button"
-      className="veil-icon-btn"
-      style={{ width: '28px', height: '28px', minWidth: '28px', minHeight: '28px', fontSize: '0.8rem' }}
+      className="veil-icon-btn veil-search-clear-btn"
       onClick={onClear}
       aria-label="Clear search text"
       title="Clear search"
     >
-      ✕
+      <CloseIcon size={16} />
     </button>
   ) : undefined;
 
@@ -36,11 +35,11 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(({
     <Input
       ref={ref}
       type="search"
-      leadingIcon="🔍"
+      leadingIcon={<SearchIcon size={18} color="var(--veil-text-muted)" />}
       trailingAction={clearButton}
       value={value}
       placeholder={placeholder}
-      aria-label={rest['aria-label'] || 'Search conversation history'}
+      aria-label={rest['aria-label'] || 'Search conversations'}
       {...rest}
     />
   );

@@ -2,10 +2,11 @@
  * Reusable Toast Notification Component & Context System for VEIL.
  *
  * Implements non-blocking, accessible toast stack with duplicate prevention,
- * automatic dismissal, manual close, and screen reader announcements.
+ * automatic dismissal, manual close, and SVG iconography.
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { CheckCircleIcon, AlertCircleIcon, InfoIcon, CloseIcon } from '../icons/index.ts';
 
 export type ToastType = 'success' | 'info' | 'warning' | 'error';
 
@@ -50,26 +51,29 @@ export const Toast: React.FC<{
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return '✓';
+        return <CheckCircleIcon size={20} color="var(--veil-success)" />;
       case 'warning':
-        return '⚠️';
+        return <AlertCircleIcon size={20} color="var(--veil-warning)" />;
       case 'error':
-        return '✕';
+        return <AlertCircleIcon size={20} color="var(--veil-danger)" />;
       case 'info':
       default:
-        return 'ℹ️';
+        return <InfoIcon size={20} color="var(--veil-info)" />;
     }
   };
+
+  const isError = toast.type === 'error';
 
   return (
     <div
       className={`veil-toast veil-toast-${toast.type}`}
-      role="status"
-      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+      role={isError ? 'alert' : 'status'}
+      aria-live={isError ? 'assertive' : 'polite'}
+      aria-atomic="true"
     >
-      <span className="veil-toast-icon" aria-hidden="true">
+      <div className="veil-toast-icon" aria-hidden="true">
         {getIcon()}
-      </span>
+      </div>
       <div className="veil-toast-content">
         {toast.title && <div className="veil-toast-title">{toast.title}</div>}
         <div className="veil-toast-message">{toast.message}</div>
@@ -80,7 +84,7 @@ export const Toast: React.FC<{
         onClick={() => onDismiss(toast.id)}
         aria-label="Dismiss notification"
       >
-        ✕
+        <CloseIcon size={16} />
       </button>
     </div>
   );
@@ -109,18 +113,13 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       message: string;
       durationMs?: number;
     }) => {
-      const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
+      const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       setToasts((prev) => {
-        // Prevent duplicate toasts with the exact same message within active stack
+        // Prevent exact duplicate spamming
         const isDuplicate = prev.some((t) => t.message === message && t.type === type);
         if (isDuplicate) return prev;
-
-        // Limit stack to maximum 4 visible toasts
-        const next = [...prev, { id, type, title, message, durationMs }];
-        return next.slice(-4);
+        return [...prev.slice(-4), { id, type, title, message, durationMs }];
       });
-
       return id;
     },
     []
@@ -129,7 +128,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <ToastContext.Provider value={{ showToast, dismissToast, clearAllToasts }}>
       {children}
-      <div className="veil-toast-container" aria-label="Notifications">
+      <div className="veil-toast-container" aria-label="Notifications" role="region">
         {toasts.map((toast) => (
           <Toast key={toast.id} toast={toast} onDismiss={dismissToast} />
         ))}

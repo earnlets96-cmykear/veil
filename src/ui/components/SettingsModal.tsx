@@ -15,7 +15,7 @@
  * with touch targets >= 44px and safe-area compatibility.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, ReactNode } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { NotificationPrivacyMode } from '../../notifications/types.ts';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
@@ -29,6 +29,22 @@ import {
   Spinner,
   useToast,
 } from './ui/index.ts';
+import {
+  UserIcon,
+  KeyIcon,
+  ShieldIcon,
+  AlertCircleIcon,
+  SunIcon,
+  FolderIcon,
+  LockIcon,
+  InfoIcon,
+  ArrowLeftIcon,
+  CloseIcon,
+  CopyIcon,
+  CheckIcon,
+  RefreshCwIcon,
+  TrashIcon,
+} from './icons/index.ts';
 
 type SettingsCategory =
   | 'profile'
@@ -172,15 +188,15 @@ export const SettingsModal: React.FC = () => {
     setMobileDetailOpen(true);
   };
 
-  const navCategories: { id: SettingsCategory; label: string; icon: string }[] = [
-    { id: 'profile', label: 'My Profile', icon: '👤' },
-    { id: 'account', label: 'Account & Identity', icon: '🔑' },
-    { id: 'privacy', label: 'Privacy & Security', icon: '🛡️' },
-    { id: 'notifications', label: 'Notifications', icon: '🔔' },
-    { id: 'appearance', label: 'Appearance', icon: '🎨' },
-    { id: 'storage', label: 'Storage & Data', icon: '💾' },
-    { id: 'spaces', label: 'Spaces & Vault', icon: '🪐' },
-    { id: 'about', label: 'About VEIL', icon: 'ℹ️' },
+  const navCategories: { id: SettingsCategory; label: string; icon: ReactNode }[] = [
+    { id: 'profile', label: 'My Profile', icon: <UserIcon size={18} /> },
+    { id: 'account', label: 'Account & Identity', icon: <KeyIcon size={18} /> },
+    { id: 'privacy', label: 'Privacy & Security', icon: <ShieldIcon size={18} /> },
+    { id: 'notifications', label: 'Notifications', icon: <AlertCircleIcon size={18} /> },
+    { id: 'appearance', label: 'Appearance', icon: <SunIcon size={18} /> },
+    { id: 'storage', label: 'Storage & Data', icon: <FolderIcon size={18} /> },
+    { id: 'spaces', label: 'Spaces & Vault', icon: <LockIcon size={18} /> },
+    { id: 'about', label: 'About VEIL', icon: <InfoIcon size={18} /> },
   ];
 
   return (
@@ -191,7 +207,7 @@ export const SettingsModal: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {mobileDetailOpen && (
               <IconButton
-                icon="←"
+                icon={<ArrowLeftIcon size={18} />}
                 aria-label="Back to settings menu"
                 className="veil-back-btn"
                 onClick={() => setMobileDetailOpen(false)}
@@ -202,7 +218,7 @@ export const SettingsModal: React.FC = () => {
             </h2>
           </div>
           <IconButton
-            icon="✕"
+            icon={<CloseIcon size={18} />}
             aria-label="Close settings"
             onClick={closeModal}
           />
@@ -221,14 +237,14 @@ export const SettingsModal: React.FC = () => {
                 className={`veil-settings-nav-item ${activeCategory === cat.id ? 'active' : ''}`}
                 onClick={() => selectNavCategory(cat.id)}
               >
-                <span>{cat.icon}</span>
+                <span className="veil-settings-nav-icon">{cat.icon}</span>
                 <span>{cat.label}</span>
               </button>
             ))}
           </nav>
 
           {/* Settings Detail Content Panel */}
-          <main className={`veil-settings-detail ${!mobileDetailOpen ? 'hide-mobile' : ''}`}>
+          <main className={`veil-settings-detail ${!mobileDetailOpen ? 'hide-mobile' : ''}`}>ilOpen ? 'hide-mobile' : ''}`}>
             {/* 1. MY PROFILE */}
             {activeCategory === 'profile' && (
               <div>
@@ -254,7 +270,8 @@ export const SettingsModal: React.FC = () => {
                           size="sm"
                           onClick={() => fileInputRef.current?.click()}
                         >
-                          📷 Change
+                          <ImageIcon size={14} />
+                          <span>Change</span>
                         </Button>
                         {avatarPreview && (
                           <Button
@@ -263,7 +280,8 @@ export const SettingsModal: React.FC = () => {
                             size="sm"
                             onClick={() => setAvatarPreview(null)}
                           >
-                            ✕ Remove
+                            <CloseIcon size={14} />
+                            <span>Remove</span>
                           </Button>
                         )}
                       </div>
@@ -279,7 +297,7 @@ export const SettingsModal: React.FC = () => {
 
                   {!isEditingProfile && (
                     <div style={{ marginTop: '0.5rem' }}>
-                      <Badge variant="secure">✓ Public Profile Active</Badge>
+                      <Badge variant="secure">Public Profile Active</Badge>
                     </div>
                   )}
                 </div>
@@ -403,7 +421,7 @@ export const SettingsModal: React.FC = () => {
                         style={{ width: '100%' }}
                         onClick={() => setIsEditingProfile(true)}
                       >
-                        ✏️ Edit Profile
+                        Edit Profile
                       </Button>
                     </div>
                   </div>
@@ -443,7 +461,17 @@ export const SettingsModal: React.FC = () => {
                     style={{ width: '100%' }}
                     onClick={handleCopyInvitation}
                   >
-                    {copiedInvite ? '✓ Link Copied' : '🔗 Copy Cryptographic Invitation Link'}
+                    {copiedInvite ? (
+                      <>
+                        <CheckIcon size={16} color="var(--veil-success)" />
+                        <span>Link Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShareIcon size={16} />
+                        <span>Copy Cryptographic Invitation Link</span>
+                      </>
+                    )}
                   </Button>
                 </div>
 
@@ -455,7 +483,8 @@ export const SettingsModal: React.FC = () => {
                       size="sm"
                       onClick={() => setShowPairingSas(true)}
                     >
-                      + Link Device
+                      <PlusIcon size={14} />
+                      <span>Link Device</span>
                     </Button>
                   </div>
 
@@ -585,7 +614,8 @@ export const SettingsModal: React.FC = () => {
                     style={{ width: '100%' }}
                     onClick={panicLock}
                   >
-                    🚨 Trigger Emergency Panic Lock
+                    <AlertCircleIcon size={16} />
+                    <span>Trigger Emergency Panic Lock</span>
                   </Button>
                 </div>
               </div>
@@ -694,7 +724,17 @@ export const SettingsModal: React.FC = () => {
                   style={{ width: '100%' }}
                   onClick={handleClearCache}
                 >
-                  {cacheCleared ? '✓ Local Cache Cleared' : '🗑️ Clear Ephemeral Attachment Cache'}
+                  {cacheCleared ? (
+                    <>
+                      <CheckIcon size={16} color="var(--veil-success)" />
+                      <span>Local Cache Cleared</span>
+                    </>
+                  ) : (
+                    <>
+                      <TrashIcon size={16} />
+                      <span>Clear Ephemeral Attachment Cache</span>
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -729,7 +769,8 @@ export const SettingsModal: React.FC = () => {
                     lockSpace();
                   }}
                 >
-                  🔒 Lock Active Space
+                  <LockIcon size={16} />
+                  <span>Lock Active Space</span>
                 </Button>
               </div>
             )}
@@ -742,17 +783,19 @@ export const SettingsModal: React.FC = () => {
                 </h3>
 
                 <div className="veil-card" style={{ textAlign: 'center', padding: '1.25rem' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.35rem' }}>🛡️</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem' }}>
+                    <ShieldIcon size={40} color="var(--veil-accent-primary)" />
+                  </div>
                   <h4 style={{ fontSize: '1.1rem', fontWeight: 700 }}>VEIL Messaging</h4>
                   <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.75rem' }}>
-                    Version 1.0.0 (Build Phase 32)
+                    Version 1.0.0 (Release Candidate)
                   </div>
                   <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', lineHeight: 1.5 }}>
                     Zero-knowledge, privacy-preserving encrypted communications platform.
                     Protected by Double Ratchet, Argon2id, XChaCha20-Poly1305, and blind relay routing.
                   </p>
                   <div style={{ marginTop: '0.75rem' }}>
-                    <Badge variant="secure">🔒 Post-RC Security Freeze Active</Badge>
+                    <Badge variant="secure">Post-RC Security Freeze Active</Badge>
                   </div>
                 </div>
               </div>

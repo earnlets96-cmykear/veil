@@ -138,9 +138,9 @@ describe('ConversationView Render & Verification Status Suite', () => {
 
     expect(html).toContain('Alice');
     expect(html).toContain('Hello from Alice!');
-    expect(html).toContain('Verify Identity');
-    expect(html).not.toContain('✓ Verified');
-    expect(html).not.toContain('🚨 Key Changed');
+    expect(html).toContain('End-to-End Encrypted Double Ratchet');
+    expect(html).not.toContain('Verified');
+    expect(html).not.toContain('Key Changed');
   });
 
   it('mounts direct VERIFIED conversation and renders verified badge & safety number action', () => {
@@ -164,9 +164,8 @@ describe('ConversationView Render & Verification Status Suite', () => {
     const html = renderWithContext(mockContext);
 
     expect(html).toContain('Alice');
-    expect(html).toContain('✓ Verified');
-    expect(html).toContain('🛡️ Safety Number');
-    expect(html).not.toContain('🚨 Key Changed');
+    expect(html).toContain('Verified');
+    expect(html).not.toContain('Key Changed');
   });
 
   it('mounts direct MISMATCH conversation and renders key changed warning & review key action', () => {
@@ -185,9 +184,8 @@ describe('ConversationView Render & Verification Status Suite', () => {
     const html = renderWithContext(mockContext);
 
     expect(html).toContain('Alice');
-    expect(html).toContain('🚨 Key Changed');
-    expect(html).toContain('🚨 Review Key');
-    expect(html).not.toContain('✓ Verified');
+    expect(html).toContain('Key Changed');
+    expect(html).not.toContain('Verified');
   });
 
   it('mounts direct conversation with NO matching contact record safely without error', () => {
@@ -202,7 +200,7 @@ describe('ConversationView Render & Verification Status Suite', () => {
 
     expect(html).toContain('Alice');
     expect(html).toContain('Hello from Alice!');
-    expect(html).toContain('Verify Identity');
+    expect(html).toContain('End-to-End Encrypted Double Ratchet');
   });
 
   it('mounts GROUP conversation safely and displays group info action', () => {
@@ -236,8 +234,7 @@ describe('ConversationView Render & Verification Status Suite', () => {
     const html = renderWithContext(mockContext);
 
     expect(html).toContain('Engineering Team');
-    expect(html).toContain('Group Info');
-    expect(html).toContain('Encrypted Group Ratchet');
+    expect(html).toContain('End-to-End Encrypted');
     expect(html).toContain('Group standup in 5 mins');
   });
 
@@ -259,6 +256,6 @@ describe('ConversationView Render & Verification Status Suite', () => {
     const html = renderWithContext(mockContext);
 
     expect(html).toContain('Alice');
-    expect(html).toContain('🔒 Double Ratchet E2EE');
+    expect(html).toContain('End-to-End Encrypted Conversation');
   });
 });

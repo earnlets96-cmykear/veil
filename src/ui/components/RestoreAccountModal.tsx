@@ -7,6 +7,8 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { Button, IconButton, PasswordInput } from './ui/index.ts';
+import { CloseIcon, RefreshCwIcon } from './icons/index.ts';
 
 export const RestoreAccountModal: React.FC = () => {
   const { restoreAccount, closeModal } = useApp();
@@ -17,7 +19,7 @@ export const RestoreAccountModal: React.FC = () => {
 
   const handleRestore = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) return;
+    if (!username.trim() || !password.trim() || isLoading) return;
 
     setError(null);
     setIsLoading(true);
@@ -33,17 +35,11 @@ export const RestoreAccountModal: React.FC = () => {
   };
 
   return (
-    <div className="veil-modal-overlay">
+    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="restore-account-title">
       <div className="veil-modal-card">
         <div className="veil-modal-header">
-          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Restore Account & Keys</h2>
-          <button
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
-            onClick={closeModal}
-          >
-            ✕
-          </button>
+          <h2 id="restore-account-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Restore Account & Keys</h2>
+          <IconButton icon={<CloseIcon size={18} />} aria-label="Close dialog" onClick={closeModal} />
         </div>
 
         <form onSubmit={handleRestore}>
@@ -87,9 +83,7 @@ export const RestoreAccountModal: React.FC = () => {
               >
                 Account Password
               </label>
-              <input
-                type="password"
-                className="veil-input"
+              <PasswordInput
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -108,6 +102,7 @@ export const RestoreAccountModal: React.FC = () => {
                   fontSize: 'var(--veil-text-xs)',
                   textAlign: 'center',
                 }}
+                role="alert"
               >
                 {error}
               </div>
@@ -115,12 +110,13 @@ export const RestoreAccountModal: React.FC = () => {
           </div>
 
           <div className="veil-modal-footer">
-            <button type="button" className="veil-btn veil-btn-secondary" onClick={closeModal} disabled={isLoading}>
+            <Button type="button" variant="secondary" onClick={closeModal} disabled={isLoading}>
               Cancel
-            </button>
-            <button type="submit" className="veil-btn veil-btn-primary" disabled={isLoading || !username || !password}>
-              {isLoading ? 'Deriving KEK & Restoring...' : 'Restore Account'}
-            </button>
+            </Button>
+            <Button type="submit" variant="primary" disabled={isLoading || !username || !password} loading={isLoading}>
+              <RefreshCwIcon size={16} />
+              <span>{isLoading ? 'Deriving & Restoring...' : 'Restore Account'}</span>
+            </Button>
           </div>
         </form>
       </div>

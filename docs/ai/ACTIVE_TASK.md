@@ -2,41 +2,41 @@
 
 ## Current Working Goal
 
-- **Milestone**: **PHASE 31: Production Connectivity Repair, Render/R2/Supabase Integration Verification & Mobile Reliability**
+- **Milestone**: **PHASE 32: Complete UI/UX Overhaul, Telegram-Inspired Media Suite & File Saver Engine**
 - **Status**: **COMPLETED & VERIFIED (ALL OBJECTIVES 100% ACHIEVED & CERTIFIED)**
-- **Release Version**: **`1.0.0` (Production Hardened Mobile & Cloud Continuity Release)**
+- **Release Version**: **`1.0.0` (Production Hardened UI/UX & Media Continuity Release)**
 - **Total Test Suites**: **250 test files (100% clean pass)**
 - **Total Automated Tests**: **635 tests (100% clean pass)**
-- **Phase 31 Production Smoke Test**: **16/16 checks passed (100% on live Render + Supabase + R2)**
-- **Phase 31 Mobile Acceptance Suite**: **10/10 checks passed (100%)**
-- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (`BUILD SUCCESSFUL in 28s`)**
-- **Android Execution**: **Verified on Android API 35 with clean startup, ErrorBoundary protection, and storage initialization**
-- **Build Status**: **Clean production build (`npm run build`) in 1.61s**
+- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (`BUILD SUCCESSFUL in 4m 38s`)**
+- **Build Status**: **Clean production release build (`npm run build:release`) with SHA-256 release manifest**
 
 ---
 
-## Phase 31 Checklist
+## Phase 32 Checklist
 
-- [x] Fix Android black screen / startup failures (TDZ hook reordering & top-level `ErrorBoundary`).
-- [x] Remove account-count and envelope-count information from LockScreen (`{knownSpacesCount}` removed).
-- [x] Diagnose DNS resolution failure on `relay.veil.chat` and establish canonical production endpoints (`https://veil-rga0.onrender.com` / `wss://veil-rga0.onrender.com/v1/ws`).
-- [x] Support `VITE_RELAY_URL` and `VITE_RELAY_WS_URL` build-time environment variable overrides.
-- [x] Authoritative routing across HTTP REST, WebSocket, Mailbox, Directory, and CloudClient attachment subsystems.
-- [x] Verify Render PORT binding on `0.0.0.0` with `process.env.PORT`.
-- [x] Verify CORS OPTIONS preflight handling on live production endpoints.
-- [x] Verify live Supabase PostgreSQL and Cloudflare R2 connectivity on Render.
-- [x] Verify zero-knowledge account registration and capability-based mailbox allocation on Render.
-- [x] Verify encrypted attachment upload/download with AEAD authenticated decryption on Cloudflare R2.
-- [x] Verify unauthorized attachment access rejection (404/403 Access Denied).
-- [x] Verify live WebSocket ping/pong connectivity on Render `/v1/ws`.
-- [x] Fix degraded/polling state behavior with bounded exponential backoff (1s-30s) and jitter.
-- [x] Make profile editing offline-first with automatic background directory sync.
-- [x] Create 4 new Phase 31 test suites (`tests/phase31-*.test.ts/tsx`).
-- [x] Author comprehensive 16-point live smoke test script (`scripts/phase31-production-connectivity.mjs`).
-- [x] Document custom domain CNAME DNS configuration in `docs/PHASE31_PRODUCTION_CONNECTIVITY.md`.
-- [x] Update core AI continuity documents (`CURRENT_STATE.md`, `ACTIVE_TASK.md`, `CHANGELOG.md`).
-
-
-
-
-
+- [x] **Pure SVG Vector Icon Library**: Built stroke-based, scalable SVGs in `src/ui/components/icons/Icons.tsx` (over 35 custom vector icons). Completely eradicated all emoji UI controls across the application.
+- [x] **Unified File Saver Engine (`src/ui/utils/fileSaver.ts`)**:
+  - Native Android support via `@capacitor/filesystem` writing to `Directory.Documents/VEIL` and `@capacitor/share` fallback.
+  - Web browser support via `showSaveFilePicker` and robust blob download triggers.
+  - Preserved strict E2EE pipeline: ciphertext download -> local key decryption -> local file storage.
+- [x] **Telegram-Inspired Media Viewer (`src/ui/components/media/MediaViewer.tsx`)**:
+  - Fullscreen photo & video viewer with pan/zoom (1x to 4x), touch gestures, and keyboard navigation.
+  - Sleek custom HTML5 video controls with scrubber, play/pause, timecode, and fullscreen.
+  - Multi-item gallery carousel navigation and direct save/share actions.
+- [x] **Shared Media Gallery (`src/ui/components/media/MediaGalleryModal.tsx`)**:
+  - In-conversation shared media modal with categorized tabs: Photos & Videos (3-column responsive grid), Files & Documents (file-type icons and sizes), and Voice Notes.
+- [x] **Pre-Send Attachment Staging (`src/ui/components/media/AttachmentPreviewModal.tsx`)**:
+  - Pre-send attachment inspection modal with thumbnails, document cards, optional caption input, and individual item deletion.
+- [x] **Modernized UI Primitives & Design System**:
+  - `AttachmentCard`: File-type SVGs (PDF, Zip, Text, Audio, Image, Video) and interactive download/decrypting/completed status indicators.
+  - `VoiceNoteCard`: SVG Play/Pause buttons, interactive waveform scrubber, and timer display.
+  - `MessageStatus`: SVG Clock, Refresh, Single Check, Double Check (delivered & read), and AlertCircle icons.
+  - `PasswordInput`: SVG Eye / EyeOff passphrase visibility toggle.
+  - `SearchInput`: SVG SearchIcon and CloseIcon clear button.
+  - `Toast`: Dynamic SVG icons and accessible `role="alert"` / `aria-live="assertive"` for errors.
+- [x] **Main Views & Dialog Modernization**:
+  - Modernized `LockScreen`, `Sidebar`, `ConversationView`, `MessageComposer`, `SettingsModal`, `ProfileModal`, `ContactDetailsModal`, `NewChatModal`, `NewGroupModal`, `GroupDetailsModal`, `CreateSpaceModal`, `RestoreAccountModal`, and `ErrorBoundary`.
+- [x] **Full Regression & Integrity Verification**:
+  - 250 / 250 test suites passing (635 / 635 tests).
+  - Release manifest SHA-256 integrity verified.
+  - Native Android debug APK assembled cleanly via Gradle.

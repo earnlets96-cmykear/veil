@@ -4,31 +4,33 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
+import { Button, IconButton } from './ui/index.ts';
+import { CloseIcon, UsersIcon } from './icons/index.ts';
 
 export const NewGroupModal: React.FC = () => {
   const { createGroup, closeModal } = useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || isSubmitting) return;
 
-    await createGroup(name.trim(), description.trim());
+    setIsSubmitting(true);
+    try {
+      await createGroup(name.trim(), description.trim());
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="veil-modal-overlay">
+    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="create-group-title">
       <div className="veil-modal-card">
         <div className="veil-modal-header">
-          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Create Encrypted Group</h2>
-          <button
-            className="veil-btn veil-btn-secondary"
-            style={{ padding: '0.2rem 0.5rem', fontSize: '1rem' }}
-            onClick={closeModal}
-          >
-            ✕
-          </button>
+          <h2 id="create-group-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Create Encrypted Group</h2>
+          <IconButton icon={<CloseIcon size={18} />} aria-label="Close dialog" onClick={closeModal} />
         </div>
 
         <form onSubmit={handleCreateGroup}>
@@ -83,12 +85,13 @@ export const NewGroupModal: React.FC = () => {
           </div>
 
           <div className="veil-modal-footer">
-            <button type="button" className="veil-btn veil-btn-secondary" onClick={closeModal}>
+            <Button type="button" variant="secondary" onClick={closeModal}>
               Cancel
-            </button>
-            <button type="submit" className="veil-btn veil-btn-primary" disabled={!name.trim()}>
-              Create Group
-            </button>
+            </Button>
+            <Button type="submit" variant="primary" disabled={!name.trim()} loading={isSubmitting}>
+              <UsersIcon size={16} />
+              <span>Create Group</span>
+            </Button>
           </div>
         </form>
       </div>

@@ -1,15 +1,24 @@
 /**
- * Modernized Message Composer Component for VEIL Phase 31.
+ * Modernized Message Composer Component for VEIL Phase 31/32.
  *
- * Implements Enter to send, Shift+Enter for multiline, encrypted file attachment picking,
- * live voice note recording & sending, and message reply quote banners using
- * VEIL reusable component primitives.
+ * Implements Telegram-inspired auto-expanding composer, pre-send attachment staging,
+ * live voice note recording & sending with waveform pulse, reply quote banners,
+ * and 100% SVG vector iconography.
  */
 
 import React, { useState, useRef, KeyboardEvent } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview } from './ui/index.ts';
+import {
+  SendIcon,
+  PaperclipIcon,
+  MicIcon,
+  CloseIcon,
+  StopIcon,
+  CheckIcon,
+} from './icons/index.ts';
+import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 
 export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const { sendMessage, sendAttachment, sendVoiceMessage, replyTarget, setReplyTarget } = useApp();
@@ -17,13 +26,19 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
+  const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorderRef = useRef<VoiceRecorder | null>(null);
 
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
     const msgText = text;
     setText('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setIsSending(true);
 
     try {
@@ -42,15 +57,40 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value);
+    // Auto-grow textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+    }
+  };
+
+  // Stage files for pre-send preview modal
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const file = files[0];
-
-    try {
-      await sendAttachment(conversationId, file);
-    } catch (_e) {}
+    const fileArray = Array.from(files);
+    setStagedFiles(fileArray);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Confirm sending staged files
+  const handleConfirmSendFiles = async (filesToSend: File[], caption?: string) => {
+    setStagedFiles(null);
+    setIsSending(true);
+    try {
+      for (const file of filesToSend) {
+        await sendAttachment(conversationId, file);
+      }
+      if (caption) {
+        await sendMessage(conversationId, caption);
+      }
+    } catch (_err) {
+      // Enqueued in offline queue
+    } finally {
+      setIsSending(false);
+    }
   };
 
   // Voice recording controls
@@ -100,6 +140,15 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+      {/* Pre-send Attachment Preview Modal */}
+      {stagedFiles && (
+        <AttachmentPreviewModal
+          files={stagedFiles}
+          onConfirmSend={handleConfirmSendFiles}
+          onCancel={() => setStagedFiles(null)}
+        />
+      )}
+
       {/* Quoted Message Reply Banner */}
       {replyTarget && (
         <ReplyPreview
@@ -118,6 +167,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
         <input
           type="file"
           ref={fileInputRef}
+          multiple
           style={{ display: 'none' }}
           onChange={handleFileChange}
           aria-hidden="true"
@@ -158,15 +208,17 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
                 onClick={handleCancelVoice}
                 disabled={isSending}
               >
-                ✕ Cancel
+                <CloseIcon size={16} />
+                <span>Cancel</span>
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleSendVoice}
-                isLoading={isSending}
+                loading={isSending}
               >
-                ✔ Send Voice
+                <SendIcon size={16} />
+                <span>Send Voice</span>
               </Button>
             </div>
           </div>
@@ -174,26 +226,27 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
           /* Standard Message & Attachment Controls */
           <>
             <IconButton
-              icon="📎"
-              variant="secondary"
+              icon={<PaperclipIcon size={20} />}
+              variant="ghost"
               onClick={() => fileInputRef.current?.click()}
               aria-label="Attach Encrypted File"
-              title="Attach Encrypted File"
+              title="Attach File"
             />
 
             <IconButton
-              icon="🎙️"
-              variant="secondary"
+              icon={<MicIcon size={20} />}
+              variant="ghost"
               onClick={handleStartVoice}
               aria-label="Record Voice Note"
               title="Record Voice Note"
             />
 
             <textarea
+              ref={textareaRef}
               className="veil-composer-input"
               placeholder="Type an encrypted message... (Enter to send, Shift+Enter for newline)"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={handleTextChange}
               onKeyDown={handleKeyDown}
               rows={1}
               aria-label="Message Input Field"
@@ -204,10 +257,11 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
               size="md"
               onClick={handleSend}
               disabled={!text.trim() || isSending}
-              isLoading={isSending}
+              loading={isSending}
               aria-label="Send Message"
             >
-              Send ➤
+              <SendIcon size={18} />
+              <span>Send</span>
             </Button>
           </>
         )}

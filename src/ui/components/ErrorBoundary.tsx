@@ -7,6 +7,7 @@
  */
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertCircleIcon } from './icons/index.ts';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -108,13 +109,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2rem',
                 color: '#ffffff',
                 boxShadow: '0 0 24px rgba(239, 68, 68, 0.4)',
                 marginBottom: '1.25rem',
               }}
             >
-              ⚠️
+              <AlertCircleIcon size={32} />
             </div>
 
             <h1
