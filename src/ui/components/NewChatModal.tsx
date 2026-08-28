@@ -352,7 +352,21 @@ export const NewChatModal: React.FC = () => {
               <form onSubmit={handleSendRequest}>
                 {requestSent ? (
                   <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>✅</div>
+                    <div
+                      style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: 'var(--veil-radius-full)',
+                        background: 'var(--veil-success-subtle, rgba(16, 185, 129, 0.15))',
+                        border: '1px solid var(--veil-success)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '0.75rem',
+                      }}
+                    >
+                      <CheckIcon size={28} color="var(--veil-success)" />
+                    </div>
                     <h3 style={{ fontSize: 'var(--veil-text-md)', fontWeight: 600, color: 'var(--veil-success)' }}>
                       Contact Request Sent!
                     </h3>

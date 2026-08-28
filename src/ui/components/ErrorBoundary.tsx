@@ -3,11 +3,11 @@
  *
  * Catches unhandled component errors, prevents black-screen crashes,
  * sanitizes error messages to prevent secret/key leakage, and provides
- * recovery actions (Retry, Continue Offline).
+ * recovery actions (Retry, Continue Offline) with 100% pure SVG icons.
  */
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertCircleIcon } from './icons/index.ts';
+import { AlertCircleIcon, RefreshCwIcon, LockIcon } from './icons/index.ts';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -92,9 +92,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             style={{
               width: '100%',
               maxWidth: '440px',
-              padding: '2.5rem',
+              padding: '2.25rem',
               textAlign: 'center',
-              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
               borderRadius: '16px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
@@ -102,8 +102,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           >
             <div
               style={{
-                width: '64px',
-                height: '64px',
+                width: '60px',
+                height: '60px',
                 borderRadius: '16px',
                 background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
                 display: 'inline-flex',
@@ -114,12 +114,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 marginBottom: '1.25rem',
               }}
             >
-              <AlertCircleIcon size={32} />
+              <AlertCircleIcon size={30} />
             </div>
 
             <h1
               style={{
-                fontSize: '1.5rem',
+                fontSize: '1.35rem',
                 fontWeight: 700,
                 letterSpacing: '-0.02em',
                 marginBottom: '0.5rem',
@@ -132,9 +132,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <p
               style={{
                 color: '#94a3b8',
-                fontSize: '0.875rem',
+                fontSize: '0.85rem',
                 lineHeight: 1.5,
-                marginBottom: '1.5rem',
+                marginBottom: '1.25rem',
               }}
             >
               The application encountered an unexpected issue while loading. Your local encrypted data remains secure and untouched on this device.
@@ -172,9 +172,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   border: 'none',
                   borderRadius: '8px',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
                 }}
               >
-                🔄 Retry Loading
+                <RefreshCwIcon size={16} />
+                <span>Retry Loading</span>
               </button>
 
               <button
@@ -191,9 +196,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   border: '1px solid rgba(255, 255, 255, 0.15)',
                   borderRadius: '8px',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
                 }}
               >
-                📱 Return to Lock Screen
+                <LockIcon size={16} />
+                <span>Return to Lock Screen</span>
               </button>
             </div>
           </div>

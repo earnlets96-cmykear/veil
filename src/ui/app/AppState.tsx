@@ -1129,7 +1129,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: msgId,
         conversationId,
         senderId: activeSession.spaceId,
-        text: '🎙️ Voice Message',
+        text: 'Voice Message',
         isOutgoing: true,
         timestamp: Date.now(),
         status: 'SENDING',
@@ -1161,7 +1161,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
             activeSession,
             targetContact.prekeyBundle,
-            '🎙️ Voice Message',
+            'Voice Message',
             undefined,
             activeReply,
             voiceMeta
@@ -1172,7 +1172,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             id: msgId,
             conversationId,
             senderId: activeSession.spaceId,
-            text: '🎙️ Voice Message',
+            text: 'Voice Message',
             voice: voiceMeta,
             replyTo: activeReply,
           });

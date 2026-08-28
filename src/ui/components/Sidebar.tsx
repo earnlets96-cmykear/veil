@@ -56,6 +56,7 @@ export const Sidebar: React.FC = () => {
     searchResults,
     setSearchQuery,
     searchDirectory,
+    sendContactRequest,
     exportMyInvitation,
     myProfile,
   } = useApp();
@@ -410,7 +411,12 @@ export const Sidebar: React.FC = () => {
               )}
 
               {globalResults.map((user) => {
-                const relationship = getRelationshipState(user.peerId, user.username, contacts, contactRequests);
+                const relationship = getRelationshipState(user.peerId, user.username, {
+                  myIdentityId: activeSession?.spaceId,
+                  myUsername: myProfile?.username,
+                  contacts: contacts || [],
+                  contactRequests: contactRequests || [],
+                });
                 return (
                   <UserSearchResult
                     key={user.peerId}
@@ -418,7 +424,9 @@ export const Sidebar: React.FC = () => {
                     relationship={relationship}
                     onOpenProfile={(res) => openModal({ type: 'profile', peerId: res.peerId, peerUsername: res.username, searchResult: res })}
                     onSendRequest={async (res) => {
-                      await (window as any).__veil_send_request?.(res.peerId);
+                      try {
+                        await sendContactRequest(res.username);
+                      } catch (_e) {}
                     }}
                     onMessageUser={(peerId) => {
                       selectConversation(peerId);
@@ -529,7 +537,7 @@ export const Sidebar: React.FC = () => {
                 >
                   <Avatar
                     name={conv.name}
-                    imageUrl={conv.avatar || contacts.find((c) => c.identityId === conv.id)?.avatar}
+                    imageUrl={conv.avatar || (contacts || []).find((c) => c.identityId === conv.id)?.avatar}
                     size="md"
                     isGroup={conv.type === 'group'}
                     aria-label={`${conv.name} avatar`}

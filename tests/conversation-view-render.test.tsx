@@ -138,7 +138,7 @@ describe('ConversationView Render & Verification Status Suite', () => {
 
     expect(html).toContain('Alice');
     expect(html).toContain('Hello from Alice!');
-    expect(html).toContain('End-to-End Encrypted Double Ratchet');
+    expect(html).toContain('End-to-End Encrypted');
     expect(html).not.toContain('Verified');
     expect(html).not.toContain('Key Changed');
   });
@@ -200,7 +200,7 @@ describe('ConversationView Render & Verification Status Suite', () => {
 
     expect(html).toContain('Alice');
     expect(html).toContain('Hello from Alice!');
-    expect(html).toContain('End-to-End Encrypted Double Ratchet');
+    expect(html).toContain('End-to-End Encrypted');
   });
 
   it('mounts GROUP conversation safely and displays group info action', () => {

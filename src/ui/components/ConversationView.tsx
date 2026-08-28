@@ -15,6 +15,7 @@ import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import { useApp } from '../app/AppState.tsx';
 import { MessageComposer } from './MessageComposer.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
+import { VoicePlayer } from '../../attachments/voicePlayer.ts';
 import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
 import type { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/types.ts';
 import { base64ToBytes } from '../../crypto/utils.ts';
@@ -158,23 +159,44 @@ export const ConversationView: React.FC = () => {
     }
   }, [activeChatId, activeMessages.length]);
 
+  // Track playback progress per message
+  const [playbackProgress, setPlaybackProgress] = useState<Record<string, number>>({});
+
   // Handle Voice Note Playback
   const handleToggleVoice = async (msg: UIMessage) => {
-    if (!msg.voice) return;
+    if (!msg.voice || !activeSession) return;
 
     if (playingAudioId === msg.id) {
-      VoiceRecorder.stopPlayback();
+      VoicePlayer.stop();
       setPlayingAudioId(null);
+      setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
       return;
     }
 
     try {
+      if (!cloudClient.getSessionToken()) {
+        await ensureCloudSession(activeSession);
+      }
+
       setPlayingAudioId(msg.id);
-      await VoiceRecorder.playVoiceNote(msg.voice.ciphertextChunks);
+      await VoicePlayer.playVoiceNote(activeSession, cloudClient, msg.voice, msg.id, {
+        onProgress: (percent) => {
+          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
+        },
+        onEnded: () => {
+          setPlayingAudioId(null);
+          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+        },
+        onError: (err) => {
+          setPlayingAudioId(null);
+          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+          showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
+        },
+      });
     } catch (err: any) {
-      showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
-    } finally {
       setPlayingAudioId(null);
+      setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+      showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
     }
   };
 
@@ -345,12 +367,14 @@ export const ConversationView: React.FC = () => {
 
   if (!activeChatId) {
     return (
-      <div className="veil-conversation-empty">
-        <EmptyState
-          icon={<ShieldIcon size={56} color="var(--veil-accent-primary)" />}
-          title="End-to-End Encrypted Messaging"
-          description="Select a conversation or start a new encrypted chat to begin private communication."
-        />
+      <div className="veil-conversation-empty" role="region" aria-label="No conversation selected">
+        <div className="veil-empty-chat-placeholder">
+          <div className="veil-empty-chat-icon-container">
+            <ShieldIcon size={36} color="var(--veil-accent-primary)" />
+          </div>
+          <h3 className="veil-empty-chat-title">Your conversations are encrypted by default</h3>
+          <p className="veil-empty-chat-subtitle">Select a conversation to begin</p>
+        </div>
       </div>
     );
   }
@@ -402,7 +426,7 @@ export const ConversationView: React.FC = () => {
             />
 
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}
+              className="veil-header-profile-trigger"
               onClick={() => {
                 if (isGroup) {
                   openModal({ type: 'groupDetails', conversationId: activeChatId });
@@ -425,13 +449,13 @@ export const ConversationView: React.FC = () => {
                 <div className="veil-header-title">{conversationName}</div>
                 <div className="veil-header-subtitle">
                   {isGroup ? (
-                    'End-to-End Encrypted (Group Ratchet)'
+                    'Group • End-to-End Encrypted'
                   ) : activeContact?.verificationStatus === 'MISMATCH' ? (
-                    <span style={{ color: 'var(--veil-danger)' }}>Key Changed (Review Key)</span>
+                    <span style={{ color: 'var(--veil-danger)' }}>Key Changed</span>
                   ) : activeContact?.verificationStatus === 'VERIFIED' || activeConversation?.isVerified || activeContact?.verified ? (
                     <span style={{ color: 'var(--veil-success)' }}>Verified (Ed25519)</span>
                   ) : (
-                    'End-to-End Encrypted Double Ratchet'
+                    'End-to-End Encrypted'
                   )}
                 </div>
               </div>
@@ -582,12 +606,19 @@ export const ConversationView: React.FC = () => {
                       <VoiceNoteCard
                         durationSeconds={msg.voice.durationSeconds}
                         playbackState={playingAudioId === msg.id ? 'playing' : 'idle'}
+                        currentProgressPercent={playbackProgress[msg.id] || 0}
                         onPlayToggle={() => handleToggleVoice(msg)}
+                        onSeek={(percent) => {
+                          if (playingAudioId === msg.id) {
+                            VoicePlayer.seek(percent);
+                            setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
+                          }
+                        }}
                       />
                     )}
 
                     {/* Text Message Bubble (Rendered if message has text and isn't raw media placeholder) */}
-                    {msg.text && !msg.text.startsWith('📎 Attachment:') && (
+                    {msg.text && !msg.text.startsWith('📎 Attachment:') && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
                       <MessageBubble
                         messageId={msg.id}
                         senderName={msg.senderName}

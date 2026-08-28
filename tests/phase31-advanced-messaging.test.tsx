@@ -62,7 +62,8 @@ describe('Phase 31 Step 5A: Advanced Message Interaction Tests', () => {
         />
       );
 
-      expect(html).toContain('🔄 Retry');
+      expect(html).toContain('Retry');
+      expect(html).toContain('<svg');
       expect(html).toContain('aria-label="Retry sending failed message"');
       expect(html).toContain('Failed to deliver');
     });

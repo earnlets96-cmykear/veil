@@ -49,7 +49,7 @@ function renderApp() {
       <div class="veil-app-container">
         <div class="veil-auth-card">
           <div class="veil-auth-header">
-            <div class="veil-logo-icon">⚠️</div>
+            <div class="veil-logo-icon">!</div>
             <h1 class="veil-title">Storage Unavailable</h1>
             <p class="veil-subtitle">VEIL failed closed for security</p>
           </div>
@@ -70,7 +70,7 @@ function renderApp() {
       <div class="veil-app-container">
         <div class="veil-auth-card">
           <div class="veil-auth-header">
-            <div class="veil-logo-icon">🛡️</div>
+            <div class="veil-logo-icon">V</div>
             <h1 class="veil-title">VEIL</h1>
             <p class="veil-subtitle">Privacy-First Multi-Space Messenger</p>
             <div class="veil-badge veil-badge-rc">v1.0.0-rc.1 (Phase 11)</div>
@@ -152,8 +152,8 @@ function renderApp() {
           </div>
 
           <div class="veil-header-actions">
-            <button id="quick-lock-btn" class="veil-btn veil-btn-secondary">🔒 Quick Lock</button>
-            <button id="panic-lock-btn" class="veil-btn veil-btn-danger">🚨 Panic Lock</button>
+            <button id="quick-lock-btn" class="veil-btn veil-btn-secondary">Quick Lock</button>
+            <button id="panic-lock-btn" class="veil-btn veil-btn-danger">Panic Lock</button>
           </div>
         </header>
 

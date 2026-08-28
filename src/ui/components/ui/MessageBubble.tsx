@@ -11,6 +11,7 @@ import { ReplyPreview, ReplyPreviewData } from './ReplyPreview.tsx';
 import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
 import { Spinner } from './Spinner.tsx';
+import { RefreshCwIcon } from '../icons/index.ts';
 
 export interface MessageBubbleProps {
   id: string;
@@ -175,7 +176,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   <span>Retrying...</span>
                 </>
               ) : (
-                '🔄 Retry'
+                <>
+                  <RefreshCwIcon size={12} />
+                  <span>Retry</span>
+                </>
               )}
             </button>
           )}

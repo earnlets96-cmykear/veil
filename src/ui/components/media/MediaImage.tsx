@@ -2,13 +2,13 @@
  * Inline Decrypted Media Image & Video Thumbnail Component for VEIL.
  *
  * Automatically orchestrates authenticated cloud retrieval, cryptographic reassembly,
- * and ephemeral Blob URL generation with loading skeleton and error recovery.
+ * and ephemeral Blob URL generation with smooth loading skeleton and automatic dead-blob recovery.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
-import { PlayIcon, ImageIcon, VideoIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
+import { PlayIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
 
 export interface MediaImageProps {
   attachment: AttachmentPayload;
@@ -21,22 +21,37 @@ export interface MediaImageProps {
 export const MediaImage: React.FC<MediaImageProps> = ({
   attachment,
   onClick,
-  alt = 'Decrypted media',
+  alt = 'Encrypted media',
   className = '',
   isVideo = false,
 }) => {
   const { activeSession, cloudClient, ensureCloudSession } = useApp();
+  const key = attachment.objectId || attachment.attachmentId || attachment.name;
+  
   const [media, setMedia] = useState<DecryptedMedia | null>(() => {
-    const key = attachment.objectId || attachment.attachmentId || attachment.name;
     return MediaCache.get(key) || null;
   });
   const [isLoading, setIsLoading] = useState(!media);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
-  const fetchAndDecrypt = async () => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchAndDecrypt = useCallback(async (forceRetry = false) => {
     if (!activeSession) return;
-    setIsLoading(true);
-    setError(null);
+    if (forceRetry) {
+      MediaCache.invalidate(key);
+    }
+
+    if (isMountedRef.current) {
+      setIsLoading(true);
+      setError(null);
+    }
 
     try {
       if (!cloudClient.getSessionToken()) {
@@ -44,16 +59,19 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       }
 
       const result = await MediaCache.getOrFetch(attachment, activeSession, cloudClient);
-      setMedia(result);
+      if (isMountedRef.current) {
+        setMedia(result);
+        setIsLoading(false);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to decrypt media');
-    } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setError(err?.message || 'Media unavailable');
+        setIsLoading(false);
+      }
     }
-  };
+  }, [activeSession, cloudClient, ensureCloudSession, key, attachment]);
 
   useEffect(() => {
-    const key = attachment.objectId || attachment.attachmentId || attachment.name;
     const cached = MediaCache.get(key);
     if (cached) {
       setMedia(cached);
@@ -61,27 +79,24 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       return;
     }
 
-    if (attachment.previewUrl && attachment.previewUrl.startsWith('blob:')) {
-      const item: DecryptedMedia = {
-        id: key,
-        blobUrl: attachment.previewUrl,
-        data: new Uint8Array(),
-        mimeType: attachment.mimeType || 'image/jpeg',
-        name: attachment.name,
-        sizeBytes: attachment.sizeBytes || 0,
-      };
-      MediaCache.set(key, item);
-      setMedia(item);
-      setIsLoading(false);
-      return;
-    }
-
     fetchAndDecrypt();
-  }, [attachment.objectId, attachment.attachmentId, attachment.previewUrl]);
+  }, [key, fetchAndDecrypt]);
+
+  // Handle broken/stale blob image load failure
+  const handleImageError = () => {
+    if (isMountedRef.current) {
+      MediaCache.invalidate(key);
+      fetchAndDecrypt(true);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className={`veil-media-thumbnail-loading ${className}`.trim()} role="progressbar" aria-label="Decrypting media...">
+      <div
+        className={`veil-media-thumbnail-loading ${className}`.trim()}
+        role="progressbar"
+        aria-label="Decrypting media..."
+      >
         <div className="veil-media-skeleton-pulse" />
         <div className="veil-media-loading-badge">
           <span className="veil-spinner veil-spinner-sm" />
@@ -94,15 +109,15 @@ export const MediaImage: React.FC<MediaImageProps> = ({
   if (error || !media) {
     return (
       <div className={`veil-media-thumbnail-error ${className}`.trim()} role="alert">
-        <AlertCircleIcon size={24} color="var(--veil-danger)" />
-        <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
-          {error || 'Decryption failed'}
+        <AlertCircleIcon size={22} color="var(--veil-danger)" />
+        <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
+          {error || 'Media unavailable'}
         </span>
         <button
           type="button"
           className="veil-btn veil-btn-secondary veil-btn-sm"
-          onClick={fetchAndDecrypt}
-          style={{ marginTop: '0.4rem', padding: '0.2rem 0.5rem' }}
+          onClick={() => fetchAndDecrypt(true)}
+          style={{ marginTop: '0.4rem', padding: '0.25rem 0.6rem', gap: '4px' }}
         >
           <RefreshCwIcon size={14} />
           <span>Retry</span>
@@ -117,7 +132,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      aria-label={`View ${isVideo ? 'video' : 'image'} ${attachment.name}`}
+      aria-label={`View ${isVideo ? 'video' : 'photo'} ${attachment.name}`}
       onKeyDown={(e) => {
         if (onClick && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
@@ -130,6 +145,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
         alt={alt || attachment.name}
         className="veil-media-thumbnail-img"
         loading="lazy"
+        onError={handleImageError}
       />
 
       {isVideo && (

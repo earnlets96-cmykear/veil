@@ -469,3 +469,12 @@ export const FolderIcon: React.FC<IconProps> = ({ size = 20, className = '', col
     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
   </svg>
 );
+
+export const UserPlusIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <line x1="20" y1="8" x2="20" y2="14" />
+    <line x1="23" y1="11" x2="17" y2="11" />
+  </svg>
+);

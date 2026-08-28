@@ -2,7 +2,7 @@
  * Relationship State Helper for VEIL.
  *
  * Computes the relationship between the active local identity and a target peer:
- * - SELF: Current user's own identity
+ * - SELF: Current user's own identity (same identityId or same username)
  * - BLOCKED: User is in Space blocklist or blocked contact
  * - CONTACT_VERIFIED: Added contact with verified cryptographic safety number
  * - CONTACT_UNVERIFIED: Added contact with unverified safety number
@@ -28,20 +28,36 @@ export type RelationshipState =
 export interface RelationshipContext {
   myIdentityId?: string;
   myUsername?: string;
-  contacts: Contact[];
-  contactRequests: ContactRequest[];
+  contacts?: Contact[];
+  contactRequests?: ContactRequest[];
   blocklist?: string[];
 }
 
 export function getRelationshipState(
   peerIdentityId: string | undefined,
   peerUsername: string | undefined,
-  ctx: RelationshipContext
+  ctxOrContacts: RelationshipContext | Contact[] = {},
+  maybeRequests: ContactRequest[] = []
 ): RelationshipState {
-  const cleanPeerUsername = peerUsername ? peerUsername.toLowerCase().replace(/^@/, '') : undefined;
-  const cleanMyUsername = ctx.myUsername ? ctx.myUsername.toLowerCase().replace(/^@/, '') : undefined;
+  // Normalize parameters to support both context object and positional array arguments
+  let ctx: RelationshipContext;
+  if (Array.isArray(ctxOrContacts)) {
+    ctx = {
+      contacts: ctxOrContacts,
+      contactRequests: maybeRequests,
+    };
+  } else {
+    ctx = ctxOrContacts || {};
+  }
 
-  // 1. Check if self
+  const contactsList = Array.isArray(ctx.contacts) ? ctx.contacts : [];
+  const requestsList = Array.isArray(ctx.contactRequests) ? ctx.contactRequests : [];
+  const blocklist = Array.isArray(ctx.blocklist) ? ctx.blocklist : [];
+
+  const cleanPeerUsername = peerUsername ? peerUsername.toLowerCase().replace(/^@/, '').trim() : undefined;
+  const cleanMyUsername = ctx.myUsername ? ctx.myUsername.toLowerCase().replace(/^@/, '').trim() : undefined;
+
+  // 1. Check if self (same identityId or same username)
   if (
     (peerIdentityId && ctx.myIdentityId && peerIdentityId === ctx.myIdentityId) ||
     (cleanPeerUsername && cleanMyUsername && cleanPeerUsername === cleanMyUsername)
@@ -50,22 +66,22 @@ export function getRelationshipState(
   }
 
   // 2. Check blocklist
-  if (peerIdentityId && ctx.blocklist && ctx.blocklist.includes(peerIdentityId)) {
+  if (peerIdentityId && blocklist.includes(peerIdentityId)) {
     return 'BLOCKED';
   }
 
   // 3. Check contacts list
-  const matchedContact = ctx.contacts.find(
+  const matchedContact = contactsList.find(
     (c) =>
-      (peerIdentityId && c.identityId === peerIdentityId) ||
-      (cleanPeerUsername && c.name.toLowerCase().replace(/^@/, '') === cleanPeerUsername)
+      (peerIdentityId && c?.identityId === peerIdentityId) ||
+      (cleanPeerUsername && c?.name?.toLowerCase().replace(/^@/, '').trim() === cleanPeerUsername)
   );
 
   if (matchedContact) {
     if (matchedContact.status === 'BLOCKED') {
       return 'BLOCKED';
     }
-    if (matchedContact.verificationStatus === 'FAILED') {
+    if (matchedContact.verificationStatus === 'FAILED' || (matchedContact as any).verificationStatus === 'MISMATCH') {
       return 'KEY_CHANGED';
     }
     if (matchedContact.verificationStatus === 'VERIFIED') {
@@ -75,22 +91,29 @@ export function getRelationshipState(
   }
 
   // 4. Check contact requests (prioritize active pending requests)
-  const activeRequests = ctx.contactRequests.filter(
+  const activeRequests = requestsList.filter(
     (r) =>
-      (peerIdentityId && r.peerIdentityId === peerIdentityId) ||
-      (cleanPeerUsername && r.peerUsername.toLowerCase().replace(/^@/, '') === cleanPeerUsername)
+      (peerIdentityId && r?.peerIdentityId === peerIdentityId) ||
+      (cleanPeerUsername && r?.peerUsername?.toLowerCase().replace(/^@/, '').trim() === cleanPeerUsername)
   );
 
-  const pendingReq = activeRequests.find((r) => r.status === 'INCOMING_PENDING' || r.status === 'OUTGOING_PENDING');
+  const pendingReq = activeRequests.find(
+    (r) => r?.status === 'INCOMING_PENDING' || r?.status === 'OUTGOING_PENDING' || (r?.direction === 'inbound' && r?.status === 'pending') || (r?.direction === 'outbound' && r?.status === 'pending')
+  );
+
   if (pendingReq) {
-    if (pendingReq.status === 'INCOMING_PENDING') return 'PENDING_INCOMING';
-    if (pendingReq.status === 'OUTGOING_PENDING') return 'PENDING_OUTGOING';
+    if (pendingReq.status === 'INCOMING_PENDING' || (pendingReq.direction === 'inbound' && pendingReq.status === 'pending')) {
+      return 'PENDING_INCOMING';
+    }
+    if (pendingReq.status === 'OUTGOING_PENDING' || (pendingReq.direction === 'outbound' && pendingReq.status === 'pending')) {
+      return 'PENDING_OUTGOING';
+    }
   }
 
-  const otherReq = activeRequests.find((r) => r.status === 'BLOCKED' || r.status === 'ACCEPTED');
+  const otherReq = activeRequests.find((r) => r?.status === 'BLOCKED' || r?.status === 'ACCEPTED' || r?.status === 'accepted');
   if (otherReq) {
     if (otherReq.status === 'BLOCKED') return 'BLOCKED';
-    if (otherReq.status === 'ACCEPTED') return 'CONTACT_UNVERIFIED';
+    if (otherReq.status === 'ACCEPTED' || otherReq.status === 'accepted') return 'CONTACT_UNVERIFIED';
   }
 
   return 'NOT_CONNECTED';

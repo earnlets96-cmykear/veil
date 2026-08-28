@@ -80,9 +80,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPeer = Boolean(peerId || peerUsername || searchResult);
-  const peerConv = isPeer ? conversations.find((c) => c.id === peerId) : null;
+  const peerConv = isPeer ? (conversations || []).find((c) => c.id === peerId) : null;
   const peerContact = isPeer
-    ? contacts.find((c) => c.identityId === peerId || (peerUsername && c.name.toLowerCase() === peerUsername.toLowerCase()))
+    ? (contacts || []).find((c) => c.identityId === peerId || (peerUsername && c.name.toLowerCase() === peerUsername.toLowerCase()))
     : null;
 
   const [peerDoc, setPeerDoc] = useState<SignedProfileDocument | null>(null);
@@ -124,18 +124,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     : getRelationshipState(effectiveIdentityId, effectiveUsername, {
         myIdentityId: myProfile?.identityId || loadedIdentity?.document.identityId,
         myUsername: myProfile?.username,
-        contacts,
-        contactRequests,
+        contacts: contacts || [],
+        contactRequests: contactRequests || [],
       });
 
-  const matchingIncomingRequest = contactRequests.find(
+  const matchingIncomingRequest = (contactRequests || []).find(
     (r) =>
       r.status === 'INCOMING_PENDING' &&
       ((effectiveIdentityId && r.peerIdentityId === effectiveIdentityId) ||
         (effectiveUsername && r.peerUsername.toLowerCase() === effectiveUsername.toLowerCase()))
   );
 
-  const matchingOutgoingRequest = contactRequests.find(
+  const matchingOutgoingRequest = (contactRequests || []).find(
     (r) =>
       r.status === 'OUTGOING_PENDING' &&
       ((effectiveIdentityId && r.peerIdentityId === effectiveIdentityId) ||

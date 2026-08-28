@@ -1,15 +1,15 @@
 /**
- * Modernized Message Composer Component for VEIL Phase 31/32.
+ * Modernized Mobile-First Message Composer Component for VEIL.
  *
  * Implements Telegram-inspired auto-expanding composer, pre-send attachment staging,
  * live voice note recording & sending with waveform pulse, reply quote banners,
- * and 100% SVG vector iconography.
+ * contextual Android permission handling, and 100% SVG vector iconography.
  */
 
 import React, { useState, useRef, KeyboardEvent } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
-import { Button, IconButton, ReplyPreview } from './ui/index.ts';
+import { Button, IconButton, ReplyPreview, useToast } from './ui/index.ts';
 import {
   SendIcon,
   PaperclipIcon,
@@ -19,14 +19,19 @@ import {
   CheckIcon,
 } from './icons/index.ts';
 import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
+import { PermissionsModal } from './PermissionsModal.tsx';
 
 export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   const { sendMessage, sendAttachment, sendVoiceMessage, replyTarget, setReplyTarget } = useApp();
+  const { showToast } = useToast();
+
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [isPermissionPermanent, setIsPermissionPermanent] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -34,7 +39,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
 
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
-    const msgText = text;
+    const msgText = text.trim();
     setText('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -51,7 +56,8 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Send on Enter (without Shift) on desktop; allow normal newline on mobile keyboards
+    if (e.key === 'Enter' && !e.shiftKey && typeof window !== 'undefined' && window.innerWidth > 768) {
       e.preventDefault();
       handleSend();
     }
@@ -59,7 +65,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
-    // Auto-grow textarea
+    // Auto-grow textarea up to 140px max height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
@@ -83,8 +89,8 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
       for (const file of filesToSend) {
         await sendAttachment(conversationId, file);
       }
-      if (caption) {
-        await sendMessage(conversationId, caption);
+      if (caption && caption.trim()) {
+        await sendMessage(conversationId, caption.trim());
       }
     } catch (_err) {
       // Enqueued in offline queue
@@ -93,18 +99,50 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
     }
   };
 
-  // Voice recording controls
-  const handleStartVoice = async () => {
+  // Voice recording controls with runtime permission management
+  const startRecordingFlow = async () => {
     try {
       const rec = new VoiceRecorder();
       recorderRef.current = rec;
       setRecordSeconds(0);
       setIsRecording(true);
       await rec.startRecording((seconds) => setRecordSeconds(seconds));
+      setShowPermissionModal(false);
     } catch (err: any) {
-      alert(`Microphone error: ${err.message || 'Permission denied or unsupported'}`);
       setIsRecording(false);
+      const errMsg = (err?.message || '').toLowerCase();
+      const isDenied = errMsg.includes('denied') || errMsg.includes('not allowed') || errMsg.includes('permission');
+      if (isDenied) {
+        setIsPermissionPermanent(true);
+        setShowPermissionModal(true);
+      } else {
+        showToast({
+          type: 'error',
+          message: err?.message || 'Microphone not supported or unavailable',
+        });
+      }
     }
+  };
+
+  const handleStartVoice = async () => {
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'microphone' as any });
+        if (perm.state === 'denied') {
+          setIsPermissionPermanent(true);
+          setShowPermissionModal(true);
+          return;
+        } else if (perm.state === 'prompt') {
+          // Show permission explanation before prompting
+          setIsPermissionPermanent(false);
+          setShowPermissionModal(true);
+          return;
+        }
+      } catch (_e) {
+        // Fall through to standard getUserMedia request
+      }
+    }
+    await startRecordingFlow();
   };
 
   const handleCancelVoice = () => {
@@ -124,7 +162,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
       setIsRecording(false);
       await sendVoiceMessage(conversationId, durationSeconds, audioBlob, mimeType);
     } catch (err: any) {
-      alert(`Voice message error: ${err.message || 'Failed to send'}`);
+      showToast({ type: 'error', message: err?.message || 'Failed to send voice message' });
     } finally {
       setIsSending(false);
       setIsRecording(false);
@@ -146,6 +184,16 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
           files={stagedFiles}
           onConfirmSend={handleConfirmSendFiles}
           onCancel={() => setStagedFiles(null)}
+        />
+      )}
+
+      {/* Permission Explanation Modal */}
+      {showPermissionModal && (
+        <PermissionsModal
+          type="microphone"
+          isPermanentlyDenied={isPermissionPermanent}
+          onAllow={startRecordingFlow}
+          onCancel={() => setShowPermissionModal(false)}
         />
       )}
 
@@ -182,7 +230,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
               justifyContent: 'space-between',
               width: '100%',
               gap: '0.75rem',
-              padding: '0 0.5rem',
+              minHeight: '44px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -207,18 +255,18 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
                 size="sm"
                 onClick={handleCancelVoice}
                 disabled={isSending}
+                icon={<CloseIcon size={16} />}
               >
-                <CloseIcon size={16} />
-                <span>Cancel</span>
+                Cancel
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleSendVoice}
                 loading={isSending}
+                icon={<SendIcon size={16} />}
               >
-                <SendIcon size={16} />
-                <span>Send Voice</span>
+                Send Voice
               </Button>
             </div>
           </div>
@@ -244,7 +292,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
             <textarea
               ref={textareaRef}
               className="veil-composer-input"
-              placeholder="Type an encrypted message... (Enter to send, Shift+Enter for newline)"
+              placeholder="Type an encrypted message..."
               value={text}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}
@@ -252,17 +300,16 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
               aria-label="Message Input Field"
             />
 
-            <Button
-              variant="primary"
-              size="md"
+            <button
+              type="button"
+              className="veil-btn-composer-send"
               onClick={handleSend}
               disabled={!text.trim() || isSending}
-              loading={isSending}
               aria-label="Send Message"
+              title="Send Message"
             >
-              <SendIcon size={18} />
-              <span>Send</span>
-            </Button>
+              {isSending ? <Spinner size="sm" aria-label="Sending..." /> : <SendIcon size={18} color="#ffffff" />}
+            </button>
           </>
         )}
       </div>

@@ -248,4 +248,28 @@ export class VoiceRecorder {
     const blob = new Blob([plaintextBytes], { type: meta.mimeType || 'audio/webm' });
     return URL.createObjectURL(blob);
   }
+
+  /**
+   * Plays a decrypted voice note via singleton VoicePlayer.
+   */
+  public static async playVoiceNote(
+    session: SpaceSession,
+    cloudClient: CloudClient,
+    meta: VoiceRecordingMetadata,
+    messageId: string,
+    callbacks?: any
+  ): Promise<void> {
+    const { VoicePlayer } = await import('./voicePlayer.ts');
+    return VoicePlayer.playVoiceNote(session, cloudClient, meta, messageId, callbacks);
+  }
+
+  /**
+   * Stops active voice note playback.
+   */
+  public static async stopPlayback(): Promise<void> {
+    const { VoicePlayer } = await import('./voicePlayer.ts');
+    VoicePlayer.stop();
+  }
 }
+
+export * from './voicePlayer.ts';

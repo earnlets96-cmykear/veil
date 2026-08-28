@@ -44,8 +44,8 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
   const [copiedSafetyNumber, setCopiedSafetyNumber] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const conv = conversations.find((c) => c.id === conversationId);
-  const contact = contacts.find((c) => c.identityId === conversationId);
+  const conv = (conversations || []).find((c) => c.id === conversationId);
+  const contact = (contacts || []).find((c) => c.identityId === conversationId);
 
   const displayName = contact?.name || conv?.name || 'Contact';
   const rawFingerprint = contact?.fingerprint || conv?.fingerprint || conversationId.slice(0, 16).toUpperCase();

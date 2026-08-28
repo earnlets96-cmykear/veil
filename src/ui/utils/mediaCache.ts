@@ -1,9 +1,13 @@
 /**
- * In-Memory Decrypted Media Cache for VEIL.
+ * In-Memory Ephemeral Decrypted Media Cache for VEIL.
  *
  * Implements ephemeral in-memory caching of decrypted image/video buffers and blob URLs,
  * preventing repeated network downloads and expensive cryptographic re-decryption.
- * All entries are zeroized and revoked on Space lock or Panic Lock.
+ *
+ * HARD PERSISTENCE RULES:
+ * - Blob URLs are strictly session-ephemeral. NEVER treated as durable across app restarts.
+ * - Stale, revoked, or dead Blob URLs are automatically invalidated and re-fetched from R2/S3.
+ * - All entries are zeroized and revoked on Space lock or Panic Lock.
  */
 
 import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
@@ -41,6 +45,7 @@ class MediaCacheManager {
 
   /**
    * Retrieves a cached decrypted media object or fetches and decrypts it on demand.
+   * Never treats stale persisted blob URLs as valid unless actively in RAM cache.
    */
   public async getOrFetch(
     attachment: AttachmentPayload,
@@ -49,53 +54,52 @@ class MediaCacheManager {
   ): Promise<DecryptedMedia> {
     const key = attachment.objectId || attachment.attachmentId || attachment.name;
 
-    // 1. Return from in-memory cache if already decrypted
-    if (this.cache.has(key)) {
-      return this.cache.get(key)!;
+    // 1. Return from in-memory RAM cache if actively decrypted in this session
+    const cached = this.cache.get(key);
+    if (cached && cached.blobUrl) {
+      return cached;
     }
 
-    // 2. Return existing in-flight promise if a fetch is already in progress
+    // 2. Return existing in-flight promise if a fetch is already running for this key
     if (this.inFlight.has(key)) {
       return this.inFlight.get(key)!;
     }
 
-    // 3. If a direct preview URL already exists (e.g. from local staging)
-    if (attachment.previewUrl && attachment.previewUrl.startsWith('blob:')) {
-      const mediaItem: DecryptedMedia = {
-        id: key,
-        blobUrl: attachment.previewUrl,
-        data: new Uint8Array(),
-        mimeType: attachment.mimeType || 'image/jpeg',
-        name: attachment.name,
-        sizeBytes: attachment.sizeBytes || 0,
-      };
-      this.cache.set(key, mediaItem);
-      return mediaItem;
-    }
-
-    // 4. Start asynchronous download and decryption
+    // 3. Start asynchronous cloud download and AEAD decryption
     const fetchPromise = (async (): Promise<DecryptedMedia> => {
       try {
-        if (!attachment.objectId) {
-          throw new Error('Attachment lacks objectId for cloud retrieval');
+        const objectId = attachment.objectId || attachment.attachmentId;
+        if (!objectId) {
+          throw new Error('Attachment lacks objectId or attachmentId for cloud retrieval');
         }
 
-        const rawCiphertext = await cloudClient.downloadAttachment(attachment.objectId);
+        const rawCiphertext = await cloudClient.downloadAttachment(objectId);
         let plaintextBytes: Uint8Array;
 
         if (attachment.encryptionKeyBase64) {
           const encryptionKey = base64ToBytes(attachment.encryptionKeyBase64);
-          const chunks: EncryptedAttachmentChunk[] = JSON.parse(new TextDecoder().decode(rawCiphertext));
-          const meta: AttachmentMetadata = {
-            attachmentId: attachment.attachmentId || attachment.objectId,
-            name: attachment.name,
-            mimeType: attachment.mimeType || 'application/octet-stream',
-            sizeBytes: attachment.sizeBytes || 0,
-            chunkCount: attachment.chunkCount || chunks.length,
-            chunkSize: attachment.chunkSize || (64 * 1024),
-            sha256Hash: attachment.sha256Hash || '',
-          };
-          plaintextBytes = AttachmentPipeline.decryptAndReassemble(meta, chunks, encryptionKey);
+          let chunks: EncryptedAttachmentChunk[];
+          try {
+            chunks = JSON.parse(new TextDecoder().decode(rawCiphertext));
+          } catch (_jsonErr) {
+            // Fallback in case raw ciphertext is a single encrypted binary blob
+            chunks = [];
+          }
+
+          if (Array.isArray(chunks) && chunks.length > 0) {
+            const meta: AttachmentMetadata = {
+              attachmentId: attachment.attachmentId || objectId,
+              name: attachment.name,
+              mimeType: attachment.mimeType || 'application/octet-stream',
+              sizeBytes: attachment.sizeBytes || 0,
+              chunkCount: attachment.chunkCount || chunks.length,
+              chunkSize: attachment.chunkSize || (64 * 1024),
+              sha256Hash: attachment.sha256Hash || '',
+            };
+            plaintextBytes = AttachmentPipeline.decryptAndReassemble(meta, chunks, encryptionKey);
+          } else {
+            plaintextBytes = rawCiphertext;
+          }
         } else {
           plaintextBytes = rawCiphertext;
         }
@@ -124,17 +128,31 @@ class MediaCacheManager {
   }
 
   /**
-   * Retrieves an item synchronously from cache if present.
+   * Retrieves an item synchronously from in-memory RAM cache if present.
    */
   public get(key: string): DecryptedMedia | undefined {
     return this.cache.get(key);
   }
 
   /**
-   * Stores a pre-decrypted media item directly in cache (e.g. newly created attachment).
+   * Stores a pre-decrypted media item directly in RAM cache (e.g. freshly staged file before sending).
    */
   public set(key: string, item: DecryptedMedia): void {
     this.cache.set(key, item);
+  }
+
+  /**
+   * Explicitly invalidates a key and revokes its Blob URL (used on error or re-fetch retry).
+   */
+  public invalidate(key: string): void {
+    const item = this.cache.get(key);
+    if (item && item.blobUrl && typeof URL !== 'undefined') {
+      try {
+        URL.revokeObjectURL(item.blobUrl);
+      } catch (_e) {}
+    }
+    this.cache.delete(key);
+    this.inFlight.delete(key);
   }
 
   /**

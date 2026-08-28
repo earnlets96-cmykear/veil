@@ -1294,18 +1294,21 @@
 /* Inline Media Thumbnail Component */
 .veil-media-bubble-container {
   position: relative;
-  border-radius: var(--veil-radius-lg);
+  border-radius: var(--veil-radius-lg, 16px);
   overflow: hidden;
-  max-width: 320px;
+  max-width: min(82vw, 360px);
+  width: 100%;
+  min-width: 180px;
   background-color: var(--veil-bg-surface-elevated);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  display: block;
 }
 
 .veil-media-thumbnail-wrapper {
   position: relative;
   width: 100%;
-  max-height: 360px;
-  min-height: 140px;
+  max-height: 380px;
+  min-height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;

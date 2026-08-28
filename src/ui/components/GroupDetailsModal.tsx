@@ -12,7 +12,7 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
   const [newMemberId, setNewMemberId] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
 
-  const group = conversations.find((c) => c.id === conversationId);
+  const group = (conversations || []).find((c) => c.id === conversationId);
   const groupState = group?.groupState;
 
   const handleAddMember = (e: React.FormEvent) => {
