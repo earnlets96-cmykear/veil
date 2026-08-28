@@ -310,7 +310,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Auto-register public profile in Directory so Space is immediately routeable
       const identity = idMgr.loadIdentity(session, store);
-      const username = storedProfile?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const cloudSession = store.get<any>(session, 'veil:cloud:session');
+      const username = storedProfile?.username || cloudSession?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '');
       if (identity && username && binding) {
         const prekeyBundle = prekeyManager.createPrekeyBundle(session);
         const autoProfile = createSignedProfile(
@@ -1617,10 +1618,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!identity) throw new Error('Identity not loaded');
         const binding = await netManager.getOrCreateMailbox(activeSession);
         const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+        const cloudSession = store.get<any>(activeSession, 'veil:cloud:session');
+        const fallbackUsername = cloudSession?.username || `user_${identity.document.identityId.slice(0, 8)}`;
         profileToSend = createSignedProfile(
           identity.document.identityId,
           identity.signingPrivateKey,
-          `user_${identity.document.identityId.slice(0, 8)}`,
+          fallbackUsername,
           activeSession.name,
           binding.mailboxId,
           prekeyBundle
@@ -1647,10 +1650,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!identity) throw new Error('Identity not loaded');
         const binding = await netManager.getOrCreateMailbox(activeSession);
         const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+        const cloudSession = store.get<any>(activeSession, 'veil:cloud:session');
+        const fallbackUsername = cloudSession?.username || `user_${identity.document.identityId.slice(0, 8)}`;
         profileToSend = createSignedProfile(
           identity.document.identityId,
           identity.signingPrivateKey,
-          `user_${identity.document.identityId.slice(0, 8)}`,
+          fallbackUsername,
           activeSession.name,
           binding.mailboxId,
           prekeyBundle

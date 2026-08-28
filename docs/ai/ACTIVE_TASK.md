@@ -5,9 +5,9 @@
 - **Milestone**: **PHASE 37: Real Android UI Repair, Voice Playback Fix, Media Reliability & Production-Grade Mobile Layout**
 - **Status**: **COMPLETED & VERIFIED (ALL OBJECTIVES 100% ACHIEVED & CERTIFIED)**
 - **Release Version**: **`1.0.0` (Production Hardened UI Transformation, Voice Player & Mobile Layout Release)**
-- **Total Test Suites**: **258 test files (100% clean pass)**
-- **Total Automated Tests**: **657 tests (100% clean pass)**
-- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (`app-debug.apk`, 4.52 MB, `BUILD SUCCESSFUL in 18s`)**
+- **Total Test Suites**: **263 test files (100% clean pass)**
+- **Total Automated Tests**: **681 tests (100% clean pass)**
+- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (`app-debug.apk`, 4.37 MB, `BUILD SUCCESSFUL in 22s`)**
 - **Build Status**: **Clean production release build (`npm run build:release`) with updated SHA-256 release manifest**
 
 ---
@@ -28,7 +28,7 @@
   - Fixed timestamp / status tick wrapping (`.veil-message-meta` has `white-space: nowrap; flex-shrink: 0;`).
   - Outgoing and incoming messages maintain natural padding, border radii, and background styling without collapsing into narrow vertical rectangles.
 - [x] **Media & Photo Bubble Sizing**:
-  - Updated `.veil-media-bubble-container` with responsive `max-width: min(82vw, 360px); width: 100%; min-width: 180px;`.
+  - Updated `.veil-media-bubble-container` with responsive `width: min(80vw, 360px); min-width: 180px; max-width: 100%;`.
   - Photos and videos preserve aspect ratios, rounded corners, overlay timestamps, and tap-to-fullscreen in `MediaViewer`.
 - [x] **Mobile Message Composer**:
   - Compacted composer padding (`padding: 0.45rem 0.6rem; padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));`).
@@ -36,10 +36,17 @@
 - [x] **Subtle Desktop Empty State Redesign**:
   - Redesigned empty state to minimal branding: "Your conversations are encrypted by default" / "Select a conversation to begin".
   - Strictly hidden on mobile viewports.
-- [x] **Automated Regression Test Coverage**:
+- [x] **AccountManager KDF Parameter Alignment**:
+  - Enabled `registerAccount` to accept both `kdfParams` and `customKdfParams`, speeding up testing and preventing fallback timeouts.
+- [x] **Automated Regression Test Coverage (7 dedicated test files, 30 tests)**:
   - Authored `tests/phase37-voice-playback.test.ts` (4 tests).
   - Authored `tests/phase37-mobile-layout.test.tsx` (2 tests).
-  - Verified all 258 / 258 test suites passing (657 / 657 tests).
+  - Authored `tests/phase37-android-layout.test.ts` (9 tests).
+  - Authored `tests/phase37-avatar-persistence.test.ts` (4 tests).
+  - Authored `tests/phase37-media-restart.test.ts` (5 tests).
+  - Authored `tests/phase37-recovery-e2e.test.ts` (3 tests).
+  - Authored `tests/phase37-request-delivery.test.ts` (3 tests).
+  - Verified all 263 / 263 test suites passing (681 / 681 tests).
 - [x] **Native Android Build**:
   - Synchronized Capacitor Android assets (`npx cap sync android`).
-  - Compiled debug APK via Gradle wrapper (`BUILD SUCCESSFUL in 18s`).
+  - Compiled debug APK via Gradle wrapper (`BUILD SUCCESSFUL in 22s`).

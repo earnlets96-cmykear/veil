@@ -1296,8 +1296,8 @@
   position: relative;
   border-radius: var(--veil-radius-lg, 16px);
   overflow: hidden;
-  max-width: min(82vw, 360px);
-  width: 100%;
+  width: min(80vw, 360px);
+  max-width: 100%;
   min-width: 180px;
   background-color: var(--veil-bg-surface-elevated);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);

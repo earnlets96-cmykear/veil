@@ -66,6 +66,7 @@ export class AccountManager {
     spaceName?: string;
     deviceName?: string;
     kdfParams?: Partial<KdfParameters>;
+    customKdfParams?: Partial<KdfParameters>;
   }): Promise<{
     account: any;
     session: SpaceSession;
@@ -75,12 +76,13 @@ export class AccountManager {
     const spaceName = params.spaceName || 'Main Space';
     const deviceId = `dev_${bytesToHex(randomBytes(8))}`;
     const deviceName = params.deviceName || 'Primary Device';
+    const activeKdfParams = params.kdfParams || params.customKdfParams;
 
     // 1. Create local Space and unlock session
     const spaceHeader = this.vault.createSpace({
       name: spaceName,
       password,
-      kdfParams: params.kdfParams,
+      kdfParams: activeKdfParams,
     });
     await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
 
@@ -98,9 +100,9 @@ export class AccountManager {
     const kdfConfig: KdfParameters = {
       algorithm: 'argon2id',
       salt: bytesToBase64(salt),
-      timeCost: params.kdfParams?.timeCost ?? 3,
-      memoryCost: params.kdfParams?.memoryCost ?? 65536,
-      parallelism: params.kdfParams?.parallelism ?? 1,
+      timeCost: activeKdfParams?.timeCost ?? 3,
+      memoryCost: activeKdfParams?.memoryCost ?? 65536,
+      parallelism: activeKdfParams?.parallelism ?? 1,
       keyLength: 32,
     };
 

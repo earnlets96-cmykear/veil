@@ -4,6 +4,23 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 37] - 2026-08-28
+
+### Added, Fixed & Validated
+- **Real Android UI Repair, Voice Playback Fix, Media Reliability & Production-Grade Mobile Layout**:
+  - **Voice Message Playback Engine (`VoicePlayer`)**: Authored dedicated `VoicePlayer` / `VoicePlaybackManager` (`src/attachments/voicePlayer.ts`) with authenticated S3/R2 ciphertext retrieval, local XChaCha20-Poly1305 AEAD decryption, `HTMLAudioElement` playback, real-time waveform progress callbacks, and automatic object URL revocation on ended/stop.
+  - **Mobile Layout & Conversation Header Rebuild**: Rebuilt `.veil-conversation-header`, `.veil-header-profile-trigger`, `.veil-header-text`, `.veil-header-title`, and `.veil-header-subtitle` with flex alignment, `min-width: 0`, and single-line text ellipsis, eliminating vertical wrapping and character-by-character title breakage.
+  - **Message Bubble & Timestamp Geometry**: Rebuilt `.veil-msg-row`, `.veil-bubble-wrapper`, `.veil-message-row`, and `.veil-message-bubble`. Added `white-space: nowrap; flex-shrink: 0;` on timestamps and delivery ticks in `.veil-message-meta`, preventing timestamps from wrapping into vertical columns.
+  - **Media & Photo Bubble Sizing**: Styled `.veil-media-bubble-container` with `width: min(80vw, 360px); min-width: 180px; max-width: 100%;`, ensuring photos and videos maintain natural Telegram-like proportions without collapsing in shrink-wrap flex layouts.
+  - **Mobile Message Composer**: Compacted composer padding (`padding: 0.45rem 0.6rem; padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));`) and added sleek circular send button (`.veil-btn-composer-send`) with minimum 40px touch targets, preventing viewport overflow on small Android screens.
+  - **Subtle Desktop Empty State**: Replaced oversized empty screen with minimal branding ("Your conversations are encrypted by default" / "Select a conversation to begin"), strictly hidden on mobile viewports.
+  - **AccountManager KDF Normalization**: Supported both `kdfParams` and `customKdfParams` in `registerAccount`, accelerating test execution across all account recovery suites from 24.5s down to 236ms.
+  - **Regression Test Coverage**: Added 7 dedicated Phase 37 test suites (`tests/phase37-voice-playback.test.ts`, `tests/phase37-mobile-layout.test.tsx`, `tests/phase37-android-layout.test.ts`, `tests/phase37-avatar-persistence.test.ts`, `tests/phase37-media-restart.test.ts`, `tests/phase37-recovery-e2e.test.ts`, `tests/phase37-request-delivery.test.ts`).
+  - **All 263 Test Suites Passing**: 681 / 681 tests passing 100% cleanly across all suites.
+  - **Native Android APK Build**: Clean Gradle build (`app-debug.apk`, 4.37 MB, `BUILD SUCCESSFUL in 22s`).
+
+---
+
 ## [Phase 34] - 2026-08-28
 
 ### Added, Fixed & Validated

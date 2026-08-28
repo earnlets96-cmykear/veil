@@ -412,7 +412,7 @@ export const Sidebar: React.FC = () => {
 
               {globalResults.map((user) => {
                 const relationship = getRelationshipState(user.peerId, user.username, {
-                  myIdentityId: activeSession?.spaceId,
+                  myIdentityId: myProfile?.identityId || activeSession?.spaceId,
                   myUsername: myProfile?.username,
                   contacts: contacts || [],
                   contactRequests: contactRequests || [],

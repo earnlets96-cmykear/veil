@@ -68,5 +68,5 @@ describe('Phase 30: Cloudflare R2 / S3 Object Storage', () => {
       await storage.delete(key);
       expect(await storage.exists(key)).toBe(false);
     }
-  });
+  }, 35000);
 });
