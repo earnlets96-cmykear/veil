@@ -8,17 +8,22 @@
 import React, { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export type IconButtonVariant = 'ghost' | 'primary' | 'secondary' | 'danger';
+export type IconButtonSize = 'sm' | 'md' | 'lg';
 
 export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  'aria-label': string; // Mandatory for a11y
+  'aria-label'?: string;
+  ariaLabel?: string;
   variant?: IconButtonVariant;
+  size?: IconButtonSize;
   isLoading?: boolean;
   icon: ReactNode;
 }
 
 export const IconButton: React.FC<IconButtonProps> = ({
-  'aria-label': ariaLabel,
+  'aria-label': ariaLabelAttr,
+  ariaLabel,
   variant = 'ghost',
+  size = 'md',
   isLoading = false,
   disabled = false,
   icon,
@@ -26,14 +31,16 @@ export const IconButton: React.FC<IconButtonProps> = ({
   title,
   ...rest
 }) => {
+  const effectiveAriaLabel = ariaLabelAttr || ariaLabel || title || 'button';
   const variantClass = `veil-icon-btn-${variant}`;
+  const sizeClass = `veil-icon-btn-${size}`;
 
   return (
     <button
       type="button"
-      className={`veil-icon-btn ${variantClass} ${className}`.trim()}
-      aria-label={ariaLabel}
-      title={title || ariaLabel}
+      className={`veil-icon-btn ${variantClass} ${sizeClass} ${className}`.trim()}
+      aria-label={effectiveAriaLabel}
+      title={title || effectiveAriaLabel}
       disabled={disabled || isLoading}
       aria-busy={isLoading ? 'true' : undefined}
       {...rest}

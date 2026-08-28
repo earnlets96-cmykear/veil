@@ -72,7 +72,7 @@ export const UserSearchResult: React.FC<UserSearchResultProps> = (props) => {
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onMessageUser(result.peerId);
+                  onMessageUser(result.identityId);
                 }}
               >
                 <SendIcon size={14} />
@@ -91,7 +91,7 @@ export const UserSearchResult: React.FC<UserSearchResultProps> = (props) => {
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onMessageUser(result.peerId);
+                  onMessageUser(result.identityId);
                 }}
               >
                 <SendIcon size={14} />

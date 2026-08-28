@@ -1280,6 +1280,15 @@ body {
    RESPONSIVE LAYOUT & MOBILE ARCHITECTURE
    ========================================================================= */
 
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
 @media (max-width: 768px) {
   .veil-app-layout {
     position: fixed;
@@ -1334,10 +1343,21 @@ body {
 
   .veil-message-bubble {
     max-width: 100%;
+    min-width: 60px;
+    width: fit-content;
+    word-break: break-word;
   }
 
   .veil-bubble-wrapper {
-    max-width: min(85vw, 420px);
+    max-width: min(78vw, 420px);
+    width: fit-content;
+    min-width: 60px;
+  }
+
+  .veil-media-bubble-container {
+    max-width: min(82vw, 360px);
+    width: 100%;
+    min-width: 160px;
   }
 
   .veil-toast-container {

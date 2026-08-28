@@ -19,7 +19,7 @@ import type { CloudClient } from '../network/cloudClient.ts';
 import { SpaceVaultManager } from '../spaces/vault.ts';
 import { SpaceIdentityManager } from '../identity/manager.ts';
 import type { EncryptedSpaceStore } from '../storage/spaceStore.ts';
-import type { IStorageAdapter } from '../storage/indexedDbAdapter.ts';
+import type { IStorageAdapter } from '../storage/types.ts';
 import type { SpaceSession } from '../spaces/session.ts';
 import type { IdentityDocument } from '../identity/document.ts';
 import type { KdfParameters } from '../types/index.ts';

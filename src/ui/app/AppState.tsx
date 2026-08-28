@@ -111,7 +111,7 @@ export interface AppContextType {
   exportMyInvitation: () => string | null;
   updateContactVerification: (identityId: string, status: VerificationStatus) => Promise<void>;
   createGroup: (name: string, description?: string) => Promise<void>;
-  ensureCloudSession: (session: SpaceSession) => Promise<void>;
+  ensureCloudSession: (session: SpaceSession, forceReauth?: boolean) => Promise<boolean | void>;
 
   // Phase 23 & Phase 32 Actions
   registerUsername: (username: string, displayName?: string, bio?: string, avatar?: string) => Promise<SignedProfileDocument>;
@@ -642,11 +642,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return unsub;
   }, []);
 
-  // Periodic mailbox background sync while Space is unlocked
+  // Periodic mailbox background sync while Space is unlocked + immediate on focus/resume
   useEffect(() => {
     if (!activeSession || !activeSession.isActive()) return;
 
-    const interval = setInterval(async () => {
+    const performSync = async () => {
       try {
         if (activeSession && activeSession.isActive()) {
           await netManager.syncMailbox(activeSession);
@@ -659,9 +659,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         }
       } catch (_e) {}
-    }, 3000);
+    };
 
-    return () => clearInterval(interval);
+    const interval = setInterval(performSync, 3000);
+
+    const handleResume = () => {
+      performSync();
+      netManager.reconnect(activeSession);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleResume);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          handleResume();
+        }
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleResume);
+      }
+    };
   }, [activeSession]);
 
   const unlockSpace = useCallback(
@@ -676,7 +699,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const createSpace = useCallback(async (name: string, passphrase: string) => {
     await sessionController.createSpace(name, passphrase);
     setKnownSpacesCount(vault.listEnvelopes().length);
-  }, []);
+    try {
+      const session = await sessionController.unlock(passphrase);
+      setActiveSession(session);
+      await loadSpaceData(session);
+      const username = name.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${session.spaceId.slice(0, 8)}`;
+      await ensureCloudSession(session);
+      await accountManager.createOrUpdateRecoveryVault(session, passphrase, username);
+    } catch (_e) {}
+  }, [ensureCloudSession, loadSpaceData]);
 
   const lockSpace = useCallback(() => {
     sessionController.lock();

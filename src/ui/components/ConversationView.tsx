@@ -77,7 +77,7 @@ export const ConversationView: React.FC = () => {
     cloudClient,
     ensureCloudSession,
     setReplyTarget,
-    deleteMessage,
+    deleteMessageLocally,
   } = useApp();
 
   const { showToast } = useToast();
@@ -268,7 +268,7 @@ export const ConversationView: React.FC = () => {
       return {
         id: m.id,
         type: m.attachment!.mimeType?.startsWith('video/') ? 'video' : 'image',
-        url: cached?.blobUrl || m.attachment!.previewUrl || m.attachment!.url || '',
+        url: cached?.blobUrl || (m.attachment as any)!.previewUrl || (m.attachment as any)!.url || '',
         name: m.attachment!.name,
         sizeBytes: m.attachment!.sizeBytes,
         mimeType: m.attachment!.mimeType,
@@ -311,7 +311,7 @@ export const ConversationView: React.FC = () => {
 
   const handleDeleteContextMessage = (msg: UIMessage) => {
     if (activeChatId) {
-      deleteMessage(activeChatId, msg.id);
+      deleteMessageLocally(activeChatId, msg.id);
       showToast({ type: 'info', message: 'Message deleted' });
     }
     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
@@ -333,7 +333,7 @@ export const ConversationView: React.FC = () => {
   const handleBatchDelete = () => {
     if (!activeChatId) return;
     for (const id of selectedMessageIds) {
-      deleteMessage(activeChatId, id);
+      deleteMessageLocally(activeChatId, id);
     }
     showToast({ type: 'info', message: `Deleted ${selectedMessageIds.size} messages` });
     setIsSelectionMode(false);
@@ -449,13 +449,13 @@ export const ConversationView: React.FC = () => {
                 <div className="veil-header-title">{conversationName}</div>
                 <div className="veil-header-subtitle">
                   {isGroup ? (
-                    'Group • End-to-End Encrypted'
+                    'Group • Encrypted'
                   ) : activeContact?.verificationStatus === 'MISMATCH' ? (
                     <span style={{ color: 'var(--veil-danger)' }}>Key Changed</span>
-                  ) : activeContact?.verificationStatus === 'VERIFIED' || activeConversation?.isVerified || activeContact?.verified ? (
-                    <span style={{ color: 'var(--veil-success)' }}>Verified (Ed25519)</span>
+                  ) : activeContact?.verificationStatus === 'VERIFIED' || activeConversation?.isVerified ? (
+                    <span style={{ color: 'var(--veil-success)' }}>Encrypted • Verified ✓</span>
                   ) : (
-                    'End-to-End Encrypted'
+                    'Encrypted • Private'
                   )}
                 </div>
               </div>
@@ -585,7 +585,7 @@ export const ConversationView: React.FC = () => {
                               minute: '2-digit',
                             })}
                           </span>
-                          {msg.isOutgoing && <MessageStatus status={msg.deliveryStatus as any} />}
+                          {msg.isOutgoing && <MessageStatus status={msg.status} />}
                         </div>
                       </div>
                     )}
@@ -620,12 +620,12 @@ export const ConversationView: React.FC = () => {
                     {/* Text Message Bubble (Rendered if message has text and isn't raw media placeholder) */}
                     {msg.text && !msg.text.startsWith('📎 Attachment:') && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
                       <MessageBubble
-                        messageId={msg.id}
+                        id={msg.id}
                         senderName={msg.senderName}
                         isOutgoing={msg.isOutgoing}
                         text={msg.text}
                         timestamp={msg.timestamp}
-                        status={msg.deliveryStatus as any}
+                        status={msg.status}
                         onReplyClick={() => setReplyTarget(msg)}
                       />
                     )}

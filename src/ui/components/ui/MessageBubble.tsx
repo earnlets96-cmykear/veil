@@ -14,11 +14,14 @@ import { Spinner } from './Spinner.tsx';
 import { RefreshCwIcon } from '../icons/index.ts';
 
 export interface MessageBubbleProps {
-  id: string;
+  id?: string;
+  messageId?: string;
+  senderName?: string;
   isOutgoing: boolean;
   text?: string;
   timestamp: number | Date;
   status?: DeliveryStatus;
+  deliveryStatus?: DeliveryStatus;
   replyTo?: ReplyPreviewData;
   onReplyClick?: (messageId: string) => void;
   onReplyTrigger?: () => void;
@@ -39,10 +42,13 @@ export interface MessageBubbleProps {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   id,
+  messageId,
+  senderName,
   isOutgoing,
   text,
   timestamp,
-  status = 'DELIVERED_TO_RECIPIENT',
+  status,
+  deliveryStatus,
   replyTo,
   onReplyClick,
   onReplyTrigger,
@@ -60,6 +66,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isGroupedWithNext = false,
   className = '',
 }) => {
+  const effectiveId = id || messageId || 'msg';
+  const effectiveStatus: DeliveryStatus = status || deliveryStatus || 'DELIVERED_TO_RECIPIENT';
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleTouchStart = () => {
@@ -77,14 +85,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
-  const isFailed = status === 'FAILED';
+  const isFailed = effectiveStatus === 'FAILED';
   const groupedClass = `${isGroupedWithPrevious ? 'veil-message-grouped-prev' : ''} ${
     isGroupedWithNext ? 'veil-message-grouped-next' : ''
   }`.trim();
 
   return (
     <div
-      id={`msg-${id}`}
+      id={`msg-${effectiveId}`}
       className={`veil-message-row ${isOutgoing ? 'outgoing' : 'incoming'} ${groupedClass} ${className}`.trim()}
       onClick={isSelectionMode && onSelectToggle ? onSelectToggle : undefined}
       onContextMenu={onContextMenu}
@@ -98,7 +106,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             type="checkbox"
             checked={isSelected}
             onChange={onSelectToggle}
-            aria-label={`Select message ${id}`}
+            aria-label={`Select message ${effectiveId}`}
             style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--veil-accent-primary)' }}
           />
         </div>
@@ -186,7 +194,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           <MessageTimestamp timestamp={timestamp} />
 
-          {isOutgoing && <MessageStatus status={status} />}
+          {isOutgoing && <MessageStatus status={effectiveStatus} />}
         </div>
       </div>
     </div>

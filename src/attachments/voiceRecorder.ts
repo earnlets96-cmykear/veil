@@ -245,7 +245,7 @@ export class VoiceRecorder {
       }
     }
 
-    const blob = new Blob([plaintextBytes], { type: meta.mimeType || 'audio/webm' });
+    const blob = new Blob([plaintextBytes as any], { type: meta.mimeType || 'audio/webm' });
     return URL.createObjectURL(blob);
   }
 

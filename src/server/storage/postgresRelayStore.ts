@@ -112,7 +112,7 @@ export class PostgresRelayStore implements IRelayStore {
     if (res.rows.length === 0) return null;
     const r = res.rows[0];
     return {
-      protocolVersion: 1,
+      protocolVersion: 'v1',
       envelopeId: r.envelopeId,
       mailboxId: r.mailboxId,
       payload: r.payload,
@@ -134,7 +134,7 @@ export class PostgresRelayStore implements IRelayStore {
     `;
     const res = await this.pg.query<any>(sql, [mailboxId, Date.now(), limit]);
     return res.rows.map((r) => ({
-      protocolVersion: 1,
+      protocolVersion: 'v1',
       envelopeId: r.envelopeId,
       mailboxId: r.mailboxId,
       payload: r.payload,

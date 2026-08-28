@@ -13,8 +13,8 @@
 import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
 import { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/types.ts';
 import { base64ToBytes } from '../../crypto/utils.ts';
-import { CloudClient } from '../../cloud/client.ts';
-import { SpaceSession } from '../../spaces/types.ts';
+import { CloudClient } from '../../network/cloudClient.ts';
+import { SpaceSession } from '../../spaces/session.ts';
 
 export interface DecryptedMedia {
   id: string;

@@ -564,11 +564,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                 </div>
               ) : (
                 /* Peer Phone Number Visibility Check */
-                (peerDoc?.phoneNumber && (peerDoc.phoneVisibility === 'everyone' || (relState.startsWith('CONTACT') && peerDoc.phoneVisibility === 'contacts'))) ? (
+                ((peerDoc as any)?.phoneNumber && ((peerDoc as any).phoneVisibility === 'everyone' || (relState.startsWith('CONTACT') && (peerDoc as any).phoneVisibility === 'contacts'))) ? (
                   <div className="veil-profile-info-row">
                     <div>
                       <div className="veil-profile-info-label">Phone Number</div>
-                      <div className="veil-profile-info-val">{peerDoc.phoneNumber}</div>
+                      <div className="veil-profile-info-val">{(peerDoc as any).phoneNumber}</div>
                     </div>
                     <Badge variant="neutral">Verified Phone</Badge>
                   </div>

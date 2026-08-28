@@ -6,7 +6,7 @@
  * and automatic memory zeroization & Object URL revocation on completion or space lock.
  */
 
-import { CloudClient } from '../cloud/client.ts';
+import { CloudClient } from '../network/cloudClient.ts';
 import { SpaceSession } from '../spaces/session.ts';
 import { VoiceRecordingMetadata, VoiceRecorder } from './voiceRecorder.ts';
 
@@ -89,7 +89,7 @@ export class VoicePlaybackManager {
         if (callbacks.onEnded) callbacks.onEnded();
       };
 
-      audio.onerror = (e) => {
+      audio.onerror = (_e: any) => {
         const err = new Error('Audio playback error occurred');
         this.stop();
         if (callbacks.onError) callbacks.onError(err);

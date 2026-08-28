@@ -81,7 +81,7 @@ export function getRelationshipState(
     if (matchedContact.status === 'BLOCKED') {
       return 'BLOCKED';
     }
-    if (matchedContact.verificationStatus === 'FAILED' || (matchedContact as any).verificationStatus === 'MISMATCH') {
+    if (matchedContact.verificationStatus === 'MISMATCH') {
       return 'KEY_CHANGED';
     }
     if (matchedContact.verificationStatus === 'VERIFIED') {
@@ -98,22 +98,22 @@ export function getRelationshipState(
   );
 
   const pendingReq = activeRequests.find(
-    (r) => r?.status === 'INCOMING_PENDING' || r?.status === 'OUTGOING_PENDING' || (r?.direction === 'inbound' && r?.status === 'pending') || (r?.direction === 'outbound' && r?.status === 'pending')
+    (r) => r?.status === 'INCOMING_PENDING' || r?.status === 'OUTGOING_PENDING' || (r?.isIncoming && (r?.status as any) === 'PENDING')
   );
 
   if (pendingReq) {
-    if (pendingReq.status === 'INCOMING_PENDING' || (pendingReq.direction === 'inbound' && pendingReq.status === 'pending')) {
+    if (pendingReq.status === 'INCOMING_PENDING' || (pendingReq.isIncoming && (pendingReq.status as any) === 'PENDING')) {
       return 'PENDING_INCOMING';
     }
-    if (pendingReq.status === 'OUTGOING_PENDING' || (pendingReq.direction === 'outbound' && pendingReq.status === 'pending')) {
+    if (pendingReq.status === 'OUTGOING_PENDING' || (!pendingReq.isIncoming && (pendingReq.status as any) === 'PENDING')) {
       return 'PENDING_OUTGOING';
     }
   }
 
-  const otherReq = activeRequests.find((r) => r?.status === 'BLOCKED' || r?.status === 'ACCEPTED' || r?.status === 'accepted');
+  const otherReq = activeRequests.find((r) => r?.status === 'BLOCKED' || r?.status === 'ACCEPTED');
   if (otherReq) {
     if (otherReq.status === 'BLOCKED') return 'BLOCKED';
-    if (otherReq.status === 'ACCEPTED' || otherReq.status === 'accepted') return 'CONTACT_UNVERIFIED';
+    if (otherReq.status === 'ACCEPTED') return 'CONTACT_UNVERIFIED';
   }
 
   return 'NOT_CONNECTED';

@@ -125,7 +125,7 @@ export class FileSaver {
     mimeType: string
   ): Promise<SaveFileResult> {
     try {
-      const blob = new Blob([data], { type: mimeType });
+      const blob = new Blob([data as any], { type: mimeType });
 
       // If modern File System Access API is supported and in secure context
       if (typeof (window as any).showSaveFilePicker === 'function') {

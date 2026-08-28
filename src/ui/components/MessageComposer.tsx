@@ -9,7 +9,7 @@
 import React, { useState, useRef, KeyboardEvent } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
-import { Button, IconButton, ReplyPreview, useToast } from './ui/index.ts';
+import { Button, IconButton, ReplyPreview, Spinner, useToast } from './ui/index.ts';
 import {
   SendIcon,
   PaperclipIcon,

@@ -514,7 +514,6 @@ export class SqlCloudDatabase implements ICloudDatabase {
         sessionId: r.sessionId,
         accountId: r.accountId,
         deviceId: r.deviceId,
-        sessionToken: '',
         tokenHash: r.tokenHash,
         createdAt: Number(r.createdAt),
         expiresAt: Number(r.expiresAt),
@@ -542,7 +541,6 @@ export class SqlCloudDatabase implements ICloudDatabase {
         sessionId: r.sessionId,
         accountId: r.accountId,
         deviceId: r.deviceId,
-        sessionToken: '',
         tokenHash: r.tokenHash,
         createdAt: Number(r.createdAt),
         expiresAt: Number(r.expiresAt),
@@ -930,6 +928,44 @@ export class SqlCloudDatabase implements ICloudDatabase {
     return null;
   }
 
+  public async getAttachment(accountId: string, spaceId: string, attachmentId: string): Promise<CloudAttachmentEntity | null> {
+    if (this.isPostgresMode && this.pgClient) {
+      const sql = `
+        SELECT attachment_id as "attachmentId", account_id as "accountId", space_id as "spaceId",
+               object_id as "objectId", encrypted_metadata as "encryptedMetadata",
+               ciphertext_size as "ciphertextSize", ciphertext_hash as "ciphertextHash",
+               encryption_version as "encryptionVersion", status, chunk_count as "chunkCount",
+               chunk_size as "chunkSize", created_at as "createdAt", updated_at as "updatedAt",
+               deleted_at as "deletedAt"
+        FROM attachments
+        WHERE account_id = $1 AND space_id = $2 AND attachment_id = $3
+      `;
+      const res = await this.pgClient.query<any>(sql, [accountId, spaceId, attachmentId]);
+      if (res.rows.length === 0) return null;
+      const r = res.rows[0];
+      return {
+        attachmentId: r.attachmentId,
+        accountId: r.accountId,
+        spaceId: r.spaceId,
+        objectId: r.objectId,
+        encryptedMetadata: r.encryptedMetadata,
+        ciphertextSize: Number(r.ciphertextSize),
+        ciphertextHash: r.ciphertextHash,
+        encryptionVersion: r.encryptionVersion,
+        status: r.status,
+        chunkCount: r.chunkCount,
+        chunkSize: r.chunkSize,
+        createdAt: Number(r.createdAt),
+        updatedAt: Number(r.updatedAt),
+        deletedAt: r.deletedAt ? Number(r.deletedAt) : undefined,
+      };
+    }
+
+    const key = `${accountId}:${spaceId}:${attachmentId}`;
+    const a = this.attachmentsTable.get(key);
+    return a ? { ...a } : null;
+  }
+
   public async listAttachments(accountId: string, spaceId: string): Promise<CloudAttachmentEntity[]> {
     if (this.isPostgresMode && this.pgClient) {
       const sql = `
@@ -1037,7 +1073,6 @@ export class SqlCloudDatabase implements ICloudDatabase {
         recoveryId: r.recoveryId,
         encryptedVaultBlob: r.encryptedVaultBlob,
         kdfParams: r.kdfParams,
-        version: 1,
         updatedAt: Number(r.updatedAt),
       };
     }
@@ -1085,5 +1120,9 @@ export class SqlCloudDatabase implements ICloudDatabase {
       updatedAt: Date.now(),
     });
     this.persistToDurableDisk();
+  }
+
+  public async updateSyncCursor(accountId: string, deviceId: string, spaceId: string, cursor: number): Promise<void> {
+    return this.setSyncCursor(accountId, deviceId, spaceId, cursor);
   }
 }

@@ -16,6 +16,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
   loading?: boolean;
   leftIcon?: ReactNode;
+  icon?: ReactNode;
   rightIcon?: ReactNode;
   fullWidth?: boolean;
   children?: ReactNode;
@@ -27,6 +28,7 @@ export const Button: React.FC<ButtonProps> = ({
   isLoading = false,
   loading = false,
   leftIcon,
+  icon,
   rightIcon,
   fullWidth = false,
   disabled = false,
@@ -35,6 +37,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...rest
 }) => {
   const isBusy = isLoading || loading;
+  const effectiveLeftIcon = leftIcon || icon;
   const variantClass = `veil-btn-${variant}`;
   const sizeClass = `veil-btn-${size}`;
   const widthClass = fullWidth ? 'veil-btn-full' : '';
@@ -50,7 +53,7 @@ export const Button: React.FC<ButtonProps> = ({
       {isBusy ? (
         <span className="veil-spinner veil-spinner-sm" aria-hidden="true" />
       ) : (
-        leftIcon && <span className="veil-btn-icon-slot" aria-hidden="true">{leftIcon}</span>
+        effectiveLeftIcon && <span className="veil-btn-icon-slot" aria-hidden="true">{effectiveLeftIcon}</span>
       )}
       <span>{children}</span>
       {!isBusy && rightIcon && (

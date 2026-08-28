@@ -109,6 +109,7 @@ export type ServerWsMessage =
   | { type: 'error'; code: RelayErrorCode; message: string };
 
 // Directory Protocol Types
+export type { SignedProfileDocument } from '../identity/profile.ts';
 import type { SignedProfileDocument } from '../identity/profile.ts';
 
 export interface RegisterProfileRequest {
@@ -128,6 +129,7 @@ export interface DirectorySearchResult {
   displayName: string;
   avatar?: string;
   profileSignature: string;
+  bio?: string;
 }
 
 export interface DirectorySearchResponse {

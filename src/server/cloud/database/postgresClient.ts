@@ -118,7 +118,7 @@ export class PostgresClient {
   /**
    * Executes a parameterized query with automatic retry on transient connection failures.
    */
-  public async query<T = any>(sql: string, params: any[] = []): Promise<pg.QueryResult<T>> {
+  public async query<T extends pg.QueryResultRow = any>(sql: string, params: any[] = []): Promise<pg.QueryResult<T>> {
     let lastError: Error | null = null;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {

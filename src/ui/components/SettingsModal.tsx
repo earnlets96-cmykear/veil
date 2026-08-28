@@ -150,10 +150,12 @@ export const SettingsModal: React.FC = () => {
   };
 
   const handleCopyInvite = () => {
-    navigator.clipboard.writeText(invitationLink);
-    setCopiedInvite(true);
-    showToast({ type: 'success', message: 'Invitation link copied to clipboard' });
-    setTimeout(() => setCopiedInvite(false), 2500);
+    if (invitationLink) {
+      navigator.clipboard.writeText(invitationLink);
+      setCopiedInvite(true);
+      showToast({ type: 'success', message: 'Invitation link copied to clipboard' });
+      setTimeout(() => setCopiedInvite(false), 2500);
+    }
   };
 
   const handleClearCache = () => {

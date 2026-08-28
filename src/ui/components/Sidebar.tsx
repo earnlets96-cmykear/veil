@@ -107,9 +107,11 @@ export const Sidebar: React.FC = () => {
 
   const handleCopyInvitation = () => {
     const link = exportMyInvitation();
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2500);
+    if (link) {
+      navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
   };
 
   const formatConversationTime = (timestamp?: number) => {
@@ -192,9 +194,9 @@ export const Sidebar: React.FC = () => {
     return true;
   });
 
-  const pendingIncoming = contactRequests.filter((r) => r.direction === 'inbound' && r.status === 'pending');
+  const pendingIncoming = contactRequests.filter((r) => r.isIncoming && r.status === 'INCOMING_PENDING');
 
-  const localConvResults = searchResults.filter((r) => r.type === 'conversation' || r.type === 'message');
+  const localConvResults = searchResults.filter((r) => r.type === 'contact' || r.type === 'message' || (r.type as any) === 'conversation');
   const localMatchingContacts = contacts.filter((c) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return false;
@@ -411,7 +413,7 @@ export const Sidebar: React.FC = () => {
               )}
 
               {globalResults.map((user) => {
-                const relationship = getRelationshipState(user.peerId, user.username, {
+                const relationship = getRelationshipState(user.identityId, user.username, {
                   myIdentityId: myProfile?.identityId || activeSession?.spaceId,
                   myUsername: myProfile?.username,
                   contacts: contacts || [],
@@ -419,10 +421,10 @@ export const Sidebar: React.FC = () => {
                 });
                 return (
                   <UserSearchResult
-                    key={user.peerId}
+                    key={user.identityId}
                     result={user}
                     relationship={relationship}
-                    onOpenProfile={(res) => openModal({ type: 'profile', peerId: res.peerId, peerUsername: res.username, searchResult: res })}
+                    onOpenProfile={(res) => openModal({ type: 'profile', peerId: res.identityId, peerUsername: res.username, searchResult: res })}
                     onSendRequest={async (res) => {
                       try {
                         await sendContactRequest(res.username);
@@ -458,7 +460,7 @@ export const Sidebar: React.FC = () => {
                 {pendingIncoming.map((req) => (
                   <div key={req.requestId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0' }}>
                     <div style={{ fontSize: 'var(--veil-text-xs)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      @{req.peerUsername || req.peerId.slice(0, 10)}
+                      @{req.peerUsername || req.peerIdentityId.slice(0, 10)}
                     </div>
                     <div style={{ display: 'flex', gap: '0.25rem' }}>
                       <Button variant="primary" size="sm" onClick={() => acceptContactRequest(req.requestId)}>
