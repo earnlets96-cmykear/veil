@@ -23,6 +23,7 @@ export class CloudClient {
   private sessionToken: string | null = null;
   private accountId: string | null = null;
   private deviceId: string | null = null;
+  private onUnauthorizedHandler: (() => Promise<boolean>) | null = null;
 
   constructor(config: string | CloudClientConfig) {
     if (typeof config === 'string') {
@@ -32,6 +33,10 @@ export class CloudClient {
       this.baseUrl = (config?.baseUrl || 'http://127.0.0.1:8787').replace(/\/+$/, '');
       this.timeoutMs = config?.requestTimeoutMs || 10000;
     }
+  }
+
+  public setOnUnauthorized(handler: (() => Promise<boolean>) | null): void {
+    this.onUnauthorizedHandler = handler;
   }
 
   public setSession(token: string | null, accountId: string | null, deviceId: string | null): void {
@@ -56,7 +61,8 @@ export class CloudClient {
     path: string,
     method: 'GET' | 'POST' | 'DELETE' = 'GET',
     body?: any,
-    timeoutOverrideMs?: number
+    timeoutOverrideMs?: number,
+    retryCount = 0
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -80,6 +86,14 @@ export class CloudClient {
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 401 && retryCount === 0 && this.onUnauthorizedHandler) {
+          try {
+            const reauthed = await this.onUnauthorizedHandler();
+            if (reauthed) {
+              return await this.request<T>(path, method, body, timeoutOverrideMs, retryCount + 1);
+            }
+          } catch (_reauthErr) {}
+        }
         throw new Error(json.error || `HTTP ${res.status}: ${res.statusText}`);
       }
       return json as T;

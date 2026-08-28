@@ -386,7 +386,7 @@ export const Sidebar: React.FC = () => {
                       setSearchQuery('');
                     }}
                   >
-                    <Avatar name={contact.name} size="sm" />
+                    <Avatar name={contact.name} imageUrl={contact.avatar} size="sm" />
                     <div className="veil-conversation-info">
                       <div className="veil-conversation-name">{contact.name}</div>
                       <div className="veil-conversation-preview">{contact.identityId.slice(0, 16)}...</div>
@@ -483,7 +483,7 @@ export const Sidebar: React.FC = () => {
                     if (e.key === 'Enter' || e.key === ' ') selectConversation(contact.identityId);
                   }}
                 >
-                  <Avatar name={contact.name} size="md" />
+                  <Avatar name={contact.name} imageUrl={contact.avatar} size="md" />
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{contact.name}</span>
@@ -529,6 +529,7 @@ export const Sidebar: React.FC = () => {
                 >
                   <Avatar
                     name={conv.name}
+                    imageUrl={conv.avatar || contacts.find((c) => c.identityId === conv.id)?.avatar}
                     size="md"
                     isGroup={conv.type === 'group'}
                     aria-label={`${conv.name} avatar`}

@@ -416,6 +416,7 @@ export const ConversationView: React.FC = () => {
             >
               <Avatar
                 name={conversationName}
+                imageUrl={activeConversation?.avatar || activeContact?.avatar}
                 size="md"
                 isGroup={isGroup}
                 aria-label={`${conversationName} profile`}

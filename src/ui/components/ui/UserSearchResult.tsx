@@ -75,7 +75,7 @@ export const UserSearchResult: React.FC<UserSearchResultProps> = ({
       aria-label={`User ${displayName} ${cleanUsername}`}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: 0 }}>
-        <Avatar name={displayName || username} size="md" />
+        <Avatar name={displayName || username} imageUrl={avatarUrl} size="md" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span

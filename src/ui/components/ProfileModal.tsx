@@ -403,6 +403,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
             <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
               <Avatar
                 name={isPeer ? effectiveDisplayName : displayNameInput || activeSession?.name || 'User'}
+                imageUrl={isPeer ? (peerDoc?.avatar || searchResult?.avatar || peerContact?.avatar || peerConv?.avatar) : (avatarPreview || myProfile?.avatar)}
                 size="xl"
                 isGroup={isPeer && peerConv?.type === 'group'}
               />

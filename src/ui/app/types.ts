@@ -11,6 +11,7 @@ export interface UIConversation {
   type: 'direct' | 'group';
   name: string;
   avatarSeed: string;
+  avatar?: string;
   fingerprint?: string;
   isVerified?: boolean;
   lastMessage?: string;

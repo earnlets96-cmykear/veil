@@ -222,8 +222,9 @@ export class AccountManager {
     const recoveredMasterKey = base64ToBytes(backupData.masterKeyBase64);
 
     try {
-      // 2. Recreate Space locally using original Master Key
+      // 2. Recreate Space locally using original Master Key and Space ID
       const spaceHeader = this.vault.createSpace({
+        spaceId: backupData.spaceId,
         name: backupData.spaceName,
         password,
         masterKey: recoveredMasterKey,
@@ -260,4 +261,61 @@ export class AccountManager {
       zeroize(recoveredMasterKey);
     }
   }
+
+  /**
+   * Pushes/refreshes a zero-knowledge recovery vault for an existing Space session.
+   */
+  public async createOrUpdateRecoveryVault(
+    session: SpaceSession,
+    password: string,
+    username: string,
+    customKdfParams?: Partial<KdfParameters>
+  ): Promise<void> {
+    const loadedId = this.idMgr.loadIdentity(session, this.store);
+    if (!loadedId) {
+      throw new Error('No identity loaded for Space session');
+    }
+
+    const salt = randomBytes(32);
+    const kdfConfig: KdfParameters = {
+      algorithm: 'argon2id',
+      salt: bytesToBase64(salt),
+      timeCost: customKdfParams?.timeCost ?? 3,
+      memoryCost: customKdfParams?.memoryCost ?? 65536,
+      parallelism: customKdfParams?.parallelism ?? 1,
+      keyLength: 32,
+    };
+
+    const kek = deriveKeyArgon2id(password, salt, kdfConfig);
+    const masterKey = session.getMasterKey();
+
+    const backupPayload: IdentityBackupPayload = {
+      version: 1,
+      spaceId: session.spaceId,
+      spaceName: session.name,
+      masterKeyBase64: bytesToBase64(masterKey),
+      identityDocument: loadedId.document,
+      signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
+      keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
+      createdAt: Date.now(),
+    };
+
+    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${username.toLowerCase()}`);
+    const { nonce, ciphertext } = encryptXChaCha20Poly1305(
+      kek,
+      JSON.stringify(backupPayload),
+      aad
+    );
+
+    zeroize(kek);
+
+    const encryptedVaultBlob = JSON.stringify({
+      format: 'VEIL-IDENTITY-BACKUP-v1',
+      nonce: bytesToBase64(nonce),
+      ciphertext: bytesToBase64(ciphertext),
+    });
+
+    await this.cloudClient.setRecoveryVault(encryptedVaultBlob, kdfConfig);
+  }
 }
+

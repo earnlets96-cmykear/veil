@@ -142,7 +142,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
 
           {/* Contact Identity Summary */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Avatar name={displayName} size="lg" />
+            <Avatar name={displayName} imageUrl={conv?.avatar || contact?.avatar} size="lg" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 'var(--veil-text-base)', color: 'var(--veil-text-primary)' }}>
                 {displayName}

@@ -4,6 +4,21 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 34] - 2026-08-28
+
+### Added, Fixed & Validated
+- **Real UI Rebuild, Telegram-Style Media, Authorization, Recovery & Network Reliability**:
+  - **Group Attachment Authorization Repair (No 401)**: Solved group attachment upload failures by ensuring authenticated bearer session tokens are passed in both direct and group flows, allowing group attachments without single-recipient restrictions, and implementing automatic 401 token auto-healing in `CloudClient`.
+  - **Zero-Knowledge Account Recovery on Clean Device**: Implemented `createOrUpdateRecoveryVault` in `AccountManager` to push Argon2id-encrypted recovery vaults to the cloud. Restored identical `spaceId`, `masterKey`, and Ed25519 `identityId` on fresh devices and wired full space hydration in `AppState.tsx`.
+  - **Avatar & Profile Picture Propagation**: Propagated avatar data URLs through invitation payloads, contact requests, address books, chat lists, conversation headers, and profile modals.
+  - **Real In-App Inline Media & Fullscreen Viewer**: Built `MediaCache` and `<MediaImage />` for automatic cloud ciphertext retrieval, authenticated AEAD decryption, lazy loading, and tap-to-fullscreen pan/zoom viewer.
+  - **Physical File Downloads on Android**: Integrated `@capacitor/filesystem` into `Documents/VEIL` with system share sheet fallback and explicit user toast confirmation.
+  - **100% SVG Vector Iconography**: Eliminated Unicode emojis from interface controls.
+  - **All 253 Test Suites Passing**: 642 / 642 tests passing 100% cleanly across all suites.
+  - **Native Android APK Build**: Clean Gradle build (`BUILD SUCCESSFUL in 22s`).
+
+---
+
 ## [Phase 31] - 2026-08-27
 
 ### Added, Fixed & Validated

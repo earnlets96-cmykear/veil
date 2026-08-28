@@ -286,7 +286,7 @@ export class ContactRequestManager {
   public async acceptRequest(
     session: SpaceSession,
     requestId: string,
-    myProfile: SignedProfileDocument
+    myProfile?: SignedProfileDocument
   ): Promise<ContactRequest> {
     const request = await this.getRequest(session, requestId);
     if (!request) {
@@ -298,27 +298,28 @@ export class ContactRequestManager {
       throw new Error('Active Space identity not loaded');
     }
 
+    const responderIdentityId = myProfile ? myProfile.identityId : myIdentity.document.identityId;
     const now = Date.now();
     const canonicalRes = JSON.stringify({
       requestId,
-      responderIdentityId: myProfile.identityId,
+      responderIdentityId,
       status: 'ACCEPTED',
       respondedAt: now,
     });
     const sigBytes = sign(myIdentity.signingPrivateKey, new TextEncoder().encode(canonicalRes));
     const signature = bytesToBase64(sigBytes);
 
-    const responseWire: ContactResponseWire = {
-      type: 'CONTACT_RESPONSE',
-      requestId,
-      responderProfile: myProfile,
-      status: 'ACCEPTED',
-      respondedAt: now,
-      signature,
-    };
+    if (myProfile && this.networkManager) {
+      const responseWire: ContactResponseWire = {
+        type: 'CONTACT_RESPONSE',
+        requestId,
+        responderProfile: myProfile,
+        status: 'ACCEPTED',
+        respondedAt: now,
+        signature,
+      };
 
-    // 1. Dispatch acceptance response to peer's mailbox
-    if (this.networkManager) {
+      // 1. Dispatch acceptance response to peer's mailbox
       await this.networkManager.sendEnvelope(
         session,
         request.peerProfile.mailboxId,
@@ -335,6 +336,7 @@ export class ContactRequestManager {
       keyAgreementPublicKey: request.peerProfile.prekeyBundle.identityDocument.keyAgreementPublicKey,
       fingerprint: request.peerProfile.prekeyBundle.identityDocument.fingerprint,
       mailboxId: request.peerProfile.mailboxId,
+      avatar: request.peerProfile.avatar,
       prekeyBundle: request.peerProfile.prekeyBundle,
       createdAt: request.peerProfile.issuedAt,
       expiresAt: request.peerProfile.expiresAt || 0,
@@ -439,6 +441,7 @@ export class ContactRequestManager {
         keyAgreementPublicKey: wire.responderProfile.prekeyBundle.identityDocument.keyAgreementPublicKey,
         fingerprint: wire.responderProfile.prekeyBundle.identityDocument.fingerprint,
         mailboxId: wire.responderProfile.mailboxId,
+        avatar: wire.responderProfile.avatar,
         prekeyBundle: wire.responderProfile.prekeyBundle,
         createdAt: wire.responderProfile.issuedAt,
         expiresAt: wire.responderProfile.expiresAt || 0,

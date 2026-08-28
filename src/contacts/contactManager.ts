@@ -45,6 +45,7 @@ export class ContactManager {
       addedAt: Date.now(),
       prekeyBundle: invitation.prekeyBundle,
       mailboxId: invitation.mailboxId,
+      avatar: invitation.avatar,
     };
 
     if (existingIdx >= 0) {

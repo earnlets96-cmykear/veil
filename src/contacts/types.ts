@@ -19,6 +19,7 @@ export interface Contact {
   lastSeen?: number;
   prekeyBundle?: PrekeyBundle;
   mailboxId?: string;
+  avatar?: string;
   metadata?: Record<string, string>;
 }
 
@@ -30,8 +31,10 @@ export interface InvitationPayload {
   keyAgreementPublicKey: string; // Base64
   fingerprint: string;
   mailboxId?: string;
+  avatar?: string;
   prekeyBundle?: PrekeyBundle;
   createdAt: number;
   expiresAt: number;
   signature: string; // Ed25519 signature over canonical payload string
 }
+

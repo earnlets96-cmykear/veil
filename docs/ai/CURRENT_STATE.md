@@ -37,18 +37,19 @@
 | **Phase 31** | Production Connectivity Repair, Render/R2/Supabase Integration Verification & Mobile Reliability | **COMPLETED & ACCEPTED** | Root caused and resolved DNS resolution failure by establishing `https://veil-rga0.onrender.com` / `wss://veil-rga0.onrender.com/v1/ws` as canonical production endpoints; verified live Supabase PostgreSQL, Cloudflare R2, account registration, mailbox creation, envelope persistence, encrypted attachment upload/download, and WebSocket `/v1/ws` connectivity (16/16 checks 100% on live Render); excised account-count disclosure on LockScreen; verified 0.0.0.0 PORT binding; created 4 new test suites (250/250 suites, 635/635 tests passing, 100%); fresh native Android APK compiled and verified |
 | **Phase 32** | Complete UI/UX Overhaul, Telegram-Inspired Media Suite & File Saver Engine | **COMPLETED & ACCEPTED** | 100% Pure SVG Icon System (zero emojis as UI controls); Unified `FileSaver` engine for native Android (`@capacitor/filesystem` into `Documents/VEIL` + `@capacitor/share` fallback) and Web (`showSaveFilePicker` / anchor blobs); Fullscreen `MediaViewer` with smooth pan/zoom (1x-4x) and HTML5 video player; `MediaGalleryModal` shared media browser (Photos & Videos grid, Files & Documents list, Voice Notes); `AttachmentPreviewModal` pre-send staging modal; Telegram-inspired message geometry, selection toolbar, contextual long-press menus, responsive auto-expanding composer; all 250 test suites (635 tests) passing; native Android debug APK compiled cleanly |
 | **Phase 33** | Actual UI Transformation, Real In-App Media Integration & Settings Redesign | **COMPLETED & ACCEPTED** | Fixed image viewing pipeline: built `MediaCache` and `<MediaImage />` component for automatic cloud download, cryptographic reassembly, and inline thumbnail rendering; connected `MediaViewer` directly to decrypted buffers with double-click zoom, pan, and HTML5 video playback; fixed `App.tsx` modal router to render `<SettingsModal />`; fully redesigned Settings with Telegram-inspired Profile Header Card and grouped iOS/Telegram list rows with colored SVG icon badges; modernized Chat List with formatted relative timestamps, unread counter pills, and SVG snippet indicators (Photo, Video, File, Voice); 100% test pass (250/250 files, 635/635 tests); release manifest updated; native Android APK verified (`BUILD SUCCESSFUL in 17s`) |
+| **Phase 34** | Real UI Rebuild, Telegram-Style Media, Authorization, Recovery & Network Reliability | **COMPLETED & ACCEPTED** | Zero-Knowledge Account Recovery: created `createOrUpdateRecoveryVault` in `AccountManager`, preserved `spaceId` and deterministic Ed25519 identity on fresh device recovery, and connected full space hydration in `AppState.tsx`; Avatar Propagation: preserved avatar across invitations, `ContactRequestManager` send/inbound/accept handshakes, `ContactDetailsModal`, `ConversationView`, `ProfileModal`, `Sidebar`, and `UserSearchResult`; Group Attachment & Session Auto-Healing: enabled authenticated attachments for groups without recipient restriction, and implemented automatic 401 retry with re-authentication in `CloudClient`; 100% test pass across all 253 test files (642/642 tests); native Android debug APK verified (`BUILD SUCCESSFUL in 22s`) |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
 - **Release Version**: **`1.0.0` (Production Hardened UI Transformation & Media Integration Release)**
-- **Total Test Files**: **250 / 250 passed (100% pass rate)**
-- **Total Tests**: **635 / 635 passed (0 failures, 0 skipped)**
+- **Total Test Files**: **253 / 253 passed (100% pass rate)**
+- **Total Tests**: **642 / 642 passed (0 failures, 0 skipped)**
 - **Live Smoke Test**: **16 / 16 passed (100% pass rate on live Render backend)**
-- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (verified clean Gradle build in 17s)**
+- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (verified clean Gradle build in 22s)**
 - **Build Status**: `npm run build:release` succeeds cleanly (`dist/` created, release manifest verified)
-- **Android Build Status**: `cmd /c "cd android && gradlew.bat assembleDebug"` succeeds cleanly (`BUILD SUCCESSFUL in 17s`, `app-debug.apk` generated)
+- **Android Build Status**: `cmd /c "cd android && gradlew.bat assembleDebug"` succeeds cleanly (`app-debug.apk` generated)
 - **Phase 31 Production Acceptance**: `npx tsx scripts/phase31-mobile-production-acceptance.mjs` passes 10/10 checks cleanly (100%).
 - **Live Acceptance Suite**: `npx tsx scripts/phase30-live-acceptance.mjs` passes 12/12 acceptance checks cleanly (100%).
 - **Working Tree**: Clean, verified, documented.

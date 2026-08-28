@@ -157,8 +157,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchQuery, setSearchQueryState] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-  const ensureCloudSession = useCallback(async (session: SpaceSession) => {
-    if (cloudClient.getSessionToken()) return;
+  const ensureCloudSession = useCallback(async (session: SpaceSession, forceReauth = false): Promise<boolean> => {
+    if (!forceReauth && cloudClient.getSessionToken()) return true;
 
     try {
       const savedCloudSession = (await store.getAsync<{
@@ -184,14 +184,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } catch (_sErr) {}
       };
 
-      if (savedCloudSession && savedCloudSession.sessionToken && savedCloudSession.expiresAt > Date.now()) {
+      if (!forceReauth && savedCloudSession && savedCloudSession.sessionToken && savedCloudSession.expiresAt > Date.now()) {
         cloudClient.setSession(
           savedCloudSession.sessionToken,
           savedCloudSession.accountId,
           savedCloudSession.deviceId
         );
         await syncCurrentSpace(savedCloudSession.accountId);
-        return;
+        return true;
       }
 
       // Auto-register / authenticate cloud session deterministically for this Space
@@ -220,7 +220,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             username: username.toLowerCase(),
           });
           await syncCurrentSpace(logRes.account.accountId);
-          return;
+
+          // Push zero-knowledge recovery vault for this session
+          try {
+            await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
+          } catch (_vErr) {}
+
+          return true;
         }
       } catch (_loginErr) {
         try {
@@ -242,7 +248,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               username: username.toLowerCase(),
             });
             await syncCurrentSpace(regRes.account.accountId);
-            return;
+
+            // Push zero-knowledge recovery vault for this session
+            try {
+              await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
+            } catch (_vErr) {}
+
+            return true;
           }
         } catch (_regErr) {
           if (typeof console !== 'undefined' && console.warn) {
@@ -251,6 +263,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
     } catch (_e) {}
+    return false;
   }, []);
 
   const loadSpaceData = useCallback(async (session: SpaceSession) => {
@@ -685,6 +698,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               type: 'direct',
               name: contact.name,
               avatarSeed: contact.identityId,
+              avatar: contact.avatar,
               fingerprint: contact.fingerprint,
               isVerified: contact.verificationStatus === 'VERIFIED',
               unreadCount: 0,
@@ -889,43 +903,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const rawCiphertext = new TextEncoder().encode(JSON.stringify(chunks));
       const ciphertextHash = bytesToHex(sha256(rawCiphertext));
 
-      // 3. Resolve recipient contact for authorization
+      // 3. Resolve recipient contact or group for authorization
+      const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
       const freshContacts = await contactManager.listContacts(activeSession);
       const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
 
-      if (!cloudClient.getSessionToken()) {
-        await ensureCloudSession(activeSession);
-      }
+      await ensureCloudSession(activeSession);
 
       let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
-      try {
-        const createRes = await cloudClient.createAttachment({
+      const uploadWithSession = async () => {
+        const createParams: any = {
           attachmentId: metadata.attachmentId,
           spaceId: activeSession.spaceId,
           ciphertextSize: rawCiphertext.length,
           ciphertextHash,
           chunkCount: metadata.chunkCount,
           chunkSize: metadata.chunkSize,
-          recipientUsername: targetUsername,
-          recipientAccountId: targetContact?.metadata?.accountId,
+          conversationId,
           encryptedMetadata: JSON.stringify({
             name: metadata.name,
             mimeType: metadata.mimeType,
             sizeBytes: metadata.sizeBytes,
-            recipientUsername: targetUsername,
-            recipientAccountId: targetContact?.metadata?.accountId,
+            conversationId,
+            recipientUsername: isGroup ? undefined : targetUsername,
+            recipientAccountId: isGroup ? undefined : targetContact?.metadata?.accountId,
           }),
-        });
+        };
+
+        if (!isGroup) {
+          createParams.recipientUsername = targetUsername;
+          createParams.recipientAccountId = targetContact?.metadata?.accountId;
+        }
+
+        const createRes = await cloudClient.createAttachment(createParams);
         objectId = createRes.attachment.objectId;
         await cloudClient.uploadAttachment(objectId, rawCiphertext);
+      };
+
+      try {
+        await uploadWithSession();
       } catch (uploadErr: any) {
-        if (typeof console !== 'undefined' && console.warn) {
-          console.warn('[VEIL-ATTACHMENT] Attachment upload failed:', uploadErr);
+        // Retry once with refreshed cloud session
+        try {
+          const reauthed = await ensureCloudSession(activeSession, true);
+          if (reauthed) {
+            await uploadWithSession();
+          } else {
+            throw uploadErr;
+          }
+        } catch (retryErr: any) {
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[VEIL-ATTACHMENT] Attachment upload failed:', retryErr);
+          }
+          alert(`Attachment upload failed: ${retryErr?.message || 'Cloud storage unavailable'}`);
+          return;
         }
-        alert(`Attachment upload failed: ${uploadErr?.message || 'Cloud storage unavailable'}`);
-        return;
       }
 
       let previewUrl: string | undefined;
@@ -996,12 +1030,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
 
       try {
+        const wireText = metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/') ? '' : `Attachment: ${file.name}`;
         let wirePayload: string;
         if (targetContact?.prekeyBundle) {
           const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
             activeSession,
             targetContact.prekeyBundle,
-            `📎 Attachment: ${file.name}`,
+            wireText,
             attachmentPayload,
             activeReply
           );
@@ -1011,7 +1046,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             id: msgId,
             conversationId,
             senderId: activeSession.spaceId,
-            text: `📎 Attachment: ${file.name}`,
+            text: wireText,
             attachment: attachmentPayload,
             replyTo: activeReply,
           });
@@ -1032,7 +1067,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
       } catch (_e) {}
     },
-    [activeSession, contacts, replyTarget]
+    [activeSession, contacts, conversations, replyTarget]
   );
 
   const sendVoiceMessage = useCallback(
@@ -1270,29 +1305,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const restoreAccount = useCallback(
     async (username: string, password: string) => {
-      const { session, identityDoc } = await accountManager.restoreAccount({
+      const { session } = await accountManager.restoreAccount({
         username,
         password,
       });
       setActiveSession(session);
       sessionController.recordUserActivity();
-
-      const loadedContacts = await contactManager.listContacts(session);
-      setContacts(loadedContacts);
-
-      const loadedMessages = store.get<Record<string, UIMessage[]>>(session, 'veil:ui:messages') || {};
-      setMessages(loadedMessages);
-
-      const loadedConversations = store.get<UIConversation[]>(session, 'veil:ui:conversations') || [];
-      setConversations(loadedConversations);
-
-      try {
-        const binding = await netManager.allocateMailbox(session);
-        store.set(session, 'net_mailbox_binding', binding);
-        await syncEngine.sync(session);
-      } catch (_e) {}
+      setKnownSpacesCount(vault.listEnvelopes().length);
+      await loadSpaceData(session);
     },
-    []
+    [loadSpaceData]
   );
 
   const registerCloudAccount = useCallback(
