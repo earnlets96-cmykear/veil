@@ -22,13 +22,13 @@ describe('VEIL Phase 7: Human-Centered Security Indicators Tests', () => {
     const verified = SecurityIndicators.getConversationStatus(true, false);
     expect(verified.status).toBe('verified');
     expect(verified.label).toBe('Verified');
-    expect(verified.badge).toBe('✓');
+    expect(verified.badge).toBe('Verified');
 
     // 3. Contact key changed
     const keyChanged = SecurityIndicators.getConversationStatus(true, true);
     expect(keyChanged.status).toBe('security_changed');
     expect(keyChanged.label).toBe('Security Changed');
-    expect(keyChanged.badge).toBe('⚠');
+    expect(keyChanged.badge).toBe('Key Changed');
   });
 
   it('IDENTITY CHANGE WARNING: Generates clear warning message when contact keys change', () => {

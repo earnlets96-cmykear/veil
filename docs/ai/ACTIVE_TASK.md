@@ -2,31 +2,37 @@
 
 ## Current Working Goal
 
-- **Milestone**: **PHASE 44: Account Persistence & Recovery Forensic Repair + Premium Loading UI**
-- **Status**: **COMPLETED & VERIFIED (ALL OBJECTIVES 100% ACHIEVED & CERTIFIED)**
-- **Release Version**: **`1.0.0` (Account Persistence & Recovery Forensic Repair)**
-- **Total Test Suites**: **308 test files (100% clean pass)**
-- **Total Automated Tests**: **798 tests (100% clean pass, 0 failures, 0 skipped)**
-- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (`app-debug.apk` in 22s)**
-- **Build Status**: **Clean production release build (`npm run build` in 1.80s, release manifest generated)**
-- **Physical Device Status**: **PHYSICAL ANDROID VERIFICATION: UNVERIFIED (User to perform manual physical device checklist)**
+- **Milestone**: **PHASE 44A: Chat UI Regression Forensic Repair & SVG Iconography System**
+- **Status**: **CODE & BUILD VERIFIED (ALL DELIVERABLES CERTIFIED, PENDING USER PHYSICAL TEST)**
+- **Release Version**: **`1.0.0` (Chat UI Regression Repair & SVG System)**
+- **Total Test Suites**: **309 test files (100% clean pass)**
+- **Total Automated Tests**: **801 tests (100% clean pass, 0 failures, 0 skipped)**
+- **Android APK Build**: **Debug APK built, synced, and assembled with Gradle wrapper (`app-debug.apk` in 16s)**
+- **Build Status**: **Clean production release build (`npm run build` in 1.65s, release manifest generated)**
+- **Physical Device Status**: **USER PHYSICAL TEST — NOT YET VERIFIED (User to perform 17-item manual checklist)**
 
 ---
 
-## Phase 44 Checklist
+## Phase 44A Checklist
 
-- [x] **Mobile Environment Production Relay Resolution (`appConfig.ts`)**:
-  - Prevented mobile/Capacitor/WebView from falling back to `127.0.0.1` and defaulted to `https://veil-rga0.onrender.com`.
-- [x] **Network & Timeout Error Classification (`cloudClient.ts`)**:
-  - Intercepted fetch errors to provide clear, distinguishable messages for network, timeout, 401, 404, 409, and 500 errors.
-- [x] **Fail-Closed Space Registration & Remote Vault Persistence (`AppState.tsx`, `CreateSpaceModal.tsx`)**:
-  - Added explicit username field and enforced fail-closed account registration with encrypted recovery vault upload on Space creation.
-- [x] **Zero-Local-State Bootstrap Recovery (`accountManager.ts`)**:
-  - Reconstructs exact Account ID, Master Key, Ed25519 identity, spaces, contacts, and conversations from empty storage.
-- [x] **Ugly SVG Spinner Removal & Minimal Premium Loading UI (`Spinner.tsx`, `LoadingSpinner.tsx`, `veil-components.css`)**:
-  - Replaced SVG circle/stroke animations with GPU-accelerated CSS spinner; updated button loading states ("Recovering…", "Creating Space…").
+- [x] **Forensic Phase 42 → 43 Diff & Root Cause Diagnosis**:
+  - Confirmed `.veil-conversation-view` missing styling and class mismatch on `.veil-conversation` containers.
+- [x] **Chat Container Geometry & Flex Column Enforcements (`veil-design-system.css`, `ConversationView.tsx`)**:
+  - Fixed `.veil-conversation, .veil-conversation-view` root flex container (`flex: 1; height: 100%; display: flex; flex-direction: column; overflow: hidden;`).
+  - Fixed `.veil-chat-header` top anchoring (`height: 56px; flex-shrink: 0;`).
+  - Fixed `.veil-timeline` scrolling message list (`flex: 1 1 auto; min-height: 0; overflow-y: auto;`).
+  - Fixed `.veil-composer` bottom anchoring (`flex-shrink: 0; width: 100%;`).
+  - Fixed responsive mobile viewport rules for Android WebViews.
+- [x] **Repository-Wide UI Icon Audit & Zero-Emoji Verification**:
+  - Replaced `↩` arrow with `ReplyIcon` SVG in `MessageBubble.tsx`.
+  - Replaced `✓` with `CheckIcon` SVG and `🚨` with `AlertCircleIcon` SVG in `ConversationView.tsx`.
+  - Removed `📷`, `▶`, `📎` from `AppState.tsx` summary badges.
+  - Standardized snippet formatting in `Sidebar.tsx` with vector SVG icons (`ImageIcon`, `VideoIcon`, `FileIcon`, `MicIcon`).
+  - Updated `SecurityIndicators` to return clean text tokens.
+- [x] **Preserved All Phase 40–44 Working Subsystems**:
+  - Maintained E2EE media delivery, R2 ciphertext storage, grouped media, video player, video seek, audio seek, swipe-to-reply, in-app picker, bounded upload concurrency, and account recovery.
 - [x] **Automated Regression & Build Certification**:
-  - 4 new test suites with 10 automated tests (`tests/phase44-*.test.ts`, `tests/phase44-*.test.tsx`).
-  - Full test suite passing (308 files, 798 tests).
+  - 1 new dedicated test suite with 3 automated tests (`tests/phase44a-ui-layout-and-icons.test.tsx`).
+  - Full test suite passing (309 files, 801 tests).
   - Web production build passing.
   - Android debug APK assembled cleanly via Gradle wrapper.

@@ -1,41 +1,33 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 44 (Account Persistence & Recovery Forensic Repair + Premium Loading UI)
+## Current Verified Phase: PHASE 44A (Chat UI Regression Forensic Repair & SVG Iconography System)
 - **Status**: **COMPLETE & VERIFIED 100%**
-- **Test Results**: **308 / 308 test files passing (798 / 798 automated tests, 100% clean pass, 0 failures, 0 skipped)**
-- **Web App Build**: **PASS (`npm run build` in 1.80s)**
+- **Test Results**: **309 / 309 test files passing (801 / 801 automated tests, 100% clean pass, 0 failures, 0 skipped)**
+- **Web App Build**: **PASS (`npm run build` in 1.65s)**
 - **Release Manifest**: **PASS (`release/v1.0.0/manifest.json` generated)**
 - **Capacitor Sync**: **PASS (`npx cap sync android` in 0.15s)**
-- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` in 22s, `BUILD SUCCESSFUL`)**
-- **Physical Android Verification**: **UNVERIFIED (User to perform manual physical device test checklist)**
+- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` in 16s, `BUILD SUCCESSFUL`)**
+- **Physical Android Verification**: **USER PHYSICAL TEST — NOT YET VERIFIED (User to perform manual physical device checklist)**
 
 ---
 
-## Phase 44 Verified Deliverables
+## Phase 44A Verified Deliverables
 
-1. **Mobile & Production Environment Relay Resolution (`src/config/appConfig.ts`)**:
-   - Fixed `ConfigManager.getConfig()` to accurately detect mobile WebView, Capacitor, and production bundles, defaulting to `PRODUCTION_RELAY_URL` (`https://veil-rga0.onrender.com`) instead of localhost `127.0.0.1`, completely resolving "Failed to fetch" on Android devices.
-   - Maintained query string and `localStorage` relay override support.
+1. **Conversation View & Scrollable Timeline Layout Geometry (`src/styles/veil-design-system.css`, `src/ui/components/ConversationView.tsx`)**:
+   - Fixed conversation container geometry to match `.veil-conversation, .veil-conversation-view` (`flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; background-color: var(--veil-bg-base); overflow: hidden; position: relative;`).
+   - Fixed header anchoring with `.veil-conversation-header, .veil-chat-header` (`height: 56px; flex-shrink: 0;`).
+   - Fixed message list scrolling with `.veil-timeline` (`flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; width: 100%; box-sizing: border-box;`).
+   - Fixed bottom composer anchoring with `.veil-composer` (`flex-shrink: 0; width: 100%; box-sizing: border-box; position: relative; z-index: var(--veil-z-header);`).
+   - Fixed responsive mobile rules: `.veil-app-layout.has-active-chat .veil-conversation` and `.veil-app-layout.has-active-chat .veil-conversation-view` take full viewport (`width: 100vw; height: 100vh; height: 100dvh; position: fixed; inset: 0; z-index: 100;`).
 
-2. **Actionable Network & Timeout Error Translation (`src/network/cloudClient.ts`)**:
-   - Wrapped `fetch` exceptions to provide distinguishable, human-readable error messages for timeouts (`AbortError`), connectivity/DNS drops, 401s, 404s, and 500s.
+2. **Zero Unicode Emoji/Symbol UI Icons & Vector SVG Icon System Restoration**:
+   - Replaced `↩ Reply` with `<ReplyIcon size={12} /><span>Reply</span>` in `MessageBubble.tsx`.
+   - Replaced `✓ Verified` with `<CheckIcon size={12} /><span>Verified</span>` and `🚨 Key Changed` with `<AlertCircleIcon size={12} /><span>Key Changed</span>` in `ConversationView.tsx`.
+   - Replaced `📷 Photo`, `▶ Video`, `📎 ${name}` in `AppState.tsx` with clean text strings (`Photo`, `Video`, `${name}`, `${count} Media Files`).
+   - Standardized `Sidebar.tsx` snippet rendering using vector SVG icons (`ImageIcon`, `VideoIcon`, `FileIcon`, `MicIcon`).
+   - Cleaned `SecurityIndicators` to return clean text tokens without raw Unicode glyphs.
 
-3. **Fail-Closed Account Creation & Remote Encrypted Vault Guarantee (`src/ui/app/AppState.tsx`, `src/ui/components/CreateSpaceModal.tsx`)**:
-   - Added explicit username selection and validation during space creation.
-   - Enforced fail-closed registration: `createSpace` invokes `AccountManager.registerAccount`, generating local Space Master Keys, deriving zero-knowledge recovery KEK with Argon2id, encrypting the identity backup via XChaCha20-Poly1305, registering on the cloud server, and uploading the recovery vault to `/v1/account/recovery/vault/set`.
-   - Guaranteed that registration failures immediately surface in the UI rather than allowing silent local-only spaces.
-
-4. **Zero-Local-State Bootstrap Recovery (`src/account/accountManager.ts`, `tests/phase44-account-persistence-e2e.test.ts`)**:
-   - Proved that uninstalling the application (complete destruction of local storage / IndexedDB) does not destroy the account.
-   - Fresh installation bootstrap recovers identical Account ID, Space Master Key, Ed25519 identity, spaces, contacts, and conversations.
-
-5. **Ugly SVG Spinner Removal & Minimal Premium Loading UI (`Spinner.tsx`, `LoadingSpinner.tsx`, `veil-components.css`)**:
-   - Removed raw SVG circle/path stroke markup.
-   - Replaced with a unified, GPU-accelerated Telegram/Signal-style CSS loader with smooth easing and tokenized accent colors.
-   - Updated modal action buttons with clean loading transitions ("Recovering…", "Creating Space…").
-
-6. **Dedicated Phase 44 Test Suites (`tests/phase44-*.test.ts`, `tests/phase44-*.test.tsx`)**:
-   - `phase44-account-persistence-e2e.test.ts`: Proves remote persistence and fresh reinstall recovery.
-   - `phase44-recovery-errors.test.ts`: Validates distinguishable error reporting for 401, network unreachable, missing vault, and idempotent recovery.
-   - `phase44-config-production.test.ts`: Proves mobile production relay defaulting.
-   - `phase44-spinner-audit.test.tsx`: Validates clean CSS spinner rendering.
+3. **Dedicated Phase 44A Test Suite (`tests/phase44a-ui-layout-and-icons.test.tsx`)**:
+   - Validates vector SVG `ReplyIcon` rendering in `MessageBubble`.
+   - Verifies CSS flex layout geometry, scrollable timeline definitions, and mobile media queries.
+   - Proves **ZERO** Unicode UI emoji/symbol characters across the entire `src/ui` directory.

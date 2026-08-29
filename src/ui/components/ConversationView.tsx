@@ -485,7 +485,7 @@ export const ConversationView: React.FC = () => {
   }
 
   return (
-    <div className="veil-conversation-view" role="main" aria-label={`Chat with ${conversationName}`}>
+    <div className="veil-conversation veil-conversation-view" role="main" aria-label={`Chat with ${conversationName}`}>
       {/* Top Header Bar */}
       {isSelectionMode ? (
         <div className="veil-chat-header veil-selection-header" role="toolbar">
@@ -555,13 +555,15 @@ export const ConversationView: React.FC = () => {
                 <div className="veil-chat-header-name">
                   <span>{conversationName}</span>
                   {(activeContact?.verificationStatus === 'VERIFIED' || activeContact?.isVerified || activeConversation?.isVerified) && (
-                    <span className="veil-verified-badge" title="Identity Verified">
-                      ✓ Verified
+                    <span className="veil-verified-badge" title="Identity Verified" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <CheckIcon size={12} color="var(--veil-accent-primary)" />
+                      <span>Verified</span>
                     </span>
                   )}
                   {activeContact?.verificationStatus === 'MISMATCH' && (
-                    <span className="veil-mismatch-badge" title="Key Changed">
-                      🚨 Key Changed
+                    <span className="veil-mismatch-badge" title="Key Changed" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <AlertCircleIcon size={12} color="var(--veil-danger)" />
+                      <span>Key Changed</span>
                     </span>
                   )}
                 </div>
@@ -759,8 +761,8 @@ export const ConversationView: React.FC = () => {
 
                     {/* Text Message Bubble (Rendered if message has text and isn't raw media placeholder) */}
                     {msg.text &&
-                      !msg.text.startsWith('📎 Attachment:') &&
                       !msg.text.startsWith('Attachment:') &&
+                      !msg.text.includes('Attachment:') &&
                       msg.text !== 'Voice Message' && (
                         <MessageBubble
                           id={msg.id}

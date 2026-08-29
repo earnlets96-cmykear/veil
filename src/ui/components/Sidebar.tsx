@@ -146,7 +146,7 @@ export const Sidebar: React.FC = () => {
     if (!lastMessage) return 'E2EE encrypted conversation';
     const msg = lastMessage.trim();
 
-    if (msg.includes('📎 Attachment:') || msg.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+    if (msg === 'Photo' || msg.includes('Photo') || msg.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
       return (
         <span className="veil-snippet-with-icon">
           <ImageIcon size={14} color="var(--veil-accent-primary)" />
@@ -155,11 +155,20 @@ export const Sidebar: React.FC = () => {
       );
     }
 
-    if (msg.match(/\.(mp4|webm|mov|mkv)$/i)) {
+    if (msg === 'Video' || msg.includes('Video') || msg.match(/\.(mp4|webm|mov|mkv)$/i)) {
       return (
         <span className="veil-snippet-with-icon">
           <VideoIcon size={14} color="var(--veil-accent-primary)" />
           <span>Video</span>
+        </span>
+      );
+    }
+
+    if (msg.includes('Media Files')) {
+      return (
+        <span className="veil-snippet-with-icon">
+          <ImageIcon size={14} color="var(--veil-accent-primary)" />
+          <span>{msg}</span>
         </span>
       );
     }
@@ -173,8 +182,8 @@ export const Sidebar: React.FC = () => {
       );
     }
 
-    if (msg.includes('📎') || msg.includes('Attachment:')) {
-      const cleanName = msg.replace(/^📎\s*Attachment:\s*/i, '');
+    if (msg.includes('Attachment:')) {
+      const cleanName = msg.replace(/^Attachment:\s*/i, '');
       return (
         <span className="veil-snippet-with-icon">
           <FileIcon size={14} color="var(--veil-accent-primary)" />

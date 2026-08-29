@@ -2,6 +2,33 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase44a] - 2026-08-30
+
+### Added
+- **Dedicated Phase 44A Regression Test Suite (`tests/phase44a-ui-layout-and-icons.test.tsx`)**:
+  - Validates vector SVG `ReplyIcon` rendering in `MessageBubble`.
+  - Verifies flex layout geometry, scrollable timeline definitions, and mobile media queries.
+  - Proves **ZERO** Unicode UI emoji/symbol characters across the entire `src/ui` directory.
+
+### Changed
+- **Conversation View & Scrollable Timeline Layout (`src/styles/veil-design-system.css`, `src/ui/components/ConversationView.tsx`)**:
+  - Aligned `.veil-conversation, .veil-conversation-view` root flex layout (`flex: 1; height: 100%; display: flex; flex-direction: column; overflow: hidden;`).
+  - Anchored `.veil-conversation-header, .veil-chat-header` to top of chat (`height: 56px; flex-shrink: 0;`).
+  - Enabled native scroll on message list with `.veil-timeline` (`flex: 1 1 auto; min-height: 0; overflow-y: auto;`).
+  - Anchored `.veil-composer` to bottom of chat (`flex-shrink: 0; width: 100%;`).
+  - Configured responsive mobile rules ensuring full-viewport expansion on Android WebView.
+- **Zero Unicode Symbol/Emoji UI Icons & Vector SVG Restoration**:
+  - Replaced `↩` arrow with `ReplyIcon` SVG in `MessageBubble.tsx`.
+  - Replaced `✓` with `CheckIcon` SVG and `🚨` with `AlertCircleIcon` SVG in `ConversationView.tsx`.
+  - Replaced `📷`, `▶`, `📎` with clean text strings in `AppState.tsx` summary badges.
+  - Standardized snippet formatting in `Sidebar.tsx` with vector SVG icons (`ImageIcon`, `VideoIcon`, `FileIcon`, `MicIcon`).
+  - Updated `SecurityIndicators` to return clean text tokens.
+
+### Verification
+- 309 / 309 test files passing (801 / 801 automated tests, 100% clean pass, 0 failures, 0 skipped).
+- Web production build passing (`dist/`).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`app-debug.apk` in 16s).
+
 ## [1.0.0-phase44] - 2026-08-30
 
 ### Added

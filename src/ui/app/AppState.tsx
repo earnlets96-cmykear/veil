@@ -1073,11 +1073,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const summaryBadge =
         files.length === 1
           ? files[0].type.startsWith('image/')
-            ? '📷 Photo'
+            ? 'Photo'
             : files[0].type.startsWith('video/')
-            ? '▶ Video'
-            : `📎 ${files[0].name}`
-          : `📷 ${files.length} Media Files`;
+            ? 'Video'
+            : files[0].name
+          : `${files.length} Media Files`;
 
       setConversations((prev) => {
         const updated = prev.map((c) =>

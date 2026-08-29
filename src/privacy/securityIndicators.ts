@@ -26,14 +26,14 @@ export class SecurityIndicators {
       return {
         status: 'security_changed',
         label: 'Security Changed',
-        badge: '⚠',
+        badge: 'Key Changed',
       };
     }
     if (isVerified) {
       return {
         status: 'verified',
         label: 'Verified',
-        badge: '✓',
+        badge: 'Verified',
       };
     }
     return {

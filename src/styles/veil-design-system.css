@@ -690,11 +690,13 @@ body {
    CONVERSATION VIEW & TIMELINE
    ========================================================================= */
 
-.veil-conversation {
+.veil-conversation,
+.veil-conversation-view {
   flex: 1;
   height: 100%;
   width: 100%;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background-color: var(--veil-bg-base);
@@ -703,7 +705,8 @@ body {
 }
 
 /* Telegram-Style Horizontal Header */
-.veil-conversation-header {
+.veil-conversation-header,
+.veil-chat-header {
   height: 56px;
   min-height: 56px;
   padding: 0 0.75rem;
@@ -720,7 +723,8 @@ body {
   flex-shrink: 0;
 }
 
-.veil-conversation-header-left {
+.veil-conversation-header-left,
+.veil-chat-header-left {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -730,7 +734,8 @@ body {
   overflow: hidden;
 }
 
-.veil-header-profile-trigger {
+.veil-header-profile-trigger,
+.veil-chat-header-avatar-group {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -742,7 +747,8 @@ body {
   user-select: none;
 }
 
-.veil-header-text {
+.veil-header-text,
+.veil-chat-header-titles {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -751,7 +757,8 @@ body {
   overflow: hidden;
 }
 
-.veil-header-title {
+.veil-header-title,
+.veil-chat-header-name {
   font-weight: 600;
   font-size: var(--veil-text-sm);
   color: var(--veil-text-primary);
@@ -759,9 +766,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
-.veil-header-subtitle {
+.veil-header-subtitle,
+.veil-chat-header-status {
   font-size: var(--veil-text-xs);
   color: var(--veil-text-muted);
   white-space: nowrap;
@@ -769,14 +780,35 @@ body {
   text-overflow: ellipsis;
   line-height: 1.25;
   margin-top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-.veil-conversation-header-right {
+.veil-conversation-header-right,
+.veil-chat-header-actions {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.25rem;
   flex-shrink: 0;
+}
+
+.veil-btn-back {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--veil-text-secondary);
+  padding: 0.35rem;
+  border-radius: var(--veil-radius-md);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.veil-btn-back:hover {
+  background-color: var(--veil-bg-surface-hover);
+  color: var(--veil-text-primary);
 }
 
 /* Timeline & Scrollable Message Area */
@@ -1327,13 +1359,28 @@ body,
     padding: 0 !important;
   }
 
+  .veil-app-layout.has-active-chat .veil-conversation-view {
+    display: flex !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .veil-app-layout:not(.has-active-chat) .veil-conversation,
+  .veil-app-layout:not(.has-active-chat) .veil-conversation-view,
   .veil-app-layout:not(.has-active-chat) .veil-conversation-empty,
   .veil-app-layout.has-active-chat .veil-conversation-empty {
     display: none !important;
   }
 
-  .veil-btn-mobile-back {
+  .veil-btn-mobile-back,
+  .veil-btn-back,
+  .veil-mobile-only {
     display: inline-flex !important;
   }
 

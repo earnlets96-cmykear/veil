@@ -225,7 +225,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               }}
               aria-label="Reply to this message"
             >
-              ↩ Reply
+              <ReplyIcon size={12} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '3px' }} />
+              <span>Reply</span>
             </button>
           )}
 
