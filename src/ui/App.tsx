@@ -19,6 +19,15 @@ import { ProfileModal } from './components/ProfileModal.tsx';
 export const App: React.FC = () => {
   const { activeSession, activeChatId, activeModal } = useApp();
 
+  React.useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('veil:theme') || 'obsidian';
+      const savedDensity = localStorage.getItem('veil:density') || 'comfortable';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.documentElement.setAttribute('data-density', savedDensity);
+    } catch (_e) {}
+  }, []);
+
   if (!activeSession || !activeSession.isActive()) {
     return (
       <>

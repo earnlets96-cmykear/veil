@@ -2,6 +2,41 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase38] - 2026-08-29
+
+### Added
+- **5-Theme Design System (`src/styles/themes.css`, `veil-design-system.css`, `SettingsModal.tsx`)**:
+  - Implemented 5 complete tokenized production themes: **Obsidian** (warm dark neutral #0c0c0e), **Slate** (cool dark blue-gray #0f1219), **Light** (clean minimal light #f5f5f7), **Midnight** (deep blue-black #0a0e18), and **Graphite** (neutral charcoal #121212).
+  - Implemented 3 message density presets: **Compact**, **Comfortable**, and **Spacious**.
+  - Dynamic cascading via `data-theme` and `data-density` attributes with instant apply (no restart) and persistent storage.
+- **Web Worker Async Argon2id Unlock (`src/crypto/kdfWorker.ts`, `src/crypto/kdf.ts`, `src/spaces/vault.ts`, `sessionController.ts`)**:
+  - Offloaded expensive 64 MiB Argon2id key derivation to a background Web Worker (`deriveKeyArgon2idAsync` / `unlockSpaceAsync`), eliminating main thread UI freezes during Space unlock.
+  - Rebuilt Lock Screen with sub-100ms visual response, clean typography, progressive loading transitions ("Unlocking..." -> "Preparing secure space..."), and zero AI clutter/radial gradients.
+- **True End-to-End Read Receipts (`src/messaging/readReceipts.ts`, `AppState.tsx`, `MessageStatus.tsx`)**:
+  - Implemented `ReadReceiptManager` with debounced batch wire dispatching and inbound payload handling.
+  - Extended `DeliveryStatus` to include `READ` and `UPLOADING` states.
+  - Updated `MessageStatus.tsx` to provide clear 3-tier delivery ticks: Single Gray Check (Sent to Relay), Double Gray Checks (Delivered to Recipient), and Double Accent Checks (Read by Recipient).
+- **Non-Blocking File & Media Pipeline (`AppState.tsx`, `MessageComposer.tsx`, `ConversationView.tsx`)**:
+  - Instant preliminary message creation with local ephemeral preview URL and `UPLOADING` state.
+  - Background asynchronous chunking, XChaCha20-Poly1305 encryption, and Cloudflare R2 upload without freezing the composer or conversation.
+  - Non-blocking composer allowing uninterrupted text typing and multi-file queueing.
+- **Interactive Voice Note Scrubbing & Timing (`VoiceNoteCard.tsx`, `ConversationView.tsx`)**:
+  - Added pointer click & drag scrubbing across the waveform with real-time `seek()` execution without re-downloading audio.
+  - Added live `currentTime / totalDuration` timing display (e.g. `0:07 / 0:24`).
+- **Privacy-Preserving Presence Subsystem (`src/presence/presenceManager.ts`, `types.ts`, `SettingsModal.tsx`)**:
+  - Local-first activity tracking with 60s inactivity decay and browser lifecycle listeners.
+  - Fine-grained privacy controls: `nobody`, `contacts`, `everyone` with clean formatted status ("online", "last seen Xm ago", "last seen recently").
+- **Dedicated Phase 38 Test Suites (`tests/phase38-*.test.ts`)**:
+  - `phase38-unlock-performance.test.ts`: Validates async Argon2id derivation and multi-space unlock.
+  - `phase38-read-receipts.test.ts`: Validates delivery status progression and inbound receipt updating.
+  - `phase38-theme-and-presence.test.ts`: Validates presence privacy rules, activity decay, and subtitle formatting.
+  - `phase38-voice-seek-and-media.test.ts`: Validates voice player seeking and media cache operations.
+
+### Verification
+- 100% test pass rate across all test suites.
+- Native Android debug APK assembled cleanly via Gradle (`app-debug.apk`).
+- SHA-256 release manifest verified and updated.
+
 ## [1.0.0-phase37] - 2026-08-28
 
 ### Added

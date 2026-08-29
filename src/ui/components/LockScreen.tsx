@@ -1,18 +1,24 @@
 /**
- * Neutral Lock Screen Component for VEIL.
+ * VEIL Restrained Production Lock & Authentication Screen.
  *
  * Implements credential-selected Space unlocking without revealing existing
  * Space names or counts before authentication.
- * 100% SVG vector iconography and accessibility.
+ *
+ * Features:
+ * - 100% SVG vector iconography and accessible form controls.
+ * - Sub-100ms instant loading feedback with progressive state updates.
+ * - Zero decorative clutter, glows, or AI-style radial gradients.
+ * - Local-first encryption reassurance with zero secret leakage.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { PasswordInput } from './ui/PasswordInput.tsx';
 import { Button } from './ui/Button.tsx';
+import { Spinner } from './ui/Spinner.tsx';
 import {
-  ShieldIcon,
   LockIcon,
+  ShieldIcon,
   PlusIcon,
   RefreshCwIcon,
   AlertCircleIcon,
@@ -22,22 +28,34 @@ export const LockScreen: React.FC = () => {
   const { unlockSpace, openModal, panicLock, storageReady, storageError } = useApp();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<'idle' | 'deriving' | 'loading_data'>('idle');
+
+  // Progressive status message transitions while unlocking
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (loadingPhase === 'deriving') {
+      timer = setTimeout(() => {
+        setLoadingPhase('loading_data');
+      }, 400);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [loadingPhase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passphrase.trim() || isLoading) return;
+    if (!passphrase.trim() || loadingPhase !== 'idle') return;
 
     setError(null);
-    setIsLoading(true);
+    setLoadingPhase('deriving');
 
     try {
       await unlockSpace(passphrase);
     } catch (_err: any) {
-      setError('Invalid credentials or Space envelope not found.');
+      setError('Invalid passphrase or Space envelope not found.');
       setPassphrase('');
-    } finally {
-      setIsLoading(false);
+      setLoadingPhase('idle');
     }
   };
 
@@ -45,15 +63,17 @@ export const LockScreen: React.FC = () => {
     if (storageError) {
       return (
         <div className="veil-modal-overlay" style={{ background: 'var(--veil-bg-base)' }}>
-          <div className="veil-card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+          <div className="veil-card" style={{ maxWidth: '400px', width: '90%', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-              <AlertCircleIcon size={44} color="var(--veil-danger)" />
+              <AlertCircleIcon size={36} color="var(--veil-danger)" />
             </div>
-            <h2 style={{ fontSize: 'var(--veil-text-xl)', marginBottom: '0.5rem' }}>Storage Unavailable</h2>
+            <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600, marginBottom: '0.5rem' }}>
+              Storage Unavailable
+            </h2>
             <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1.25rem' }}>
               {storageError}
             </p>
-            <Button variant="danger" onClick={() => window.location.reload()}>
+            <Button variant="danger" onClick={() => window.location.reload()} fullWidth>
               Retry Initialization
             </Button>
           </div>
@@ -69,35 +89,26 @@ export const LockScreen: React.FC = () => {
           justifyContent: 'center',
           height: '100vh',
           width: '100vw',
-          background: 'radial-gradient(ellipse at top, #141b2d 0%, #090c13 100%)',
-          color: '#f8fafc',
+          backgroundColor: 'var(--veil-bg-base)',
+          color: 'var(--veil-text-primary)',
         }}
       >
-        <div className="veil-card-glass" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem', textAlign: 'center' }}>
-          <div
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: 'var(--veil-radius-lg)',
-              background: 'linear-gradient(135deg, var(--veil-accent-primary), #a855f7)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 0 24px var(--veil-accent-glow)',
-              marginBottom: '1rem',
-            }}
-          >
-            <ShieldIcon size={28} />
+        <div className="veil-card" style={{ width: '90%', maxWidth: '380px', padding: '2rem', textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+            <Spinner size="md" />
           </div>
-          <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600, marginBottom: '0.5rem' }}>Initializing VEIL</h2>
-          <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)' }}>
+          <h2 style={{ fontSize: 'var(--veil-text-base)', fontWeight: 600, marginBottom: '0.25rem' }}>
+            Initializing VEIL
+          </h2>
+          <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-xs)' }}>
             Securing isolated cryptographic partitions...
           </p>
         </div>
       </div>
     );
   }
+
+  const isLoading = loadingPhase !== 'idle';
 
   return (
     <div
@@ -107,48 +118,61 @@ export const LockScreen: React.FC = () => {
         justifyContent: 'center',
         minHeight: '100vh',
         width: '100vw',
-        background: 'radial-gradient(ellipse at top, #141b2d 0%, #090c13 100%)',
+        backgroundColor: 'var(--veil-bg-base)',
         padding: 'var(--veil-space-4)',
       }}
     >
-      <div className="veil-card-glass" style={{ width: '100%', maxWidth: '440px', padding: '2.5rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+      <div
+        className="veil-card"
+        style={{
+          width: '100%',
+          maxWidth: '390px',
+          padding: '2rem',
+          boxShadow: 'var(--veil-elevation-2)',
+          borderColor: 'var(--veil-border)',
+        }}
+      >
+        {/* Brand Header */}
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <div
             style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: 'var(--veil-radius-lg)',
-              background: 'linear-gradient(135deg, var(--veil-accent-primary), #a855f7)',
+              width: '44px',
+              height: '44px',
+              borderRadius: 'var(--veil-radius-md)',
+              backgroundColor: 'var(--veil-accent-primary-subtle)',
+              border: '1px solid var(--veil-accent-primary-alpha)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 0 24px var(--veil-accent-glow)',
-              marginBottom: '1rem',
+              color: 'var(--veil-accent-primary)',
+              marginBottom: '0.85rem',
             }}
           >
-            <ShieldIcon size={28} />
+            <ShieldIcon size={22} />
           </div>
           <h1
             style={{
-              fontSize: 'var(--veil-text-2xl)',
+              fontSize: '1.5rem',
               fontWeight: 700,
-              letterSpacing: '-0.03em',
-              background: 'linear-gradient(135deg, #f8fafc 0%, #a855f7 50%, #6366f1 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
+              color: 'var(--veil-text-primary)',
+              lineHeight: 1.2,
             }}
           >
             VEIL
           </h1>
-          <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginTop: '0.25rem' }}>
-            Privacy-First Multi-Space Messenger
+          <p
+            style={{
+              color: 'var(--veil-text-secondary)',
+              fontSize: 'var(--veil-text-xs)',
+              marginTop: '0.35rem',
+            }}
+          >
+            Unlock your encrypted Space
           </p>
-          <div style={{ marginTop: '0.5rem' }}>
-            <span className="veil-badge veil-badge-secure">End-to-End Encrypted</span>
-          </div>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1.25rem' }}>
             <label
@@ -159,8 +183,7 @@ export const LockScreen: React.FC = () => {
                 fontWeight: 600,
                 color: 'var(--veil-text-secondary)',
                 marginBottom: '0.5rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+                letterSpacing: '0.03em',
               }}
             >
               Enter Space Passphrase / PIN
@@ -179,18 +202,22 @@ export const LockScreen: React.FC = () => {
           {error && (
             <div
               style={{
-                padding: '0.65rem',
-                backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid var(--veil-danger)',
-                borderRadius: 'var(--veil-radius-md)',
+                padding: '0.65rem 0.85rem',
+                backgroundColor: 'var(--veil-danger-bg)',
+                border: '1px solid var(--veil-danger-border)',
+                borderRadius: 'var(--veil-radius-sm)',
                 color: 'var(--veil-danger)',
                 fontSize: 'var(--veil-text-xs)',
-                textAlign: 'center',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
                 marginBottom: '1.25rem',
               }}
               role="alert"
             >
-              {error}
+              <AlertCircleIcon size={16} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
             </div>
           )}
 
@@ -202,40 +229,53 @@ export const LockScreen: React.FC = () => {
             loading={isLoading}
             disabled={isLoading || !passphrase.trim()}
           >
-            <LockIcon size={18} />
-            <span>{isLoading ? 'Deriving Keys & Unlocking...' : 'Unlock Space'}</span>
+            {isLoading ? (
+              <span>
+                {loadingPhase === 'deriving'
+                  ? 'Deriving Keys...'
+                  : 'Preparing Secure Space...'}
+              </span>
+            ) : (
+              <>
+                <LockIcon size={17} />
+                <span>Unlock Space</span>
+              </>
+            )}
           </Button>
         </form>
 
+        {/* Secondary Actions */}
         <div
           style={{
             marginTop: '1.5rem',
             paddingTop: '1.25rem',
-            borderTop: '1px solid var(--veil-border-subtle)',
+            borderTop: '1px solid var(--veil-divider)',
             display: 'flex',
-            gap: '0.5rem',
-            justifyContent: 'space-between',
             alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.5rem',
           }}
         >
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => openModal({ type: 'createSpace' })}
+            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
           >
-            <PlusIcon size={16} />
+            <PlusIcon size={14} />
             <span>New Space</span>
           </Button>
 
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="sm"
             onClick={() => openModal({ type: 'restoreAccount' })}
+            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
             title="Restore Account on Fresh Device"
           >
-            <RefreshCwIcon size={16} />
+            <RefreshCwIcon size={14} />
             <span>Restore</span>
           </Button>
 
@@ -244,10 +284,28 @@ export const LockScreen: React.FC = () => {
             variant="danger"
             size="sm"
             onClick={panicLock}
+            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
             title="Instant Memory Wipe"
           >
             <span>Panic</span>
           </Button>
+        </div>
+
+        {/* Local Security Assurance */}
+        <div
+          style={{
+            marginTop: '1.25rem',
+            textAlign: 'center',
+            fontSize: '11px',
+            color: 'var(--veil-text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+          }}
+        >
+          <LockIcon size={12} color="var(--veil-text-muted)" />
+          <span>Locally encrypted with Argon2id &amp; XChaCha20</span>
         </div>
       </div>
     </div>

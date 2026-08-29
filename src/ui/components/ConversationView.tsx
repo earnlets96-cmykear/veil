@@ -78,6 +78,7 @@ export const ConversationView: React.FC = () => {
     ensureCloudSession,
     setReplyTarget,
     deleteMessageLocally,
+    markConversationAsRead,
   } = useApp();
 
   const { showToast } = useToast();
@@ -159,8 +160,16 @@ export const ConversationView: React.FC = () => {
     }
   }, [activeChatId, activeMessages.length]);
 
-  // Track playback progress per message
+  // Automatically mark conversation as read when active
+  useEffect(() => {
+    if (activeChatId && activeConversation && (activeConversation.unreadCount || 0) > 0) {
+      markConversationAsRead(activeChatId);
+    }
+  }, [activeChatId, activeConversation?.unreadCount, markConversationAsRead]);
+
+  // Track playback progress & current time per message
   const [playbackProgress, setPlaybackProgress] = useState<Record<string, number>>({});
+  const [playbackCurrentTime, setPlaybackCurrentTime] = useState<Record<string, number>>({});
 
   // Handle Voice Note Playback
   const handleToggleVoice = async (msg: UIMessage) => {
@@ -180,22 +189,26 @@ export const ConversationView: React.FC = () => {
 
       setPlayingAudioId(msg.id);
       await VoicePlayer.playVoiceNote(activeSession, cloudClient, msg.voice, msg.id, {
-        onProgress: (percent) => {
+        onProgress: (percent, currentTime) => {
           setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
+          setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: currentTime }));
         },
         onEnded: () => {
           setPlayingAudioId(null);
           setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+          setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
         },
         onError: (err) => {
           setPlayingAudioId(null);
           setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+          setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
           showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
         },
       });
     } catch (err: any) {
       setPlayingAudioId(null);
       setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+      setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
       showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
     }
   };
@@ -449,13 +462,13 @@ export const ConversationView: React.FC = () => {
                 <div className="veil-header-title">{conversationName}</div>
                 <div className="veil-header-subtitle">
                   {isGroup ? (
-                    'Group • Encrypted'
+                    'Group • End-to-End Encrypted'
                   ) : activeContact?.verificationStatus === 'MISMATCH' ? (
                     <span style={{ color: 'var(--veil-danger)' }}>Key Changed</span>
                   ) : activeContact?.verificationStatus === 'VERIFIED' || activeConversation?.isVerified ? (
                     <span style={{ color: 'var(--veil-success)' }}>Encrypted • Verified ✓</span>
                   ) : (
-                    'Encrypted • Private'
+                    'End-to-End Encrypted'
                   )}
                 </div>
               </div>
@@ -605,14 +618,17 @@ export const ConversationView: React.FC = () => {
                     {msg.voice && (
                       <VoiceNoteCard
                         durationSeconds={msg.voice.durationSeconds}
+                        currentTimeSeconds={playbackCurrentTime[msg.id] || 0}
                         playbackState={playingAudioId === msg.id ? 'playing' : 'idle'}
                         currentProgressPercent={playbackProgress[msg.id] || 0}
                         onPlayToggle={() => handleToggleVoice(msg)}
                         onSeek={(percent) => {
-                          if (playingAudioId === msg.id) {
-                            VoicePlayer.seek(percent);
-                            setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
-                          }
+                          VoicePlayer.seek(percent);
+                          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
+                          setPlaybackCurrentTime((prev) => ({
+                            ...prev,
+                            [msg.id]: (percent / 100) * (msg.voice?.durationSeconds || 1),
+                          }));
                         }}
                       />
                     )}

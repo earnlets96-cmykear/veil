@@ -626,12 +626,12 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: var(--veil-conv-item-padding, 0.75rem);
   border-radius: var(--veil-radius-md);
   cursor: pointer;
   transition: background-color var(--veil-duration-fast) var(--veil-easing-standard);
   user-select: none;
-  min-height: 56px;
+  min-height: var(--veil-conv-item-height, 56px);
 }
 
 .veil-conversation-item:hover {
@@ -788,7 +788,7 @@ body {
   padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--veil-msg-gap, 0.4rem);
   background-color: var(--veil-bg-base);
   width: 100%;
   box-sizing: border-box;
@@ -835,9 +835,9 @@ body {
 .veil-message-bubble {
   max-width: 100%;
   width: fit-content;
-  padding: 0.55rem 0.8rem;
+  padding: var(--veil-msg-padding-y, 0.55rem) var(--veil-msg-padding-x, 0.8rem);
   border-radius: var(--veil-radius-lg);
-  font-size: var(--veil-text-sm);
+  font-size: var(--veil-msg-font-size, var(--veil-text-sm));
   line-height: 1.4;
   position: relative;
   word-break: break-word;
@@ -848,15 +848,15 @@ body {
 
 .veil-message-row.outgoing .veil-message-bubble,
 .veil-message-bubble.outgoing {
-  background-color: var(--veil-accent-primary);
-  color: #ffffff;
+  background-color: var(--veil-bubble-outgoing, var(--veil-accent-primary));
+  color: var(--veil-bubble-outgoing-text, #ffffff);
   border-bottom-right-radius: 4px;
 }
 
 .veil-message-row.incoming .veil-message-bubble,
 .veil-message-bubble.incoming {
-  background-color: var(--veil-bg-surface-elevated);
-  color: var(--veil-text-primary);
+  background-color: var(--veil-bubble-incoming, var(--veil-bg-surface-elevated));
+  color: var(--veil-bubble-incoming-text, var(--veil-text-primary));
   border: 1px solid var(--veil-border);
   border-bottom-left-radius: 4px;
 }

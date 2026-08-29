@@ -1,34 +1,39 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-08-28T23:16:00.385Z",
+  "generatedAt": "2026-08-29T08:53:10.594Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
-  "totalArtifacts": 5,
+  "totalArtifacts": 6,
   "artifacts": [
     {
-      "path": "dist/assets/index-CXOJZzwH.js",
-      "sizeBytes": 550605,
-      "sha256": "278d1f72cc54a744282532447259ff6405be8e75be023ea9ee69bf34003553b0"
+      "path": "dist/assets/index-B7mYVjhJ.js",
+      "sizeBytes": 558161,
+      "sha256": "5d3fa36aee336842509eaade634e06f20158d240fb0c403e09d72a7729f8231b"
     },
     {
-      "path": "dist/assets/index-hZr3JTD0.css",
-      "sizeBytes": 55610,
-      "sha256": "12ab0b43b68218bc9582480d685099d7709220810ceb3930bbf0a50ef156a86d"
+      "path": "dist/assets/index-pDd_voqr.css",
+      "sizeBytes": 65790,
+      "sha256": "93174738286e937a6913842339f431c58df0e4deb086281de2f860e7b27f2642"
     },
     {
-      "path": "dist/assets/web-D2b43k21.js",
-      "sizeBytes": 361,
-      "sha256": "95adda5b5a5263ec5f5fd1d2f1a2acc2b9c68758deb618cb2aec5c068c3e1c39"
+      "path": "dist/assets/kdfWorker-BwQiA9Kx.js",
+      "sizeBytes": 13048,
+      "sha256": "971bd75697290f8aac93f60ced8fb036b8a3e51ece317eee344a764b344bcaa5"
     },
     {
-      "path": "dist/assets/web-Dx8ScAxX.js",
+      "path": "dist/assets/web-BqmSkVMc.js",
       "sizeBytes": 8728,
-      "sha256": "c56ba27d9ee586967f67a8aa07ad53601bdef3f7235c1e550bdcb68e98608752"
+      "sha256": "4a758442fbe5aa5f0d84d9d2677bd23dce9f4591f0a1f31bdf6de5b22f57ffa1"
+    },
+    {
+      "path": "dist/assets/web-BL4uPOZg.js",
+      "sizeBytes": 361,
+      "sha256": "fff8a3a4967e7da616cd3048ac6501da0fb20700c0c3e14f2fa73f17d1692411"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "9e44f2c593251a1c9610c06bbe18e63a2758b0e7fbd309231a916e3242d73138"
+      "sha256": "5291068797067e44595f90e2b9f85339c5aa2593cf07c84e9bafb9e27a7b2c22"
     }
   ]
 }

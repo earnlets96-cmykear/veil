@@ -63,8 +63,8 @@ export class SessionController {
    * Unlocks a Space using credential-selected envelope authentication.
    */
   public async unlock(passphrase: string): Promise<SpaceSession> {
-    // 1. Unlock session via SpaceVaultManager
-    const session = this.vault.unlockSpace(passphrase);
+    // 1. Unlock session via SpaceVaultManager (async to keep UI responsive)
+    const session = await this.vault.unlockSpaceAsync(passphrase);
 
     // 2. Load persisted encrypted partition from storage adapter
     await this.store.loadPartitionFromStorage(session);

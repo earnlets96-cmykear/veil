@@ -64,6 +64,8 @@ import { DirectorySearchResult } from '../../server/types.ts';
 export interface UserPrivacySettings {
   phoneVisibility: 'nobody' | 'contacts' | 'everyone';
   profileVisibility: 'nobody' | 'contacts' | 'everyone';
+  lastSeenVisibility?: 'nobody' | 'contacts' | 'everyone';
+  readReceiptsEnabled?: boolean;
   phoneNumber?: string;
   bio?: string;
   avatar?: string;

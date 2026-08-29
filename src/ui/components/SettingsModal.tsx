@@ -91,9 +91,39 @@ export const SettingsModal: React.FC = () => {
   const [notifLevel, setNotifLevel] = useState<NotificationPrivacyMode>(notificationDispatcher.getPrivacyMode());
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showPairingSas, setShowPairingSas] = useState(false);
-  const [themeVal, setThemeVal] = useState('onyx-dark');
-  const [densityVal, setDensityVal] = useState('normal');
+  const [themeVal, setThemeVal] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') || 'obsidian';
+    }
+    return 'obsidian';
+  });
+  const [densityVal, setDensityVal] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-density') || 'comfortable';
+    }
+    return 'comfortable';
+  });
   const [cacheCleared, setCacheCleared] = useState(false);
+
+  const handleSelectTheme = (themeId: string) => {
+    setThemeVal(themeId);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', themeId);
+    }
+    try {
+      localStorage.setItem('veil:theme', themeId);
+    } catch (_e) {}
+  };
+
+  const handleSelectDensity = (densityId: string) => {
+    setDensityVal(densityId);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-density', densityId);
+    }
+    try {
+      localStorage.setItem('veil:density', densityId);
+    } catch (_e) {}
+  };
 
   const [devices] = useState<{ id: string; name: string; lastSeen: number }[]>([
     { id: 'dev_primary', name: 'Primary Device (This Client)', lastSeen: Date.now() },
@@ -591,22 +621,28 @@ export const SettingsModal: React.FC = () => {
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
                   Theme
                 </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '1rem' }}>
+                  Choose your visual interface style. Applies instantly across all Spaces.
+                </p>
                 <div className="veil-theme-grid">
                   {[
-                    { id: 'onyx-dark', name: 'Onyx Dark', color: '#0b0e14' },
-                    { id: 'slate-dark', name: 'Slate Dark', color: '#0f172a' },
-                    { id: 'obsidian', name: 'Obsidian Black', color: '#000000' },
-                    { id: 'cyberpunk', name: 'Cyberpunk Neon', color: '#080811' },
+                    { id: 'obsidian', name: 'Obsidian', color: '#0c0c0e', desc: 'Warm dark neutral' },
+                    { id: 'slate', name: 'Slate', color: '#0f1219', desc: 'Cool dark blue-gray' },
+                    { id: 'light', name: 'Light', color: '#f5f5f7', desc: 'Clean minimal light' },
+                    { id: 'midnight', name: 'Midnight', color: '#0a0e18', desc: 'Deep blue-black' },
+                    { id: 'graphite', name: 'Graphite', color: '#121212', desc: 'Neutral charcoal' },
                   ].map((t) => (
                     <div
                       key={t.id}
                       className={`veil-theme-card ${themeVal === t.id ? 'active' : ''}`}
-                      onClick={() => setThemeVal(t.id)}
+                      onClick={() => handleSelectTheme(t.id)}
                       role="button"
                       tabIndex={0}
+                      aria-label={`Select ${t.name} theme`}
                     >
-                      <div className="veil-theme-swatch" style={{ background: t.color }} />
-                      <div className="veil-theme-name">{t.name}</div>
+                      <div className="veil-theme-swatch" style={{ background: t.color, border: '1px solid var(--veil-border)' }} />
+                      <div className="veil-theme-name" style={{ fontWeight: 600 }}>{t.name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--veil-text-muted)', marginTop: '2px' }}>{t.desc}</div>
                     </div>
                   ))}
                 </div>
@@ -616,14 +652,18 @@ export const SettingsModal: React.FC = () => {
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
                   Message Density
                 </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  Adjust padding and bubble sizing in conversation timelines.
+                </p>
                 <select
                   value={densityVal}
-                  onChange={(e) => setDensityVal(e.target.value)}
+                  onChange={(e) => handleSelectDensity(e.target.value)}
                   className="veil-select"
+                  aria-label="Message density selector"
                 >
-                  <option value="compact">Compact</option>
-                  <option value="normal">Normal (Default)</option>
-                  <option value="spacious">Spacious</option>
+                  <option value="compact">Compact (High Information Density)</option>
+                  <option value="comfortable">Comfortable (Default)</option>
+                  <option value="spacious">Spacious (Relaxed Touch Target Layout)</option>
                 </select>
               </div>
             </div>

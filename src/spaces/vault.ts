@@ -6,7 +6,7 @@
 
 import { randomBytes, bytesToBase64, base64ToBytes } from '../crypto/utils.ts';
 import { zeroize } from '../crypto/memory.ts';
-import { deriveKeyArgon2id, DEFAULT_KDF_PARAMS } from '../crypto/kdf.ts';
+import { deriveKeyArgon2id, deriveKeyArgon2idAsync, DEFAULT_KDF_PARAMS } from '../crypto/kdf.ts';
 import { encryptXChaCha20Poly1305, decryptXChaCha20Poly1305 } from '../crypto/aead.ts';
 import { SpaceSession } from './session.ts';
 import { validateSpaceEnvelope, computeEnvelopeAad, CURRENT_ENVELOPE_VERSION } from './envelope.ts';
@@ -186,6 +186,64 @@ export class SpaceVaultManager {
     }
 
     // Generic safe error
+    throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
+  }
+
+  /**
+   * Async version of unlockSpace that runs Argon2id in a Web Worker
+   * to prevent UI thread blocking. Falls back to synchronous derivation
+   * if Workers are unavailable.
+   */
+  public async unlockSpaceAsync(password: string, targetSpaceId?: string): Promise<SpaceSession> {
+    if (!password || password.length === 0) {
+      throw new Error('Unable to unlock Space: empty password');
+    }
+
+    const candidateEnvelopes = targetSpaceId
+      ? (this.envelopes.has(targetSpaceId) ? [this.envelopes.get(targetSpaceId)!] : [])
+      : Array.from(this.envelopes.values());
+
+    if (candidateEnvelopes.length === 0) {
+      throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
+    }
+
+    for (const envelope of candidateEnvelopes) {
+      let candidateKek: Uint8Array | null = null;
+      let decryptedSmk: Uint8Array | null = null;
+
+      try {
+        validateSpaceEnvelope(envelope);
+        candidateKek = await deriveKeyArgon2idAsync(password, envelope.kdfParams.salt, envelope.kdfParams);
+
+        const nonceBytes = base64ToBytes(envelope.encryptedMasterKey.nonce);
+        const ciphertextBytes = base64ToBytes(envelope.encryptedMasterKey.ciphertext);
+
+        const aad = computeEnvelopeAad(
+          envelope.spaceId,
+          envelope.version,
+          envelope.encryptedMasterKey.algorithm,
+          envelope.kdfParams.salt
+        );
+
+        decryptedSmk = decryptXChaCha20Poly1305(candidateKek, nonceBytes, ciphertextBytes, aad);
+
+        const session = new SpaceSession(
+          envelope.spaceId,
+          envelope.name,
+          envelope.isDecoy,
+          decryptedSmk
+        );
+
+        this.activeSessions.set(envelope.spaceId, session);
+        return session;
+      } catch (_err) {
+        continue;
+      } finally {
+        if (candidateKek) zeroize(candidateKek);
+        if (decryptedSmk) zeroize(decryptedSmk);
+      }
+    }
+
     throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
   }
 

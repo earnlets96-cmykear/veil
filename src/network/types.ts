@@ -19,8 +19,10 @@ export type NetworkState =
 export type DeliveryStatus =
   | 'QUEUED'
   | 'SENDING'
+  | 'UPLOADING'
   | 'SENT_TO_RELAY'
   | 'DELIVERED_TO_RECIPIENT'
+  | 'READ'
   | 'PROCESSING'
   | 'PROCESSED'
   | 'FAILED';

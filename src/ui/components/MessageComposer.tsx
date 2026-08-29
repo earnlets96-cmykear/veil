@@ -81,21 +81,18 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Confirm sending staged files
+  // Confirm sending staged files (non-blocking)
   const handleConfirmSendFiles = async (filesToSend: File[], caption?: string) => {
     setStagedFiles(null);
-    setIsSending(true);
     try {
       for (const file of filesToSend) {
-        await sendAttachment(conversationId, file);
+        sendAttachment(conversationId, file);
       }
       if (caption && caption.trim()) {
         await sendMessage(conversationId, caption.trim());
       }
     } catch (_err) {
-      // Enqueued in offline queue
-    } finally {
-      setIsSending(false);
+      // Background queue preserves messages
     }
   };
 
