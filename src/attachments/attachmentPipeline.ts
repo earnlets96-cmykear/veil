@@ -28,9 +28,10 @@ export class AttachmentPipeline {
     name: string,
     mimeType: string,
     encryptionKey: Uint8Array,
-    chunkSize = DEFAULT_CHUNK_SIZE
+    chunkSize = DEFAULT_CHUNK_SIZE,
+    existingAttachmentId?: string
   ): { metadata: AttachmentMetadata; chunks: EncryptedAttachmentChunk[] } {
-    const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
+    const attachmentId = existingAttachmentId || `att_${bytesToHex(randomBytes(8))}`;
     const totalBytes = data.length;
     const chunkCount = Math.max(1, Math.ceil(totalBytes / chunkSize));
     const fullHash = bytesToHex(sha256(data));

@@ -41,16 +41,16 @@
 | **Phase 36** | Physical Android Fixes + True Mobile UI Rebuild + Persistent Media + Permissions + Search Stability | **COMPLETED & VERIFIED** | Rebuilt mobile-first layout architecture eliminating split-pane leaks and empty-state bleeds; hardened `MediaCache` and `MediaImage` against ephemeral dead-blob URLs, rehydrating encrypted ciphertext from cloud R2 on restart; added `RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS` to `AndroidManifest.xml` with human-centered `PermissionsModal`; resolved `undefined.find` search crash in `Sidebar.tsx` and `relationshipHelper.ts`; eliminated 100% of Unicode emoji icons in UI controls; rebuilt message composer and photo bubble sizing; verified 256 test files (651 tests, 100% pass) and compiled Android debug APK (4.52 MB). |
 | **Phase 37** | Real Android UI Repair, Voice Playback Fix, Media Reliability & Production-Grade Mobile Layout | **COMPLETED & VERIFIED** | Fixed `ml.playvoicenote is not a function` by building dedicated `VoicePlayer` / `VoicePlaybackManager` for AEAD decrypted audio playback with real-time waveform progress; rebuilt mobile layout geometry fixing title/time wrapping; fixed photo bubble collapse; streamlined mobile composer; 100% test pass (263/263 files, 681/681 tests); native Android debug APK compiled in 22s (4.37 MB). |
 | **Phase 38** | Product-Quality UI, Performance & Messaging UX Overhaul | **COMPLETED & VERIFIED** | 5-theme tokenized design system (Obsidian, Slate, Light, Midnight, Graphite) & 3 message densities; Web Worker background Argon2id KDF eliminating main-thread UI unlock freeze with sub-100ms response; true E2EE Read Receipts with 3-tier checks (Sent / Delivered / Read) & debounced wire dispatch; non-blocking background file/media upload pipeline with immediate preview; interactive voice note click/drag waveform scrubbing with live current/total timers; privacy-preserving presence subsystem (nobody/contacts/everyone); 100% SVG iconography with zero AI clutter; all test suites passing; native Android APK verified. |
+| **Phase 39** | Forensic Media Pipeline, Real Audio Seek, Account Recovery & State-Machine Repair | **COMPLETED & ACCEPTED** | Fixed attachment objectId/attachmentId loss with upfront deterministic ID generation & state-machine transitions (`QUEUED` $\rightarrow$ `UPLOADING` $\rightarrow$ `PROCESSING` $\rightarrow$ `SENT` / `FAILED`); eliminated permanent "Decrypting" hang via 30s timeout bounding in `MediaCache` & structured retry error boundary; built hardened cross-platform Base64 & Base64URL codec system in `utils.ts` handling unpadded/URL-safe inputs without `atob` window crashes; fixed zero-knowledge account recovery authentication mismatch on fresh installs; connected real clamped waveform audio seeking in `VoicePlayer` & `VoiceNoteCard` with pointer capture; 100% test pass across all 277 test files (735/735 tests); native Android debug APK compiled cleanly in 18s. |
 
 ---
 
 ## 2. Quantitative Verification Metrics
 
-- **Release Version**: **`1.0.0` (Product-Quality UI, Performance & Messaging UX Overhaul)**
-- **Total Test Files**: **267 / 267 passed (100% pass rate)**
-- **Total Tests**: **696 / 696 passed (0 failures, 0 skipped)**
-- **Live Smoke Test**: **16 / 16 passed (100% pass rate on live Render backend)**
-- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (verified clean Gradle build)**
-- **Release Build Status**: `npm run build` succeeds cleanly (`dist/` created, Web Worker chunk generated, SHA-256 release manifest verified)
-- **Android Build Status**: `cmd /c "cd android && gradlew.bat assembleDebug"` succeeds cleanly (`app-debug.apk` generated)
+- **Release Version**: **`1.0.0` (Forensic Media Pipeline, Real Audio Seek, Account Recovery & State-Machine Repair)**
+- **Total Test Files**: **277 / 277 passed (100% pass rate)**
+- **Total Tests**: **735 / 735 passed (0 failures, 0 skipped)**
+- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (verified clean Gradle build in 18s)**
+- **Release Build Status**: `npm run build` succeeds cleanly (`dist/` created in 1.72s)
+- **Capacitor Sync**: `npx cap sync android` succeeds cleanly in 0.28s
 - **Working Tree**: Clean, verified, documented.

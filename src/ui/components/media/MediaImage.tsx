@@ -27,11 +27,17 @@ export const MediaImage: React.FC<MediaImageProps> = ({
 }) => {
   const { activeSession, cloudClient, ensureCloudSession } = useApp();
   const key = attachment.objectId || attachment.attachmentId || attachment.name;
-  
+
   const [media, setMedia] = useState<DecryptedMedia | null>(() => {
-    return MediaCache.get(key) || null;
+    return (
+      MediaCache.get(key) ||
+      (attachment.objectId ? MediaCache.get(attachment.objectId) : undefined) ||
+      (attachment.attachmentId ? MediaCache.get(attachment.attachmentId) : undefined) ||
+      null
+    );
   });
-  const [isLoading, setIsLoading] = useState(!media);
+
+  const [isLoading, setIsLoading] = useState(!media && !attachment.previewUrl);
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
 
@@ -42,55 +48,73 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     };
   }, []);
 
-  const fetchAndDecrypt = useCallback(async (forceRetry = false) => {
-    if (!activeSession) return;
-    if (forceRetry) {
-      MediaCache.invalidate(key);
-    }
-
-    if (isMountedRef.current) {
-      setIsLoading(true);
-      setError(null);
-    }
-
-    try {
-      if (!cloudClient.getSessionToken()) {
-        await ensureCloudSession(activeSession);
+  const fetchAndDecrypt = useCallback(
+    async (forceRetry = false) => {
+      if (!activeSession) return;
+      if (forceRetry) {
+        MediaCache.invalidate(key);
+        if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
+        if (attachment.attachmentId) MediaCache.invalidate(attachment.attachmentId);
       }
 
-      const result = await MediaCache.getOrFetch(attachment, activeSession, cloudClient);
       if (isMountedRef.current) {
-        setMedia(result);
-        setIsLoading(false);
+        setIsLoading(true);
+        setError(null);
       }
-    } catch (err: any) {
-      if (isMountedRef.current) {
-        setError(err?.message || 'Media unavailable');
-        setIsLoading(false);
+
+      try {
+        if (!cloudClient.getSessionToken()) {
+          await ensureCloudSession(activeSession);
+        }
+
+        const result = await MediaCache.getOrFetch(attachment, activeSession, cloudClient);
+        if (isMountedRef.current) {
+          setMedia(result);
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+        if (isMountedRef.current) {
+          setError(err?.message || 'Media unavailable');
+          setIsLoading(false);
+        }
       }
-    }
-  }, [activeSession, cloudClient, ensureCloudSession, key, attachment]);
+    },
+    [activeSession, cloudClient, ensureCloudSession, key, attachment]
+  );
 
   useEffect(() => {
-    const cached = MediaCache.get(key);
+    const cached =
+      MediaCache.get(key) ||
+      (attachment.objectId ? MediaCache.get(attachment.objectId) : undefined) ||
+      (attachment.attachmentId ? MediaCache.get(attachment.attachmentId) : undefined);
+
     if (cached) {
       setMedia(cached);
       setIsLoading(false);
       return;
     }
 
-    fetchAndDecrypt();
-  }, [key, fetchAndDecrypt]);
+    if (attachment.objectId || attachment.attachmentId) {
+      fetchAndDecrypt();
+    } else if (!attachment.previewUrl) {
+      setError('Attachment lacks objectId or attachmentId for cloud retrieval');
+      setIsLoading(false);
+    }
+  }, [key, attachment.objectId, attachment.attachmentId, attachment.previewUrl, fetchAndDecrypt]);
 
   // Handle broken/stale blob image load failure
   const handleImageError = () => {
     if (isMountedRef.current) {
       MediaCache.invalidate(key);
+      if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
+      if (attachment.attachmentId) MediaCache.invalidate(attachment.attachmentId);
       fetchAndDecrypt(true);
     }
   };
 
-  if (isLoading) {
+  const displayBlobUrl = media?.blobUrl || attachment.previewUrl;
+
+  if (isLoading && !displayBlobUrl) {
     return (
       <div
         className={`veil-media-thumbnail-loading ${className}`.trim()}
@@ -106,11 +130,11 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     );
   }
 
-  if (error || !media) {
+  if (error && !displayBlobUrl) {
     return (
       <div className={`veil-media-thumbnail-error ${className}`.trim()} role="alert">
         <AlertCircleIcon size={22} color="var(--veil-danger)" />
-        <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
+        <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginTop: '2px', textAlign: 'center' }}>
           {error || 'Media unavailable'}
         </span>
         <button
@@ -140,13 +164,17 @@ export const MediaImage: React.FC<MediaImageProps> = ({
         }
       }}
     >
-      <img
-        src={media.blobUrl}
-        alt={alt || attachment.name}
-        className="veil-media-thumbnail-img"
-        loading="lazy"
-        onError={handleImageError}
-      />
+      {displayBlobUrl ? (
+        <img
+          src={displayBlobUrl}
+          alt={alt || attachment.name}
+          className="veil-media-thumbnail-img"
+          loading="lazy"
+          onError={handleImageError}
+        />
+      ) : (
+        <div className="veil-media-skeleton-pulse" />
+      )}
 
       {isVideo && (
         <div className="veil-media-play-badge" aria-hidden="true">

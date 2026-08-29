@@ -20,7 +20,8 @@ export class VoicePlaybackManager {
   private currentAudio: HTMLAudioElement | null = null;
   private currentBlobUrl: string | null = null;
   private currentPlayingId: string | null = null;
-  private timeUpdateInterval: any = null;
+  private activeCallbacks: VoicePlaybackCallbacks | null = null;
+  private currentDuration: number = 0;
 
   public getPlayingId(): string | null {
     return this.currentPlayingId;
@@ -34,6 +35,17 @@ export class VoicePlaybackManager {
     return !this.currentAudio.paused && !this.currentAudio.ended;
   }
 
+  public getCurrentTime(): number {
+    return this.currentAudio ? this.currentAudio.currentTime || 0 : 0;
+  }
+
+  public getDuration(): number {
+    if (this.currentAudio && this.currentAudio.duration && !isNaN(this.currentAudio.duration) && isFinite(this.currentAudio.duration)) {
+      return this.currentAudio.duration;
+    }
+    return this.currentDuration || 0;
+  }
+
   /**
    * Downloads ciphertext from cloud storage, decrypts locally, and starts playback.
    */
@@ -44,6 +56,9 @@ export class VoicePlaybackManager {
     messageId: string,
     callbacks: VoicePlaybackCallbacks = {}
   ): Promise<void> {
+    this.activeCallbacks = callbacks;
+    this.currentDuration = meta.durationSeconds || 0;
+
     // If already playing this message, resume or do nothing
     if (this.currentPlayingId === messageId && this.currentAudio) {
       if (this.currentAudio.paused) {
@@ -54,6 +69,8 @@ export class VoicePlaybackManager {
 
     // Stop any existing playback and clean up previous object URLs
     this.stop();
+    this.activeCallbacks = callbacks;
+    this.currentDuration = meta.durationSeconds || 0;
 
     try {
       this.currentPlayingId = messageId;
@@ -84,6 +101,12 @@ export class VoicePlaybackManager {
       }
       this.currentAudio = audio;
 
+      audio.onloadedmetadata = () => {
+        if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+          this.currentDuration = audio.duration;
+        }
+      };
+
       audio.onended = () => {
         this.stop();
         if (callbacks.onEnded) callbacks.onEnded();
@@ -96,10 +119,11 @@ export class VoicePlaybackManager {
       };
 
       audio.ontimeupdate = () => {
-        if (!audio.duration || isNaN(audio.duration)) return;
-        const percent = Math.min(100, Math.max(0, (audio.currentTime / audio.duration) * 100));
+        const duration = this.getDuration() || meta.durationSeconds || 1;
+        if (!duration || isNaN(duration)) return;
+        const percent = Math.min(100, Math.max(0, (audio.currentTime / duration) * 100));
         if (callbacks.onProgress) {
-          callbacks.onProgress(percent, audio.currentTime, audio.duration);
+          callbacks.onProgress(percent, audio.currentTime, duration);
         }
       };
 
@@ -126,9 +150,18 @@ export class VoicePlaybackManager {
    * Seeks playback position to a percentage (0 - 100).
    */
   public seek(percent: number): void {
-    if (this.currentAudio && this.currentAudio.duration && !isNaN(this.currentAudio.duration)) {
-      const targetTime = (Math.max(0, Math.min(100, percent)) / 100) * this.currentAudio.duration;
-      this.currentAudio.currentTime = targetTime;
+    const clampedPercent = Math.max(0, Math.min(100, isNaN(percent) ? 0 : percent));
+    const duration = this.getDuration() || 1;
+    const targetTime = (clampedPercent / 100) * duration;
+
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.currentTime = targetTime;
+      } catch (_e) {}
+    }
+
+    if (this.activeCallbacks?.onProgress) {
+      this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
     }
   }
 
@@ -136,11 +169,6 @@ export class VoicePlaybackManager {
    * Stops active playback and revokes ephemeral audio blob URLs.
    */
   public stop(): void {
-    if (this.timeUpdateInterval) {
-      clearInterval(this.timeUpdateInterval);
-      this.timeUpdateInterval = null;
-    }
-
     if (this.currentAudio) {
       try {
         this.currentAudio.pause();
@@ -158,6 +186,8 @@ export class VoicePlaybackManager {
     }
 
     this.currentPlayingId = null;
+    this.activeCallbacks = null;
+    this.currentDuration = 0;
   }
 }
 

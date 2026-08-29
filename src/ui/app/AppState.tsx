@@ -200,7 +200,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const identity = idMgr.loadIdentity(session, store);
       const storedProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
       const username = (storedProfile?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${session.spaceId.slice(0, 8)}`).replace(/^@/, '');
-      const authPassword = bytesToHex(sha256(session.getMasterKey()));
+      const authPassword = explicitPassword || (savedCloudSession?.authPassword) || bytesToHex(sha256(session.getMasterKey()));
       const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
 
       try {
@@ -220,13 +220,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             deviceId: logRes.device.deviceId,
             expiresAt: logRes.session.expiresAt,
             username: username.toLowerCase(),
+            authPassword: explicitPassword ? authPassword : savedCloudSession?.authPassword,
           });
           await syncCurrentSpace(logRes.account.accountId);
 
-          // Push zero-knowledge recovery vault for this session
-          try {
-            await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
-          } catch (_vErr) {}
+          if (explicitPassword) {
+            try {
+              await accountManager.createOrUpdateRecoveryVault(session, explicitPassword, username);
+            } catch (_vErr) {}
+          }
 
           return true;
         }
@@ -248,13 +250,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               deviceId: regRes.device.deviceId,
               expiresAt: regRes.session.expiresAt,
               username: username.toLowerCase(),
+              authPassword: explicitPassword ? authPassword : savedCloudSession?.authPassword,
             });
             await syncCurrentSpace(regRes.account.accountId);
 
-            // Push zero-knowledge recovery vault for this session
-            try {
-              await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
-            } catch (_vErr) {}
+            if (explicitPassword) {
+              try {
+                await accountManager.createOrUpdateRecoveryVault(session, explicitPassword, username);
+              } catch (_vErr) {}
+            }
 
             return true;
           }
@@ -723,7 +727,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setActiveSession(session);
       await loadSpaceData(session);
       const username = name.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${session.spaceId.slice(0, 8)}`;
-      await ensureCloudSession(session);
+      await ensureCloudSession(session, false, passphrase);
       await accountManager.createOrUpdateRecoveryVault(session, passphrase, username);
     } catch (_e) {}
   }, [ensureCloudSession, loadSpaceData]);
@@ -939,6 +943,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
+
       const activeReply = replyTarget ? {
         messageId: replyTarget.id,
         senderName: replyTarget.senderName || replyTarget.senderId,
@@ -957,10 +963,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       const initialAttachmentPayload = {
+        attachmentId,
         name: file.name,
         sizeBytes: file.size,
         mimeType: file.type || 'application/octet-stream',
         previewUrl: initialPreviewUrl,
+        state: 'UPLOADING' as const,
       };
 
       const freshContacts = await contactManager.listContacts(activeSession);
@@ -1014,12 +1022,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const arrayBuffer = await file.arrayBuffer();
           const fileBytes = new Uint8Array(arrayBuffer);
 
+          // Pre-cache staging bytes for immediate inline rendering
+          MediaCache.set(attachmentId, {
+            id: attachmentId,
+            blobUrl: initialPreviewUrl || '',
+            data: fileBytes,
+            mimeType: file.type || 'application/octet-stream',
+            name: file.name,
+            sizeBytes: file.size,
+          });
+
           const ephemeralKey = randomBytes(32);
           const { metadata, chunks } = AttachmentPipeline.chunkAndEncrypt(
             fileBytes,
             file.name,
             file.type || 'application/octet-stream',
-            ephemeralKey
+            ephemeralKey,
+            undefined,
+            attachmentId
           );
 
           const rawCiphertext = new TextEncoder().encode(JSON.stringify(chunks));
@@ -1085,9 +1105,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ciphertextHash,
             encryptionKeyBase64: bytesToBase64(ephemeralKey),
             previewUrl,
+            state: 'SENT' as const,
           };
 
-          const cacheKey = objectId || metadata.attachmentId;
+          const cacheKey = objectId;
           MediaCache.set(cacheKey, {
             id: cacheKey,
             blobUrl: previewUrl || '',
@@ -1138,7 +1159,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           setMessages((prev) => {
             const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-              m.id === msgId ? { ...m, status: 'FAILED' as const } : m
+              m.id === msgId
+                ? {
+                    ...m,
+                    status: 'FAILED' as const,
+                    attachment: {
+                      ...initialAttachmentPayload,
+                      state: 'FAILED' as const,
+                      error: (uploadErr as any)?.message || 'Upload failed',
+                    },
+                  }
+                : m
             );
             const updated = { ...prev };
             for (const k of keys) {

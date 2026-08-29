@@ -5,7 +5,7 @@
  * dynamic waveform bars, interactive click/drag scrubbing, and current/total duration timer.
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { Spinner } from './Spinner.tsx';
 import { Progress } from './Progress.tsx';
 import { PlayIcon, PauseIcon } from '../icons/index.ts';
@@ -34,6 +34,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   className = '',
 }) => {
   const waveformRef = useRef<HTMLDivElement>(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   const formatDuration = (sec: number) => {
     const safeSec = Math.max(0, Math.floor(sec || 0));
@@ -48,6 +49,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const calculatePercentFromPointer = useCallback((clientX: number) => {
     if (!waveformRef.current) return 0;
     const rect = waveformRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
     const clickX = clientX - rect.left;
     return Math.max(0, Math.min(100, (clickX / rect.width) * 100));
   }, []);
@@ -55,26 +57,43 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!onSeek) return;
     e.preventDefault();
+    setIsScrubbing(true);
+
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (_e) {}
+
     const percent = calculatePercentFromPointer(e.clientX);
     onSeek(percent);
-
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      const p = calculatePercentFromPointer(moveEvent.clientX);
-      onSeek(p);
-    };
-
-    const handlePointerUp = () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
   };
 
-  const timerDisplay = playbackState === 'playing' || playbackState === 'paused'
-    ? `${formatDuration(currentTimeSeconds)} / ${formatDuration(durationSeconds)}`
-    : formatDuration(durationSeconds);
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing || !onSeek) return;
+    e.preventDefault();
+    const percent = calculatePercentFromPointer(e.clientX);
+    onSeek(percent);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    setIsScrubbing(false);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch (_e) {}
+    if (onSeek) {
+      const percent = calculatePercentFromPointer(e.clientX);
+      onSeek(percent);
+    }
+  };
+
+  const handlePointerCancel = () => {
+    setIsScrubbing(false);
+  };
+
+  const timerDisplay =
+    playbackState === 'playing' || playbackState === 'paused' || isScrubbing
+      ? `${formatDuration(currentTimeSeconds)} / ${formatDuration(durationSeconds)}`
+      : formatDuration(durationSeconds);
 
   return (
     <div className={`veil-voicenote-card ${className}`.trim()} role="region" aria-label="Voice Note Player">
@@ -102,6 +121,9 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
             ref={waveformRef}
             className="veil-waveform-container"
             onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
             style={{ cursor: onSeek ? 'pointer' : 'default', touchAction: 'none' }}
             aria-label="Audio waveform scrubber"
             role="slider"

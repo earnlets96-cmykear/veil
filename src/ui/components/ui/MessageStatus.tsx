@@ -55,7 +55,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({ status, className 
     case 'DELIVERED_TO_RECIPIENT':
     case 'PROCESSED':
       return (
-        <span className={`veil-msg-status ${className}`.trim()} title="Delivered" aria-label="Delivered to recipient">
+        <span className={`veil-msg-status ${className}`.trim()} title="Delivered & Read" aria-label="Delivered to recipient">
           <CheckCheckIcon size={size} color="var(--veil-text-secondary)" />
         </span>
       );

@@ -9,6 +9,7 @@
  */
 
 import { argon2id } from '@noble/hashes/argon2.js';
+import { base64ToBytes } from './utils.ts';
 
 self.onmessage = (event: MessageEvent) => {
   const { password, salt, params, requestId } = event.data;
@@ -19,7 +20,7 @@ self.onmessage = (event: MessageEvent) => {
       : new Uint8Array(password);
 
     const saltBytes = typeof salt === 'string'
-      ? Uint8Array.from(atob(salt), (c) => c.charCodeAt(0))
+      ? base64ToBytes(salt)
       : new Uint8Array(salt);
 
     const derivedKey = argon2id(pwdBytes, saltBytes, {
