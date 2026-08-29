@@ -137,6 +137,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       style={{
         cursor: isSelectionMode ? 'pointer' : undefined,
         position: 'relative',

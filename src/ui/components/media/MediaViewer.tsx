@@ -153,6 +153,17 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     resolveCurrentMedia();
   }, [currentIndex, resolveCurrentMedia]);
 
+  // Clean up video decoder and listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      }
+    };
+  }, []);
+
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);

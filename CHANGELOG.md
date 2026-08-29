@@ -2,6 +2,27 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase43] - 2026-08-30
+
+### Added
+- **Dedicated Phase 43 Forensic Test Suites (`tests/phase43-*.test.ts`)**:
+  - `phase43-audio-seeking-exhaustive.test.ts`: Proves exact seek calculations for 0%, 25%, 50%, 75%, 100%, out-of-bounds clamping, and duration=NaN/0 handling.
+  - `phase43-grouped-media-combinations.test.ts`: Validates single-message multi-attachment combinations (1-5+ images, img+video, video+img+video, order preservation, failure isolation).
+  - `phase43-video-lifecycle-exhaustive.test.tsx`: Validates play/pause state transitions, seek calculations, duration accuracy, mute/unmute, and unmount decoder cleanup.
+  - `phase43-reply-and-picker-lifecycle.test.tsx`: Validates swipe-to-reply gesture sensitivity, vertical scroll cancellation, quote preservation, and picker state reset.
+  - `phase43-account-recovery-exhaustive.test.ts`: Proves full fresh install recovery of Master Key, Ed25519 identity, spaces, contacts, and conversations with negative attack tests.
+
+### Changed
+- **Resource Lifecycle & Video Cleanup (`src/ui/components/media/MediaViewer.tsx`)**:
+  - Added unmount lifecycle hook for `<video>` decoders, releasing video frame buffers and removing `src` attributes.
+- **Touch Gesture Cancellation Resiliency (`src/ui/components/ui/MessageBubble.tsx`)**:
+  - Added `onTouchCancel` handler ensuring swipe-to-reply offsets and long-press timers immediately reset if Android OS interrupts touch gestures.
+
+### Verification
+- 304 / 304 test files passing (788 / 788 automated tests, 100% clean pass, 0 failures, 0 skipped).
+- Web production build passing (`dist/`).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`app-debug.apk`).
+
 ## [1.0.0-phase42] - 2026-08-30
 
 ### Added
