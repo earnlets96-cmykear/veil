@@ -2,6 +2,30 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase44] - 2026-08-30
+
+### Added
+- **Dedicated Phase 44 Forensic Test Suites (`tests/phase44-*.test.ts`, `tests/phase44-*.test.tsx`)**:
+  - `phase44-account-persistence-e2e.test.ts`: Proves remote persistence and full reinstall recovery from empty local storage.
+  - `phase44-recovery-errors.test.ts`: Validates distinguishable error reporting for 401, network unreachable, missing vault, and idempotent recovery.
+  - `phase44-config-production.test.ts`: Proves mobile production relay defaulting to `PRODUCTION_RELAY_URL` (`https://veil-rga0.onrender.com`).
+  - `phase44-spinner-audit.test.tsx`: Validates clean CSS spinner rendering without SVG stroke artifacts.
+
+### Changed
+- **Mobile Environment Production Relay Resolution (`src/config/appConfig.ts`)**:
+  - Configured `ConfigManager.getConfig()` to default mobile/Capacitor/WebView environments to `https://veil-rga0.onrender.com` rather than localhost `127.0.0.1`, resolving Android "Failed to fetch" errors.
+- **Fail-Closed Space Registration & Remote Vault Persistence (`src/ui/app/AppState.tsx`, `src/ui/components/CreateSpaceModal.tsx`)**:
+  - Added explicit username selection on space creation and enforced fail-closed account registration with remote encrypted recovery vault upload.
+- **Network & Timeout Error Classification (`src/network/cloudClient.ts`)**:
+  - Intercepted fetch errors and abort signals to produce clean, actionable user-facing messages.
+- **Ugly SVG Spinner Removal & Minimal Premium Loading UI (`Spinner.tsx`, `LoadingSpinner.tsx`, `veil-components.css`)**:
+  - Replaced SVG stroke circle animations with GPU-accelerated CSS spinner; updated button loading states ("Recovering…", "Creating Space…").
+
+### Verification
+- 308 / 308 test files passing (798 / 798 automated tests, 100% clean pass, 0 failures, 0 skipped).
+- Web production build passing (`dist/`).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`app-debug.apk` in 22s).
+
 ## [1.0.0-phase43] - 2026-08-30
 
 ### Added

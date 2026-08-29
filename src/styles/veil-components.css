@@ -300,21 +300,30 @@
 
 .veil-spinner {
   display: inline-block;
+  box-sizing: border-box;
   border: 2px solid rgba(255, 255, 255, 0.2);
   border-top-color: currentColor;
-  border-radius: var(--veil-radius-full);
-  animation: veilSpin 0.7s linear infinite;
+  border-radius: 50%;
+  will-change: transform;
+  animation: veilSpin 0.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  vertical-align: middle;
+}
+
+.veil-spinner-xs {
+  width: 12px;
+  height: 12px;
+  border-width: 1.75px;
 }
 
 .veil-spinner-sm {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border-width: 2px;
 }
 
 .veil-spinner-md {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-width: 2.5px;
 }
 

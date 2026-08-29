@@ -57,7 +57,25 @@ const PROD_CONFIG: AppConfig = {
 
 export class ConfigManager {
   public static getConfig(env?: AppEnvironment): AppConfig {
-    const currentEnv = env || (process.env.NODE_ENV === 'production' ? 'production' : process.env.NODE_ENV === 'test' ? 'test' : 'development');
+    let currentEnv: AppEnvironment;
+
+    if (env) {
+      currentEnv = env;
+    } else if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+      currentEnv = 'test';
+    } else if (typeof import.meta !== 'undefined' && (import.meta as any).env?.MODE === 'test') {
+      currentEnv = 'test';
+    } else if (
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+      window.location.port === '5173'
+    ) {
+      // Local Vite development server
+      currentEnv = 'development';
+    } else {
+      // Default to production for mobile WebView, Capacitor, release builds, and production deployments
+      currentEnv = 'production';
+    }
 
     let base: AppConfig;
     switch (currentEnv) {
@@ -79,7 +97,14 @@ export class ConfigManager {
         const queryRelay = urlParams.get('relay');
         const storedRelay = window.localStorage.getItem('veil_custom_relay_url');
         const origin = window.location.origin;
-        const autoOrigin = origin && !origin.includes('localhost') && !origin.includes('127.0.0.1') && !origin.startsWith('file:') ? origin : null;
+        const autoOrigin =
+          origin &&
+          !origin.includes('localhost') &&
+          !origin.includes('127.0.0.1') &&
+          !origin.startsWith('file:') &&
+          !origin.startsWith('capacitor:')
+            ? origin
+            : null;
         const customUrl = queryRelay || storedRelay || autoOrigin;
         if (customUrl) {
           if (queryRelay) {

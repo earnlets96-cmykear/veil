@@ -10,10 +10,20 @@ import { CloseIcon, PlusIcon } from './icons/index.ts';
 export const CreateSpaceModal: React.FC = () => {
   const { createSpace, closeModal } = useApp();
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameEdited, setUsernameEdited] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!usernameEdited) {
+      const slug = val.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      setUsername(slug);
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,11 +34,17 @@ export const CreateSpaceModal: React.FC = () => {
       return;
     }
 
+    const effectiveUsername = (username.trim() || name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')).replace(/^@/, '');
+    if (!effectiveUsername) {
+      setError('Please provide a valid alphanumeric username.');
+      return;
+    }
+
     setError(null);
     setIsLoading(true);
 
     try {
-      await createSpace(name.trim(), passphrase);
+      await createSpace(name.trim(), passphrase, effectiveUsername);
       closeModal();
     } catch (err: any) {
       setError(err.message || 'Failed to create Space.');
@@ -48,7 +64,7 @@ export const CreateSpaceModal: React.FC = () => {
         <form onSubmit={handleCreate}>
           <div className="veil-modal-body">
             <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1rem' }}>
-              Each Space derives completely independent keys and storage partitions.
+              Each Space derives completely independent cryptographic keys, zero-knowledge cloud backup, and isolated storage partitions.
             </p>
 
             <div style={{ marginBottom: '1rem' }}>
@@ -68,9 +84,34 @@ export const CreateSpaceModal: React.FC = () => {
                 className="veil-input"
                 placeholder="Personal"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 required
                 autoFocus
+              />
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--veil-text-xs)',
+                  fontWeight: 600,
+                  color: 'var(--veil-text-secondary)',
+                  marginBottom: '0.4rem',
+                }}
+              >
+                Account Username (for cloud sync & recovery)
+              </label>
+              <input
+                type="text"
+                className="veil-input"
+                placeholder="alice"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  setUsernameEdited(true);
+                }}
+                required
               />
             </div>
 
@@ -137,8 +178,8 @@ export const CreateSpaceModal: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={isLoading || !name || !passphrase} loading={isLoading}>
-              <PlusIcon size={16} />
-              <span>{isLoading ? 'Creating Envelope...' : 'Create Space'}</span>
+              {!isLoading && <PlusIcon size={16} />}
+              <span>{isLoading ? 'Creating Space…' : 'Create Space'}</span>
             </Button>
           </div>
         </form>

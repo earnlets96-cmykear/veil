@@ -99,7 +99,7 @@ export interface AppContextType {
 
   // Actions
   unlockSpace: (passphrase: string) => Promise<void>;
-  createSpace: (name: string, passphrase: string) => Promise<void>;
+  createSpace: (name: string, passphrase: string, explicitUsername?: string) => Promise<void>;
   restoreAccount: (username: string, password: string) => Promise<void>;
   registerCloudAccount: (username: string, password: string, spaceName?: string) => Promise<void>;
   lockSpace: () => void;
@@ -739,18 +739,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [loadSpaceData]
   );
 
-  const createSpace = useCallback(async (name: string, passphrase: string) => {
-    await sessionController.createSpace(name, passphrase);
-    setKnownSpacesCount(vault.listEnvelopes().length);
-    try {
+  const createSpace = useCallback(
+    async (name: string, passphrase: string, explicitUsername?: string) => {
+      const cleanUsername =
+        (explicitUsername || name).toLowerCase().replace(/[^a-z0-9_]/g, '') ||
+        `user_${bytesToHex(randomBytes(4))}`;
+
+      // If fresh install / first space, register account remotely and persist recovery vault fail-closed
+      const knownCount = vault.listEnvelopes().length;
+      if (knownCount === 0) {
+        const { session } = await accountManager.registerAccount({
+          username: cleanUsername,
+          password: passphrase,
+          spaceName: name,
+        });
+        setKnownSpacesCount(vault.listEnvelopes().length);
+        setActiveSession(session);
+        sessionController.recordUserActivity();
+        await loadSpaceData(session);
+        return;
+      }
+
+      // If existing device with prior spaces, create additional space envelope and push updated recovery vault
+      await sessionController.createSpace(name, passphrase);
+      setKnownSpacesCount(vault.listEnvelopes().length);
       const session = await sessionController.unlock(passphrase);
       setActiveSession(session);
       await loadSpaceData(session);
-      const username = name.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${session.spaceId.slice(0, 8)}`;
       await ensureCloudSession(session, false, passphrase);
-      await accountManager.createOrUpdateRecoveryVault(session, passphrase, username);
-    } catch (_e) {}
-  }, [ensureCloudSession, loadSpaceData]);
+      await accountManager.createOrUpdateRecoveryVault(session, passphrase, cleanUsername);
+    },
+    [ensureCloudSession, loadSpaceData]
+  );
 
   const lockSpace = useCallback(() => {
     sessionController.lock();

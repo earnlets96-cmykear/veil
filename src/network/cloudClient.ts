@@ -77,12 +77,28 @@ export class CloudClient {
     const timeout = setTimeout(() => controller.abort(), timeoutOverrideMs || this.timeoutMs);
 
     try {
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+      } catch (fetchErr: any) {
+        if (fetchErr?.name === 'AbortError' || controller.signal.aborted) {
+          throw new Error(`Recovery server timed out after ${timeoutOverrideMs || this.timeoutMs}ms. Please try again.`);
+        }
+        if (
+          fetchErr?.message?.includes('Failed to fetch') ||
+          fetchErr?.message?.includes('NetworkError') ||
+          fetchErr?.message?.includes('fetch failed') ||
+          fetchErr?.message?.includes('Network request failed')
+        ) {
+          throw new Error(`Unable to connect to recovery server at ${this.baseUrl}. Please check your internet connection.`);
+        }
+        throw fetchErr;
+      }
 
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -93,6 +109,18 @@ export class CloudClient {
               return await this.request<T>(path, method, body, timeoutOverrideMs, retryCount + 1);
             }
           } catch (_reauthErr) {}
+        }
+        if (res.status === 401) {
+          throw new Error(json.error || 'Invalid username or password');
+        }
+        if (res.status === 404) {
+          throw new Error(json.error || 'Account or recovery vault not found on server');
+        }
+        if (res.status === 409) {
+          throw new Error(json.error || 'Username is already registered. Please choose another username.');
+        }
+        if (res.status >= 500) {
+          throw new Error(json.error || `Recovery server error (${res.status}). Please try again later.`);
         }
         throw new Error(json.error || `HTTP ${res.status}: ${res.statusText}`);
       }

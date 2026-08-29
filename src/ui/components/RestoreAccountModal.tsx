@@ -114,8 +114,8 @@ export const RestoreAccountModal: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={isLoading || !username || !password} loading={isLoading}>
-              <RefreshCwIcon size={16} />
-              <span>{isLoading ? 'Deriving & Restoring...' : 'Restore Account'}</span>
+              {!isLoading && <RefreshCwIcon size={16} />}
+              <span>{isLoading ? 'Recovering…' : 'Restore Account'}</span>
             </Button>
           </div>
         </form>
