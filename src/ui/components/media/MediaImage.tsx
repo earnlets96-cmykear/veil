@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
+import { MediaLogger } from '../../utils/mediaLogger.ts';
 import { PlayIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
 
 export interface MediaImageProps {
@@ -67,15 +68,35 @@ export const MediaImage: React.FC<MediaImageProps> = ({
           await ensureCloudSession(activeSession);
         }
 
+        MediaLogger.log({
+          event: 'DECRYPTION_STARTED',
+          attachmentId: attachment.attachmentId,
+          objectId: attachment.objectId,
+          mimeType: attachment.mimeType,
+        });
+
         const result = await MediaCache.getOrFetch(attachment, activeSession, cloudClient);
         if (isMountedRef.current) {
           setMedia(result);
           setIsLoading(false);
+          MediaLogger.log({
+            event: 'DECRYPTION_COMPLETED',
+            attachmentId: attachment.attachmentId,
+            objectId: attachment.objectId,
+            mimeType: attachment.mimeType,
+            sizeBytes: result.sizeBytes,
+          });
         }
       } catch (err: any) {
         if (isMountedRef.current) {
           setError(err?.message || 'Media unavailable');
           setIsLoading(false);
+          MediaLogger.log({
+            event: 'MEDIA_ERROR',
+            attachmentId: attachment.attachmentId,
+            objectId: attachment.objectId,
+            error: err?.message,
+          });
         }
       }
     },
@@ -102,8 +123,8 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     }
   }, [key, attachment.objectId, attachment.attachmentId, attachment.previewUrl, fetchAndDecrypt]);
 
-  // Handle broken/stale blob image load failure
-  const handleImageError = () => {
+  // Handle broken/stale blob image or video load failure
+  const handleMediaError = () => {
     if (isMountedRef.current) {
       MediaCache.invalidate(key);
       if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
@@ -113,6 +134,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
   };
 
   const displayBlobUrl = media?.blobUrl || attachment.previewUrl;
+  const isVideoMedia = isVideo || attachment.mimeType?.startsWith('video/');
 
   if (isLoading && !displayBlobUrl) {
     return (
@@ -156,7 +178,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      aria-label={`View ${isVideo ? 'video' : 'photo'} ${attachment.name}`}
+      aria-label={`View ${isVideoMedia ? 'video' : 'photo'} ${attachment.name}`}
       onKeyDown={(e) => {
         if (onClick && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
@@ -165,18 +187,29 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       }}
     >
       {displayBlobUrl ? (
-        <img
-          src={displayBlobUrl}
-          alt={alt || attachment.name}
-          className="veil-media-thumbnail-img"
-          loading="lazy"
-          onError={handleImageError}
-        />
+        isVideoMedia ? (
+          <video
+            src={displayBlobUrl}
+            className="veil-media-thumbnail-img veil-media-thumbnail-video"
+            preload="metadata"
+            muted
+            playsInline
+            onError={handleMediaError}
+          />
+        ) : (
+          <img
+            src={displayBlobUrl}
+            alt={alt || attachment.name}
+            className="veil-media-thumbnail-img"
+            loading="lazy"
+            onError={handleMediaError}
+          />
+        )
       ) : (
         <div className="veil-media-skeleton-pulse" />
       )}
 
-      {isVideo && (
+      {isVideoMedia && (
         <div className="veil-media-play-badge" aria-hidden="true">
           <PlayIcon size={26} color="#ffffff" />
         </div>

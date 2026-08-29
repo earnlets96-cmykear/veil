@@ -1,11 +1,14 @@
 /**
- * Telegram-Inspired Fullscreen Media Viewer Component for VEIL.
+ * Telegram & Signal-Inspired Fullscreen Media Viewer Component for VEIL.
  *
- * Implements high-fidelity image inspection (pinch/scroll zoom, pan), HTML5 video playback
- * with sleek controls, next/previous gallery navigation, and direct file saving/sharing.
+ * Implements high-fidelity media inspection with on-demand zero-knowledge decryption,
+ * pinch/scroll zoom, pan, dedicated HTML5 video controls, and next/previous gallery navigation.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useApp } from '../../app/AppState.tsx';
+import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
+import { MediaLogger } from '../../utils/mediaLogger.ts';
 import {
   CloseIcon,
   ChevronLeftIcon,
@@ -19,8 +22,11 @@ import {
   VolumeIcon,
   VolumeXIcon,
   MaximizeIcon,
+  RefreshCwIcon,
+  AlertCircleIcon,
 } from '../icons/index.ts';
 import { IconButton } from '../ui/IconButton.tsx';
+import { Spinner } from '../ui/Spinner.tsx';
 
 export interface MediaViewerItem {
   id: string;
@@ -31,6 +37,7 @@ export interface MediaViewerItem {
   mimeType?: string;
   timestamp?: number;
   senderName?: string;
+  attachment?: AttachmentPayload;
   data?: Uint8Array;
 }
 
@@ -49,27 +56,101 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   onDownload,
   onShare,
 }) => {
+  const { activeSession, cloudClient, ensureCloudSession } = useApp();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
+  const [loadingMedia, setLoadingMedia] = useState<Record<string, boolean>>({});
+  const [mediaErrors, setMediaErrors] = useState<Record<string, string>>({});
+
+  // Image zoom & pan state
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // Video player state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const currentItem = items[currentIndex] || items[0];
 
-  // Reset zoom and pan when navigating items
+  const currentItem = items[currentIndex] || items[0];
+  const currentKey = currentItem?.attachment?.objectId || currentItem?.attachment?.attachmentId || currentItem?.id || currentItem?.name;
+  const currentBlobUrl = resolvedUrls[currentKey] || currentItem?.url || MediaCache.get(currentKey)?.blobUrl || '';
+
+  // Asynchronously resolve & decrypt media if not yet in memory
+  const resolveCurrentMedia = useCallback(
+    async (forceRetry = false) => {
+      if (!currentItem) return;
+
+      const key = currentItem.attachment?.objectId || currentItem.attachment?.attachmentId || currentItem.id || currentItem.name;
+
+      if (!forceRetry) {
+        const cached = MediaCache.get(key) || (currentItem.url ? { blobUrl: currentItem.url } : undefined);
+        if (cached && cached.blobUrl) {
+          setResolvedUrls((prev) => ({ ...prev, [key]: cached.blobUrl }));
+          setLoadingMedia((prev) => ({ ...prev, [key]: false }));
+          return;
+        }
+      }
+
+      if (!currentItem.attachment || !activeSession) return;
+
+      setLoadingMedia((prev) => ({ ...prev, [key]: true }));
+      setMediaErrors((prev) => ({ ...prev, [key]: '' }));
+
+      try {
+        if (!cloudClient.getSessionToken()) {
+          await ensureCloudSession(activeSession);
+        }
+
+        MediaLogger.log({
+          event: 'DECRYPTION_STARTED',
+          attachmentId: currentItem.attachment.attachmentId,
+          objectId: currentItem.attachment.objectId,
+          mimeType: currentItem.mimeType,
+        });
+
+        const result = await MediaCache.getOrFetch(currentItem.attachment, activeSession, cloudClient);
+        setResolvedUrls((prev) => ({ ...prev, [key]: result.blobUrl }));
+        setLoadingMedia((prev) => ({ ...prev, [key]: false }));
+
+        MediaLogger.log({
+          event: 'DECRYPTION_COMPLETED',
+          attachmentId: currentItem.attachment.attachmentId,
+          objectId: currentItem.attachment.objectId,
+          mimeType: currentItem.mimeType,
+          sizeBytes: result.sizeBytes,
+        });
+      } catch (err: any) {
+        setLoadingMedia((prev) => ({ ...prev, [key]: false }));
+        setMediaErrors((prev) => ({ ...prev, [key]: err?.message || 'Failed to load media' }));
+        MediaLogger.log({
+          event: 'MEDIA_ERROR',
+          attachmentId: currentItem.attachment.attachmentId,
+          objectId: currentItem.attachment.objectId,
+          error: err?.message,
+        });
+      }
+    },
+    [currentItem, activeSession, cloudClient, ensureCloudSession]
+  );
+
   useEffect(() => {
+    // Reset interaction state on item switch
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setIsPlaying(false);
     setVideoProgress(0);
-  }, [currentIndex]);
+    setVideoDuration(0);
+    setIsVideoLoading(true);
+
+    resolveCurrentMedia();
+  }, [currentIndex, resolveCurrentMedia]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -92,11 +173,14 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         handlePrev();
       } else if (e.key === 'ArrowRight') {
         handleNext();
+      } else if (e.key === ' ' && currentItem?.type === 'video') {
+        e.preventDefault();
+        togglePlay();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, handlePrev, handleNext]);
+  }, [onClose, handlePrev, handleNext, currentItem?.type]);
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(prev + 0.75, 4));
@@ -119,7 +203,6 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     }
   };
 
-  // Pan interaction
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom > 1) {
       setIsDragging(true);
@@ -140,15 +223,19 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     setIsDragging(false);
   };
 
-  // Video playback toggle
-  const togglePlay = () => {
+  // Video playback controls
+  const togglePlay = async () => {
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play();
-      setIsPlaying(true);
+      try {
+        await videoRef.current.play();
+        setIsPlaying(true);
+      } catch (err: any) {
+        setIsPlaying(false);
+      }
     }
   };
 
@@ -158,7 +245,24 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     setIsMuted(!isMuted);
   };
 
+  const toggleFullscreen = () => {
+    if (!stageRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    } else {
+      stageRef.current.requestFullscreen?.();
+    }
+  };
+
+  const handleVideoSeek = (targetPercent: number) => {
+    if (!videoRef.current || !videoDuration) return;
+    const targetSeconds = (targetPercent / 100) * videoDuration;
+    videoRef.current.currentTime = targetSeconds;
+    setVideoProgress(targetSeconds);
+  };
+
   const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds) || isNaN(seconds) || seconds < 0) return '0:00';
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
@@ -172,6 +276,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   };
 
   if (!currentItem) return null;
+
+  const isCurrentLoading = loadingMedia[currentKey] || (!currentBlobUrl && !mediaErrors[currentKey]);
+  const currentError = mediaErrors[currentKey];
 
   return (
     <div
@@ -215,7 +322,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
           {onShare && (
             <IconButton
               icon={<ShareIcon size={20} />}
-              onClick={() => onShare(currentItem)}
+              onClick={() => onShare({ ...currentItem, url: currentBlobUrl })}
               aria-label="Share media"
               variant="ghost"
             />
@@ -224,7 +331,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
           {onDownload && (
             <IconButton
               icon={<DownloadIcon size={20} />}
-              onClick={() => onDownload(currentItem)}
+              onClick={() => onDownload({ ...currentItem, url: currentBlobUrl })}
               aria-label="Download file"
               variant="ghost"
             />
@@ -247,74 +354,147 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         onDoubleClick={handleDoubleClick}
         style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
       >
-        {currentItem.type === 'image' && (
-          <img
-            src={currentItem.url}
-            alt={currentItem.name}
-            className="veil-media-viewer-img"
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-            }}
-            draggable={false}
-          />
+        {isCurrentLoading && (
+          <div className="veil-media-thumbnail-loading" role="progressbar" aria-label="Decrypting media...">
+            <Spinner size="md" />
+            <span style={{ marginTop: '0.75rem', fontSize: 'var(--veil-text-sm)', color: '#ffffff' }}>
+              Decrypting media...
+            </span>
+          </div>
         )}
 
-        {currentItem.type === 'video' && (
-          <div className="veil-media-viewer-video-container">
-            <video
-              ref={videoRef}
-              src={currentItem.url}
-              className="veil-media-viewer-video"
-              playsInline
-              onClick={togglePlay}
-              onTimeUpdate={() => {
-                if (videoRef.current) {
-                  setVideoProgress(videoRef.current.currentTime);
-                  setVideoDuration(videoRef.current.duration || 0);
-                }
-              }}
-              onEnded={() => setIsPlaying(false)}
-            />
+        {currentError && !isCurrentLoading && (
+          <div className="veil-media-thumbnail-error" role="alert" style={{ background: 'transparent' }}>
+            <AlertCircleIcon size={32} color="var(--veil-danger)" />
+            <span style={{ fontSize: 'var(--veil-text-sm)', color: '#ffffff', marginTop: '0.5rem' }}>
+              {currentError}
+            </span>
+            <button
+              type="button"
+              className="veil-btn veil-btn-secondary veil-btn-sm"
+              onClick={() => resolveCurrentMedia(true)}
+              style={{ marginTop: '0.75rem', gap: '6px' }}
+            >
+              <RefreshCwIcon size={14} />
+              <span>Retry</span>
+            </button>
+          </div>
+        )}
 
-            {/* Custom Sleek Video Controls Bar */}
-            <div className="veil-media-viewer-video-controls">
-              <IconButton
-                icon={isPlaying ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
-                onClick={togglePlay}
-                aria-label={isPlaying ? 'Pause video' : 'Play video'}
-                variant="primary"
+        {!isCurrentLoading && !currentError && currentBlobUrl && (
+          <>
+            {currentItem.type === 'image' && (
+              <img
+                src={currentBlobUrl}
+                alt={currentItem.name}
+                className="veil-media-viewer-img"
+                style={{
+                  transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                }}
+                draggable={false}
               />
+            )}
 
-              <div className="veil-media-viewer-progress-wrapper">
-                <input
-                  type="range"
-                  min={0}
-                  max={videoDuration || 100}
-                  value={videoProgress}
-                  onChange={(e) => {
-                    const targetTime = parseFloat(e.target.value);
-                    if (videoRef.current) {
-                      videoRef.current.currentTime = targetTime;
-                      setVideoProgress(targetTime);
+            {currentItem.type === 'video' && (
+              <div className="veil-media-viewer-video-container">
+                <video
+                  ref={videoRef}
+                  src={currentBlobUrl}
+                  className="veil-media-viewer-video"
+                  playsInline
+                  onClick={togglePlay}
+                  onLoadedMetadata={(e) => {
+                    const dur = (e.target as HTMLVideoElement).duration;
+                    if (Number.isFinite(dur) && dur > 0) {
+                      setVideoDuration(dur);
+                    }
+                    setIsVideoLoading(false);
+                  }}
+                  onCanPlay={() => setIsVideoLoading(false)}
+                  onWaiting={() => setIsVideoLoading(true)}
+                  onPlaying={() => {
+                    setIsPlaying(true);
+                    setIsVideoLoading(false);
+                  }}
+                  onPause={() => setIsPlaying(false)}
+                  onTimeUpdate={(e) => {
+                    const target = e.target as HTMLVideoElement;
+                    setVideoProgress(target.currentTime);
+                    if (Number.isFinite(target.duration) && target.duration > 0) {
+                      setVideoDuration(target.duration);
                     }
                   }}
-                  className="veil-media-viewer-seek"
+                  onEnded={() => {
+                    setIsPlaying(false);
+                    setVideoProgress(0);
+                  }}
+                  onError={() => {
+                    setIsVideoLoading(false);
+                    setMediaErrors((prev) => ({ ...prev, [currentKey]: 'Video playback failed' }));
+                  }}
                 />
-              </div>
 
-              <div className="veil-media-viewer-time">
-                {formatTime(videoProgress)} / {formatTime(videoDuration)}
-              </div>
+                {/* Floating Big Play Button Overlay */}
+                {!isPlaying && !isVideoLoading && (
+                  <button
+                    type="button"
+                    className="veil-media-viewer-play-overlay"
+                    onClick={togglePlay}
+                    aria-label="Play video"
+                  >
+                    <PlayIcon size={44} color="#ffffff" />
+                  </button>
+                )}
 
-              <IconButton
-                icon={isMuted ? <VolumeXIcon size={18} /> : <VolumeIcon size={18} />}
-                onClick={toggleMute}
-                aria-label={isMuted ? 'Unmute' : 'Mute'}
-                variant="ghost"
-              />
-            </div>
-          </div>
+                {isVideoLoading && (
+                  <div className="veil-media-viewer-loading-overlay">
+                    <Spinner size="md" />
+                  </div>
+                )}
+
+                {/* Custom Sleek Video Controls Bar */}
+                <div className="veil-media-viewer-video-controls">
+                  <IconButton
+                    icon={isPlaying ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
+                    onClick={togglePlay}
+                    aria-label={isPlaying ? 'Pause video' : 'Play video'}
+                    variant="primary"
+                  />
+
+                  <div className="veil-media-viewer-progress-wrapper">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0}
+                      onChange={(e) => handleVideoSeek(parseFloat(e.target.value))}
+                      className="veil-media-viewer-seek"
+                      aria-label="Video scrubber"
+                    />
+                  </div>
+
+                  <div className="veil-media-viewer-time">
+                    {formatTime(videoProgress)} / {formatTime(videoDuration)}
+                  </div>
+
+                  <IconButton
+                    icon={isMuted ? <VolumeXIcon size={18} /> : <VolumeIcon size={18} />}
+                    onClick={toggleMute}
+                    aria-label={isMuted ? 'Unmute' : 'Mute'}
+                    variant="ghost"
+                  />
+
+                  <IconButton
+                    icon={<MaximizeIcon size={18} />}
+                    onClick={toggleFullscreen}
+                    aria-label="Fullscreen"
+                    variant="ghost"
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Previous Navigation Button */}

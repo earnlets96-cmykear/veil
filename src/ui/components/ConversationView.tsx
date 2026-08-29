@@ -287,6 +287,7 @@ export const ConversationView: React.FC = () => {
         mimeType: m.attachment!.mimeType,
         timestamp: m.timestamp,
         senderName: m.senderName,
+        attachment: m.attachment,
         data: cached?.data,
       };
     });
@@ -623,7 +624,7 @@ export const ConversationView: React.FC = () => {
                         currentProgressPercent={playbackProgress[msg.id] || 0}
                         onPlayToggle={() => handleToggleVoice(msg)}
                         onSeek={(percent) => {
-                          VoicePlayer.seek(percent);
+                          VoicePlayer.seek(percent, msg.id);
                           setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
                           setPlaybackCurrentTime((prev) => ({
                             ...prev,

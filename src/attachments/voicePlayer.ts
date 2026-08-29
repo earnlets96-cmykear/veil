@@ -9,6 +9,7 @@
 import { CloudClient } from '../network/cloudClient.ts';
 import { SpaceSession } from '../spaces/session.ts';
 import { VoiceRecordingMetadata, VoiceRecorder } from './voiceRecorder.ts';
+import { MediaLogger } from '../ui/utils/mediaLogger.ts';
 
 export interface VoicePlaybackCallbacks {
   onProgress?: (progressPercent: number, currentTime: number, duration: number) => void;
@@ -22,6 +23,7 @@ export class VoicePlaybackManager {
   private currentPlayingId: string | null = null;
   private activeCallbacks: VoicePlaybackCallbacks | null = null;
   private currentDuration: number = 0;
+  private stagedSeekPercent: Record<string, number> = {};
 
   public getPlayingId(): string | null {
     return this.currentPlayingId;
@@ -63,6 +65,11 @@ export class VoicePlaybackManager {
     if (this.currentPlayingId === messageId && this.currentAudio) {
       if (this.currentAudio.paused) {
         await this.currentAudio.play();
+        MediaLogger.log({
+          event: 'PLAYBACK_STARTED',
+          objectId: meta.objectId,
+          duration: this.getDuration(),
+        });
         return;
       }
     }
@@ -75,9 +82,22 @@ export class VoicePlaybackManager {
     try {
       this.currentPlayingId = messageId;
 
+      MediaLogger.log({
+        event: 'DOWNLOAD_STARTED',
+        objectId: meta.objectId,
+        mimeType: meta.mimeType,
+      });
+
       // 1. Download and decrypt encrypted audio into ephemeral Blob URL
       const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(session, cloudClient, meta);
       this.currentBlobUrl = blobUrl;
+
+      MediaLogger.log({
+        event: 'DECRYPTION_COMPLETED',
+        objectId: meta.objectId,
+        mimeType: meta.mimeType,
+        sizeBytes: meta.sizeBytes,
+      });
 
       // 2. Instantiate audio element
       let audio: any;
@@ -105,15 +125,39 @@ export class VoicePlaybackManager {
         if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
           this.currentDuration = audio.duration;
         }
+
+        // Apply any pre-play staged seek position
+        const staged = this.stagedSeekPercent[messageId];
+        if (typeof staged === 'number' && staged > 0) {
+          const target = (staged / 100) * this.getDuration();
+          try {
+            audio.currentTime = target;
+          } catch (_e) {}
+        }
+
+        MediaLogger.log({
+          event: 'METADATA_LOADED',
+          objectId: meta.objectId,
+          duration: this.getDuration(),
+        });
       };
 
       audio.onended = () => {
+        MediaLogger.log({
+          event: 'PLAYBACK_ENDED',
+          objectId: meta.objectId,
+        });
         this.stop();
         if (callbacks.onEnded) callbacks.onEnded();
       };
 
       audio.onerror = (_e: any) => {
         const err = new Error('Audio playback error occurred');
+        MediaLogger.log({
+          event: 'MEDIA_ERROR',
+          objectId: meta.objectId,
+          error: err.message,
+        });
         this.stop();
         if (callbacks.onError) callbacks.onError(err);
       };
@@ -127,7 +171,19 @@ export class VoicePlaybackManager {
         }
       };
 
+      // Set initial seek if available before play starts
+      const staged = this.stagedSeekPercent[messageId];
+      if (typeof staged === 'number' && staged > 0) {
+        const duration = this.getDuration() || meta.durationSeconds || 1;
+        audio.currentTime = (staged / 100) * duration;
+      }
+
       await audio.play();
+      MediaLogger.log({
+        event: 'PLAYBACK_STARTED',
+        objectId: meta.objectId,
+        duration: this.getDuration(),
+      });
     } catch (err: any) {
       this.stop();
       if (callbacks.onError) {
@@ -148,9 +204,17 @@ export class VoicePlaybackManager {
 
   /**
    * Seeks playback position to a percentage (0 - 100).
+   * Works whether audio is currently playing, paused, or staged before initial play.
    */
-  public seek(percent: number): void {
+  public seek(percent: number, messageId?: string): void {
     const clampedPercent = Math.max(0, Math.min(100, isNaN(percent) ? 0 : percent));
+
+    if (messageId) {
+      this.stagedSeekPercent[messageId] = clampedPercent;
+    } else if (this.currentPlayingId) {
+      this.stagedSeekPercent[this.currentPlayingId] = clampedPercent;
+    }
+
     const duration = this.getDuration() || 1;
     const targetTime = (clampedPercent / 100) * duration;
 
@@ -163,6 +227,12 @@ export class VoicePlaybackManager {
     if (this.activeCallbacks?.onProgress) {
       this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
     }
+
+    MediaLogger.log({
+      event: 'SEEK_EXECUTED',
+      seekPercent: clampedPercent,
+      duration: targetTime,
+    });
   }
 
   /**
