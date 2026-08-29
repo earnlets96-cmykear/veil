@@ -15,6 +15,7 @@ import { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/
 import { base64ToBytes } from '../../crypto/utils.ts';
 import { CloudClient } from '../../network/cloudClient.ts';
 import { SpaceSession } from '../../spaces/session.ts';
+import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
 
 export interface DecryptedMedia {
   id: string;
@@ -91,7 +92,10 @@ class MediaCacheManager {
         });
 
         const downloadAndDecrypt = async (): Promise<DecryptedMedia> => {
+          RuntimeDiagnostics.download('downloadStarted', { objectId, attachmentId: attachment.attachmentId });
           const rawCiphertext = await cloudClient.downloadAttachment(objectId);
+          RuntimeDiagnostics.download('downloadCompleted', { objectId, bytes: rawCiphertext.length });
+
           let plaintextBytes: Uint8Array;
 
           if (attachment.encryptionKeyBase64) {
@@ -114,6 +118,12 @@ class MediaCacheManager {
                 sha256Hash: attachment.sha256Hash || '',
               };
               plaintextBytes = AttachmentPipeline.decryptAndReassemble(meta, chunks, encryptionKey);
+              RuntimeDiagnostics.decrypt('decryptionCompleted', {
+                attachmentId: meta.attachmentId,
+                chunkCount: chunks.length,
+                decryptedBytes: plaintextBytes.length,
+                sha256Verified: true,
+              });
             } else {
               plaintextBytes = rawCiphertext;
             }
@@ -123,6 +133,13 @@ class MediaCacheManager {
 
           const mimeType = attachment.mimeType || 'application/octet-stream';
           const blobUrl = AttachmentPipeline.createEphemeralBlobUrl(plaintextBytes, mimeType);
+
+          RuntimeDiagnostics.media('blobCreated', {
+            objectId,
+            blobUrl,
+            blobSize: plaintextBytes.length,
+            blobMime: mimeType,
+          });
 
           const mediaItem: DecryptedMedia = {
             id: primaryKey,

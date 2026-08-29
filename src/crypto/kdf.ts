@@ -4,7 +4,7 @@
  */
 
 import { argon2id } from '@noble/hashes/argon2.js';
-import { base64ToBytes } from './utils.ts';
+import { base64ToBytes, bytesToBase64 } from './utils.ts';
 import type { KdfParameters } from '../types/index.ts';
 
 /**
@@ -86,7 +86,7 @@ export async function deriveKeyArgon2idAsync(
 
   const saltStr = typeof salt === 'string'
     ? salt
-    : btoa(String.fromCharCode(...salt));
+    : bytesToBase64(salt);
 
   const pwdStr = typeof password === 'string'
     ? password

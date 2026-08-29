@@ -2,6 +2,7 @@
  * Modernized Mobile-First Message Composer Component for VEIL.
  *
  * Implements Telegram-inspired auto-expanding composer, pre-send attachment staging,
+ * in-app media picker bottom sheet with per-media privacy options,
  * live voice note recording & sending with waveform pulse, reply quote banners,
  * contextual Android permission handling, and 100% SVG vector iconography.
  */
@@ -19,6 +20,7 @@ import {
   CheckIcon,
 } from './icons/index.ts';
 import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
+import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
 import { PermissionsModal } from './PermissionsModal.tsx';
 
 export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversationId }) => {
@@ -30,6 +32,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isPermissionPermanent, setIsPermissionPermanent] = useState(false);
 
@@ -85,11 +88,35 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   const handleConfirmSendFiles = async (filesToSend: File[], caption?: string) => {
     setStagedFiles(null);
     try {
-      for (const file of filesToSend) {
-        sendAttachment(conversationId, file);
+      if (filesToSend.length === 1) {
+        sendAttachment(conversationId, filesToSend[0]);
+      } else if (filesToSend.length > 1) {
+        sendAttachments(conversationId, filesToSend);
       }
       if (caption && caption.trim()) {
         await sendMessage(conversationId, caption.trim());
+      }
+    } catch (_err) {
+      // Background queue preserves messages
+    }
+  };
+
+  // Handle send from In-App Media Picker
+  const handleMediaPickerSend = async (options: MediaPickerSendOptions) => {
+    try {
+      if (options.files.length === 1) {
+        sendAttachment(conversationId, options.files[0], {
+          allowSave: options.allowSave,
+          allowForward: options.allowForward,
+        });
+      } else if (options.files.length > 1) {
+        sendAttachments(conversationId, options.files, {
+          allowSave: options.allowSave,
+          allowForward: options.allowForward,
+        });
+      }
+      if (options.caption && options.caption.trim()) {
+        await sendMessage(conversationId, options.caption.trim());
       }
     } catch (_err) {
       // Background queue preserves messages
@@ -184,6 +211,15 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
         />
       )}
 
+      {/* In-App Media & File Picker Bottom Sheet */}
+      {isMediaPickerOpen && (
+        <MediaPickerModal
+          isOpen={isMediaPickerOpen}
+          onClose={() => setIsMediaPickerOpen(false)}
+          onSend={handleMediaPickerSend}
+        />
+      )}
+
       {/* Permission Explanation Modal */}
       {showPermissionModal && (
         <PermissionsModal
@@ -251,19 +287,20 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
                 variant="secondary"
                 size="sm"
                 onClick={handleCancelVoice}
-                disabled={isSending}
-                icon={<CloseIcon size={16} />}
+                aria-label="Cancel Voice Recording"
               >
-                Cancel
+                <CloseIcon size={16} />
+                <span>Cancel</span>
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleSendVoice}
-                loading={isSending}
-                icon={<SendIcon size={16} />}
+                disabled={isSending}
+                aria-label="Send Voice Message"
               >
-                Send Voice
+                {isSending ? <Spinner size="xs" /> : <SendIcon size={16} />}
+                <span>Send</span>
               </Button>
             </div>
           </div>
@@ -273,9 +310,9 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
             <IconButton
               icon={<PaperclipIcon size={20} />}
               variant="ghost"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setIsMediaPickerOpen(true)}
               aria-label="Attach Encrypted File"
-              title="Attach File"
+              title="Attach Encrypted File"
             />
 
             <IconButton

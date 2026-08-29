@@ -23,6 +23,7 @@ import type { IStorageAdapter } from '../storage/types.ts';
 import type { SpaceSession } from '../spaces/session.ts';
 import type { IdentityDocument } from '../identity/document.ts';
 import type { KdfParameters } from '../types/index.ts';
+import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
 
 export interface IdentityBackupPayload {
   version: 1;
@@ -182,18 +183,40 @@ export class AccountManager {
     identityDoc: IdentityDocument;
   }> {
     const { username, password } = params;
+    const cleanUsername = username.trim().toLowerCase();
     const deviceId = `dev_${bytesToHex(randomBytes(8))}`;
     const deviceName = params.deviceName || 'Restored Device';
 
-    // 1. Authenticate and fetch recovery vault blob
-    const restoreRes = await this.cloudClient.restoreAccount({
-      username,
-      password,
+    RuntimeDiagnostics.recovery('restoreInitiated', {
+      username: cleanUsername,
       deviceId,
       deviceName,
     });
 
+    // 1. Authenticate and fetch recovery vault blob
+    let restoreRes: any;
+    try {
+      restoreRes = await this.cloudClient.restoreAccount({
+        username: cleanUsername,
+        password,
+        deviceId,
+        deviceName,
+      });
+      RuntimeDiagnostics.recovery('serverAuthSuccess', {
+        accountId: restoreRes.account?.accountId,
+        hasRecoveryVault: !!restoreRes.recovery?.encryptedVaultBlob,
+      });
+    } catch (authErr: any) {
+      RuntimeDiagnostics.recovery('serverAuthFailed', {
+        error: authErr?.message,
+      });
+      throw authErr;
+    }
+
     if (!restoreRes.recovery || !restoreRes.recovery.encryptedVaultBlob) {
+      RuntimeDiagnostics.recovery('missingRecoveryVault', {
+        accountId: restoreRes.account?.accountId,
+      });
       throw new Error('Account has no encrypted identity backup on cloud server');
     }
 
@@ -209,13 +232,20 @@ export class AccountManager {
 
     const nonce = base64ToBytes(vaultBlob.nonce);
     const ciphertext = base64ToBytes(vaultBlob.ciphertext);
-    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${username.toLowerCase()}`);
+    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`);
 
     let backupData: IdentityBackupPayload;
     try {
       const decryptedBytes = decryptXChaCha20Poly1305(kek, nonce, ciphertext, aad);
       backupData = JSON.parse(new TextDecoder().decode(decryptedBytes));
+      RuntimeDiagnostics.recovery('vaultDecryptionSuccess', {
+        spaceId: backupData.spaceId,
+        identityId: backupData.identityDocument?.identityId,
+      });
     } catch (_e) {
+      RuntimeDiagnostics.recovery('vaultDecryptionFailed', {
+        error: 'Invalid password or corrupted backup payload',
+      });
       throw new Error('Failed to decrypt identity backup: invalid password or corrupted backup');
     } finally {
       zeroize(kek);
@@ -250,9 +280,14 @@ export class AccountManager {
           accountId: restoreRes.account.accountId,
           deviceId: restoreRes.device.deviceId,
           expiresAt: restoreRes.session.expiresAt,
-          username: username.toLowerCase(),
+          username: cleanUsername,
         });
       }
+
+      RuntimeDiagnostics.recovery('spaceRestoredSuccess', {
+        spaceId: session.spaceId,
+        identityId: backupData.identityDocument?.identityId,
+      });
 
       return {
         account: restoreRes.account,

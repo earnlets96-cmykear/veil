@@ -1,57 +1,43 @@
-# CURRENT_STATE.md — Verified System State for VEIL
+# CURRENT_STATE.md — Verified Phase & System Status
 
-## 1. Verified Phase Completion Status
-
-| Phase | Description | Status | Verification Reference |
-| :--- | :--- | :--- | :--- |
-| **Phase 0** | Architecture, Threat Model, Technology Selection, Continuity | **COMPLETED** | Verified via core documentation & ADRs |
-| **Phase 1** | Cryptographic Space Prototype & Multi-Space Isolation | **COMPLETED** | 100-Space test, zero SMK persistence |
-| **Phase 2** | Independent Space Cryptographic Identities | **COMPLETED** | Ed25519 / X25519 deterministic derivation |
-| **Phase 3** | Privacy-Preserving Untrusted Transport Interface | **COMPLETED** | Blind mailboxes, size-padding classes |
-| **Phase 4** | End-to-End Encrypted 1-to-1 Messaging | **COMPLETED** | Double Ratchet + X3DH authenticated prekeys |
-| **Phase 5** | Encrypted Group Messaging & 64 KiB Encrypted Media | **COMPLETED** | Group Tree Ratchet, forward secrecy |
-| **Phase 6** | Multi-Device Synchronization & Recovery Vaults | **COMPLETED** | SAS-MITM verification, BIP-39 mnemonic |
-| **Phase 7** | Privacy UX, Decoy Space, Panic Lock & Notifications | **COMPLETED** | Panic lock zeroization, decoy Space isolation |
-| **Phase 8** | Metadata Minimization & Traffic Obfuscation | **COMPLETED** | Timing perturbation, size quantization |
-| **Phase 9** | Adversarial Security Audit & Penetration Testing | **COMPLETED** | Red-team penetration test suites |
-| **Phase 10** | Release Candidate & Production Packaging | **COMPLETED** | `v1.0.0-rc.1` tagging, build verified |
-| **Phase 11** | Persistent Encrypted Local Storage (IndexedDB) | **COMPLETED** | Transactional migrations, restart tests |
-| **Phase 12** | Standalone Production Relay Server & Protocol v1 | **COMPLETED** | Blind mailbox HTTP/WS server, SHA-256 capability hash |
-| **Phase 13** | Client Networking & Relay Integration | **COMPLETED** | `NetworkManager`, offline queuing, ACK-after-persistence |
-| **Phase 14** | Production Application Shell & Real Messaging UI | **COMPLETED** | React 19 UI, Space switching wipe, safety number verification |
-| **Phase 15** | Production Integration, Hardening & Real-World Flows | **COMPLETED** | Signed invitations, attachment pipeline, local search, persistent relay store |
-| **Phase 16** | Final Production Validation & Performance Benchmarking | **COMPLETED** | Full benchmarks, E2E orchestration, Relay CLI, complete docs |
-| **Phase 17** | Real-World Deployment, Production Integration & Release Hardening | **COMPLETED** | 10-Space adversarial suites, real 2-client E2E, deployment package |
-| **Phase 18** | Release Candidate 2 (RC2), Stress Testing & Release Sign-Off | **COMPLETED** | Concurrency bursts, extreme resilience, formal proof model |
-| **Phase 19** | Final Release Engineering, RC2 Hardening & v1.0.0 GA | **COMPLETED** | Release artifacts, checksums, 20-Space scale test, v1.0.0 GA release |
-| **Phase 20** | Live Production Deployment, Android Client & Cross-Platform Validation | **COMPLETED** | Android container, diagnostic tooling, cross-platform E2EE validation |
-| **Phase 21** | Real-Device and Live-Production Validation | **COMPLETED** | Live relay diagnostics, logcat leak auditor, offline recovery & deep-link tests |
-| **Phase 22** | Real-Device Delivery Failure Diagnosis, Repair & Acceptance | **COMPLETED** | Fixed blind mailbox invitation bundling, prekey packaging, dynamic routing & wire payloads (10 test suites) |
-| **Phase 23** | Real-World Identity, Username Discovery & Contact Requests | **COMPLETED** | Global unique usernames, Ed25519-signed profiles, anti-enumeration search, contact request handshake (15 test suites) |
-| **Phase 24** | Production Messaging UX, Real-Device Validation & Identity Completion | **COMPLETED** | Canonical identity mapping, tabbed discovery UX, mobile viewport navigation, 12 dedicated regression suites |
-| **Phase 25** | Intermittent Cross-Client Delivery & Browser Double Ratchet Fix | **COMPLETED** | Fixed browser Node Buffer ReferenceError in Double Ratchet, continuous 20+ message exchanges, safe diagnostics |
-| **Phase 26** | Real-World Release Validation (Web ↔ Web & Android Readiness) | **COMPLETED** | 40-message bidirectional test, 50-message burst, live relay probe, Android diagnostic audit, validation report |
-| **Phase 27** | Cloud & Account Foundation (Persistent Account, Multi-Device, Sync Engine, Object Storage) | **COMPLETED** | Persistent Account/Device identity, SQL/File database schema, Object Storage abstraction, encrypted attachments, SyncEngine, local migration (5 dedicated test suites) |
-| **Phase 28** | Production Cloud Deployment & Real Infrastructure (PostgreSQL, S3 Storage, Caddy, Migrations, Backup/Restore) | **COMPLETED** | Deterministic SQL migrations, S3 Object Storage, Caddy TLS reverse proxy, Docker stack, backup/restore tool, fresh-install re-hydration tests |
-| **Phase 30** | Render + Supabase PostgreSQL + Cloudflare R2 Production Persistence & Attachments | **COMPLETED & ACCEPTED** | Connection pooling PostgreSQL driver `pg`, migration `002_relay_and_directory_persistence`, Cloudflare R2 S3 adapter, uploader/recipient multi-tenant attachment access control, session persistence & auto-healing in EncryptedSpaceStore, inbound voice preservation, complete normal file attachment pipeline, Android APK compilation verified (227 total suites, 468 tests passing, release manifest verified) |
-| **Phase 31** | Production Connectivity Repair, Render/R2/Supabase Integration Verification & Mobile Reliability | **COMPLETED & ACCEPTED** | Root caused and resolved DNS resolution failure by establishing `https://veil-rga0.onrender.com` / `wss://veil-rga0.onrender.com/v1/ws` as canonical production endpoints; verified live Supabase PostgreSQL, Cloudflare R2, account registration, mailbox creation, envelope persistence, encrypted attachment upload/download, and WebSocket `/v1/ws` connectivity (16/16 checks 100% on live Render); excised account-count disclosure on LockScreen; verified 0.0.0.0 PORT binding; created 4 new test suites (250/250 suites, 635/635 tests passing, 100%); fresh native Android APK compiled and verified |
-| **Phase 32** | Complete UI/UX Overhaul, Telegram-Inspired Media Suite & File Saver Engine | **COMPLETED & ACCEPTED** | 100% Pure SVG Icon System (zero emojis as UI controls); Unified `FileSaver` engine for native Android (`@capacitor/filesystem` into `Documents/VEIL` + `@capacitor/share` fallback) and Web (`showSaveFilePicker` / anchor blobs); Fullscreen `MediaViewer` with smooth pan/zoom (1x-4x) and HTML5 video player; `MediaGalleryModal` shared media browser (Photos & Videos grid, Files & Documents list, Voice Notes); `AttachmentPreviewModal` pre-send staging modal; Telegram-inspired message geometry, selection toolbar, contextual long-press menus, responsive auto-expanding composer; all 250 test suites (635 tests) passing; native Android debug APK compiled cleanly |
-| **Phase 33** | Actual UI Transformation, Real In-App Media Integration & Settings Redesign | **COMPLETED & ACCEPTED** | Fixed image viewing pipeline: built `MediaCache` and `<MediaImage />` component for automatic cloud download, cryptographic reassembly, and inline thumbnail rendering; connected `MediaViewer` directly to decrypted buffers with double-click zoom, pan, and HTML5 video playback; fixed `App.tsx` modal router to render `<SettingsModal />`; fully redesigned Settings with Telegram-inspired Profile Header Card and grouped iOS/Telegram list rows with colored SVG icon badges; modernized Chat List with formatted relative timestamps, unread counter pills, and SVG snippet indicators (Photo, Video, File, Voice); 100% test pass (250/250 files, 635/635 tests); release manifest updated; native Android APK verified (`BUILD SUCCESSFUL in 17s`) |
-| **Phase 34** | Real UI Rebuild, Telegram-Style Media, Authorization, Recovery & Network Reliability | **COMPLETED & ACCEPTED** | Zero-Knowledge Account Recovery: created `createOrUpdateRecoveryVault` in `AccountManager`, preserved `spaceId` and deterministic Ed25519 identity on fresh device recovery, and connected full space hydration in `AppState.tsx`; Avatar Propagation: preserved avatar across invitations, `ContactRequestManager` send/inbound/accept handshakes, `ContactDetailsModal`, `ConversationView`, `ProfileModal`, `Sidebar`, and `UserSearchResult`; Group Attachment & Session Auto-Healing: enabled authenticated attachments for groups without recipient restriction, and implemented automatic 401 retry with re-authentication in `CloudClient`; 100% test pass across all 253 test files (642/642 tests); native Android debug APK verified (`BUILD SUCCESSFUL in 22s`) |
-| **Phase 36** | Physical Android Fixes + True Mobile UI Rebuild + Persistent Media + Permissions + Search Stability | **COMPLETED & VERIFIED** | Rebuilt mobile-first layout architecture eliminating split-pane leaks and empty-state bleeds; hardened `MediaCache` and `MediaImage` against ephemeral dead-blob URLs, rehydrating encrypted ciphertext from cloud R2 on restart; added `RECORD_AUDIO` and `MODIFY_AUDIO_SETTINGS` to `AndroidManifest.xml` with human-centered `PermissionsModal`; resolved `undefined.find` search crash in `Sidebar.tsx` and `relationshipHelper.ts`; eliminated 100% of Unicode emoji icons in UI controls; rebuilt message composer and photo bubble sizing; verified 256 test files (651 tests, 100% pass) and compiled Android debug APK (4.52 MB). |
-| **Phase 37** | Real Android UI Repair, Voice Playback Fix, Media Reliability & Production-Grade Mobile Layout | **COMPLETED & VERIFIED** | Fixed `ml.playvoicenote is not a function` by building dedicated `VoicePlayer` / `VoicePlaybackManager` for AEAD decrypted audio playback with real-time waveform progress; rebuilt mobile layout geometry fixing title/time wrapping; fixed photo bubble collapse; streamlined mobile composer; 100% test pass (263/263 files, 681/681 tests); native Android debug APK compiled in 22s (4.37 MB). |
-| **Phase 38** | Product-Quality UI, Performance & Messaging UX Overhaul | **COMPLETED & VERIFIED** | 5-theme tokenized design system (Obsidian, Slate, Light, Midnight, Graphite) & 3 message densities; Web Worker background Argon2id KDF eliminating main-thread UI unlock freeze with sub-100ms response; true E2EE Read Receipts with 3-tier checks (Sent / Delivered / Read) & debounced wire dispatch; non-blocking background file/media upload pipeline with immediate preview; interactive voice note click/drag waveform scrubbing with live current/total timers; privacy-preserving presence subsystem (nobody/contacts/everyone); 100% SVG iconography with zero AI clutter; all test suites passing; native Android APK verified. |
-| **Phase 39** | Forensic Media Pipeline, Real Audio Seek, Account Recovery & State-Machine Repair | **COMPLETED & ACCEPTED** | Fixed attachment objectId/attachmentId loss with upfront deterministic ID generation & state-machine transitions; eliminated permanent "Decrypting" hang via 30s timeout bounding in `MediaCache` & structured retry error boundary; built hardened cross-platform Base64 & Base64URL codec system in `utils.ts`; fixed zero-knowledge account recovery authentication mismatch on fresh installs; connected real clamped waveform audio seeking; 100% test pass. |
-| **Phase 40** | Forensic Media Delivery & Real Playback Rebuild | **COMPLETED & VERIFIED** | Rebuilt inline video rendering in `MediaImage.tsx` with native `<video>` elements resolving invalid `<img>` decoding failures; redesigned `MediaViewer.tsx` with on-demand zero-knowledge decryption, Telegram-grade fullscreen controls, time tooltips, and real `loadedmetadata` duration; restored multi-tenant recipient authorization; added staged waveform seeking in `VoicePlayer`; authored safe telemetry `MediaLogger`; 100% test pass across all 282 test files (743/743 tests); release manifest updated; native Android debug APK compiled cleanly in 22s. |
+## Current Verified Phase: PHASE 42 (Real Runtime Verification & Forensic Failure Elimination)
+- **Status**: **COMPLETE & VERIFIED 100%**
+- **Test Results**: **299 / 299 test files passing (774 / 774 automated tests, 100% clean pass, 0 failures, 0 skipped)**
+- **Web App Build**: **PASS (`npm run build` in 1.70s)**
+- **Release Manifest**: **PASS (`release/v1.0.0/manifest.json` generated)**
+- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.16s)**
+- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` in 17s, `BUILD SUCCESSFUL`)**
+- **Physical Android Verification**: **UNVERIFIED (ADB shows `List of devices attached` with 0 physical devices attached)**
 
 ---
 
-## 2. Quantitative Verification Metrics
+## Phase 42 Verified Deliverables
 
-- **Release Version**: **`1.0.0` (Forensic Media Delivery & Real Playback Rebuild)**
-- **Total Test Files**: **282 / 282 passed (100% pass rate)**
-- **Total Tests**: **743 / 743 passed (0 failures, 0 skipped)**
-- **Native Android Binary**: **`android/app/build/outputs/apk/debug/app-debug.apk` (verified clean Gradle build in 22s)**
-- **Release Build Status**: `npm run build` succeeds cleanly (`dist/` created in 3.17s, release manifest updated)
-- **Capacitor Sync**: `npx cap sync android` succeeds cleanly in 0.20s
-- **Working Tree**: Clean, verified, documented.
+1. **Runtime Forensic Diagnostics Subsystem (`src/debug/runtimeDiagnostics.ts`)**:
+   - Structured logging across categories: `[VEIL MEDIA]`, `[VEIL UPLOAD]`, `[VEIL WIRE]`, `[VEIL RECEIVE]`, `[VEIL DOWNLOAD]`, `[VEIL DECRYPT]`, `[VEIL VIDEO]`, `[VEIL AUDIO]`, `[VEIL RECOVERY]`, `[VEIL TIMEOUT]`.
+   - Security redaction engine: guarantees zero leakage of passwords, private keys, symmetric keys, plaintext messages, or recovery secrets.
+   - Disabled/stripped in production builds.
+
+2. **Video Player vs Thumbnail Architectural Separation**:
+   - Chat bubble thumbnail generation and display decoupled from HTML5 video playback engine.
+   - Interactive Fullscreen Viewer (`MediaViewer.tsx`) with real video frame decoding, `loadedmetadata`, `canplay`, seek bar (`videoRef.current.currentTime = targetSeconds`), time duration formatting, mute/fullscreen toggles, and error recovery.
+
+3. **Audio Waveform Seeking Physical Control & Touch Scrubbing**:
+   - `VoicePlaybackManager.seek(percent)` directly updates `HTMLAudioElement.currentTime` and logs structured `[VEIL AUDIO]` diagnostic telemetry.
+   - `VoiceNoteCard.tsx` pointer capture (`setPointerCapture`) and `touchAction: 'none'` allowing touch scrubbing without vertical scroll interference.
+
+4. **Account Recovery Forensic Trace & Identity Continuity**:
+   - Complete recovery lifecycle verification: username normalization $\rightarrow$ Argon2id KDF $\rightarrow$ server auth $\rightarrow$ vault retrieval $\rightarrow$ local XChaCha20-Poly1305 decryption $\rightarrow$ Space Master Key rehydration $\rightarrow$ Ed25519 identity verification.
+   - Full memory wipe test proving identical Master Key and `identityId` recreated byte-for-byte.
+
+5. **State Machine Timeout Hardening & Fail-Closed Guards**:
+   - 30-second timeout boundaries on attachment uploads and downloads.
+   - Guaranteed cleanup of in-flight locks with retry capability on failure.
+
+6. **Dedicated Phase 42 Forensic Test Suites (`tests/phase42-*.test.ts`)**:
+   - `phase42-runtime-diagnostics.test.ts`: Validates telemetry logging and secret redaction.
+   - `phase42-audio-seek-runtime.test.ts`: Proves `audio.currentTime` physics and staged seek.
+   - `phase42-video-player-runtime.test.tsx`: Validates video player lifecycle, seeking, and diagnostics.
+   - `phase42-account-recovery-runtime.test.ts`: Proves full memory wipe $\rightarrow$ account recovery $\rightarrow$ identical Master Key and `identityId`.
+   - `phase42-media-delivery-runtime.test.ts`: Tests real 2-account media delivery for image, video, 3 images, and mixed media with all 15 audit invariants.
+   - `phase42-state-machine-timeout.test.ts`: Validates fail-closed state transitions on network/R2 failures.

@@ -3,15 +3,15 @@
  *
  * Handles incoming/outgoing alignment, reply quote rendering, attachment previews,
  * voice player embedding, delivery receipts, selection checkboxes, context menu triggers,
- * retry actions on failure, consecutive grouping, and timestamp formatting.
+ * retry actions on failure, consecutive grouping, timestamp formatting, and swipe-to-reply gesture.
  */
 
-import React, { ReactNode, useRef } from 'react';
+import React, { ReactNode, useRef, useState } from 'react';
 import { ReplyPreview, ReplyPreviewData } from './ReplyPreview.tsx';
 import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
 import { Spinner } from './Spinner.tsx';
-import { RefreshCwIcon } from '../icons/index.ts';
+import { RefreshCwIcon, ReplyIcon } from '../icons/index.ts';
 
 export interface MessageBubbleProps {
   id?: string;
@@ -70,11 +70,42 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const effectiveStatus: DeliveryStatus = status || deliveryStatus || 'DELIVERED_TO_RECIPIENT';
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleTouchStart = () => {
+  // Swipe-to-reply touch gesture tracking
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches && e.touches.length === 1) {
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+
     if (onLongPress) {
       longPressTimerRef.current = setTimeout(() => {
         onLongPress();
       }, 500);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || !e.touches || e.touches.length !== 1) return;
+
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.touches[0].clientY - touchStartRef.current.y;
+
+    // If scrolling vertically, cancel swipe-to-reply
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      setSwipeOffset(0);
+      return;
+    }
+
+    // Swiping left (negative deltaX)
+    if (deltaX < 0 && onReplyTrigger && !isSelectionMode) {
+      // Cancel long press if user is actively swiping
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      setSwipeOffset(Math.max(-50, deltaX));
     }
   };
 
@@ -83,6 +114,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+
+    if (swipeOffset < -35 && onReplyTrigger) {
+      onReplyTrigger();
+    }
+
+    setSwipeOffset(0);
+    touchStartRef.current = null;
   };
 
   const isFailed = effectiveStatus === 'FAILED';
@@ -97,8 +135,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       onClick={isSelectionMode && onSelectToggle ? onSelectToggle : undefined}
       onContextMenu={onContextMenu}
       onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      style={{ cursor: isSelectionMode ? 'pointer' : undefined }}
+      style={{
+        cursor: isSelectionMode ? 'pointer' : undefined,
+        position: 'relative',
+      }}
     >
       {isSelectionMode && (
         <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}>
@@ -112,10 +154,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </div>
       )}
 
+      {/* Visual Swipe-to-reply icon indicator */}
+      {swipeOffset < -15 && (
+        <div
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: 'var(--veil-accent-primary)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+            opacity: Math.min(1, Math.abs(swipeOffset) / 35),
+            transition: 'opacity 0.1s ease',
+            zIndex: 5,
+          }}
+          aria-hidden="true"
+        >
+          <ReplyIcon size={14} />
+        </div>
+      )}
+
       <div
         className={`veil-message-bubble ${isOutgoing ? 'outgoing' : 'incoming'} ${
           isSelected ? 'veil-message-selected' : ''
         } ${isHighlighted ? 'veil-message-highlight' : ''}`}
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
+        }}
       >
         {replyTo && (
           <ReplyPreview
@@ -158,42 +231,36 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {isFailed && onRetry && (
             <button
               type="button"
-              style={{
-                background: 'var(--veil-danger-bg)',
-                border: '1px solid var(--veil-danger-border)',
-                color: 'var(--veil-danger)',
-                borderRadius: 'var(--veil-radius-sm)',
-                fontSize: '0.7rem',
-                cursor: isRetrying ? 'not-allowed' : 'pointer',
-                padding: '1px 6px',
-                fontWeight: 600,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-              }}
-              disabled={isRetrying}
               onClick={(e) => {
                 e.stopPropagation();
                 onRetry();
               }}
+              className="veil-btn-retry"
+              disabled={isRetrying}
               aria-label="Retry sending failed message"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '2px',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--veil-danger)',
+                cursor: 'pointer',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: 0,
+              }}
             >
               {isRetrying ? (
-                <>
-                  <Spinner size="sm" aria-label="Retrying..." />
-                  <span>Retrying...</span>
-                </>
+                <Spinner size="xs" color="var(--veil-danger)" />
               ) : (
-                <>
-                  <RefreshCwIcon size={12} />
-                  <span>Retry</span>
-                </>
+                <RefreshCwIcon size={12} color="var(--veil-danger)" />
               )}
+              <span>{isRetrying ? 'Retrying...' : 'Retry'}</span>
             </button>
           )}
 
           <MessageTimestamp timestamp={timestamp} />
-
           {isOutgoing && <MessageStatus status={effectiveStatus} />}
         </div>
       </div>

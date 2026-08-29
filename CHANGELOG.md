@@ -2,7 +2,62 @@
 
 All notable changes to the VEIL project are documented in this file.
 
-## [1.0.0-phase38] - 2026-08-29
+## [1.0.0-phase42] - 2026-08-30
+
+### Added
+- **Runtime Forensic Diagnostics Subsystem (`src/debug/runtimeDiagnostics.ts`)**:
+  - Structured, categorized telemetry across all critical data pipelines: `[VEIL MEDIA]`, `[VEIL UPLOAD]`, `[VEIL WIRE]`, `[VEIL RECEIVE]`, `[VEIL DOWNLOAD]`, `[VEIL DECRYPT]`, `[VEIL VIDEO]`, `[VEIL AUDIO]`, `[VEIL RECOVERY]`, `[VEIL TIMEOUT]`.
+  - Automated security redaction engine guaranteeing zero leakage of passwords, private keys, symmetric keys, plaintext messages, or recovery secrets.
+- **Dedicated Phase 42 Forensic Test Suites (`tests/phase42-*.test.ts`)**:
+  - `phase42-runtime-diagnostics.test.ts`: Proves telemetry recording and secret redaction.
+  - `phase42-audio-seek-runtime.test.ts`: Proves `HTMLAudioElement.currentTime` updates and touch scrubbing.
+  - `phase42-video-player-runtime.test.tsx`: Validates video player lifecycle, seeking, and diagnostic events.
+  - `phase42-account-recovery-runtime.test.ts`: Proves full memory wipe $\rightarrow$ account recovery $\rightarrow$ identical Master Key and `identityId`.
+  - `phase42-media-delivery-runtime.test.ts`: Proves real 2-account media delivery for image, video, 3 images, and mixed media with all 15 audit invariants.
+  - `phase42-state-machine-timeout.test.ts`: Validates fail-closed state transitions on network/R2 failures.
+
+### Changed
+- **Video Player Architecture (`src/ui/components/media/MediaViewer.tsx`)**:
+  - Decoupled chat bubble thumbnail presentation from HTML5 video playback engine.
+  - Interactive Fullscreen Viewer with video frame decoding, `loadedmetadata`, `canplay`, seek bar (`videoRef.current.currentTime = targetSeconds`), time duration formatting, mute/fullscreen toggles, and error recovery.
+- **Account Recovery Trace & Sanitization (`src/account/accountManager.ts`)**:
+  - Instrumented `restoreAccount` with step-by-step diagnostic logging and username case-insensitivity normalization.
+- **State Machine Fail-Closed Timeouts (`src/ui/utils/mediaCache.ts`, `src/ui/app/AppState.tsx`)**:
+  - Enforced 30s timeout guards on media upload and download operations to prevent hanging pending states.
+
+### Verification
+- 299 / 299 test files passing (774 / 774 automated tests, 100% clean pass, 0 failures, 0 skipped).
+- Web production build passing (`dist/`).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`app-debug.apk`).
+
+## [1.0.0-phase41] - 2026-08-30
+
+### Added
+- **Strict Wire Serialization Boundary (`src/attachments/types.ts`)**:
+  - Added `toWireAttachment()` and `toWireAttachments()` allowlist constructors that explicitly omit local UI state (`previewUrl`, `localPreviewUrl`, `state`, `progressPercent`, `error`, `blob:`, `Blob`, `File`, DOM elements, MediaCache state, upload promises).
+  - Added recursive safety assertion `assertWireSafe()` to fail closed on any attempted transmission of ephemeral local URLs or DOM nodes over the wire.
+- **Bounded Concurrency Upload Engine (`src/ui/app/AppState.tsx`)**:
+  - Implemented `sendAttachments()` with bounded worker pool (`MAX_CONCURRENT_ATTACHMENT_UPLOADS = 2`).
+  - Added non-blocking immediate UI staging (`[A: UPLOADING, B: UPLOADING, C: QUEUED, D: QUEUED]`) with zero composer freezing.
+  - Per-item state tracking (`QUEUED | UPLOADING | SENT | FAILED`) with independent retry triggers.
+- **Dedicated Phase 41 Test Suites (`tests/phase41-*.test.ts`)**:
+  - `phase41-wire-payload-isolation.test.ts`: Validates protocol serialization allowlist and defensive recursion checks.
+  - `phase41-multi-attachments.test.ts`: Validates bounded upload concurrency (max 2) and grouping.
+  - `phase41-codec-audit.test.ts`: Scans all TypeScript files under `src/` to guarantee zero `atob()` / `btoa()` browser primitives.
+  - `phase41-audio-seek.test.ts`: Validates `VoicePlaybackManager.seek()` physical control and `currentTime` synchronization.
+  - `phase41-media-delivery-e2e.test.ts`: Validates 2-account real E2E media delivery over HTTP relay with local decryption.
+
+### Changed
+- **Codec Hardening in KDF (`src/crypto/kdf.ts`)**:
+  - Replaced legacy `btoa(String.fromCharCode(...salt))` with constant-time UTF-8 safe `bytesToBase64(salt)`.
+- **Message Composer Multi-File Dispatch (`src/ui/components/MessageComposer.tsx`)**:
+  - Dispatches multiple selected files via `sendAttachments()` for single-message grouping.
+
+### Verification
+- 293 / 293 test files passing (762 / 762 automated tests, 100% clean pass, 0 failures, 0 skipped).
+- Web production build passing (`dist/`).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`app-debug.apk`).
+
 
 ### Added
 - **5-Theme Design System (`src/styles/themes.css`, `veil-design-system.css`, `SettingsModal.tsx`)**:

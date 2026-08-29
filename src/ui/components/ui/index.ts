@@ -26,3 +26,4 @@ export * from './ReplyPreview.tsx';
 export * from './MessageStatus.tsx';
 export * from './MessageTimestamp.tsx';
 export * from './UserSearchResult.tsx';
+export * from './LoadingSpinner.tsx';

@@ -10,6 +10,7 @@ import { CloudClient } from '../network/cloudClient.ts';
 import { SpaceSession } from '../spaces/session.ts';
 import { VoiceRecordingMetadata, VoiceRecorder } from './voiceRecorder.ts';
 import { MediaLogger } from '../ui/utils/mediaLogger.ts';
+import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
 
 export interface VoicePlaybackCallbacks {
   onProgress?: (progressPercent: number, currentTime: number, duration: number) => void;
@@ -217,16 +218,27 @@ export class VoicePlaybackManager {
 
     const duration = this.getDuration() || 1;
     const targetTime = (clampedPercent / 100) * duration;
+    let actualCurrentTime = targetTime;
 
     if (this.currentAudio) {
       try {
         this.currentAudio.currentTime = targetTime;
+        actualCurrentTime = this.currentAudio.currentTime;
       } catch (_e) {}
     }
 
     if (this.activeCallbacks?.onProgress) {
       this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
     }
+
+    RuntimeDiagnostics.audio('seekRequested', {
+      duration,
+      seekRequested: clampedPercent,
+      targetTime,
+      actualCurrentTime,
+      audioActive: !!this.currentAudio,
+      messageId: messageId || this.currentPlayingId,
+    });
 
     MediaLogger.log({
       event: 'SEEK_EXECUTED',

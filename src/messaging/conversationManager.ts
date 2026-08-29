@@ -20,6 +20,12 @@ import type { SpaceSession } from '../spaces/session.ts';
 import type { EncryptedSpaceStore } from '../storage/spaceStore.ts';
 import { SpaceIdentityManager } from '../identity/manager.ts';
 import { IdentityDocument } from '../identity/document.ts';
+import {
+  toWireAttachment,
+  toWireAttachments,
+  assertWireSafe,
+  WireAttachmentPayload,
+} from '../attachments/types.ts';
 
 export type MessageDeliveryStatus = 'queued' | 'sent' | 'delivered' | 'read';
 
@@ -282,20 +288,10 @@ export class ConversationManager {
     session: SpaceSession,
     peerBundle: PrekeyBundle,
     text: string,
-    attachment?: {
-      attachmentId?: string;
-      name: string;
-      sizeBytes: number;
-      mimeType: string;
-      objectId?: string;
-      ciphertextHash?: string;
-      chunkCount?: number;
-      chunkSize?: number;
-      sha256Hash?: string;
-      encryptionKeyBase64?: string;
-    },
+    attachment?: any,
     replyTo?: { messageId: string; senderName?: string; text: string; attachmentType?: string },
-    voice?: { durationSeconds: number; sizeBytes: number; objectId: string; mimeType: string; ciphertextHash: string; encryptionKeyBase64: string; nonceBase64: string }
+    voice?: { durationSeconds: number; sizeBytes: number; objectId: string; mimeType: string; ciphertextHash: string; encryptionKeyBase64: string; nonceBase64: string },
+    attachments?: any[]
   ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {
     this.assertSession(session);
 
@@ -327,8 +323,11 @@ export class ConversationManager {
     const ratchetMsg = ratchetSession.ratchetEncrypt(text, x3dhHeader);
     const deliveryId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-    // 2. Package into WirePayload
+    // 2. Package into WirePayload with strict allowlist serialization
     const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
+    const wireAttachment = attachment ? toWireAttachment(attachment) : undefined;
+    const wireAttachments = toWireAttachments(attachments);
+
     const wireObj = {
       version: 1 as const,
       deliveryId,
@@ -336,10 +335,14 @@ export class ConversationManager {
       senderDocument: myDoc,
       senderMailboxId: binding?.mailboxId,
       ratchetMessage: ratchetMsg,
-      attachment,
+      attachment: wireAttachment,
+      attachments: wireAttachments,
       replyTo,
       voice,
     };
+
+    // Strict validation: Reject any accidental local preview URLs or Blob/File instances
+    assertWireSafe(wireObj, 'wirePayload');
 
     // 3. Size-normalize & Pad
     const jsonBytes = new TextEncoder().encode(JSON.stringify(wireObj));
@@ -376,6 +379,7 @@ export class ConversationManager {
     senderDoc: IdentityDocument;
     senderMailboxId?: string;
     attachment?: any;
+    attachments?: any[];
     replyTo?: any;
     voice?: any;
   }> {
@@ -501,6 +505,7 @@ export class ConversationManager {
       senderDoc,
       senderMailboxId: wireObj.senderMailboxId,
       attachment: wireObj.attachment,
+      attachments: wireObj.attachments,
       replyTo: wireObj.replyTo,
       voice: wireObj.voice,
     };

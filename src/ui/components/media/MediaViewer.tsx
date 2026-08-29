@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
 import { MediaLogger } from '../../utils/mediaLogger.ts';
+import { RuntimeDiagnostics } from '../../../debug/runtimeDiagnostics.ts';
 import {
   CloseIcon,
   ChevronLeftIcon,
@@ -259,6 +260,12 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     const targetSeconds = (targetPercent / 100) * videoDuration;
     videoRef.current.currentTime = targetSeconds;
     setVideoProgress(targetSeconds);
+    RuntimeDiagnostics.video('seekExecuted', {
+      targetPercent,
+      targetSeconds,
+      actualCurrentTime: videoRef.current.currentTime,
+      duration: videoDuration,
+    });
   };
 
   const formatTime = (seconds: number) => {
@@ -301,6 +308,21 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         </div>
 
         <div className="veil-media-viewer-actions">
+          {currentItem.attachment?.allowSave === false && (
+            <span
+              style={{
+                fontSize: 'var(--veil-text-xs)',
+                color: 'var(--veil-text-secondary)',
+                padding: '0.2rem 0.5rem',
+                background: 'rgba(255,255,255,0.08)',
+                borderRadius: 'var(--veil-radius-sm)',
+                marginRight: '0.5rem',
+              }}
+            >
+              Saving disabled by sender
+            </span>
+          )}
+
           {currentItem.type === 'image' && (
             <>
               <IconButton
@@ -319,7 +341,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
             </>
           )}
 
-          {onShare && (
+          {onShare && currentItem.attachment?.allowSave !== false && (
             <IconButton
               icon={<ShareIcon size={20} />}
               onClick={() => onShare({ ...currentItem, url: currentBlobUrl })}
@@ -328,7 +350,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
             />
           )}
 
-          {onDownload && (
+          {onDownload && currentItem.attachment?.allowSave !== false && (
             <IconButton
               icon={<DownloadIcon size={20} />}
               onClick={() => onDownload({ ...currentItem, url: currentBlobUrl })}
@@ -410,12 +432,20 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                       setVideoDuration(dur);
                     }
                     setIsVideoLoading(false);
+                    RuntimeDiagnostics.video('metadataLoaded', {
+                      duration: dur,
+                      objectId: currentKey,
+                    });
                   }}
-                  onCanPlay={() => setIsVideoLoading(false)}
+                  onCanPlay={() => {
+                    setIsVideoLoading(false);
+                    RuntimeDiagnostics.video('canPlay', { objectId: currentKey });
+                  }}
                   onWaiting={() => setIsVideoLoading(true)}
                   onPlaying={() => {
                     setIsPlaying(true);
                     setIsVideoLoading(false);
+                    RuntimeDiagnostics.video('playing', { objectId: currentKey });
                   }}
                   onPause={() => setIsPlaying(false)}
                   onTimeUpdate={(e) => {
@@ -428,10 +458,15 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                   onEnded={() => {
                     setIsPlaying(false);
                     setVideoProgress(0);
+                    RuntimeDiagnostics.video('ended', { objectId: currentKey });
                   }}
                   onError={() => {
                     setIsVideoLoading(false);
                     setMediaErrors((prev) => ({ ...prev, [currentKey]: 'Video playback failed' }));
+                    RuntimeDiagnostics.video('error', {
+                      objectId: currentKey,
+                      error: 'Video playback failed',
+                    });
                   }}
                 />
 

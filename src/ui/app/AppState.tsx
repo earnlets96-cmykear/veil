@@ -41,8 +41,16 @@ import { randomBytes, bytesToBase64, bytesToHex } from '../../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha256.js';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
+import { MediaLogger } from '../utils/mediaLogger.ts';
+import {
+  LocalAttachmentPayload,
+  WireAttachmentPayload,
+  toWireAttachment,
+  toWireAttachments,
+} from '../../attachments/types.ts';
 import { readReceiptManager } from '../../messaging/readReceipts.ts';
 import { presenceManager } from '../../presence/presenceManager.ts';
+import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -99,7 +107,8 @@ export interface AppContextType {
   selectConversation: (id: string | null) => void;
   setReplyTarget: (msg: UIMessage | null) => void;
   sendMessage: (conversationId: string, text: string) => Promise<void>;
-  sendAttachment: (conversationId: string, file: File) => Promise<void>;
+  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
+  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
   sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
@@ -422,8 +431,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Standard E2EE wire payload processing
         try {
           const result = await convManager.processInboundWirePayload(session, payload);
-          const { storedMessage, senderDoc, senderMailboxId, attachment, replyTo, voice } = result;
+          const { storedMessage, senderDoc, senderMailboxId, attachment, attachments, replyTo, voice } = result;
 
+          const incomingAttachments = attachments || (attachment ? [attachment] : undefined);
           const incomingMsg: UIMessage = {
             id: storedMessage.messageId,
             conversationId: storedMessage.conversationId,
@@ -432,10 +442,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             isOutgoing: false,
             timestamp: storedMessage.timestamp,
             status: 'DELIVERED_TO_RECIPIENT',
-            attachment,
+            attachment: incomingAttachments ? incomingAttachments[0] : attachment,
+            attachments: incomingAttachments,
             replyTo,
             voice,
           };
+
+          RuntimeDiagnostics.receive('wireMessageReceived', {
+            messageId: incomingMsg.id,
+            conversationId: incomingMsg.conversationId,
+            senderId: incomingMsg.senderId,
+            attachmentCount: incomingAttachments?.length || (attachment ? 1 : 0),
+            attachmentIds: incomingAttachments?.map((a: any) => a.attachmentId) || (attachment ? [attachment.attachmentId] : []),
+            objectIds: incomingAttachments?.map((a: any) => a.objectId) || (attachment ? [attachment.objectId] : []),
+          });
 
           const currentContacts = await contactManager.listContacts(session);
           let matchingContact = currentContacts.find(
@@ -937,42 +957,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, contacts, conversations]
   );
 
-  const sendAttachment = useCallback(
-    async (conversationId: string, file: File) => {
-      if (!activeSession) return;
+  const sendAttachments = useCallback(
+    async (
+      conversationId: string,
+      files: File[],
+      options?: { allowSave?: boolean; allowForward?: boolean }
+    ) => {
+      if (!activeSession || files.length === 0) return;
       sessionController.recordUserActivity();
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
+      const allowSave = options?.allowSave !== false;
+      const allowForward = options?.allowForward !== false;
 
-      const activeReply = replyTarget ? {
-        messageId: replyTarget.id,
-        senderName: replyTarget.senderName || replyTarget.senderId,
-        text: replyTarget.text,
-        attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
-      } : undefined;
+      const activeReply = replyTarget
+        ? {
+            messageId: replyTarget.id,
+            senderName: replyTarget.senderName || replyTarget.senderId,
+            text: replyTarget.text,
+            attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
+          }
+        : undefined;
 
       setReplyTarget(null);
 
-      // Create instant local ephemeral preview for smooth UX
-      let initialPreviewUrl: string | undefined;
-      if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-        try {
-          initialPreviewUrl = URL.createObjectURL(file);
-        } catch (_e) {}
-      }
-
-      const initialAttachmentPayload = {
-        attachmentId,
-        name: file.name,
-        sizeBytes: file.size,
-        mimeType: file.type || 'application/octet-stream',
-        previewUrl: initialPreviewUrl,
-        state: 'UPLOADING' as const,
-      };
+      // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
+      const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
+        const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
+        let initialPreviewUrl: string | undefined;
+        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+          try {
+            initialPreviewUrl = URL.createObjectURL(file);
+          } catch (_e) {}
+        }
+        return {
+          attachmentId,
+          name: file.name,
+          sizeBytes: file.size,
+          mimeType: file.type || 'application/octet-stream',
+          previewUrl: initialPreviewUrl,
+          localPreviewUrl: initialPreviewUrl,
+          state: idx < 2 ? ('UPLOADING' as const) : ('QUEUED' as const),
+          allowSave,
+          allowForward,
+        };
+      });
 
       const freshContacts = await contactManager.listContacts(activeSession);
-      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      const targetContact =
+        freshContacts.find((c) => c.identityId === conversationId) ||
+        contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
       const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
@@ -983,21 +1017,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         targetContact?.name,
       ].filter(Boolean) as string[]);
 
+      const summaryText =
+        files.length === 1 && !files[0].type.startsWith('image/') && !files[0].type.startsWith('video/')
+          ? `Attachment: ${files[0].name}`
+          : '';
+
       const pendingMsg: UIMessage = {
         id: msgId,
         conversationId,
         senderId: activeSession.spaceId,
-        text: file.type.startsWith('image/') || file.type.startsWith('video/') ? '' : `Attachment: ${file.name}`,
+        text: summaryText,
         isOutgoing: true,
         timestamp: Date.now(),
         status: 'UPLOADING',
-        attachment: initialAttachmentPayload,
+        attachment: initialAttachments[0],
+        attachments: initialAttachments,
         replyTo: activeReply,
+        privacy: {
+          allowSave,
+          allowForward,
+        },
       };
 
-      // 1. Instantly display in UI timeline (0ms lag, non-blocking composer)
+      // 2. Instantly display in UI timeline (0ms lag, non-blocking composer)
       setMessages((prev) => {
-        const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []);
+        const list = prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || [];
         const updated = { ...prev };
         for (const k of keys) {
           updated[k] = [...list, pendingMsg];
@@ -1006,168 +1050,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
 
+      const summaryBadge =
+        files.length === 1
+          ? files[0].type.startsWith('image/')
+            ? '📷 Photo'
+            : files[0].type.startsWith('video/')
+            ? '▶ Video'
+            : `📎 ${files[0].name}`
+          : `📷 ${files.length} Media Files`;
+
       setConversations((prev) => {
         const updated = prev.map((c) =>
-          c.id === conversationId
-            ? { ...c, lastMessage: file.type.startsWith('image/') ? '📷 Photo' : `📎 ${file.name}`, timestamp: Date.now() }
+          c.id === conversationId || c.id === targetContact?.identityId || c.name === targetContact?.name
+            ? { ...c, lastMessage: summaryBadge, timestamp: Date.now() }
             : c
         );
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
 
-      // 2. Perform background encryption, cloud upload, and wire dispatch asynchronously
+      // 3. Perform bounded background encryption, cloud upload (MAX CONCURRENCY = 2) and wire dispatch
       (async () => {
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          const fileBytes = new Uint8Array(arrayBuffer);
+        const activeAttachments = [...initialAttachments];
+        let hasAnyError = false;
 
-          // Pre-cache staging bytes for immediate inline rendering
-          MediaCache.set(attachmentId, {
-            id: attachmentId,
-            blobUrl: initialPreviewUrl || '',
-            data: fileBytes,
-            mimeType: file.type || 'application/octet-stream',
-            name: file.name,
-            sizeBytes: file.size,
-          });
-
-          const ephemeralKey = randomBytes(32);
-          const { metadata, chunks } = AttachmentPipeline.chunkAndEncrypt(
-            fileBytes,
-            file.name,
-            file.type || 'application/octet-stream',
-            ephemeralKey,
-            undefined,
-            attachmentId
-          );
-
-          const rawCiphertext = new TextEncoder().encode(JSON.stringify(chunks));
-          const ciphertextHash = bytesToHex(sha256(rawCiphertext));
-
-          await ensureCloudSession(activeSession);
-
-          let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
-          const uploadWithSession = async () => {
-            const createParams: any = {
-              attachmentId: metadata.attachmentId,
-              spaceId: activeSession.spaceId,
-              ciphertextSize: rawCiphertext.length,
-              ciphertextHash,
-              chunkCount: metadata.chunkCount,
-              chunkSize: metadata.chunkSize,
-              conversationId,
-              encryptedMetadata: JSON.stringify({
-                name: metadata.name,
-                mimeType: metadata.mimeType,
-                sizeBytes: metadata.sizeBytes,
-                conversationId,
-                recipientUsername: isGroup ? undefined : targetUsername,
-                recipientAccountId: isGroup ? undefined : targetContact?.metadata?.accountId,
-              }),
-            };
-
-            if (!isGroup) {
-              createParams.recipientUsername = targetUsername;
-              createParams.recipientAccountId = targetContact?.metadata?.accountId;
-            }
-
-            const createRes = await cloudClient.createAttachment(createParams);
-            objectId = createRes.attachment.objectId;
-            await cloudClient.uploadAttachment(objectId, rawCiphertext);
-          };
-
-          try {
-            await uploadWithSession();
-          } catch (uploadErr: any) {
-            const reauthed = await ensureCloudSession(activeSession, true);
-            if (reauthed) {
-              await uploadWithSession();
-            } else {
-              throw uploadErr;
-            }
-          }
-
-          let previewUrl = initialPreviewUrl;
-          if (!previewUrl && (metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/'))) {
-            previewUrl = AttachmentPipeline.createEphemeralBlobUrl(fileBytes, metadata.mimeType);
-          }
-
-          const finalAttachmentPayload = {
-            attachmentId: metadata.attachmentId,
-            objectId,
-            name: metadata.name,
-            mimeType: metadata.mimeType,
-            sizeBytes: metadata.sizeBytes,
-            chunkCount: metadata.chunkCount,
-            chunkSize: metadata.chunkSize,
-            sha256Hash: metadata.sha256Hash,
-            ciphertextHash,
-            encryptionKeyBase64: bytesToBase64(ephemeralKey),
-            previewUrl,
-            state: 'SENT' as const,
-          };
-
-          const cacheKey = objectId;
-          MediaCache.set(cacheKey, {
-            id: cacheKey,
-            blobUrl: previewUrl || '',
-            data: fileBytes,
-            mimeType: metadata.mimeType,
-            name: metadata.name,
-            sizeBytes: fileBytes.length,
-          });
-
-          const wireText = metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/') ? '' : `Attachment: ${file.name}`;
-          let wirePayload: string;
-          if (targetContact?.prekeyBundle) {
-            const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-              activeSession,
-              targetContact.prekeyBundle,
-              wireText,
-              finalAttachmentPayload,
-              activeReply
-            );
-            wirePayload = wirePayloadBase64;
-          } else {
-            wirePayload = JSON.stringify({
-              id: msgId,
-              conversationId,
-              senderId: activeSession.spaceId,
-              text: wireText,
-              attachment: finalAttachmentPayload,
-              replyTo: activeReply,
-            });
-          }
-
-          await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
-
-          setMessages((prev) => {
-            const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-              m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const, attachment: finalAttachmentPayload } : m
-            );
-            const updated = { ...prev };
-            for (const k of keys) {
-              updated[k] = list;
-            }
-            store.setAsync(activeSession, 'veil:ui:messages', updated);
-            return updated;
-          });
-        } catch (uploadErr) {
-          if (typeof console !== 'undefined' && console.warn) {
-            console.warn('[VEIL-ATTACHMENT] Background upload failed:', uploadErr);
-          }
+        const updateTimeline = (currentAtts: LocalAttachmentPayload[], status: any) => {
           setMessages((prev) => {
             const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
               m.id === msgId
                 ? {
                     ...m,
-                    status: 'FAILED' as const,
-                    attachment: {
-                      ...initialAttachmentPayload,
-                      state: 'FAILED' as const,
-                      error: (uploadErr as any)?.message || 'Upload failed',
-                    },
+                    status,
+                    attachment: currentAtts[0],
+                    attachments: currentAtts,
                   }
                 : m
             );
@@ -1178,10 +1093,249 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             store.setAsync(activeSession, 'veil:ui:messages', updated);
             return updated;
           });
+        };
+
+        // Bounded concurrency pool (max 2 parallel tasks)
+        let queueIndex = 0;
+        const uploadWorker = async () => {
+          while (queueIndex < files.length) {
+            const idx = queueIndex++;
+            const file = files[idx];
+            const currentAtt = activeAttachments[idx];
+
+            currentAtt.state = 'UPLOADING';
+            updateTimeline(activeAttachments, 'UPLOADING');
+
+            try {
+              MediaLogger.log({
+                event: 'ENCRYPTION_STARTED',
+                attachmentId: currentAtt.attachmentId,
+                mimeType: currentAtt.mimeType,
+                sizeBytes: currentAtt.sizeBytes,
+              });
+
+              const fileBytes = new Uint8Array(await file.arrayBuffer());
+
+              // Pre-cache staging bytes for immediate inline rendering
+              MediaCache.set(currentAtt.attachmentId, {
+                id: currentAtt.attachmentId,
+                blobUrl: currentAtt.previewUrl || URL.createObjectURL(file),
+                data: fileBytes,
+                mimeType: currentAtt.mimeType,
+                name: currentAtt.name,
+                sizeBytes: currentAtt.sizeBytes,
+              });
+
+              const ephemeralKey = randomBytes(32);
+              const { metadata, chunks } = AttachmentPipeline.chunkAndEncrypt(
+                fileBytes,
+                file.name,
+                currentAtt.mimeType,
+                ephemeralKey,
+                undefined,
+                currentAtt.attachmentId
+              );
+
+              const rawCiphertext = new TextEncoder().encode(JSON.stringify(chunks));
+              const ciphertextHash = bytesToHex(sha256(rawCiphertext));
+
+              MediaLogger.log({
+                event: 'R2_UPLOAD_STARTED',
+                attachmentId: currentAtt.attachmentId,
+                sizeBytes: rawCiphertext.length,
+              });
+
+              await ensureCloudSession(activeSession);
+
+              let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
+              const uploadWithSession = async () => {
+                const createParams: any = {
+                  attachmentId: metadata.attachmentId,
+                  spaceId: activeSession.spaceId,
+                  ciphertextSize: rawCiphertext.length,
+                  ciphertextHash,
+                  chunkCount: metadata.chunkCount,
+                  chunkSize: metadata.chunkSize,
+                  conversationId,
+                  encryptedMetadata: JSON.stringify({
+                    name: metadata.name,
+                    mimeType: metadata.mimeType,
+                    sizeBytes: metadata.sizeBytes,
+                    conversationId,
+                    recipientUsername: isGroup ? undefined : targetUsername,
+                    recipientAccountId: isGroup ? undefined : targetContact?.metadata?.accountId,
+                    allowSave,
+                    allowForward,
+                  }),
+                };
+
+                if (!isGroup) {
+                  createParams.recipientUsername = targetUsername;
+                  createParams.recipientAccountId = targetContact?.metadata?.accountId;
+                }
+
+                const createRes = await cloudClient.createAttachment(createParams);
+                objectId = createRes.attachment.objectId;
+                await cloudClient.uploadAttachment(objectId, rawCiphertext);
+              };
+
+              try {
+                const timeoutPromise = new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('Upload timeout (30s limit exceeded)')), 30000)
+                );
+                await Promise.race([uploadWithSession(), timeoutPromise]);
+              } catch (uploadErr: any) {
+                const reauthed = await ensureCloudSession(activeSession, true);
+                if (reauthed) {
+                  const timeoutPromise = new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('Upload timeout (30s limit exceeded)')), 30000)
+                  );
+                  await Promise.race([uploadWithSession(), timeoutPromise]);
+                } else {
+                  throw uploadErr;
+                }
+              }
+
+              RuntimeDiagnostics.upload('uploadCompleted', {
+                attachmentId: currentAtt.attachmentId,
+                objectId,
+                uploadedBytes: rawCiphertext.length,
+              });
+
+              MediaLogger.log({
+                event: 'R2_UPLOAD_COMPLETED',
+                attachmentId: currentAtt.attachmentId,
+                objectId,
+              });
+
+              let localPreview = currentAtt.previewUrl;
+              if (!localPreview && (metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/'))) {
+                localPreview = AttachmentPipeline.createEphemeralBlobUrl(fileBytes, metadata.mimeType);
+              }
+
+              activeAttachments[idx] = {
+                attachmentId: metadata.attachmentId,
+                objectId,
+                name: metadata.name,
+                mimeType: metadata.mimeType,
+                sizeBytes: metadata.sizeBytes,
+                chunkCount: metadata.chunkCount,
+                chunkSize: metadata.chunkSize,
+                sha256Hash: metadata.sha256Hash,
+                ciphertextHash,
+                encryptionKeyBase64: bytesToBase64(ephemeralKey),
+                previewUrl: localPreview,
+                localPreviewUrl: localPreview,
+                state: 'SENT' as const,
+                allowSave,
+                allowForward,
+              };
+
+              MediaCache.set(objectId, {
+                id: objectId,
+                blobUrl: localPreview || '',
+                data: fileBytes,
+                mimeType: metadata.mimeType,
+                name: metadata.name,
+                sizeBytes: fileBytes.length,
+              });
+
+              updateTimeline(activeAttachments, 'UPLOADING');
+            } catch (err: any) {
+              hasAnyError = true;
+              activeAttachments[idx] = {
+                ...currentAtt,
+                state: 'FAILED' as const,
+                error: err?.message || 'Upload failed',
+              };
+              RuntimeDiagnostics.upload('uploadFailed', {
+                attachmentId: currentAtt.attachmentId,
+                error: err?.message,
+              });
+              MediaLogger.log({
+                event: 'MEDIA_ERROR',
+                attachmentId: currentAtt.attachmentId,
+                error: err?.message,
+              });
+              updateTimeline(activeAttachments, 'FAILED');
+            }
+          }
+        };
+
+        // Run worker pool with max concurrency = 2
+        await Promise.all([uploadWorker(), uploadWorker()]);
+
+        // If all attachments succeeded, dispatch wire message and mark SENT_TO_RELAY
+        if (!hasAnyError && activeAttachments.every((a) => a.state === 'SENT' && a.objectId)) {
+          try {
+            const wireAttachments = toWireAttachments(activeAttachments);
+            const wireSingle = activeAttachments.length === 1 ? toWireAttachment(activeAttachments[0]) : undefined;
+            const wireText = summaryText;
+
+            let wirePayload: string;
+            if (targetContact?.prekeyBundle) {
+              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                activeSession,
+                targetContact.prekeyBundle,
+                wireText,
+                wireSingle,
+                activeReply,
+                undefined,
+                activeAttachments.length > 1 ? wireAttachments : undefined
+              );
+              wirePayload = wirePayloadBase64;
+            } else {
+              wirePayload = JSON.stringify({
+                id: msgId,
+                conversationId,
+                senderId: activeSession.spaceId,
+                text: wireText,
+                attachment: wireSingle,
+                attachments: activeAttachments.length > 1 ? wireAttachments : undefined,
+                replyTo: activeReply,
+              });
+            }
+
+            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+
+            RuntimeDiagnostics.wire('wireDispatched', {
+              msgId,
+              attachmentCount: activeAttachments.length,
+              attachmentIds: activeAttachments.map((a) => a.attachmentId),
+              objectIds: activeAttachments.map((a) => a.objectId),
+              previewUrlPresent: false,
+            });
+
+            MediaLogger.log({
+              event: 'WIRE_DISPATCHED',
+              attachmentId: activeAttachments[0]?.attachmentId,
+            });
+
+            updateTimeline(activeAttachments, 'SENT_TO_RELAY');
+          } catch (wireErr: any) {
+            RuntimeDiagnostics.wire('wireFailed', {
+              msgId,
+              error: wireErr?.message,
+            });
+            MediaLogger.log({
+              event: 'MEDIA_ERROR',
+              error: wireErr?.message || 'Wire dispatch failed',
+            });
+            updateTimeline(activeAttachments, 'FAILED');
+          }
+        } else {
+          updateTimeline(activeAttachments, 'FAILED');
         }
       })();
     },
     [activeSession, contacts, conversations, replyTarget]
+  );
+
+  const sendAttachment = useCallback(
+    async (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean }) => {
+      return sendAttachments(conversationId, [file], options);
+    },
+    [sendAttachments]
   );
 
   const sendVoiceMessage = useCallback(
@@ -1894,6 +2048,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setReplyTarget,
     sendMessage,
     sendAttachment,
+    sendAttachments,
     sendVoiceMessage,
     setSearchQuery,
     deleteMessageLocally,

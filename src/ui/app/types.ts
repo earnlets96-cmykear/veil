@@ -41,7 +41,31 @@ export interface UIMessage {
     chunkSize?: number;
     sha256Hash?: string;
     encryptionKeyBase64?: string;
+    previewUrl?: string;
+    localPreviewUrl?: string;
+    state?: string;
+    error?: string;
+    allowSave?: boolean;
+    allowForward?: boolean;
   };
+  attachments?: Array<{
+    attachmentId: string;
+    name: string;
+    sizeBytes: number;
+    mimeType: string;
+    objectId?: string;
+    ciphertextHash?: string;
+    chunkCount?: number;
+    chunkSize?: number;
+    sha256Hash?: string;
+    encryptionKeyBase64?: string;
+    previewUrl?: string;
+    localPreviewUrl?: string;
+    state?: string;
+    error?: string;
+    allowSave?: boolean;
+    allowForward?: boolean;
+  }>;
   voice?: {
     durationSeconds: number;
     sizeBytes: number;
@@ -56,6 +80,10 @@ export interface UIMessage {
     senderName?: string;
     text: string;
     attachmentType?: string;
+  };
+  privacy?: {
+    allowSave?: boolean;
+    allowForward?: boolean;
   };
 }
 
