@@ -73,7 +73,17 @@ docker compose up -d
 
 ---
 
+## 🩺 Health Checks & Keep-Alive Monitoring
+
+The relay server exposes lightweight liveness and readiness endpoints:
+
+- **`GET /health`** (or `GET /healthz`): Non-blocking liveness probe returning `{"status":"ok", "protocolVersion":"v1", "uptimeSeconds": ...}`. Requires no authentication, performs zero DB/storage I/O, and is suitable for load balancer health checks and external keep-alive pings (e.g. 10-minute ping intervals for PaaS environments like Render).
+- **`GET /readyz`**: Comprehensive readiness probe checking storage and database dependencies.
+
+---
+
 ## 🔒 Security Best Practices
 - Always terminate TLS upstream using TLS 1.3.
 - Never expose raw HTTP/WS endpoints directly to the public Internet without TLS.
 - Keep `RELAY_STORAGE_DIR` on a secure, encrypted filesystem partition (LUKS).
+

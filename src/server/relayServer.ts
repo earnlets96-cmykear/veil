@@ -194,14 +194,9 @@ export class RelayServer {
 
     try {
       if (method === 'GET' && (url === '/health' || url === '/healthz')) {
-        const dbAlive = typeof (this.cloudDb as any).checkHealth === 'function'
-          ? await (this.cloudDb as any).checkHealth()
-          : true;
         res.statusCode = 200;
         res.end(JSON.stringify({
           status: 'ok',
-          database: dbAlive ? 'connected' : 'disconnected',
-          objectStorage: 'connected',
           protocolVersion: RELAY_PROTOCOL_VERSION,
           uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
         }));
