@@ -43,8 +43,20 @@ export class CloudClient {
     this.sessionToken = token;
     this.accountId = accountId;
     this.deviceId = deviceId;
-    if (typeof console !== 'undefined' && console.debug) {
-      console.debug(`[VEIL AUTH] session present: accountId=${accountId ? accountId.slice(0, 8) : 'none'}, hasToken=${!!token}`);
+  }
+
+  public hasAuthenticatedSession(): boolean {
+    return !!(
+      this.sessionToken &&
+      /^[a-f0-9]{64}$/i.test(this.sessionToken) &&
+      this.accountId &&
+      this.deviceId
+    );
+  }
+
+  public requireAuthenticatedSession(): void {
+    if (!this.hasAuthenticatedSession()) {
+      throw new Error('Authentication required before attachment request');
     }
   }
 
@@ -76,9 +88,9 @@ export class CloudClient {
       headers['Authorization'] = `Bearer ${this.sessionToken}`;
     }
 
-    const isAttachmentRoute = path.includes('attachment');
-    if (isAttachmentRoute && typeof console !== 'undefined' && console.debug) {
-      console.debug(`[VEIL UPLOAD] request started path=${path}, method=${method}, authorizationPresent=${!!this.sessionToken}`);
+    const isAttachmentRoute = path.includes('/attachments/');
+    if (isAttachmentRoute) {
+      this.requireAuthenticatedSession();
     }
 
     const controller = new AbortController();
@@ -108,10 +120,6 @@ export class CloudClient {
         throw fetchErr;
       }
 
-      if (isAttachmentRoute && typeof console !== 'undefined' && console.debug) {
-        console.debug(`[VEIL UPLOAD] response status=${res.status} path=${path}`);
-      }
-
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 401 && retryCount === 0 && this.onUnauthorizedHandler) {
@@ -123,6 +131,7 @@ export class CloudClient {
           } catch (_reauthErr) {}
         }
         if (res.status === 401) {
+          this.setSession(null, null, null);
           throw new Error(json.error || 'Invalid username or password');
         }
         if (res.status === 404) {
