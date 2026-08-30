@@ -5,7 +5,7 @@
  * NotificationDispatcher, LocalSearchEngine, and AppConfig.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { SpaceVaultManager } from '../../spaces/vault.ts';
 import { EncryptedSpaceStore } from '../../storage/spaceStore.ts';
 import { IndexedDBStorageAdapter } from '../../storage/indexedDbAdapter.ts';
@@ -168,6 +168,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [knownSpacesCount, setKnownSpacesCount] = useState(0);
   const [searchQuery, setSearchQueryState] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const cloudCredentials = useRef(new Map<string, string>());
 
   const ensureCloudSession = useCallback(
     async (session: SpaceSession, forceReauth = false, customPassword?: string): Promise<boolean> => {
@@ -180,7 +181,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           deviceId: string;
           expiresAt: number;
           username?: string;
-          authPassword?: string;
         }>(session, 'veil:cloud:session')) || null;
 
         const syncCurrentSpace = async (accId: string) => {
@@ -218,11 +218,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           `user_${session.spaceId.slice(0, 8)}`
         ).replace(/^@/, '');
 
-        const authPassword =
-          customPassword ||
-          savedCloudSession?.authPassword ||
-          explicitPassword ||
-          bytesToHex(sha256(session.getMasterKey()));
+        if (customPassword) cloudCredentials.current.set(session.spaceId, customPassword);
+        const authPassword = cloudCredentials.current.get(session.spaceId);
+        if (!authPassword) return false;
 
         const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
 
@@ -243,53 +241,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               deviceId: logRes.device.deviceId,
               expiresAt: logRes.session.expiresAt,
               username: username.toLowerCase(),
-              authPassword,
             });
             await syncCurrentSpace(logRes.account.accountId);
-
-            if (customPassword || explicitPassword) {
-              try {
-                await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
-              } catch (_vErr) {}
-            }
 
             return true;
           }
         } catch (_loginErr) {
-          try {
-            const regRes = await cloudClient.registerAccount({
-              username,
-              password: authPassword,
-              deviceId,
-              deviceName: session.name,
-              deviceSigningPub: identity?.document.signingPublicKey,
-              deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
-            });
-            if (regRes.session && regRes.session.sessionToken) {
-              cloudClient.setSession(regRes.session.sessionToken, regRes.account.accountId, regRes.device.deviceId);
-              await store.setAsync(session, 'veil:cloud:session', {
-                sessionToken: regRes.session.sessionToken,
-                accountId: regRes.account.accountId,
-                deviceId: regRes.device.deviceId,
-                expiresAt: regRes.session.expiresAt,
-                username: username.toLowerCase(),
-                authPassword,
-              });
-              await syncCurrentSpace(regRes.account.accountId);
-
-              if (customPassword || explicitPassword) {
-                try {
-                  await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
-                } catch (_vErr) {}
-              }
-
-              return true;
-            }
-          } catch (_regErr) {
-            if (typeof console !== 'undefined' && console.warn) {
-              console.warn('[VEIL-CLOUD] Auto cloud session failed:', _regErr);
-            }
-          }
+          return false;
         }
       } catch (_e) {}
       return false;
@@ -816,7 +774,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           deviceId: cloudClient.getDeviceId() || '',
           expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
           username: cleanUsername,
-          authPassword: passphrase,
         });
 
         await loadSpaceData(session);
@@ -851,7 +808,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deviceId: cloudClient.getDeviceId() || '',
         expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         username: cleanUsername,
-        authPassword: passphrase,
       });
 
       await loadSpaceData(session);
@@ -1119,7 +1075,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
       });
       const targetMailboxId = targetContact?.mailboxId || conversationId;
-      const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
+      const targetUsername = targetContact?.accountUsername;
       const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
 
       const keys = new Set([
@@ -1477,7 +1433,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const freshContacts = await contactManager.listContacts(activeSession);
       const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
-      const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
+      const targetUsername = targetContact?.accountUsername;
 
       const keys = new Set([
         conversationId,
@@ -1740,7 +1696,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         deviceId: cloudClient.getDeviceId() || '',
         expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         username: cleanUsername,
-        authPassword: password,
       });
 
       await loadSpaceData(session);

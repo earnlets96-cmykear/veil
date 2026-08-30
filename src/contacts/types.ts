@@ -20,6 +20,7 @@ export interface Contact {
   prekeyBundle?: PrekeyBundle;
   mailboxId?: string;
   avatar?: string;
+  accountUsername?: string; // canonical, verified signed-profile handle for cloud attachment authorization
   metadata?: Record<string, string>;
 }
 
@@ -32,6 +33,7 @@ export interface InvitationPayload {
   fingerprint: string;
   mailboxId?: string;
   avatar?: string;
+  accountUsername?: string;
   prekeyBundle?: PrekeyBundle;
   createdAt: number;
   expiresAt: number;

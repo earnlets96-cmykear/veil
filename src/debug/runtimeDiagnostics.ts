@@ -65,6 +65,34 @@ class RuntimeDiagnosticsSubsystem {
   /**
    * Sanitizes payload data to guarantee zero secret leakage.
    */
+  private sanitizeValue(value: any, key = ''): any {
+    const lowerKey = key.toLowerCase();
+    if (
+      lowerKey.includes('password') ||
+      lowerKey.includes('secret') ||
+      lowerKey.includes('privatekey') ||
+      lowerKey.includes('masterkey') ||
+      lowerKey.includes('encryptionkey') ||
+      lowerKey.includes('sessiontoken') ||
+      lowerKey.includes('token') ||
+      lowerKey.includes('accountid') ||
+      lowerKey.includes('identityid') ||
+      lowerKey.includes('deviceid') ||
+      lowerKey.includes('bloburl') ||
+      lowerKey.includes('plaintext') ||
+      lowerKey.includes('ciphertext') ||
+      lowerKey.includes('kek')
+    ) return '[REDACTED]';
+    if (value instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))) {
+      return `[BinaryBuffer: ${value.length} bytes]`;
+    }
+    if (Array.isArray(value)) return value.map((item) => this.sanitizeValue(item));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([childKey, childValue]) => [childKey, this.sanitizeValue(childValue, childKey)]));
+    }
+    return value;
+  }
+
   private sanitize(data: Record<string, any>): Record<string, any> {
     const clean: Record<string, any> = {};
     for (const [k, v] of Object.entries(data)) {
@@ -78,11 +106,9 @@ class RuntimeDiagnosticsSubsystem {
         lowerKey.includes('kek') ||
         lowerKey.includes('plaintext')
       ) {
-        clean[k] = '[REDACTED_SECRET]';
-      } else if (v instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(v))) {
-        clean[k] = `[BinaryBuffer: ${v.length} bytes]`;
+        clean[k] = '[REDACTED]';
       } else {
-        clean[k] = v;
+        clean[k] = this.sanitizeValue(v, k);
       }
     }
     return clean;
