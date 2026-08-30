@@ -49,7 +49,7 @@ describe('VEIL Phase 27: Cloud Account & Multi-Device Management', () => {
       recoveryAnchor: 'anchor_secret_mnemonic_hash_123',
     });
 
-    expect(regResult.account.username).toBe('@alice_cloud');
+    expect(regResult.account.username).toBe('alice_cloud');
     expect(regResult.account.accountId).toMatch(/^acc_/);
     expect(regResult.device.deviceId).toBe('dev_laptop_1');
     expect(regResult.session.sessionToken).toBeDefined();

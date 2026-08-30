@@ -1,33 +1,46 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 44A (Chat UI Regression Forensic Repair & SVG Iconography System)
+## Current Verified Phase: PHASE 45 (Forensic Fix — Media Auth, Account Recovery, Reply System, Thumbnails, Contact Media Permissions)
 - **Status**: **COMPLETE & VERIFIED 100%**
-- **Test Results**: **309 / 309 test files passing (801 / 801 automated tests, 100% clean pass, 0 failures, 0 skipped)**
-- **Web App Build**: **PASS (`npm run build` in 1.65s)**
-- **Release Manifest**: **PASS (`release/v1.0.0/manifest.json` generated)**
-- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.15s)**
-- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` in 16s, `BUILD SUCCESSFUL`)**
+- **Test Results**: **314 / 314 test files passing (816 / 816 automated tests, 100% clean pass, 0 failures, 0 skipped)**
+- **Web App Build**: **PASS (`npm run build` in 3.35s)**
+- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.17s)**
+- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 19s)**
 - **Physical Android Verification**: **USER PHYSICAL TEST — NOT YET VERIFIED (User to perform manual physical device checklist)**
 
 ---
 
-## Phase 44A Verified Deliverables
+## Phase 45 Verified Deliverables
 
-1. **Conversation View & Scrollable Timeline Layout Geometry (`src/styles/veil-design-system.css`, `src/ui/components/ConversationView.tsx`)**:
-   - Fixed conversation container geometry to match `.veil-conversation, .veil-conversation-view` (`flex: 1; height: 100%; width: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; background-color: var(--veil-bg-base); overflow: hidden; position: relative;`).
-   - Fixed header anchoring with `.veil-conversation-header, .veil-chat-header` (`height: 56px; flex-shrink: 0;`).
-   - Fixed message list scrolling with `.veil-timeline` (`flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; width: 100%; box-sizing: border-box;`).
-   - Fixed bottom composer anchoring with `.veil-composer` (`flex-shrink: 0; width: 100%; box-sizing: border-box; position: relative; z-index: var(--veil-z-header);`).
-   - Fixed responsive mobile rules: `.veil-app-layout.has-active-chat .veil-conversation` and `.veil-app-layout.has-active-chat .veil-conversation-view` take full viewport (`width: 100vw; height: 100vh; height: 100dvh; position: fixed; inset: 0; z-index: 100;`).
+1. **Username Normalization (`src/server/cloud/accountService.ts`, `src/account/accountManager.ts`)**:
+   - All server-side account operations (register, login, recovery) normalize usernames with `.trim().toLowerCase().replace(/^@/, '')`.
+   - Client-side `AccountManager.registerAccount` and `createOrUpdateRecoveryVault` use `cleanUsername` for both cloud API calls and AAD in identity backup encryption.
+   - Cross-case, cross-whitespace, cross-@ recovery now works (e.g., register as `@Dagmawi`, recover as `DAGMAWI`).
 
-2. **Zero Unicode Emoji/Symbol UI Icons & Vector SVG Icon System Restoration**:
-   - Replaced `↩ Reply` with `<ReplyIcon size={12} /><span>Reply</span>` in `MessageBubble.tsx`.
-   - Replaced `✓ Verified` with `<CheckIcon size={12} /><span>Verified</span>` and `🚨 Key Changed` with `<AlertCircleIcon size={12} /><span>Key Changed</span>` in `ConversationView.tsx`.
-   - Replaced `📷 Photo`, `▶ Video`, `📎 ${name}` in `AppState.tsx` with clean text strings (`Photo`, `Video`, `${name}`, `${count} Media Files`).
-   - Standardized `Sidebar.tsx` snippet rendering using vector SVG icons (`ImageIcon`, `VideoIcon`, `FileIcon`, `MicIcon`).
-   - Cleaned `SecurityIndicators` to return clean text tokens without raw Unicode glyphs.
+2. **Cloud Session Persistence & Auto-Reauth (`src/network/cloudClient.ts`, `src/ui/app/AppState.tsx`)**:
+   - `cloudClient.setOnUnauthorized()` handler auto-re-authenticates on 401 responses.
+   - `ensureCloudSession` persists `authPassword` in `veil:cloud:session` within `EncryptedSpaceStore`.
+   - `createSpace`, `unlockSpace`, and `restoreAccount` all hydrate cloud session correctly.
 
-3. **Dedicated Phase 44A Test Suite (`tests/phase44a-ui-layout-and-icons.test.tsx`)**:
-   - Validates vector SVG `ReplyIcon` rendering in `MessageBubble`.
-   - Verifies CSS flex layout geometry, scrollable timeline definitions, and mobile media queries.
-   - Proves **ZERO** Unicode UI emoji/symbol characters across the entire `src/ui` directory.
+3. **Simplified Media Picker (`src/ui/components/media/MediaPickerModal.tsx`)**:
+   - Removed per-send `allowSave` and `allowForward` checkboxes from attachment picker.
+   - Picker now shows only: Photos, Videos, Files, Camera + selection/send.
+
+4. **Contact Profile Media Permissions (`src/ui/components/ProfileModal.tsx`, `src/contacts/contactManager.ts`)**:
+   - Added `addContact()` and `updateContact()` methods to `ContactManager`.
+   - Profile modal shows "Media Permissions" section with toggles for save/forward per contact.
+
+5. **Quoted Reply Rendering (`src/ui/components/ui/ReplyPreview.tsx`, `src/ui/components/ConversationView.tsx`)**:
+   - Reply messages render quoted/referenced message block with sender name, text snippet, and media thumbnail.
+   - `ReplyPreview` supports text, image, video, voice, and file quote types.
+
+6. **Video Frame Thumbnails (`src/ui/components/media/MediaImage.tsx`, `src/attachments/thumbnailGenerator.ts`)**:
+   - Fixed import path (was `../../` instead of `../../../`).
+   - Video thumbnails extracted as JPEG via Canvas/ThumbnailGenerator, rendered with SVG play badge and duration.
+
+7. **Phase 45 Regression Test Suites (5 files, 15 tests)**:
+   - `tests/phase45-media-auth-runtime.test.ts` — 401 rejection, authenticated upload/download, onUnauthorized retry
+   - `tests/phase45-account-recovery-runtime.test.ts` — username normalization, cross-device restore, invalid password rejection
+   - `tests/phase45-contact-media-permissions.test.ts` — add/update contact permissions, default permissions
+   - `tests/phase45-reply-rendering.test.tsx` — text/media/voice quote rendering, MessageBubble integration
+   - `tests/phase45-thumbnail-runtime.test.tsx` — video thumbnail generation, MediaCache store/invalidate

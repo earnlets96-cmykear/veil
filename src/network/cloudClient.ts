@@ -43,6 +43,9 @@ export class CloudClient {
     this.sessionToken = token;
     this.accountId = accountId;
     this.deviceId = deviceId;
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug(`[VEIL AUTH] session present: accountId=${accountId ? accountId.slice(0, 8) : 'none'}, hasToken=${!!token}`);
+    }
   }
 
   public getSessionToken(): string | null {
@@ -73,6 +76,11 @@ export class CloudClient {
       headers['Authorization'] = `Bearer ${this.sessionToken}`;
     }
 
+    const isAttachmentRoute = path.includes('attachment');
+    if (isAttachmentRoute && typeof console !== 'undefined' && console.debug) {
+      console.debug(`[VEIL UPLOAD] request started path=${path}, method=${method}, authorizationPresent=${!!this.sessionToken}`);
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutOverrideMs || this.timeoutMs);
 
@@ -98,6 +106,10 @@ export class CloudClient {
           throw new Error(`Unable to connect to recovery server at ${this.baseUrl}. Please check your internet connection.`);
         }
         throw fetchErr;
+      }
+
+      if (isAttachmentRoute && typeof console !== 'undefined' && console.debug) {
+        console.debug(`[VEIL UPLOAD] response status=${res.status} path=${path}`);
       }
 
       const json = await res.json().catch(() => ({}));

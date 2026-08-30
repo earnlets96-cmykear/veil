@@ -74,6 +74,7 @@ export class AccountManager {
     identityDoc: IdentityDocument;
   }> {
     const { username, password } = params;
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
     const spaceName = params.spaceName || 'Main Space';
     const deviceId = `dev_${bytesToHex(randomBytes(8))}`;
     const deviceName = params.deviceName || 'Primary Device';
@@ -121,7 +122,7 @@ export class AccountManager {
       createdAt: Date.now(),
     };
 
-    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${username.toLowerCase()}`);
+    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`);
     const { nonce, ciphertext } = encryptXChaCha20Poly1305(
       kek,
       JSON.stringify(backupPayload),
@@ -138,7 +139,7 @@ export class AccountManager {
 
     // 4. Register account on cloud server
     const regResult = await this.cloudClient.registerAccount({
-      username,
+      username: cleanUsername,
       password,
       deviceId,
       deviceName,
@@ -337,7 +338,8 @@ export class AccountManager {
       createdAt: Date.now(),
     };
 
-    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${username.toLowerCase()}`);
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`);
     const { nonce, ciphertext } = encryptXChaCha20Poly1305(
       kek,
       JSON.stringify(backupPayload),

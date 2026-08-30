@@ -122,7 +122,8 @@ export interface AppContextType {
   exportMyInvitation: () => string | null;
   updateContactVerification: (identityId: string, status: VerificationStatus) => Promise<void>;
   createGroup: (name: string, description?: string) => Promise<void>;
-  ensureCloudSession: (session: SpaceSession, forceReauth?: boolean) => Promise<boolean | void>;
+  ensureCloudSession: (session: SpaceSession, forceReauth?: boolean, customPassword?: string) => Promise<boolean | void>;
+  updateContactMediaPermissions: (identityId: string, permissions: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
 
   // Phase 23 & Phase 32 Actions
   registerUsername: (username: string, displayName?: string, bio?: string, avatar?: string) => Promise<SignedProfileDocument>;
@@ -168,82 +169,65 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchQuery, setSearchQueryState] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
-  const ensureCloudSession = useCallback(async (session: SpaceSession, forceReauth = false): Promise<boolean> => {
-    if (!forceReauth && cloudClient.getSessionToken()) return true;
-
-    try {
-      const savedCloudSession = (await store.getAsync<{
-        sessionToken: string;
-        accountId: string;
-        deviceId: string;
-        expiresAt: number;
-        username?: string;
-      }>(session, 'veil:cloud:session')) || null;
-
-      const syncCurrentSpace = async (accId: string) => {
-        try {
-          await cloudClient.syncSpaces([
-            {
-              spaceId: session.spaceId,
-              accountId: accId,
-              encryptedHeader: 'encrypted_header_v1',
-              version: 1,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            },
-          ]);
-        } catch (_sErr) {}
-      };
-
-      if (!forceReauth && savedCloudSession && savedCloudSession.sessionToken && savedCloudSession.expiresAt > Date.now()) {
-        cloudClient.setSession(
-          savedCloudSession.sessionToken,
-          savedCloudSession.accountId,
-          savedCloudSession.deviceId
-        );
-        await syncCurrentSpace(savedCloudSession.accountId);
-        return true;
-      }
-
-      // Auto-register / authenticate cloud session deterministically for this Space
-      const identity = idMgr.loadIdentity(session, store);
-      const storedProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
-      const username = (storedProfile?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '') || `user_${session.spaceId.slice(0, 8)}`).replace(/^@/, '');
-      const authPassword = explicitPassword || (savedCloudSession?.authPassword) || bytesToHex(sha256(session.getMasterKey()));
-      const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
+  const ensureCloudSession = useCallback(
+    async (session: SpaceSession, forceReauth = false, customPassword?: string): Promise<boolean> => {
+      if (!forceReauth && cloudClient.getSessionToken()) return true;
 
       try {
-        const logRes = await cloudClient.loginAccount({
-          username,
-          password: authPassword,
-          deviceId,
-          deviceName: session.name,
-          deviceSigningPub: identity?.document.signingPublicKey,
-          deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
-        });
-        if (logRes.session && logRes.session.sessionToken) {
-          cloudClient.setSession(logRes.session.sessionToken, logRes.account.accountId, logRes.device.deviceId);
-          await store.setAsync(session, 'veil:cloud:session', {
-            sessionToken: logRes.session.sessionToken,
-            accountId: logRes.account.accountId,
-            deviceId: logRes.device.deviceId,
-            expiresAt: logRes.session.expiresAt,
-            username: username.toLowerCase(),
-            authPassword: explicitPassword ? authPassword : savedCloudSession?.authPassword,
-          });
-          await syncCurrentSpace(logRes.account.accountId);
+        const savedCloudSession = (await store.getAsync<{
+          sessionToken: string;
+          accountId: string;
+          deviceId: string;
+          expiresAt: number;
+          username?: string;
+          authPassword?: string;
+        }>(session, 'veil:cloud:session')) || null;
 
-          if (explicitPassword) {
-            try {
-              await accountManager.createOrUpdateRecoveryVault(session, explicitPassword, username);
-            } catch (_vErr) {}
-          }
+        const syncCurrentSpace = async (accId: string) => {
+          try {
+            await cloudClient.syncSpaces([
+              {
+                spaceId: session.spaceId,
+                accountId: accId,
+                encryptedHeader: 'encrypted_header_v1',
+                version: 1,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              },
+            ]);
+          } catch (_sErr) {}
+        };
 
+        if (!forceReauth && savedCloudSession && savedCloudSession.sessionToken && savedCloudSession.expiresAt > Date.now()) {
+          cloudClient.setSession(
+            savedCloudSession.sessionToken,
+            savedCloudSession.accountId,
+            savedCloudSession.deviceId
+          );
+          await syncCurrentSpace(savedCloudSession.accountId);
           return true;
         }
-      } catch (_loginErr) {
+
+        // Auto-register / authenticate cloud session deterministically for this Space
+        const identity = idMgr.loadIdentity(session, store);
+        const storedProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
+        const username = (
+          savedCloudSession?.username ||
+          storedProfile?.username ||
+          session.name.toLowerCase().replace(/[^a-z0-9_]/g, '') ||
+          `user_${session.spaceId.slice(0, 8)}`
+        ).replace(/^@/, '');
+
+        const authPassword =
+          customPassword ||
+          savedCloudSession?.authPassword ||
+          explicitPassword ||
+          bytesToHex(sha256(session.getMasterKey()));
+
+        const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
+
         try {
-          const regRes = await cloudClient.registerAccount({
+          const logRes = await cloudClient.loginAccount({
             username,
             password: authPassword,
             deviceId,
@@ -251,35 +235,76 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             deviceSigningPub: identity?.document.signingPublicKey,
             deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
           });
-          if (regRes.session && regRes.session.sessionToken) {
-            cloudClient.setSession(regRes.session.sessionToken, regRes.account.accountId, regRes.device.deviceId);
+          if (logRes.session && logRes.session.sessionToken) {
+            cloudClient.setSession(logRes.session.sessionToken, logRes.account.accountId, logRes.device.deviceId);
             await store.setAsync(session, 'veil:cloud:session', {
-              sessionToken: regRes.session.sessionToken,
-              accountId: regRes.account.accountId,
-              deviceId: regRes.device.deviceId,
-              expiresAt: regRes.session.expiresAt,
+              sessionToken: logRes.session.sessionToken,
+              accountId: logRes.account.accountId,
+              deviceId: logRes.device.deviceId,
+              expiresAt: logRes.session.expiresAt,
               username: username.toLowerCase(),
-              authPassword: explicitPassword ? authPassword : savedCloudSession?.authPassword,
+              authPassword,
             });
-            await syncCurrentSpace(regRes.account.accountId);
+            await syncCurrentSpace(logRes.account.accountId);
 
-            if (explicitPassword) {
+            if (customPassword || explicitPassword) {
               try {
-                await accountManager.createOrUpdateRecoveryVault(session, explicitPassword, username);
+                await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
               } catch (_vErr) {}
             }
 
             return true;
           }
-        } catch (_regErr) {
-          if (typeof console !== 'undefined' && console.warn) {
-            console.warn('[VEIL-CLOUD] Auto cloud session failed:', _regErr);
+        } catch (_loginErr) {
+          try {
+            const regRes = await cloudClient.registerAccount({
+              username,
+              password: authPassword,
+              deviceId,
+              deviceName: session.name,
+              deviceSigningPub: identity?.document.signingPublicKey,
+              deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
+            });
+            if (regRes.session && regRes.session.sessionToken) {
+              cloudClient.setSession(regRes.session.sessionToken, regRes.account.accountId, regRes.device.deviceId);
+              await store.setAsync(session, 'veil:cloud:session', {
+                sessionToken: regRes.session.sessionToken,
+                accountId: regRes.account.accountId,
+                deviceId: regRes.device.deviceId,
+                expiresAt: regRes.session.expiresAt,
+                username: username.toLowerCase(),
+                authPassword,
+              });
+              await syncCurrentSpace(regRes.account.accountId);
+
+              if (customPassword || explicitPassword) {
+                try {
+                  await accountManager.createOrUpdateRecoveryVault(session, authPassword, username);
+                } catch (_vErr) {}
+              }
+
+              return true;
+            }
+          } catch (_regErr) {
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn('[VEIL-CLOUD] Auto cloud session failed:', _regErr);
+            }
           }
         }
+      } catch (_e) {}
+      return false;
+    },
+    []
+  );
+
+  useEffect(() => {
+    cloudClient.setOnUnauthorized(async () => {
+      if (activeSession) {
+        return (await ensureCloudSession(activeSession, true)) as boolean;
       }
-    } catch (_e) {}
-    return false;
-  }, []);
+      return false;
+    });
+  }, [activeSession, ensureCloudSession]);
 
   const loadSpaceData = useCallback(async (session: SpaceSession) => {
     notificationDispatcher.setLocked(false);
@@ -735,15 +760,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const session = await sessionController.unlock(passphrase);
       setActiveSession(session);
       await loadSpaceData(session);
+      await ensureCloudSession(session, false, passphrase);
     },
-    [loadSpaceData]
+    [ensureCloudSession, loadSpaceData]
   );
 
   const createSpace = useCallback(
     async (name: string, passphrase: string, explicitUsername?: string) => {
-      const cleanUsername =
-        (explicitUsername || name).toLowerCase().replace(/[^a-z0-9_]/g, '') ||
-        `user_${bytesToHex(randomBytes(4))}`;
+      const cleanUsername = (
+        (explicitUsername || name).trim().toLowerCase().replace(/[^a-z0-9_]/g, '') ||
+        `user_${bytesToHex(randomBytes(4))}`
+      ).replace(/^@/, '');
 
       // If fresh install / first space, register account remotely and persist recovery vault fail-closed
       const knownCount = vault.listEnvelopes().length;
@@ -756,7 +783,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setKnownSpacesCount(vault.listEnvelopes().length);
         setActiveSession(session);
         sessionController.recordUserActivity();
+
+        // Create and persist initial profile with chosen username
+        try {
+          const loadedId = idMgr.loadIdentity(session, store);
+          if (loadedId) {
+            const signedProfile = createSignedProfile(
+              loadedId.document.identityId,
+              loadedId.signingPrivateKey,
+              cleanUsername,
+              name
+            );
+            await store.setAsync(session, 'veil:user:profile', signedProfile);
+            setMyProfile(signedProfile);
+          }
+        } catch (_pErr) {}
+
+        await store.setAsync(session, 'veil:cloud:session', {
+          sessionToken: cloudClient.getSessionToken() || '',
+          accountId: cloudClient.getAccountId() || '',
+          deviceId: cloudClient.getDeviceId() || '',
+          expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+          username: cleanUsername,
+          authPassword: passphrase,
+        });
+
         await loadSpaceData(session);
+        await ensureCloudSession(session, false, passphrase);
         return;
       }
 
@@ -765,6 +818,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setKnownSpacesCount(vault.listEnvelopes().length);
       const session = await sessionController.unlock(passphrase);
       setActiveSession(session);
+
+      // Create and persist initial profile with chosen username
+      try {
+        const loadedId = idMgr.loadIdentity(session, store);
+        if (loadedId) {
+          const signedProfile = createSignedProfile(
+            loadedId.document.identityId,
+            loadedId.signingPrivateKey,
+            cleanUsername,
+            name
+          );
+          await store.setAsync(session, 'veil:user:profile', signedProfile);
+          setMyProfile(signedProfile);
+        }
+      } catch (_pErr) {}
+
+      await store.setAsync(session, 'veil:cloud:session', {
+        sessionToken: cloudClient.getSessionToken() || '',
+        accountId: cloudClient.getAccountId() || '',
+        deviceId: cloudClient.getDeviceId() || '',
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        username: cleanUsername,
+        authPassword: passphrase,
+      });
+
       await loadSpaceData(session);
       await ensureCloudSession(session, false, passphrase);
       await accountManager.createOrUpdateRecoveryVault(session, passphrase, cleanUsername);
@@ -986,9 +1064,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!activeSession || files.length === 0) return;
       sessionController.recordUserActivity();
 
-      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const allowSave = options?.allowSave !== false;
-      const allowForward = options?.allowForward !== false;
+      const freshContacts = await contactManager.listContacts(activeSession);
+      const targetContact =
+        freshContacts.find((c) => c.identityId === conversationId) ||
+        contacts.find((c) => c.identityId === conversationId);
+
+      const contactAllowSave = targetContact?.metadata?.allowSave !== 'false';
+      const contactAllowForward = targetContact?.metadata?.allowForward !== 'false';
+
+      const allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
+      const allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
 
       const activeReply = replyTarget
         ? {
@@ -1022,11 +1107,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           allowForward,
         };
       });
-
-      const freshContacts = await contactManager.listContacts(activeSession);
-      const targetContact =
-        freshContacts.find((c) => c.identityId === conversationId) ||
-        contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername = targetContact?.name ? targetContact.name.replace(/^@/, '').trim() : undefined;
       const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
@@ -1166,6 +1246,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
 
               await ensureCloudSession(activeSession);
+              if (!cloudClient.getSessionToken()) {
+                await ensureCloudSession(activeSession, true);
+              }
+
+              RuntimeDiagnostics.upload('uploadStarted', {
+                attachmentId: currentAtt.attachmentId,
+                mimeType: currentAtt.mimeType,
+                sizeBytes: rawCiphertext.length,
+                hasSession: !!cloudClient.getSessionToken(),
+              });
 
               let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
               const uploadWithSession = async () => {
@@ -1606,16 +1696,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const restoreAccount = useCallback(
     async (username: string, password: string) => {
+      const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
       const { session } = await accountManager.restoreAccount({
-        username,
+        username: cleanUsername,
         password,
       });
       setActiveSession(session);
       sessionController.recordUserActivity();
       setKnownSpacesCount(vault.listEnvelopes().length);
+
+      // Rehydrate user profile with recovered username
+      try {
+        const loadedId = idMgr.loadIdentity(session, store);
+        if (loadedId) {
+          const signedProfile = createSignedProfile(
+            loadedId.document.identityId,
+            loadedId.signingPrivateKey,
+            cleanUsername,
+            session.name
+          );
+          await store.setAsync(session, 'veil:user:profile', signedProfile);
+          setMyProfile(signedProfile);
+        }
+      } catch (_pErr) {}
+
+      await store.setAsync(session, 'veil:cloud:session', {
+        sessionToken: cloudClient.getSessionToken() || '',
+        accountId: cloudClient.getAccountId() || '',
+        deviceId: cloudClient.getDeviceId() || '',
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        username: cleanUsername,
+        authPassword: password,
+      });
+
       await loadSpaceData(session);
+      await ensureCloudSession(session, false, password);
     },
-    [loadSpaceData]
+    [ensureCloudSession, loadSpaceData]
+  );
+
+  const updateContactMediaPermissions = useCallback(
+    async (identityId: string, permissions: { allowSave?: boolean; allowForward?: boolean }) => {
+      if (!activeSession) return;
+      const freshContacts = await contactManager.listContacts(activeSession);
+      const contact = freshContacts.find((c) => c.identityId === identityId);
+      if (contact) {
+        const currentMeta = contact.metadata || {};
+        const updatedMeta = {
+          ...currentMeta,
+          ...(permissions.allowSave !== undefined ? { allowSave: permissions.allowSave ? 'true' : 'false' } : {}),
+          ...(permissions.allowForward !== undefined ? { allowForward: permissions.allowForward ? 'true' : 'false' } : {}),
+        };
+        await contactManager.updateContact(activeSession, {
+          ...contact,
+          metadata: updatedMeta,
+        });
+        const updatedList = await contactManager.listContacts(activeSession);
+        setContacts(updatedList);
+      }
+    },
+    [activeSession]
   );
 
   const registerCloudAccount = useCallback(
@@ -2083,6 +2223,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     updateContactVerification,
     createGroup,
     ensureCloudSession,
+    updateContactMediaPermissions,
     registerUsername,
     searchDirectory,
     sendContactRequest,

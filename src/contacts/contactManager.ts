@@ -96,6 +96,28 @@ export class ContactManager {
     }
   }
 
+  public async addContact(session: SpaceSession, contact: Contact): Promise<void> {
+    const contacts = await this.listContacts(session);
+    const idx = contacts.findIndex((c) => c.identityId === contact.identityId);
+    if (idx >= 0) {
+      contacts[idx] = { ...contacts[idx], ...contact };
+    } else {
+      contacts.push(contact);
+    }
+    await this.store.setAsync(session, CONTACTS_STORAGE_KEY, contacts);
+  }
+
+  public async updateContact(session: SpaceSession, contact: Contact): Promise<void> {
+    const contacts = await this.listContacts(session);
+    const idx = contacts.findIndex((c) => c.identityId === contact.identityId);
+    if (idx >= 0) {
+      contacts[idx] = { ...contacts[idx], ...contact };
+    } else {
+      contacts.push(contact);
+    }
+    await this.store.setAsync(session, CONTACTS_STORAGE_KEY, contacts);
+  }
+
   public async deleteContact(session: SpaceSession, identityId: string): Promise<void> {
     const contacts = await this.listContacts(session);
     const filtered = contacts.filter((c) => c.identityId !== identityId);

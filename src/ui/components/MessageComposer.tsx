@@ -105,15 +105,9 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   const handleMediaPickerSend = async (options: MediaPickerSendOptions) => {
     try {
       if (options.files.length === 1) {
-        sendAttachment(conversationId, options.files[0], {
-          allowSave: options.allowSave,
-          allowForward: options.allowForward,
-        });
+        sendAttachment(conversationId, options.files[0]);
       } else if (options.files.length > 1) {
-        sendAttachments(conversationId, options.files, {
-          allowSave: options.allowSave,
-          allowForward: options.allowForward,
-        });
+        sendAttachments(conversationId, options.files);
       }
       if (options.caption && options.caption.trim()) {
         await sendMessage(conversationId, options.caption.trim());

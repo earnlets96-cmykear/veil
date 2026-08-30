@@ -34,6 +34,7 @@ import {
   AttachmentCard,
   VoiceNoteCard,
   MessageBubble,
+  ReplyPreview,
   MessageStatus,
   useToast,
 } from './ui/index.ts';
@@ -657,6 +658,12 @@ export const ConversationView: React.FC = () => {
               (msg.attachment.mimeType?.startsWith('image/') ||
                 msg.attachment.mimeType?.startsWith('video/'));
             const isGrouped = msg.attachments && msg.attachments.length > 1;
+            const hasVisibleTextBubble = Boolean(
+              msg.text &&
+              !msg.text.startsWith('Attachment:') &&
+              !msg.text.includes('Attachment:') &&
+              msg.text !== 'Voice Message'
+            );
 
             return (
               <React.Fragment key={msg.id}>
@@ -687,6 +694,21 @@ export const ConversationView: React.FC = () => {
                   )}
 
                   <div className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}>
+                    {/* Quoted Reply Reference for Non-Text Bubbles */}
+                    {msg.replyTo && !hasVisibleTextBubble && (
+                      <div style={{ marginBottom: '6px', maxWidth: '320px' }}>
+                        <ReplyPreview
+                          replyTo={{
+                            messageId: msg.replyTo.messageId,
+                            senderName: msg.replyTo.senderName,
+                            text: msg.replyTo.text,
+                            attachmentType: msg.replyTo.attachmentType,
+                            thumbnailUrl: msg.replyTo.thumbnailUrl,
+                          }}
+                          onClick={() => handleJumpToMessage(msg.replyTo!.messageId)}
+                        />
+                      </div>
+                    )}
                     {/* Grouped Multi-Media Gallery Grid */}
                     {isGrouped && msg.attachments && (
                       <div className="veil-media-bubble-container">
@@ -778,6 +800,7 @@ export const ConversationView: React.FC = () => {
                                   senderName: msg.replyTo.senderName,
                                   text: msg.replyTo.text,
                                   attachmentType: msg.replyTo.attachmentType,
+                                  thumbnailUrl: msg.replyTo.thumbnailUrl,
                                 }
                               : undefined
                           }

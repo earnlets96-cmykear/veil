@@ -84,8 +84,8 @@ export class AccountService {
     deviceKeyAgreementPub: string;
     recoveryAnchor?: string;
   }): Promise<AuthResult> {
-    const lowerUsername = params.username.toLowerCase();
-    const existing = await this.db.getAccountByUsername(lowerUsername);
+    const cleanUsername = params.username.trim().toLowerCase().replace(/^@/, '');
+    const existing = await this.db.getAccountByUsername(cleanUsername);
     if (existing) {
       throw new Error(`Username ${params.username} is already registered`);
     }
@@ -100,7 +100,7 @@ export class AccountService {
 
     const account: AccountEntity = {
       accountId,
-      username: params.username,
+      username: cleanUsername,
       authHash,
       authSalt: bytesToBase64(salt),
       recoveryAnchor: params.recoveryAnchor,
@@ -143,7 +143,8 @@ export class AccountService {
     deviceSigningPub?: string;
     deviceKeyAgreementPub?: string;
   }): Promise<AuthResult> {
-    const account = await this.db.getAccountByUsername(params.username);
+    const cleanUsername = params.username.trim().toLowerCase().replace(/^@/, '');
+    const account = await this.db.getAccountByUsername(cleanUsername);
     if (!account) {
       throw new Error('Invalid username or password');
     }
@@ -261,7 +262,8 @@ export class AccountService {
     recoveryAnchor: string;
     newPassword: string;
   }): Promise<void> {
-    const account = await this.db.getAccountByUsername(params.username);
+    const cleanUsername = params.username.trim().toLowerCase().replace(/^@/, '');
+    const account = await this.db.getAccountByUsername(cleanUsername);
     if (!account || !account.recoveryAnchor) {
       throw new Error('Account recovery failed: invalid recovery credentials');
     }

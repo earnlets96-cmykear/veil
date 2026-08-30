@@ -24,8 +24,6 @@ import {
 
 export interface MediaPickerSendOptions {
   files: File[];
-  allowSave: boolean;
-  allowForward: boolean;
   caption?: string;
 }
 
@@ -42,8 +40,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'photos' | 'videos' | 'files'>('all');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [allowSave, setAllowSave] = useState(true);
-  const [allowForward, setAllowForward] = useState(true);
   const [caption, setCaption] = useState('');
 
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -69,8 +65,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     if (selectedFiles.length === 0) return;
     onSend({
       files: selectedFiles,
-      allowSave,
-      allowForward,
       caption: caption.trim() || undefined,
     });
     setSelectedFiles([]);
@@ -332,71 +326,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             style={{ fontSize: 'var(--veil-text-xs)' }}
           />
         )}
-
-        {/* Privacy Options Accordion */}
-        <div
-          style={{
-            padding: '0.75rem',
-            background: 'var(--veil-surface-elevated)',
-            borderRadius: 'var(--veil-radius-md)',
-            border: '1px solid var(--veil-border-subtle)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 'var(--veil-text-xs)',
-              fontWeight: 600,
-              color: 'var(--veil-text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <ShieldIcon size={14} color="var(--veil-accent-primary)" />
-            <span>Per-Media Privacy Controls</span>
-          </div>
-
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: 'var(--veil-text-xs)',
-              color: 'var(--veil-text-secondary)',
-              cursor: 'pointer',
-            }}
-          >
-            <span>Allow recipient to save to gallery</span>
-            <input
-              type="checkbox"
-              checked={allowSave}
-              onChange={(e) => setAllowSave(e.target.checked)}
-              style={{ accentColor: 'var(--veil-accent-primary)', cursor: 'pointer' }}
-            />
-          </label>
-
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: 'var(--veil-text-xs)',
-              color: 'var(--veil-text-secondary)',
-              cursor: 'pointer',
-            }}
-          >
-            <span>Allow forwarding</span>
-            <input
-              type="checkbox"
-              checked={allowForward}
-              onChange={(e) => setAllowForward(e.target.checked)}
-              style={{ accentColor: 'var(--veil-accent-primary)', cursor: 'pointer' }}
-            />
-          </label>
-        </div>
       </div>
     </Modal>
   );

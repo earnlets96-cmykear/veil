@@ -11,6 +11,7 @@ export interface ReplyPreviewData {
   senderName?: string;
   text?: string;
   attachmentType?: 'file' | 'voice' | 'image';
+  thumbnailUrl?: string;
 }
 
 export interface ReplyPreviewProps {
@@ -60,7 +61,21 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
       style={{ cursor: onClick ? 'pointer' : 'default' }}
       aria-label={`Replying to ${replyTo.senderName || 'Peer'}`}
     >
-      <div className="veil-reply-content">
+      {replyTo.thumbnailUrl && (
+        <img
+          src={replyTo.thumbnailUrl}
+          alt="Reply preview"
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: 'var(--veil-radius-xs, 4px)',
+            objectFit: 'cover',
+            flexShrink: 0,
+          }}
+        />
+      )}
+
+      <div className="veil-reply-content" style={{ flex: 1, minWidth: 0 }}>
         <div className="veil-reply-sender">
           {replyTo.senderName || 'Peer'}
         </div>
@@ -73,7 +88,7 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
         <button
           type="button"
           className="veil-btn-icon"
-          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 4px' }}
+          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: '0 4px', flexShrink: 0 }}
           onClick={(e) => {
             e.stopPropagation();
             onDismiss();

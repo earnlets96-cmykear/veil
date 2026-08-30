@@ -69,6 +69,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     blockUser,
     unblockUser,
     removeContact,
+    updateContactMediaPermissions,
     selectConversation,
     openModal,
     directoryClient,
@@ -623,6 +624,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
                   {formattedFingerprint}
                 </div>
               </div>
+
+              {/* Peer Media Permissions Settings */}
+              {isPeer && effectiveIdentityId && (
+                <div style={{ padding: '0.75rem 0', borderBottom: '1px solid var(--veil-border-subtle)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.5rem' }}>
+                    <ShieldIcon size={14} color="var(--veil-accent-primary)" />
+                    <span style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+                      Media Permissions for @{effectiveUsername}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', cursor: 'pointer' }}>
+                      <span>Allow this person to save media I send</span>
+                      <input
+                        type="checkbox"
+                        checked={peerContact?.metadata?.allowSave !== 'false'}
+                        onChange={(e) => updateContactMediaPermissions(effectiveIdentityId, { allowSave: e.target.checked })}
+                        style={{ accentColor: 'var(--veil-accent-primary)', cursor: 'pointer' }}
+                      />
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', cursor: 'pointer' }}>
+                      <span>Allow this person to forward media I send</span>
+                      <input
+                        type="checkbox"
+                        checked={peerContact?.metadata?.allowForward !== 'false'}
+                        onChange={(e) => updateContactMediaPermissions(effectiveIdentityId, { allowForward: e.target.checked })}
+                        style={{ accentColor: 'var(--veil-accent-primary)', cursor: 'pointer' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              )}
 
               {/* Add Contact Greeting Prompt */}
               {isPeer && relState === 'NOT_CONNECTED' && showAddGreeting && (

@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
 import { MediaLogger } from '../../utils/mediaLogger.ts';
+import { ThumbnailGenerator } from '../../../attachments/thumbnailGenerator.ts';
 import { PlayIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
 
 export interface MediaImageProps {
@@ -40,6 +41,8 @@ export const MediaImage: React.FC<MediaImageProps> = ({
 
   const [isLoading, setIsLoading] = useState(!media && !attachment.previewUrl);
   const [error, setError] = useState<string | null>(null);
+  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -136,6 +139,36 @@ export const MediaImage: React.FC<MediaImageProps> = ({
   const displayBlobUrl = media?.blobUrl || attachment.previewUrl;
   const isVideoMedia = isVideo || attachment.mimeType?.startsWith('video/');
 
+  useEffect(() => {
+    if (!isVideoMedia || !displayBlobUrl) return;
+
+    let isCancelled = false;
+    (async () => {
+      try {
+        let blobSource: Blob | null = null;
+        if (media?.data) {
+          blobSource = new Blob([media.data], { type: attachment.mimeType || 'video/mp4' });
+        } else {
+          const res = await fetch(displayBlobUrl);
+          blobSource = await res.blob();
+        }
+        if (blobSource && !isCancelled) {
+          const result = await ThumbnailGenerator.generateVideoThumbnail(blobSource, 0.5, 480);
+          if (!isCancelled && result.previewUrl) {
+            setVideoThumbnailUrl(result.previewUrl);
+            if (result.duration > 0) setVideoDuration(result.duration);
+          }
+        }
+      } catch (_e) {
+        // Fallback gracefully to video tag or direct url
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isVideoMedia, displayBlobUrl, media, attachment.mimeType]);
+
   if (isLoading && !displayBlobUrl) {
     return (
       <div
@@ -188,14 +221,24 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     >
       {displayBlobUrl ? (
         isVideoMedia ? (
-          <video
-            src={displayBlobUrl}
-            className="veil-media-thumbnail-img veil-media-thumbnail-video"
-            preload="metadata"
-            muted
-            playsInline
-            onError={handleMediaError}
-          />
+          videoThumbnailUrl ? (
+            <img
+              src={videoThumbnailUrl}
+              alt={alt || attachment.name}
+              className="veil-media-thumbnail-img"
+              loading="lazy"
+              onError={() => setVideoThumbnailUrl(null)}
+            />
+          ) : (
+            <video
+              src={displayBlobUrl}
+              className="veil-media-thumbnail-img veil-media-thumbnail-video"
+              preload="metadata"
+              muted
+              playsInline
+              onError={handleMediaError}
+            />
+          )
         ) : (
           <img
             src={displayBlobUrl}
@@ -212,6 +255,11 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       {isVideoMedia && (
         <div className="veil-media-play-badge" aria-hidden="true">
           <PlayIcon size={26} color="#ffffff" />
+          {videoDuration !== null && videoDuration > 0 && (
+            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#ffffff', marginLeft: '4px' }}>
+              {Math.floor(videoDuration / 60)}:{(Math.floor(videoDuration % 60)).toString().padStart(2, '0')}
+            </span>
+          )}
         </div>
       )}
     </div>

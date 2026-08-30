@@ -4,7 +4,7 @@
  * Verifies:
  * - MediaPickerModal rendering and structure
  * - Action buttons for Photos, Videos, Files, Camera
- * - Per-media privacy control toggles (allowSave, allowForward)
+ * - Per-send privacy controls are NOT present (moved to contact profile in Phase 45)
  */
 
 import { describe, it, expect, vi } from 'vitest';
@@ -30,9 +30,9 @@ describe('Phase 40: In-App Media Picker & Multi-Select Bottom Sheet', () => {
     expect(html).toContain('Videos');
     expect(html).toContain('Files');
     expect(html).toContain('Camera');
-    expect(html).toContain('Per-Media Privacy Controls');
-    expect(html).toContain('Allow recipient to save to gallery');
-    expect(html).toContain('Allow forwarding');
+    // Per-send privacy controls were removed in Phase 45
+    // (moved to contact profile media permissions)
+    expect(html).not.toContain('Per-Media Privacy Controls');
   });
 
   it('renders closed state without crashing', () => {
