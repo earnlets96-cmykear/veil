@@ -256,6 +256,26 @@ export class AccountManager {
       this.store.set(session, 'veil:identity:ka-private', first.keyAgreementPrivateKeyBase64);
       if (snapshot) {
         for (const record of first.encryptedRecords) await this.storageAdapter.saveRecord(session.spaceId, record);
+        for (const space of snapshot.spaces.slice(1)) {
+          const masterKey = base64ToBytes(space.masterKeyBase64);
+          try {
+            const header = this.vault.createSpace({
+              spaceId: space.spaceId,
+              name: space.spaceName,
+              password,
+              masterKey,
+              kdfParams: params.customKdfParams || kdfParams,
+            });
+            await this.vault.saveEnvelopeToStorage(header, this.storageAdapter);
+            const restoredSpace = this.vault.unlockSpace(password, header.spaceId);
+            this.store.set(restoredSpace, 'veil:identity:document', space.identityDocument);
+            this.store.set(restoredSpace, 'veil:identity:signing-private', space.signingPrivateKeyBase64);
+            this.store.set(restoredSpace, 'veil:identity:ka-private', space.keyAgreementPrivateKeyBase64);
+            for (const record of space.encryptedRecords) await this.storageAdapter.saveRecord(restoredSpace.spaceId, record);
+          } finally {
+            zeroize(masterKey);
+          }
+        }
       }
 
       // 5. Save restored cloud session credentials inside encrypted space store
@@ -309,18 +329,37 @@ export class AccountManager {
     };
 
     const kek = deriveKeyArgon2id(password, salt, kdfConfig);
+    let priorSpaces: RecoverySnapshotV2Space[] = [];
+    try {
+      const previous = await this.cloudClient.getRecoveryVault();
+      if (previous?.encryptedVaultBlob) {
+        const blob = JSON.parse(previous.encryptedVaultBlob);
+        if (blob.format === 'VEIL-RECOVERY-SNAPSHOT-v2') {
+          const oldParams: KdfParameters = typeof previous.kdfParams === 'string' ? JSON.parse(previous.kdfParams) : previous.kdfParams;
+          const oldKek = deriveKeyArgon2id(password, base64ToBytes(oldParams.salt), oldParams);
+          try {
+            const bytes = decryptXChaCha20Poly1305(oldKek, base64ToBytes(blob.nonce), base64ToBytes(blob.ciphertext), new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${username.trim().toLowerCase().replace(/^@/, '')}`));
+            const previousSnapshot = JSON.parse(new TextDecoder().decode(bytes)) as RecoverySnapshotV2;
+            if (previousSnapshot.version === 2 && Array.isArray(previousSnapshot.spaces)) priorSpaces = previousSnapshot.spaces;
+          } finally { zeroize(oldKek); }
+        }
+      }
+    } catch (_e) {
+      // A missing or legacy snapshot is safely replaced by the current v2 snapshot.
+    }
+    const currentSpace: RecoverySnapshotV2Space = {
+      spaceId: session.spaceId,
+      spaceName: session.name,
+      masterKeyBase64: bytesToBase64(session.getMasterKey()),
+      identityDocument: loadedId.document,
+      signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
+      keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
+      encryptedRecords: await this.storageAdapter.listRecords(session.spaceId),
+    };
     const backupPayload: RecoverySnapshotV2 = {
       version: 2,
       createdAt: Date.now(),
-      spaces: [{
-        spaceId: session.spaceId,
-        spaceName: session.name,
-        masterKeyBase64: bytesToBase64(session.getMasterKey()),
-        identityDocument: loadedId.document,
-        signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
-        keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
-        encryptedRecords: await this.storageAdapter.listRecords(session.spaceId),
-      }],
+      spaces: [...priorSpaces.filter((space) => space.spaceId !== session.spaceId), currentSpace],
     };
 
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');

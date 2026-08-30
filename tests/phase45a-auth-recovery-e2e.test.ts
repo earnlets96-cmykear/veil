@@ -39,6 +39,12 @@ describe('Phase 45A: encrypted remote recovery snapshot', () => {
     await storeA.setAsync(created.session, 'veil:contacts:list', [{ identityId: 'peer-id', name: 'Peer' }]);
     await storeA.setAsync(created.session, 'veil:ui:conversations', [{ id: 'peer-id', lastMessage: 'encrypted' }]);
     await managerA.createOrUpdateRecoveryVault(created.session, 'RecoveryPass123!', 'recovery_alice', FAST_TEST_KDF_PARAMS);
+    const secondHeader = vaultA.createSpace({ name: 'Second', password: 'RecoveryPass123!', kdfParams: FAST_TEST_KDF_PARAMS });
+    await vaultA.saveEnvelopeToStorage(secondHeader, storageA);
+    const secondSession = vaultA.unlockSpace('RecoveryPass123!', secondHeader.spaceId);
+    idsA.createIdentity(secondSession, storeA);
+    await storeA.setAsync(secondSession, 'veil:contacts:list', [{ identityId: 'peer-two', name: 'Peer Two' }]);
+    await managerA.createOrUpdateRecoveryVault(secondSession, 'RecoveryPass123!', 'recovery_alice', FAST_TEST_KDF_PARAMS);
 
     const originalIdentity = created.identityDoc.identityId;
     const originalMasterKey = bytesToHex(created.session.getMasterKey());
@@ -53,5 +59,6 @@ describe('Phase 45A: encrypted remote recovery snapshot', () => {
     expect(await storeB.getAsync(restored.session, 'veil:contacts:list')).toEqual([{ identityId: 'peer-id', name: 'Peer' }]);
     expect(await storeB.getAsync(restored.session, 'veil:ui:conversations')).toEqual([{ id: 'peer-id', lastMessage: 'encrypted' }]);
     expect((await storeB.getAsync<any>(restored.session, 'veil:cloud:session')).authPassword).toBeUndefined();
+    expect(vaultB.listEnvelopes()).toHaveLength(2);
   });
 });
