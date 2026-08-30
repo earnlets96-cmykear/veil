@@ -99,7 +99,13 @@ export class ReadReceiptManager {
       return { updatedMessages: messagesMap, didChange: false };
     }
 
-    const list = messagesMap[conversationId];
+    const targetKey = messagesMap[conversationId]
+      ? conversationId
+      : (receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId && messagesMap[receipt.readerIdentityId]
+          ? receipt.readerIdentityId
+          : conversationId);
+
+    const list = messagesMap[targetKey];
     if (!list || list.length === 0) return { updatedMessages: messagesMap, didChange: false };
 
     const receiptMessageId = receipt.type === 'READ_RECEIPT'
@@ -121,7 +127,7 @@ export class ReadReceiptManager {
       return { ...message, status: nextStatus };
     });
 
-    const updatedMessages = didChange ? { ...messagesMap, [conversationId]: nextList } : messagesMap;
+    const updatedMessages = didChange ? { ...messagesMap, [targetKey]: nextList } : messagesMap;
     return { updatedMessages, didChange };
   }
 }

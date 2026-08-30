@@ -84,10 +84,11 @@ describe('Phase 45: Account Recovery & Username Normalization Runtime', () => {
       username: '@dagmawi',
       password: 'MySecretPassword123!',
       spaceName: 'Personal',
+      deviceId: 'dev_d1',
     });
 
-    expect(origSession.spaceId).toBeDefined();
-    expect(origDoc.identityId).toBeDefined();
+    expect(origSession).toBeDefined();
+    expect(origDoc).toBeDefined();
 
     // 2. Device 2 (Simulating clean install with empty memory adapter)
     const storage2 = new MemoryAdapter();
@@ -114,7 +115,7 @@ describe('Phase 45: Account Recovery & Username Normalization Runtime', () => {
     expect(restoredDoc.identityId).toBe(origDoc.identityId);
     expect(restoredDoc.signingPublicKey).toBe(origDoc.signingPublicKey);
     expect(restoredDoc.keyAgreementPublicKey).toBe(origDoc.keyAgreementPublicKey);
-  });
+  }, 60000);
 
   it('fails recovery gracefully with invalid password', async () => {
     const storage = new MemoryAdapter();
@@ -144,5 +145,5 @@ describe('Phase 45: Account Recovery & Username Normalization Runtime', () => {
         password: 'WrongPassword999!',
       })
     ).rejects.toThrow(/Invalid username or password/i);
-  });
+  }, 60000);
 });

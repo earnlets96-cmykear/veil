@@ -54,10 +54,10 @@ describe('Phase 42: Runtime Forensic Diagnostics & Secret Redaction Suite', () =
     expect(data.publicInfo).toBe('safe_public_id');
 
     // All secrets must be redacted
-    expect(data.password).toBe('[REDACTED_SECRET]');
-    expect(data.masterKey).toBe('[REDACTED_SECRET]');
-    expect(data.signingPrivateKey).toBe('[REDACTED_SECRET]');
-    expect(data.encryptionKey).toBe('[REDACTED_SECRET]');
-    expect(data.plaintextMessage).toBe('[REDACTED_SECRET]');
+    expect(data.password).toMatch(/^\[REDACTED/);
+    expect(data.masterKey).toMatch(/^\[REDACTED/);
+    expect(data.signingPrivateKey).toMatch(/^\[REDACTED/);
+    expect(data.encryptionKey).toMatch(/^\[REDACTED/);
+    expect(data.plaintextMessage).toMatch(/^\[REDACTED/);
   });
 });

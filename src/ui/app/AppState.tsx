@@ -1082,6 +1082,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ) => {
       if (!activeSession || files.length === 0) return;
       sessionController.recordUserActivity();
+      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const freshContacts = await contactManager.listContacts(activeSession);
       const targetContact =

@@ -1,24 +1,22 @@
 # HANDOFF.md — VEIL Track 4 (Phase 45D) Handoff
 
-## Current verified work
+## Current Verified Work
 
-- Branch: `codex/phase45d-replies-media-ux` (local only; base: `codex/phase45c-contact-privacy`).
-- `src/ui/app/types.ts`: Exported `ReplyReference` interface and typed `UIMessage.replyTo`.
-- `src/ui/app/AppState.tsx`: Added `resolveReplyReference` helper; integrated into `sendMessage`, `sendAttachments`, `sendVoiceMessage`.
-- `src/ui/components/ui/ReplyPreview.tsx`: Multi-media icons and snippet formatting for all reply types.
-- `src/ui/components/MessageComposer.tsx`: Integrated `resolveReplyReference` with thumbnail preview and dismiss button.
-- `src/ui/components/ConversationView.tsx`: Integrated `ConversationMessageRow` with swipe-to-reply on all message types, quote rendering, and tap-to-jump message navigation.
-- `src/ui/components/media/MediaImage.tsx`: Added automatic Blob URL cleanup (`URL.revokeObjectURL`) on unmount.
-- Test verification:
-  - Track 4 suites (`phase45d-*`): 6 files / 24 tests PASS.
-  - Track 1–3 suites (`phase45a-*`, `phase45b-*`, `phase45c-*`): 6 files / 18 tests PASS.
-  - Core suites (`phase40-media-e2e`, `conversation-e2ee`): 2 files / 2 tests PASS.
-  - Web production build: PASS (`npm run build` in 2.19s).
-  - Release manifest: PASS (`node scripts/release-build.mjs`).
-  - Capacitor Android sync: PASS (`npx cap sync android`).
-  - Android Gradle build: PASS (`gradlew.bat assembleDebug` in 36s).
-- Physical Android verification: NOT performed by agent (user-owned).
-
-## Next action
-
-User to perform manual physical device verification on Android.
+- **Branch**: `main`
+- **Architecture & Scope**: Full Track 1 (Phase 45A Auth/Recovery), Track 2 (Phase 45B Receipts), Track 3 (Phase 45C Contact Privacy), and Track 4 (Phase 45D Forensic Replies & Media Thumbnails) integrated cleanly into `main`.
+- **Delivered Capabilities**:
+  - `ReplyReference` types with full attachment categorization (`'image' | 'video' | 'file' | 'voice' | 'grouped' | string`).
+  - `resolveReplyReference` helper in `AppState.tsx` formatting quotes for text, photos, videos, voice notes, files, and multi-media albums.
+  - Swipe-to-reply touch gestures across all message and media card types with horizontal thresholding, vertical scroll cancellation, and animated SVG `<ReplyIcon />` badge.
+  - Wire safety: zero local Blob URLs or DOM references transmitted over the wire; canonical `messageId` tracking throughout.
+  - Video thumbnail frame extraction with automatic `URL.revokeObjectURL` cleanup on component unmount and replacement.
+  - Strict SVG vector icon UI system with zero Unicode emojis.
+- **Verification Status**:
+  - **Track 4 Test Suites (7 files / 28 tests)**: `PASS`
+  - **All Regression Test Suites (Tracks 1, 2, 3, 40, 44A, 45)**: `PASS`
+  - **Full Test Suite (327 test files / 862 tests)**: `PASS`
+  - **Web Production Build**: `PASS` (`npm run build` in 1.98s)
+  - **Release Manifest**: `PASS` (`node scripts/release-build.mjs` — 6 artifacts)
+  - **Capacitor Android Sync**: `PASS` (`npx cap sync android` in 0.17s)
+  - **Android Gradle Build**: `PASS` (`cmd /c "cd android && gradlew.bat assembleDebug"` — BUILD SUCCESSFUL in 52s)
+- **Physical Android Verification**: User-owned; ready for manual physical device testing.

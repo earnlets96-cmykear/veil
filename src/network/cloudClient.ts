@@ -56,7 +56,7 @@ export class CloudClient {
 
   public requireAuthenticatedSession(): void {
     if (!this.hasAuthenticatedSession()) {
-      throw new Error('Authentication required before attachment request');
+      throw new Error('Authentication required before attachment request (Unauthorized)');
     }
   }
 
@@ -89,7 +89,15 @@ export class CloudClient {
     }
 
     const isAttachmentRoute = path.includes('/attachments/');
-    if (isAttachmentRoute) {
+    if (isAttachmentRoute && !this.hasAuthenticatedSession()) {
+      if (retryCount === 0 && this.onUnauthorizedHandler) {
+        try {
+          const reauthed = await this.onUnauthorizedHandler();
+          if (reauthed && this.hasAuthenticatedSession()) {
+            return await this.request<T>(path, method, body, timeoutOverrideMs, retryCount + 1);
+          }
+        } catch (_e) {}
+      }
       this.requireAuthenticatedSession();
     }
 

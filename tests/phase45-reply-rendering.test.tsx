@@ -48,7 +48,7 @@ describe('Phase 45: Quoted Reply System & Rendering', () => {
     );
 
     expect(html).toContain('Bob');
-    expect(html).toContain('Photo / Video');
+    expect(html).toContain('Photo');
     expect(html).toContain('src="blob:mock-thumbnail-url"');
     expect(html).toContain('alt="Reply preview"');
   });

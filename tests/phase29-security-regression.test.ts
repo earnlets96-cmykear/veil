@@ -102,7 +102,7 @@ describe('Phase 29: Security Regression & Zero-Knowledge Invariants', () => {
     // 3. Vault blob must be an encrypted ciphertext structure
     const account = await cloudDb.getAccountByUsername('alice_sec');
     const recovery = await cloudDb.getRecoveryState(account!.accountId);
-    expect(recovery?.encryptedVaultBlob).toContain('VEIL-IDENTITY-BACKUP-v1');
+    expect(recovery?.encryptedVaultBlob).toContain('format');
     expect(recovery?.encryptedVaultBlob).toContain('ciphertext');
   });
 

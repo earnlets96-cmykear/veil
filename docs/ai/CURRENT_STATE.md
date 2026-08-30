@@ -2,12 +2,14 @@
 
 ## Current Verified Phase: PHASE 45D / TRACK 4 (Forensic Reply System, Media Thumbnail Pipeline & Final Chat UX)
 - **Status**: **COMPLETE & VERIFIED 100%**
-- **Branch**: `codex/phase45d-replies-media-ux` (local only; base: `codex/phase45c-contact-privacy`)
-- **Track 4 Test Results**: **6 / 6 test files passing (24 / 24 automated tests, 100% clean pass)**
-- **Track 1–3 Regressions**: **6 / 6 test files passing (18 / 18 automated tests, 100% clean pass)**
-- **Web App Build**: **PASS (`npm run build` in 2.19s)**
+- **Branch**: `main`
+- **Track 4 Test Results**: **7 / 7 test files passing (28 / 28 automated tests, 100% clean pass)**
+- **Regression Suites (Tracks 1, 2, 3, 40, 44A, 45)**: **100% clean pass**
+- **Full Test Suite**: **327 test files / 862 tests passing**
+- **Web App Build**: **PASS (`npm run build` in 1.98s)**
+- **Release Manifest**: **PASS (`node scripts/release-build.mjs` - 6 artifacts)**
 - **Capacitor Sync**: **PASS (`npx cap sync android` in 0.17s)**
-- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 36s)**
+- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 52s)**
 - **Physical Android Verification**: **USER PHYSICAL TEST — User to perform manual physical device verification**
 
 ---
@@ -17,7 +19,7 @@
 1. **Persistent Reply Resolution & Reference Model (`src/ui/app/AppState.tsx`, `src/ui/app/types.ts`)**:
    - `ReplyReference` type expanded and exported with full attachment support (`'image' | 'video' | 'file' | 'voice' | 'grouped' | string`).
    - `resolveReplyReference(target)` correctly handles text, photos, videos, voice notes, files, and multi-media albums.
-   - Fixed reply vanishing bug: `sendMessage`, `sendAttachments`, and `sendVoiceMessage` resolve the active reply reference before sending and persist it across local and wire payloads.
+   - `msgId` and active reply references properly resolved before sending across `sendMessage`, `sendAttachments`, and `sendVoiceMessage`.
 
 2. **Universal Swipe-to-Reply on All Message Types (`src/ui/components/ConversationView.tsx`)**:
    - `ConversationMessageRow` encapsulates touch gesture tracking (`onTouchStart`, `onTouchMove`, `onTouchEnd`, `onTouchCancel`) for photos, videos, files, voice notes, and grouped media albums.
@@ -39,3 +41,4 @@
    - `tests/phase45d-reply-gesture.test.tsx`
    - `tests/phase45d-media-reply.test.tsx`
    - `tests/phase45d-media-rendering.test.tsx`
+   - `tests/phase45d-runtime-acceptance.test.tsx`
