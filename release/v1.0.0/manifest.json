@@ -1,6 +1,6 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-08-30T09:57:03.525Z",
+  "generatedAt": "2026-08-30T10:43:08.495Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 6,
@@ -32,8 +32,8 @@
     },
     {
       "path": "dist/index.html",
-      "sizeBytes": 967,
-      "sha256": "d9c96d20b1585bd634722aefe886671bb1264336c447100dba417402a2533a89"
+      "sizeBytes": 950,
+      "sha256": "f541d71ed17cd91b7ec2f25ca9ace89688c9fdd4d1ec2faee1a95bc57f003f67"
     }
   ]
 }
