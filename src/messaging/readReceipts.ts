@@ -8,10 +8,14 @@
  * - Local-first offline-tolerant delivery state persistence.
  */
 
-import { SpaceSession } from '../spaces/session.ts';
-import { NetworkManager } from '../network/networkManager.ts';
-import { EncryptedSpaceStore } from '../storage/spaceStore.ts';
 import { UIMessage } from '../ui/app/types.ts';
+
+export interface DeliveryReceiptPayload {
+  type: 'DELIVERY_RECEIPT';
+  conversationId: string;
+  messageId: string;
+  receivedAt: number;
+}
 
 export interface ReadReceiptPayload {
   type: 'READ_RECEIPT';
@@ -21,8 +25,10 @@ export interface ReadReceiptPayload {
   readAt: number;
 }
 
+export type ReceiptPayload = DeliveryReceiptPayload | ReadReceiptPayload;
+
 export class ReadReceiptManager {
-  private pendingReceipts: Map<string, { conversationId: string; lastMessageId: string; targetMailboxId: string }> = new Map();
+  private pendingReceipts: Map<string, { conversationId: string; lastMessageId: string }> = new Map();
   private debounceTimer: any = null;
 
   /**
@@ -30,19 +36,15 @@ export class ReadReceiptManager {
    * Debounces to avoid flooding when scrolling through multiple messages.
    */
   public scheduleReadReceipt(
-    session: SpaceSession,
-    netManager: NetworkManager,
     conversationId: string,
     lastMessageId: string,
-    targetMailboxId: string,
-    onSent?: () => void
+    sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>
   ): void {
-    if (!session || !session.isActive() || !conversationId || !lastMessageId) return;
+    if (!conversationId || !lastMessageId) return;
 
     this.pendingReceipts.set(conversationId, {
       conversationId,
       lastMessageId,
-      targetMailboxId,
     });
 
     if (this.debounceTimer) {
@@ -50,16 +52,15 @@ export class ReadReceiptManager {
     }
 
     this.debounceTimer = setTimeout(async () => {
-      await this.flushPendingReceipts(session, netManager);
-      if (onSent) onSent();
+      await this.flushPendingReceipts(sendReceipt);
     }, 400);
   }
 
   /**
    * Flushes all queued read receipts over the untrusted relay transport.
    */
-  public async flushPendingReceipts(session: SpaceSession, netManager: NetworkManager): Promise<void> {
-    if (!session || !session.isActive() || this.pendingReceipts.size === 0) return;
+  public async flushPendingReceipts(sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>): Promise<void> {
+    if (this.pendingReceipts.size === 0) return;
 
     const queue = Array.from(this.pendingReceipts.values());
     this.pendingReceipts.clear();
@@ -70,12 +71,12 @@ export class ReadReceiptManager {
           type: 'READ_RECEIPT',
           conversationId: item.conversationId,
           lastReadMessageId: item.lastMessageId,
-          readerIdentityId: session.spaceId,
+          // This is replaced by the authenticated sender identity when the
+          // encrypted receipt envelope is created.
+          readerIdentityId: '',
           readAt: Date.now(),
         };
-
-        const rawWire = JSON.stringify(payload);
-        await netManager.sendEnvelope(session, item.targetMailboxId, rawWire);
+        await sendReceipt(payload);
       } catch (_e) {
         // Safe swallow: receipts will re-sync on next conversation open
       }
@@ -86,39 +87,41 @@ export class ReadReceiptManager {
    * Processes an inbound read receipt payload and updates matching outgoing message statuses to 'READ'.
    */
   public processInboundReceipt(
-    receipt: ReadReceiptPayload,
-    messagesMap: Record<string, UIMessage[]>
+    receipt: ReceiptPayload,
+    messagesMap: Record<string, UIMessage[]>,
+    authenticatedPeerId?: string
   ): { updatedMessages: Record<string, UIMessage[]>; didChange: boolean } {
-    const { conversationId, lastReadMessageId, readerIdentityId } = receipt;
-
-    // Resolve key list
-    const candidateKeys = [conversationId, readerIdentityId].filter(Boolean);
-    let didChange = false;
-    const updatedMessages = { ...messagesMap };
-
-    for (const key of candidateKeys) {
-      const list = updatedMessages[key];
-      if (!list || list.length === 0) continue;
-
-      let foundLastRead = false;
-      const nextList = list.map((msg) => {
-        if (msg.id === lastReadMessageId) {
-          foundLastRead = true;
-        }
-
-        // If message is outgoing and not yet marked READ, mark it as READ
-        if (msg.isOutgoing && msg.status !== 'READ' && msg.status !== 'FAILED') {
-          didChange = true;
-          return { ...msg, status: 'READ' as const };
-        }
-        return msg;
-      });
-
-      if (didChange) {
-        updatedMessages[key] = nextList;
-      }
+    const { conversationId } = receipt;
+    if (authenticatedPeerId && (
+      conversationId !== authenticatedPeerId ||
+      (receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId !== authenticatedPeerId)
+    )) {
+      return { updatedMessages: messagesMap, didChange: false };
     }
 
+    const list = messagesMap[conversationId];
+    if (!list || list.length === 0) return { updatedMessages: messagesMap, didChange: false };
+
+    const receiptMessageId = receipt.type === 'READ_RECEIPT'
+      ? receipt.lastReadMessageId
+      : receipt.messageId;
+    const receiptIndex = list.findIndex((message) => message.id === receiptMessageId);
+    if (receiptIndex < 0) return { updatedMessages: messagesMap, didChange: false };
+
+    let didChange = false;
+    const nextList = list.map((message, index) => {
+      const acknowledged = receipt.type === 'READ_RECEIPT'
+        ? index <= receiptIndex
+        : index === receiptIndex;
+      if (!acknowledged || !message.isOutgoing || message.status === 'FAILED') return message;
+
+      const nextStatus = receipt.type === 'READ_RECEIPT' ? 'READ' : 'DELIVERED_TO_RECIPIENT';
+      if (message.status === nextStatus || (message.status === 'READ' && nextStatus !== 'READ')) return message;
+      didChange = true;
+      return { ...message, status: nextStatus };
+    });
+
+    const updatedMessages = didChange ? { ...messagesMap, [conversationId]: nextList } : messagesMap;
     return { updatedMessages, didChange };
   }
 }

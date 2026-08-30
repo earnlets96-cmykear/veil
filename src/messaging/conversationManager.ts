@@ -26,6 +26,7 @@ import {
   assertWireSafe,
   WireAttachmentPayload,
 } from '../attachments/types.ts';
+import { ReceiptPayload } from './readReceipts.ts';
 
 export type MessageDeliveryStatus = 'queued' | 'sent' | 'delivered' | 'read';
 
@@ -369,6 +370,42 @@ export class ConversationManager {
   }
 
   /**
+   * Encrypts an authenticated delivery/read control payload on an existing
+   * Double Ratchet session. Receipts never create a new session or history row.
+   */
+  public async encryptAndPackReceipt(
+    session: SpaceSession,
+    peerDocument: IdentityDocument,
+    receipt: ReceiptPayload
+  ): Promise<string> {
+    this.assertSession(session);
+    const ratchetSession = this.sessionStore.loadSession(session, peerDocument.identityId);
+    if (!ratchetSession || ratchetSession.peerIdentityId !== peerDocument.identityId) {
+      throw new Error('Cannot send receipt without an authenticated conversation session');
+    }
+
+    const myDoc = this.idMgr.getPublicDocument(session, this.store);
+    if (!myDoc) throw new Error('Cannot send receipt: no Space identity');
+
+    const authenticatedReceipt: ReceiptPayload = receipt.type === 'READ_RECEIPT'
+      ? { ...receipt, conversationId: peerDocument.identityId, readerIdentityId: myDoc.identityId }
+      : { ...receipt, conversationId: peerDocument.identityId };
+    const ratchetMsg = ratchetSession.ratchetEncrypt(JSON.stringify(authenticatedReceipt));
+    const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
+    const wireObj = {
+      version: 1 as const,
+      deliveryId: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      senderIdentityId: myDoc.identityId,
+      senderDocument: myDoc,
+      senderMailboxId: binding?.mailboxId,
+      ratchetMessage: ratchetMsg,
+    };
+    const { padded } = padPayload(new TextEncoder().encode(JSON.stringify(wireObj)));
+    this.sessionStore.saveSession(session, ratchetSession);
+    return bytesToBase64(padded);
+  }
+
+  /**
    * Processes, decrypts, and persists an incoming wire payload from a peer.
    */
   public async processInboundWirePayload(
@@ -382,6 +419,7 @@ export class ConversationManager {
     attachments?: any[];
     replyTo?: any;
     voice?: any;
+    receipt?: ReceiptPayload & { senderIdentityId: string };
   }> {
     this.assertSession(session);
 
@@ -412,6 +450,9 @@ export class ConversationManager {
     let plaintextBytes: Uint8Array | null = null;
 
     if (ratchetSession) {
+      if (ratchetSession.peerIdentityId !== senderId) {
+        throw new Error('Incoming wire sender does not match authenticated session peer');
+      }
       try {
         plaintextBytes = ratchetSession.ratchetDecrypt(ratchetMsg);
       } catch (err) {
@@ -485,6 +526,27 @@ export class ConversationManager {
     // 4. Save updated session state
     this.sessionStore.saveSession(session, ratchetSession);
 
+    // Receipt controls are authenticated by the existing ratchet session and
+    // must not appear in local message history or user-visible timelines.
+    const receipt = this.parseReceiptPayload(text, senderId);
+    if (receipt) {
+      return {
+        storedMessage: {
+          messageId: wireObj.deliveryId,
+          conversationId: senderId,
+          senderIdentityId: senderId,
+          recipientIdentityId: this.idMgr.getPublicDocument(session, this.store)?.identityId || 'local_user',
+          text: '',
+          isOutgoing: false,
+          timestamp: Date.now(),
+          status: 'delivered',
+        },
+        senderDoc,
+        senderMailboxId: wireObj.senderMailboxId,
+        receipt,
+      };
+    }
+
     // 5. Append to encrypted local conversation history
     const deliveryId = wireObj.deliveryId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const myDoc = this.idMgr.getPublicDocument(session, this.store);
@@ -526,6 +588,20 @@ export class ConversationManager {
     messages.push(msg);
     const key = `${MESSAGE_HISTORY_PREFIX}${conversationId}`;
     this.store.set(session, key, messages);
+  }
+
+  private parseReceiptPayload(text: string, senderIdentityId: string): (ReceiptPayload & { senderIdentityId: string }) | null {
+    try {
+      const parsed = JSON.parse(text) as ReceiptPayload;
+      if (!parsed || !parsed.conversationId) return null;
+      if (parsed.type === 'DELIVERY_RECEIPT' && parsed.messageId && typeof parsed.receivedAt === 'number') {
+        return { ...parsed, senderIdentityId };
+      }
+      if (parsed.type === 'READ_RECEIPT' && parsed.lastReadMessageId && typeof parsed.readAt === 'number') {
+        return { ...parsed, senderIdentityId };
+      }
+    } catch (_error) {}
+    return null;
   }
 
   private assertSession(session: SpaceSession): void {

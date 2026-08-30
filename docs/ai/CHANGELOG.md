@@ -4,6 +4,18 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Track 2] - 2026-08-30
+
+### Fixed & Verified
+- Added authenticated, encrypted `DELIVERY_RECEIPT` and `READ_RECEIPT` controls on the existing Double Ratchet session; receipt controls never create a message-history item.
+- Recipient delivery acknowledgement is emitted only after inbound ratchet decryption and encrypted history persistence.
+- Sender status transitions now strictly target the acknowledged message (`sent → delivered`) or acknowledged ordered range (`delivered → read`), and are persisted in encrypted UI state.
+- Receipt state is bound to the canonical authenticated peer identity; mismatched identities do not mutate the timeline.
+- Removed the pre-decryption raw-JSON receipt path. Attachment download paths have no read-marker call; only entering an active conversation triggers a read receipt.
+- Focused receipt/lifecycle/media regression tests and the web production build pass. Physical Android verification remains user-owned.
+
+---
+
 ## [Phase 37] - 2026-08-28
 
 ### Added, Fixed & Validated

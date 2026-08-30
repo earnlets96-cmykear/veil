@@ -1,4 +1,19 @@
-# HANDOFF.md — VEIL Phase 37 Production & Mobile Repair Handoff
+# HANDOFF.md — VEIL Track 2 Delivery and Read Receipts Handoff
+
+## Current verified work
+
+- Branch: `codex/phase45b-delivery-receipts` (local only; no push or merge).
+- `src/messaging/conversationManager.ts` encrypts receipt controls with an existing Double Ratchet session and does not persist them as chat messages.
+- `src/messaging/readReceipts.ts` applies delivery to one outgoing message and read to the acknowledged outgoing range only, rejecting a canonical-peer mismatch.
+- `src/ui/app/AppState.tsx` processes receipts only after E2EE decoding, sends delivery receipts after inbound persistence, and sends debounced read receipts only when a conversation is opened.
+- Verification: `tests/phase45b-delivery-read-receipts.test.ts`, Phase 38 receipts, Phase 24 lifecycle, Phase 40 media E2E: 7 tests in 4 files passed. `npm run build` passed.
+- Not verified: physical Android, Capacitor sync, Android build, or full workspace suite. Do not claim any of these.
+
+## Next action
+
+Wait for the user to perform physical Android verification. Do not modify Tracks 1, 3, or 4 unless a concrete regression or new instruction is supplied.
+
+---
 
 ## 1. Verified Phase Completion Status
 - **Current Phase**: **Phase 37 — Real Android UI Repair, Voice Playback Fix, Media Reliability & Production-Grade Mobile Layout** (Completed & Verified)

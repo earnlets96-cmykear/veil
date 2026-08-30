@@ -372,23 +372,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 8. Connect NetworkManager for real-time WebSocket delivery & sync
     try {
       await netManager.startListening(session, async (payload) => {
-        // Check for Read Receipts
-        try {
-          if (payload.includes('"type":"READ_RECEIPT"')) {
-            const parsed = JSON.parse(payload);
-            if (parsed.type === 'READ_RECEIPT') {
-              setMessages((prev) => {
-                const { updatedMessages, didChange } = readReceiptManager.processInboundReceipt(parsed, prev);
-                if (didChange) {
-                  store.setAsync(session, 'veil:ui:messages', updatedMessages);
-                }
-                return didChange ? updatedMessages : prev;
-              });
-              return;
-            }
-          }
-        } catch (_receiptErr) {}
-
         // Check for Contact Requests or Responses
         try {
           if (payload.includes('"type":"CONTACT_REQUEST"')) {
@@ -456,7 +439,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Standard E2EE wire payload processing
         try {
           const result = await convManager.processInboundWirePayload(session, payload);
-          const { storedMessage, senderDoc, senderMailboxId, attachment, attachments, replyTo, voice } = result;
+          const { storedMessage, senderDoc, senderMailboxId, attachment, attachments, replyTo, voice, receipt } = result;
+
+          if (receipt) {
+            setMessages((prev) => {
+              const { updatedMessages, didChange } = readReceiptManager.processInboundReceipt(
+                receipt,
+                prev,
+                senderDoc.identityId
+              );
+              if (didChange) store.setAsync(session, 'veil:ui:messages', updatedMessages);
+              return didChange ? updatedMessages : prev;
+            });
+            return;
+          }
 
           const incomingAttachments = attachments || (attachment ? [attachment] : undefined);
           const incomingMsg: UIMessage = {
@@ -525,6 +521,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             searchEngine.updateIndex(currentContacts, storedConvs, updated);
             return updated;
           });
+
+          // An acknowledgement is sent only after the encrypted conversation
+          // history has accepted the message. It uses the existing ratchet,
+          // so a relay or another contact cannot forge delivery state.
+          if (senderMailboxId) {
+            try {
+              const receiptWire = await convManager.encryptAndPackReceipt(session, senderDoc, {
+                type: 'DELIVERY_RECEIPT',
+                conversationId: senderDoc.identityId,
+                messageId: incomingMsg.id,
+                receivedAt: Date.now(),
+              });
+              await netManager.sendEnvelope(session, senderMailboxId, receiptWire);
+            } catch (_receiptError) {}
+          }
 
           // Ensure conversation exists in list and update last message
           setConversations((prev) => {
@@ -1682,16 +1693,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const contact = contacts.find((c) => c.identityId === conversationId || c.name === conversationId);
           const targetMailboxId = contact?.mailboxId || conversationId;
           readReceiptManager.scheduleReadReceipt(
-            activeSession,
-            netManager,
             conversationId,
             lastInbound.id,
-            targetMailboxId
+            async (receipt) => {
+              const peerDocument = contact?.prekeyBundle?.identityDocument || conversations.find((c) => c.id === conversationId)?.peerDoc;
+              if (!peerDocument || !targetMailboxId) return;
+              const wirePayload = await convManager.encryptAndPackReceipt(activeSession, peerDocument, receipt);
+              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+            }
           );
         }
       } catch (_e) {}
     },
-    [activeSession, messages, contacts]
+    [activeSession, messages, contacts, conversations]
   );
 
   const restoreAccount = useCallback(
