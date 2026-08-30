@@ -5,8 +5,8 @@
  * pinch/scroll zoom, pan, dedicated HTML5 video controls, and next/previous gallery navigation.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from '../../app/AppState.tsx';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import { AppContext } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
 import { MediaLogger } from '../../utils/mediaLogger.ts';
 import { RuntimeDiagnostics } from '../../../debug/runtimeDiagnostics.ts';
@@ -57,7 +57,10 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   onDownload,
   onShare,
 }) => {
-  const { activeSession, cloudClient, ensureCloudSession } = useApp();
+  const app = useContext(AppContext);
+  const activeSession = app?.activeSession;
+  const cloudClient = app?.cloudClient;
+  const ensureCloudSession = app?.ensureCloudSession;
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
   const [loadingMedia, setLoadingMedia] = useState<Record<string, boolean>>({});

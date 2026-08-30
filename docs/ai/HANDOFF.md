@@ -1,22 +1,49 @@
-# HANDOFF.md — VEIL Track 4 (Phase 45D) Handoff
+# HANDOFF.md — AI Agent Session Handoff
 
-## Current Verified Work
-
+## Handoff Summary
+- **Current Phase**: **PHASE 45E (Final Media + Reply Runtime Forensic Repair)**
+- **Status**: **COMPLETE & VERIFIED 100%**
 - **Branch**: `main`
-- **Architecture & Scope**: Full Track 1 (Phase 45A Auth/Recovery), Track 2 (Phase 45B Receipts), Track 3 (Phase 45C Contact Privacy), and Track 4 (Phase 45D Forensic Replies & Media Thumbnails) integrated cleanly into `main`.
-- **Delivered Capabilities**:
-  - `ReplyReference` types with full attachment categorization (`'image' | 'video' | 'file' | 'voice' | 'grouped' | string`).
-  - `resolveReplyReference` helper in `AppState.tsx` formatting quotes for text, photos, videos, voice notes, files, and multi-media albums.
-  - Swipe-to-reply touch gestures across all message and media card types with horizontal thresholding, vertical scroll cancellation, and animated SVG `<ReplyIcon />` badge.
-  - Wire safety: zero local Blob URLs or DOM references transmitted over the wire; canonical `messageId` tracking throughout.
-  - Video thumbnail frame extraction with automatic `URL.revokeObjectURL` cleanup on component unmount and replacement.
-  - Strict SVG vector icon UI system with zero Unicode emojis.
-- **Verification Status**:
-  - **Track 4 Test Suites (7 files / 28 tests)**: `PASS`
-  - **All Regression Test Suites (Tracks 1, 2, 3, 40, 44A, 45)**: `PASS`
-  - **Full Test Suite (327 test files / 862 tests)**: `PASS`
-  - **Web Production Build**: `PASS` (`npm run build` in 1.98s)
-  - **Release Manifest**: `PASS` (`node scripts/release-build.mjs` — 6 artifacts)
-  - **Capacitor Android Sync**: `PASS` (`npx cap sync android` in 0.17s)
-  - **Android Gradle Build**: `PASS` (`cmd /c "cd android && gradlew.bat assembleDebug"` — BUILD SUCCESSFUL in 52s)
-- **Physical Android Verification**: User-owned; ready for manual physical device testing.
+- **Full Test Suite Results**: **334 test files / 881 tests passing (100% clean pass)**
+- **Web App Build**: **PASS (`npm run build` in 1.95s)**
+- **Release Manifest**: **PASS (`node scripts/release-build.mjs` - 6 artifacts)**
+- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.20s)**
+- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 20s)**
+- **Physical Android Verification**: **USER PHYSICAL TEST — User performs manual physical device verification**
+
+---
+
+## Forensic Fixes Delivered
+
+1. **Persistent Reply System**:
+   - `replyTargetRef` in `src/ui/app/AppState.tsx` synchronizes with React state, resolving the stale closure issue where replies were dropped upon send.
+   - High-contrast Telegram-style reply bubble styling in `src/styles/veil-components.css`.
+   - `toWireReplyReference` in `src/attachments/types.ts` strictly sanitizes wire reply payload fields.
+
+2. **Attachment & Voice Recipient Authorization**:
+   - Normalized `targetUsername` resolution across handles, canonical identity IDs, and display names.
+   - Forwarded `recipientUsername`, `recipientAccountId`, and `recipientIdentityId` to cloud storage creation.
+   - Server-side `handleAttachmentDownload` in `src/server/cloud/cloudHandler.ts` matches recipient username, account ID, and identity ID, eliminating "Attachment not found or access denied" 404s.
+
+3. **Audio Playback & Physical Seeking**:
+   - Verified `seek(percent)` sets `audio.currentTime` directly with safe duration bounds.
+   - Enforced single-audio mutex playback state.
+   - Object URLs retained during playback and revoked on `stop()`.
+
+4. **Video Upload Pipeline & Player State Machine**:
+   - Zero-leak wire serialization verified for video attachments.
+   - Complete video player controls with scrubbing in `src/ui/components/media/MediaViewer.tsx`.
+
+5. **Diagnostic Telemetry Redaction**:
+   - Telemetry sanitizes passwords, private keys, symmetric keys, and secrets with `[REDACTED]`.
+
+---
+
+## Test Suites Added in Phase 45E
+- `tests/phase45e-audio-runtime.test.ts`
+- `tests/phase45e-video-upload-runtime.test.ts`
+- `tests/phase45e-video-player.test.tsx`
+- `tests/phase45e-reply-end-to-end.test.ts`
+- `tests/phase45e-reply-rendering.test.tsx`
+- `tests/phase45e-attachment-integrity.test.ts`
+- `tests/phase45e-runtime-redaction.test.ts`

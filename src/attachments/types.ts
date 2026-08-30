@@ -114,6 +114,24 @@ export function toWireAttachment(localAttachment: any): WireAttachmentPayload {
 }
 
 /**
+ * Canonical serializer converting local reply reference into a clean, protocol-safe wire reply.
+ * EXPLICIT ALLOWLIST ONLY — NEVER SPREADS previewUrl or local state.
+ */
+export function toWireReplyReference(localReply?: any): { messageId: string; senderName?: string; text: string; attachmentType?: string } | undefined {
+  if (!localReply || typeof localReply !== 'object') return undefined;
+
+  const wire = {
+    messageId: String(localReply.messageId || ''),
+    senderName: localReply.senderName ? String(localReply.senderName) : undefined,
+    text: String(localReply.text || ''),
+    attachmentType: localReply.attachmentType ? String(localReply.attachmentType) : undefined,
+  };
+
+  assertWireSafe(wire, 'wireReply');
+  return wire;
+}
+
+/**
  * Converts an array of local attachments to an array of wire attachments.
  */
 export function toWireAttachments(localAttachments?: any[]): WireAttachmentPayload[] | undefined {

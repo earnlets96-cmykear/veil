@@ -529,8 +529,17 @@ export class CloudHandler {
               const reqAccount = await this.db.getAccountById(accountId);
               if (
                 reqAccount &&
-                reqAccount.username.toLowerCase().replace(/^@/, '') ===
-                  metaObj.recipientUsername.toLowerCase().replace(/^@/, '')
+                reqAccount.username.toLowerCase().replace(/^@/, '').trim() ===
+                  metaObj.recipientUsername.toLowerCase().replace(/^@/, '').trim()
+              ) {
+                isRecipient = true;
+              }
+            } else if (metaObj.recipientIdentityId) {
+              const reqAccount = await this.db.getAccountById(accountId);
+              if (
+                reqAccount &&
+                (reqAccount.accountId === metaObj.recipientIdentityId ||
+                  requesterSpaces.some((s) => s.spaceId === metaObj.recipientIdentityId))
               ) {
                 isRecipient = true;
               }

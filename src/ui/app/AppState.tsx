@@ -922,7 +922,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, []);
 
-  const [replyTarget, setReplyTarget] = useState<UIMessage | null>(null);
+  const [replyTarget, setReplyTargetState] = useState<UIMessage | null>(null);
+  const replyTargetRef = useRef<UIMessage | null>(null);
+
+  const setReplyTarget = useCallback((target: UIMessage | null) => {
+    replyTargetRef.current = target;
+    setReplyTargetState(target);
+  }, []);
 
   const sendMessage = useCallback(
     async (conversationId: string, text: string) => {
@@ -930,7 +936,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const activeReply = resolveReplyReference(replyTarget);
+      const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
 
       const newMsg: UIMessage = {
         id: msgId,
@@ -943,7 +949,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         replyTo: activeReply,
       };
 
-      setReplyTarget(null);
+      replyTargetRef.current = null;
+      setReplyTargetState(null);
 
       setMessages((prev) => {
         const list = prev[conversationId] || [];
@@ -1071,7 +1078,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }
     },
-    [activeSession, contacts, conversations]
+    [activeSession, contacts, conversations, replyTarget]
   );
 
   const sendAttachments = useCallback(
@@ -1095,9 +1102,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
       const allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
 
-      const activeReply = resolveReplyReference(replyTarget);
+      const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
 
-      setReplyTarget(null);
+      replyTargetRef.current = null;
+      setReplyTargetState(null);
 
       // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
       const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
@@ -1121,7 +1129,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
       });
       const targetMailboxId = targetContact?.mailboxId || conversationId;
-      const targetUsername = targetContact?.accountUsername;
+      const targetUsername =
+        targetContact?.accountUsername ||
+        (targetContact?.name && !targetContact.name.includes(' ') ? targetContact.name.replace(/^@/, '').trim() : undefined) ||
+        (conversationId.startsWith('@') ? conversationId.slice(1).trim() : undefined) ||
+        targetContact?.name?.trim();
+      const recipientAccountId = targetContact?.metadata?.accountId;
+      const recipientIdentityId = targetContact?.identityId || conversationId;
       const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
 
       const keys = new Set([
@@ -1467,14 +1481,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const activeReply = resolveReplyReference(replyTarget);
+      const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
 
-      setReplyTarget(null);
+      replyTargetRef.current = null;
+      setReplyTargetState(null);
 
       const freshContacts = await contactManager.listContacts(activeSession);
       const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
-      const targetUsername = targetContact?.accountUsername;
+      const targetUsername =
+        targetContact?.accountUsername ||
+        (targetContact?.name && !targetContact.name.includes(' ') ? targetContact.name.replace(/^@/, '').trim() : undefined) ||
+        (conversationId.startsWith('@') ? conversationId.slice(1).trim() : undefined) ||
+        targetContact?.name?.trim();
+      const recipientAccountId = targetContact?.metadata?.accountId;
+      const recipientIdentityId = targetContact?.identityId || conversationId;
 
       const keys = new Set([
         conversationId,
@@ -1530,7 +1551,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             mimeType,
             {
               recipientUsername: targetUsername,
-              recipientAccountId: targetContact?.metadata?.accountId,
+              recipientAccountId,
+              allowedAccounts: recipientAccountId ? [recipientAccountId] : undefined,
             }
           );
 

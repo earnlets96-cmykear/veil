@@ -55,11 +55,19 @@ class RuntimeDiagnosticsSubsystem {
     this.history = [];
   }
 
+  public clear(): void {
+    this.history = [];
+  }
+
   public getHistory(category?: DiagnosticCategory): DiagnosticEvent[] {
     if (category) {
       return this.history.filter((e) => e.category === category);
     }
     return [...this.history];
+  }
+
+  public getEntries(category?: DiagnosticCategory): DiagnosticEvent[] {
+    return this.getHistory(category);
   }
 
   /**

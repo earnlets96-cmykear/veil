@@ -4,6 +4,41 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 45E] - 2026-08-30
+
+### Fixed & Verified
+- **Persistent Reply Quote Rendering & Closure Synchronization (`src/ui/app/AppState.tsx`)**:
+  - Implemented `replyTargetRef` synchronized with `replyTarget` React state to eliminate stale closure bugs during message sends.
+  - Ensured `sendMessage`, `sendAttachments`, and `sendVoiceMessage` always capture the real-time active reply quote without dropping metadata on send.
+  - Enhanced `src/styles/veil-components.css` with high-contrast Telegram-style quote bubble styling for outgoing (`rgba(0,0,0,0.16)` backdrop, white accent border, white bold sender) and incoming message bubbles.
+- **Attachment & Voice Note Recipient Authorization ("Not Found" Fix) (`src/ui/app/AppState.tsx`, `src/server/cloud/cloudHandler.ts`)**:
+  - Resolved `targetUsername` across `@`-trimmed handles, canonical identity IDs, and fallback display names.
+  - Populated `recipientUsername`, `recipientAccountId`, and `recipientIdentityId` in `createAttachment` and `VoiceRecorder.encryptAndUploadVoiceNote`.
+  - Updated `handleAttachmentDownload` in `cloudHandler.ts` to authorize downloads by matching `recipientUsername` (case-insensitive, `@`-trimmed), `recipientAccountId`, or `recipientIdentityId`.
+- **Audio Playback & Physical Seeking State Machine (`src/attachments/voicePlayer.ts`, `src/ui/components/ui/VoiceNoteCard.tsx`)**:
+  - Validated physical seeking setting `audio.currentTime = targetSeconds` with safe duration bounds.
+  - Managed ephemeral Object URL lifecycle (retained during active playback, revoked strictly on `stop()` or when new audio starts).
+  - Ensured single-audio mutex playback state.
+- **Video Upload Pipeline & Player State Machine (`src/attachments/types.ts`, `src/ui/components/media/MediaViewer.tsx`)**:
+  - Enforced zero-leak wire serialization via `toWireAttachment`, `toWireReplyReference`, and `assertWireSafe`.
+  - Implemented custom video playback controls, scrubbing slider, volume/mute, and fullscreen in `MediaViewer.tsx`.
+- **Diagnostic Telemetry Redaction & Safety (`src/debug/runtimeDiagnostics.ts`)**:
+  - Added `clear()` and `getEntries()` convenience methods.
+  - Verified telemetry contains zero plaintext passwords, master keys, private keys, or symmetric keys.
+- **Test Coverage & Verification**:
+  - Authored 7 focused Phase 45E test suites (19 tests, 100% passing):
+    - `tests/phase45e-audio-runtime.test.ts`
+    - `tests/phase45e-video-upload-runtime.test.ts`
+    - `tests/phase45e-video-player.test.tsx`
+    - `tests/phase45e-reply-end-to-end.test.ts`
+    - `tests/phase45e-reply-rendering.test.tsx`
+    - `tests/phase45e-attachment-integrity.test.ts`
+    - `tests/phase45e-runtime-redaction.test.ts`
+  - Regression verified full workspace: **334 test files / 881 tests passing cleanly (100%)**.
+  - Production builds verified: `npm run build` (1.95s), `scripts/release-build.mjs` (6 artifacts), `npx cap sync android` (0.20s), and `gradlew assembleDebug` (20s).
+
+---
+
 ## [Track 4] - 2026-08-30
 
 ### Fixed & Verified

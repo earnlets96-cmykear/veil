@@ -1,28 +1,24 @@
-# ACTIVE_TASK.md — Current Work Tracker
+# ACTIVE_TASK.md — Active Task Tracker
 
-## Active Task: Phase 45D / Track 4 — Forensic Reply System, Media Thumbnail Pipeline & Final Chat UX
+## Current Active Task: Phase 45E — Final Media + Reply Runtime Forensic Repair
+- **Status**: **COMPLETE**
+- **Objective**: Forensically repair the 4 remaining runtime failure modes:
+  1. Sent message reply quote rendering & React stale closure fix
+  2. Attachment & voice note recipient authorization ("Attachment not found" fix)
+  3. Audio playback, seeking, and object URL lifecycle management
+  4. Video upload pipeline, wire safety, and player state machine
 
-### Status: COMPLETE & VERIFIED
+## Tasks Completed
+- [x] Implemented `replyTargetRef` in `src/ui/app/AppState.tsx` to eliminate stale closure bugs during send operations.
+- [x] Hardened `targetUsername`, `recipientAccountId`, and `recipientIdentityId` resolution in `src/ui/app/AppState.tsx` for attachment and voice uploads.
+- [x] Updated `src/server/cloud/cloudHandler.ts` `handleAttachmentDownload` to authorize downloads via recipient username, account ID, and identity ID matching.
+- [x] Enhanced `src/styles/veil-components.css` with high-contrast Telegram-style reply quote rendering for outgoing and incoming bubbles.
+- [x] Implemented `toWireReplyReference` in `src/attachments/types.ts` to strictly sanitize wire reply payloads.
+- [x] Added `clear()` and `getEntries()` to `src/debug/runtimeDiagnostics.ts`.
+- [x] Enabled standalone context resilience in `src/ui/components/media/MediaViewer.tsx`.
+- [x] Created and verified all 7 Phase 45E test suites (`tests/phase45e-*.test.ts*`).
+- [x] Verified full regression suites (80 / 80 Phase 45 tests, 881 / 881 repository tests).
+- [x] Verified `npm run build`, `node scripts/release-build.mjs`, `npx cap sync android`, and Android Gradle `assembleDebug`.
 
-Track 4 forensically resolved persistent quoted reply serialization/persistence across reload, universal swipe-to-reply gestures across all message and media card types, offscreen video thumbnail extraction with memory cleanup, authenticated auto-healing across routes, and strict zero-emoji SVG presentation.
-
-### Verification Matrix
-- **Track 4 Focused Suites (7 files / 28 tests)**: `PASS`
-  - `tests/phase45d-reply-persistence.test.ts` (5 / 5 passed)
-  - `tests/phase45d-reply-media-e2e.test.ts` (1 / 1 passed)
-  - `tests/phase45d-thumbnail-pipeline.test.ts` (4 / 4 passed)
-  - `tests/phase45d-reply-gesture.test.tsx` (5 / 5 passed)
-  - `tests/phase45d-media-reply.test.tsx` (6 / 6 passed)
-  - `tests/phase45d-media-rendering.test.tsx` (3 / 3 passed)
-  - `tests/phase45d-runtime-acceptance.test.tsx` (4 / 4 passed)
-- **All Regression Suites (Tracks 1, 2, 3, 40, 44A, 45)**: `PASS`
-- **Full Test Suite (327 test files / 862 tests)**: `PASS`
-- **Production Web Bundle**: `PASS` (`npm run build` in 1.98s)
-- **Release Manifest**: `PASS` (`node scripts/release-build.mjs` — 6 artifacts verified)
-- **Capacitor Sync**: `PASS` (`npx cap sync android` in 0.17s)
-- **Android Gradle Compilation**: `PASS` (`gradlew.bat assembleDebug` — BUILD SUCCESSFUL in 52s)
-
-### Scope Integrity
-- Branch: `main`
-- No remote push or remote merge executed.
-- Physical Android device verification is user-owned.
+## Next Step
+- Provide clean handoff report and commit changes to local git.
