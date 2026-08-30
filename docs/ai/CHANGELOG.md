@@ -4,6 +4,34 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Track 4] - 2026-08-30
+
+### Fixed & Verified
+- **Persistent Quoted Reply System (`src/ui/app/AppState.tsx`, `src/ui/app/types.ts`)**:
+  - Exported `ReplyReference` type with complete union (`'image' | 'video' | 'file' | 'voice' | 'grouped' | string`).
+  - Authored `resolveReplyReference` helper handling text, single media (photo/video), voice notes, file attachments, and grouped media without dropping metadata or falling back to raw placeholders.
+  - Wired `resolveReplyReference` across `sendMessage`, `sendAttachments`, and `sendVoiceMessage` to ensure replies never disappear after send.
+  - Verified wire serialization strictly preserves `{ messageId, senderName, text, attachmentType }` without leaking DOM nodes, Blobs, or local blob URLs.
+- **Universal Swipe-to-Reply Gesture & Media Message Interactions (`ConversationView.tsx`)**:
+  - Implemented `ConversationMessageRow` component wrapping every message row in the timeline with unified touch gesture tracking (`onTouchStart`, `onTouchMove`, `onTouchEnd`, `onTouchCancel`).
+  - Added horizontal threshold (`deltaX < -35px`) for reply triggering, vertical scroll cancellation (`Math.abs(deltaY) > Math.abs(deltaX)`), and clean touch cancel reset.
+  - Rendered visual circular SVG `<ReplyIcon />` indicator on left swipe for non-text messages.
+  - Supported quote rendering and tap-to-jump navigation for all message types.
+- **Media Thumbnail Lifecycle & Memory Cleanup (`MediaImage.tsx`)**:
+  - Implemented `createdThumbUrlRef` and `URL.revokeObjectURL` cleanup on component unmount and thumbnail update, preventing memory leaks while keeping video poster generation decoupled from video playback.
+- **Verification & Test Coverage**:
+  - Authored 6 focused Track 4 test suites with 24 passing tests:
+    - `tests/phase45d-reply-persistence.test.ts` (5 tests)
+    - `tests/phase45d-reply-media-e2e.test.ts` (1 test)
+    - `tests/phase45d-thumbnail-pipeline.test.ts` (4 tests)
+    - `tests/phase45d-reply-gesture.test.tsx` (5 tests)
+    - `tests/phase45d-media-reply.test.tsx` (6 tests)
+    - `tests/phase45d-media-rendering.test.tsx` (3 tests)
+  - Regression verified Track 1 (`phase45a`), Track 2 (`phase45b`), and Track 3 (`phase45c`) suites (18 tests passing).
+  - Web production build (`npm run build`), release manifest (`scripts/release-build.mjs`), Capacitor sync (`npx cap sync android`), and Android Gradle build (`gradlew assembleDebug`) all pass cleanly.
+
+---
+
 ## [Track 3] - 2026-08-30
 
 ### Fixed & Verified

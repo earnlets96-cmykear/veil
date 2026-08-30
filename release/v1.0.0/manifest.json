@@ -1,6 +1,6 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-08-30T09:19:52.574Z",
+  "generatedAt": "2026-08-30T09:57:03.525Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 6,
@@ -11,9 +11,9 @@
       "sha256": "aa44a82bed51b68d78dd368d373c1c8747fc1588ede4acb8e1a222853539b9cd"
     },
     {
-      "path": "dist/assets/index-TNPs9mwl.js",
-      "sizeBytes": 608297,
-      "sha256": "f6b5e51aa2669161c562d3470093b4605bf1c80eabd0c1351fbb73a9e5db0210"
+      "path": "dist/assets/index-Cqg4a7O2.js",
+      "sizeBytes": 611355,
+      "sha256": "97ba55069f90b2e622ed1d7336e8d021fcd0475a480e6d71afabc82cc3c8d1a5"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,19 +21,19 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-CwB3Uem8.js",
-      "sizeBytes": 8728,
-      "sha256": "0fe994c8f4948acb86462b50953261ed16eab5b972f15900e413f81d2fcdc4b0"
+      "path": "dist/assets/web-DLbx8-cs.js",
+      "sizeBytes": 361,
+      "sha256": "5bc84ca987f960d120ba73a05a3c0c2f93d98848c124f232a635084816697edc"
     },
     {
-      "path": "dist/assets/web-D0saIVYr.js",
-      "sizeBytes": 361,
-      "sha256": "9ce5e93c786b77a5431f0034efff06c45f0bd06a307d7e2d79c104b9e2fb7335"
+      "path": "dist/assets/web-DS6GpkKU.js",
+      "sizeBytes": 8728,
+      "sha256": "8af8d4c325035273dfee595c73981f2a1b08bd40bd0796ca21bf87ec1217c787"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 967,
-      "sha256": "73359e8997ca6b988b6dae7017f50a8ca59ab040d3eba09c554aa9ed3cbd2f81"
+      "sha256": "d9c96d20b1585bd634722aefe886671bb1264336c447100dba417402a2533a89"
     }
   ]
 }

@@ -1,46 +1,41 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 45 (Forensic Fix — Media Auth, Account Recovery, Reply System, Thumbnails, Contact Media Permissions)
+## Current Verified Phase: PHASE 45D / TRACK 4 (Forensic Reply System, Media Thumbnail Pipeline & Final Chat UX)
 - **Status**: **COMPLETE & VERIFIED 100%**
-- **Test Results**: **314 / 314 test files passing (816 / 816 automated tests, 100% clean pass, 0 failures, 0 skipped)**
-- **Web App Build**: **PASS (`npm run build` in 3.35s)**
+- **Branch**: `codex/phase45d-replies-media-ux` (local only; base: `codex/phase45c-contact-privacy`)
+- **Track 4 Test Results**: **6 / 6 test files passing (24 / 24 automated tests, 100% clean pass)**
+- **Track 1–3 Regressions**: **6 / 6 test files passing (18 / 18 automated tests, 100% clean pass)**
+- **Web App Build**: **PASS (`npm run build` in 2.19s)**
 - **Capacitor Sync**: **PASS (`npx cap sync android` in 0.17s)**
-- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 19s)**
-- **Physical Android Verification**: **USER PHYSICAL TEST — NOT YET VERIFIED (User to perform manual physical device checklist)**
+- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 36s)**
+- **Physical Android Verification**: **USER PHYSICAL TEST — User to perform manual physical device verification**
 
 ---
 
-## Phase 45 Verified Deliverables
+## Phase 45D / Track 4 Verified Deliverables
 
-1. **Username Normalization (`src/server/cloud/accountService.ts`, `src/account/accountManager.ts`)**:
-   - All server-side account operations (register, login, recovery) normalize usernames with `.trim().toLowerCase().replace(/^@/, '')`.
-   - Client-side `AccountManager.registerAccount` and `createOrUpdateRecoveryVault` use `cleanUsername` for both cloud API calls and AAD in identity backup encryption.
-   - Cross-case, cross-whitespace, cross-@ recovery now works (e.g., register as `@Dagmawi`, recover as `DAGMAWI`).
+1. **Persistent Reply Resolution & Reference Model (`src/ui/app/AppState.tsx`, `src/ui/app/types.ts`)**:
+   - `ReplyReference` type expanded and exported with full attachment support (`'image' | 'video' | 'file' | 'voice' | 'grouped' | string`).
+   - `resolveReplyReference(target)` correctly handles text, photos, videos, voice notes, files, and multi-media albums.
+   - Fixed reply vanishing bug: `sendMessage`, `sendAttachments`, and `sendVoiceMessage` resolve the active reply reference before sending and persist it across local and wire payloads.
 
-2. **Cloud Session Persistence & Auto-Reauth (`src/network/cloudClient.ts`, `src/ui/app/AppState.tsx`)**:
-   - `cloudClient.setOnUnauthorized()` handler auto-re-authenticates on 401 responses.
-   - `ensureCloudSession` persists `authPassword` in `veil:cloud:session` within `EncryptedSpaceStore`.
-   - `createSpace`, `unlockSpace`, and `restoreAccount` all hydrate cloud session correctly.
+2. **Universal Swipe-to-Reply on All Message Types (`src/ui/components/ConversationView.tsx`)**:
+   - `ConversationMessageRow` encapsulates touch gesture tracking (`onTouchStart`, `onTouchMove`, `onTouchEnd`, `onTouchCancel`) for photos, videos, files, voice notes, and grouped media albums.
+   - Horizontal threshold (`deltaX < -35px`) triggers reply composer; vertical scroll (`Math.abs(deltaY) > Math.abs(deltaX)`) cancels gesture.
+   - Rendered visual SVG `<ReplyIcon />` badge during swipe drag.
 
-3. **Simplified Media Picker (`src/ui/components/media/MediaPickerModal.tsx`)**:
-   - Removed per-send `allowSave` and `allowForward` checkboxes from attachment picker.
-   - Picker now shows only: Photos, Videos, Files, Camera + selection/send.
+3. **Wire Payload Safety & Sanitization**:
+   - Wire serialization ensures `replyTo` strictly contains `{ messageId, senderName, text, attachmentType }`.
+   - Local `blob:`, `previewUrl`, `localPreviewUrl`, DOM nodes, and `MediaCache` instances are strictly blocked from wire messages.
 
-4. **Contact Profile Media Permissions (`src/ui/components/ProfileModal.tsx`, `src/contacts/contactManager.ts`)**:
-   - Added `addContact()` and `updateContact()` methods to `ContactManager`.
-   - Profile modal shows "Media Permissions" section with toggles for save/forward per contact.
+4. **Media Thumbnail Generation & Memory Lifecycle (`src/ui/components/media/MediaImage.tsx`)**:
+   - `MediaImage` manages video thumbnail poster Blob URLs and automatically revokes them on unmount (`URL.revokeObjectURL`) to prevent memory leaks.
+   - Video poster generation remains decoupled from video player playback source.
 
-5. **Quoted Reply Rendering (`src/ui/components/ui/ReplyPreview.tsx`, `src/ui/components/ConversationView.tsx`)**:
-   - Reply messages render quoted/referenced message block with sender name, text snippet, and media thumbnail.
-   - `ReplyPreview` supports text, image, video, voice, and file quote types.
-
-6. **Video Frame Thumbnails (`src/ui/components/media/MediaImage.tsx`, `src/attachments/thumbnailGenerator.ts`)**:
-   - Fixed import path (was `../../` instead of `../../../`).
-   - Video thumbnails extracted as JPEG via Canvas/ThumbnailGenerator, rendered with SVG play badge and duration.
-
-7. **Phase 45 Regression Test Suites (5 files, 15 tests)**:
-   - `tests/phase45-media-auth-runtime.test.ts` — 401 rejection, authenticated upload/download, onUnauthorized retry
-   - `tests/phase45-account-recovery-runtime.test.ts` — username normalization, cross-device restore, invalid password rejection
-   - `tests/phase45-contact-media-permissions.test.ts` — add/update contact permissions, default permissions
-   - `tests/phase45-reply-rendering.test.tsx` — text/media/voice quote rendering, MessageBubble integration
-   - `tests/phase45-thumbnail-runtime.test.tsx` — video thumbnail generation, MediaCache store/invalidate
+5. **Track 4 Test Suites**:
+   - `tests/phase45d-reply-persistence.test.ts`
+   - `tests/phase45d-reply-media-e2e.test.ts`
+   - `tests/phase45d-thumbnail-pipeline.test.ts`
+   - `tests/phase45d-reply-gesture.test.tsx`
+   - `tests/phase45d-media-reply.test.tsx`
+   - `tests/phase45d-media-rendering.test.tsx`

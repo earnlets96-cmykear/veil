@@ -12,7 +12,46 @@ import { IndexedDBStorageAdapter } from '../../storage/indexedDbAdapter.ts';
 import { SpaceIdentityManager } from '../../identity/manager.ts';
 import { NetworkManager } from '../../network/networkManager.ts';
 import { SessionController } from './sessionController.ts';
-import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings } from './types.ts';
+import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyReference } from './types.ts';
+
+export function resolveReplyReference(target: UIMessage | null): ReplyReference | undefined {
+  if (!target) return undefined;
+
+  let attachmentType: 'image' | 'video' | 'file' | 'voice' | 'grouped' | undefined;
+  let text = target.text || '';
+
+  if (target.voice) {
+    attachmentType = 'voice';
+    if (!text || text === 'Voice Message') text = 'Voice note';
+  } else if (target.attachments && target.attachments.length > 1) {
+    attachmentType = 'grouped';
+    if (!text || text.startsWith('Attachment:') || text.includes('Media Files')) {
+      text = `${target.attachments.length} Media Files`;
+    }
+  } else if (target.attachment || (target.attachments && target.attachments.length === 1)) {
+    const att = target.attachment || target.attachments![0];
+    const mime = att.mimeType || '';
+    if (mime.startsWith('image/')) {
+      attachmentType = 'image';
+      if (!text || text.startsWith('Attachment:')) text = 'Photo';
+    } else if (mime.startsWith('video/')) {
+      attachmentType = 'video';
+      if (!text || text.startsWith('Attachment:')) text = 'Video';
+    } else {
+      attachmentType = 'file';
+      if (!text || text.startsWith('Attachment:')) text = att.name || 'File';
+    }
+  }
+
+  const senderName = target.senderName || (target.isOutgoing ? 'yourself' : 'Peer');
+
+  return {
+    messageId: target.id,
+    senderName,
+    text,
+    attachmentType,
+  };
+}
 import { SpaceSession } from '../../spaces/session.ts';
 import { IdentityDocument } from '../../identity/document.ts';
 import { NetworkState } from '../../network/types.ts';
@@ -891,12 +930,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const activeReply = replyTarget ? {
-        messageId: replyTarget.id,
-        senderName: replyTarget.senderName || replyTarget.senderId,
-        text: replyTarget.text,
-        attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
-      } : undefined;
+      const activeReply = resolveReplyReference(replyTarget);
 
       const newMsg: UIMessage = {
         id: msgId,
@@ -1060,14 +1094,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
       const allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
 
-      const activeReply = replyTarget
-        ? {
-            messageId: replyTarget.id,
-            senderName: replyTarget.senderName || replyTarget.senderId,
-            text: replyTarget.text,
-            attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
-          }
-        : undefined;
+      const activeReply = resolveReplyReference(replyTarget);
 
       setReplyTarget(null);
 
@@ -1439,12 +1466,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const activeReply = replyTarget ? {
-        messageId: replyTarget.id,
-        senderName: replyTarget.senderName || replyTarget.senderId,
-        text: replyTarget.text,
-        attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
-      } : undefined;
+      const activeReply = resolveReplyReference(replyTarget);
 
       setReplyTarget(null);
 

@@ -138,6 +138,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
 
   const displayBlobUrl = media?.blobUrl || attachment.previewUrl;
   const isVideoMedia = isVideo || attachment.mimeType?.startsWith('video/');
+  const createdThumbUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isVideoMedia || !displayBlobUrl) return;
@@ -155,6 +156,12 @@ export const MediaImage: React.FC<MediaImageProps> = ({
         if (blobSource && !isCancelled) {
           const result = await ThumbnailGenerator.generateVideoThumbnail(blobSource, 0.5, 480);
           if (!isCancelled && result.previewUrl) {
+            if (createdThumbUrlRef.current && createdThumbUrlRef.current.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+              try {
+                URL.revokeObjectURL(createdThumbUrlRef.current);
+              } catch (_e) {}
+            }
+            createdThumbUrlRef.current = result.previewUrl;
             setVideoThumbnailUrl(result.previewUrl);
             if (result.duration > 0) setVideoDuration(result.duration);
           }
@@ -166,6 +173,11 @@ export const MediaImage: React.FC<MediaImageProps> = ({
 
     return () => {
       isCancelled = true;
+      if (createdThumbUrlRef.current && createdThumbUrlRef.current.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) {
+        try {
+          URL.revokeObjectURL(createdThumbUrlRef.current);
+        } catch (_e) {}
+      }
     };
   }, [isVideoMedia, displayBlobUrl, media, attachment.mimeType]);
 

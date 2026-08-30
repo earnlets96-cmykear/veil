@@ -75,6 +75,285 @@ interface ContextMenuState {
   message: UIMessage | null;
 }
 
+interface ConversationMessageRowProps {
+  msg: UIMessage;
+  isUnreadFirst: boolean;
+  isSelected: boolean;
+  isSelectionMode: boolean;
+  isHighlighted: boolean;
+  downloadingAttachmentId: string | null;
+  playbackProgress: Record<string, number>;
+  playbackCurrentTime: Record<string, number>;
+  playingAudioId: string | null;
+  unreadRef: React.RefObject<HTMLDivElement | null>;
+  onToggleSelect: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, msg: UIMessage) => void;
+  onReplyTrigger: (msg: UIMessage) => void;
+  onJumpToMessage: (id: string) => void;
+  onOpenGroupedMedia: (msg: UIMessage, idx: number) => void;
+  onOpenMedia: (msg: UIMessage) => void;
+  onDownloadAttachment: (msg: UIMessage) => void;
+  onToggleVoice: (msg: UIMessage) => void;
+  onSeekVoice: (msg: UIMessage, percent: number) => void;
+}
+
+const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
+  msg,
+  isUnreadFirst,
+  isSelected,
+  isSelectionMode,
+  isHighlighted,
+  downloadingAttachmentId,
+  playbackProgress,
+  playbackCurrentTime,
+  playingAudioId,
+  unreadRef,
+  onToggleSelect,
+  onContextMenu,
+  onReplyTrigger,
+  onJumpToMessage,
+  onOpenGroupedMedia,
+  onOpenMedia,
+  onDownloadAttachment,
+  onToggleVoice,
+  onSeekVoice,
+}) => {
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isMedia =
+    msg.attachment &&
+    (msg.attachment.mimeType?.startsWith('image/') ||
+      msg.attachment.mimeType?.startsWith('video/'));
+  const isGrouped = Boolean(msg.attachments && msg.attachments.length > 1);
+  const hasVisibleTextBubble = Boolean(
+    msg.text &&
+    !msg.text.startsWith('Attachment:') &&
+    !msg.text.includes('Attachment:') &&
+    msg.text !== 'Voice Message'
+  );
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches && e.touches.length === 1) {
+      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    longPressTimerRef.current = setTimeout(() => {
+      onContextMenu(e as any, msg);
+    }, 500);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current || !e.touches || e.touches.length !== 1) return;
+
+    const deltaX = e.touches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.touches[0].clientY - touchStartRef.current.y;
+
+    // Vertical scroll cancels swipe
+    if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      setSwipeOffset(0);
+      return;
+    }
+
+    if (deltaX < 0 && !isSelectionMode) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      setSwipeOffset(Math.max(-50, deltaX));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (swipeOffset < -35) {
+      onReplyTrigger(msg);
+    }
+    setSwipeOffset(0);
+    touchStartRef.current = null;
+  };
+
+  return (
+    <React.Fragment>
+      {isUnreadFirst && (
+        <div ref={unreadRef} className="veil-unread-divider" role="separator">
+          <span>Unread Messages</span>
+        </div>
+      )}
+
+      <div
+        id={`msg-${msg.id}`}
+        className={`veil-msg-row ${msg.isOutgoing ? 'outgoing' : 'incoming'} ${
+          isSelectionMode ? 'veil-msg-selectable' : ''
+        } ${isHighlighted ? 'veil-message-highlight' : ''}`}
+        onClick={() => {
+          if (isSelectionMode) onToggleSelect(msg.id);
+        }}
+        onContextMenu={(e) => onContextMenu(e, msg)}
+        onTouchStart={!hasVisibleTextBubble ? handleTouchStart : undefined}
+        onTouchMove={!hasVisibleTextBubble ? handleTouchMove : undefined}
+        onTouchEnd={!hasVisibleTextBubble ? handleTouchEnd : undefined}
+        onTouchCancel={!hasVisibleTextBubble ? handleTouchEnd : undefined}
+        style={{ position: 'relative' }}
+      >
+        {isSelectionMode && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(msg.id)}
+            className="veil-msg-checkbox"
+            aria-label="Select message"
+          />
+        )}
+
+        {/* Visual Swipe-to-reply icon indicator for non-text bubbles */}
+        {!hasVisibleTextBubble && swipeOffset < -15 && (
+          <div
+            style={{
+              position: 'absolute',
+              right: '8px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              background: 'var(--veil-accent-primary)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+              opacity: Math.min(1, Math.abs(swipeOffset) / 35),
+              transition: 'opacity 0.1s ease',
+              zIndex: 5,
+            }}
+            aria-hidden="true"
+          >
+            <ReplyIcon size={14} />
+          </div>
+        )}
+
+        <div
+          className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}
+          style={{
+            transform: !hasVisibleTextBubble ? `translateX(${swipeOffset}px)` : undefined,
+            transition: !hasVisibleTextBubble && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
+          }}
+        >
+          {/* Quoted Reply Reference for Non-Text Bubbles */}
+          {msg.replyTo && !hasVisibleTextBubble && (
+            <div style={{ marginBottom: '6px', maxWidth: '320px' }}>
+              <ReplyPreview
+                replyTo={{
+                  messageId: msg.replyTo.messageId,
+                  senderName: msg.replyTo.senderName,
+                  text: msg.replyTo.text,
+                  attachmentType: msg.replyTo.attachmentType,
+                  thumbnailUrl: msg.replyTo.thumbnailUrl,
+                }}
+                onClick={() => onJumpToMessage(msg.replyTo!.messageId)}
+              />
+            </div>
+          )}
+
+          {/* Grouped Multi-Media Gallery Grid */}
+          {isGrouped && msg.attachments && (
+            <div className="veil-media-bubble-container">
+              <GroupedMediaGrid
+                attachments={msg.attachments}
+                onOpenItem={(idx) => onOpenGroupedMedia(msg, idx)}
+              />
+              <div className="veil-media-meta-overlay">
+                <span className="veil-media-time">
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                {msg.isOutgoing && <MessageStatus status={msg.status} />}
+              </div>
+            </div>
+          )}
+
+          {/* Single Media Image / Video Card */}
+          {!isGrouped && isMedia && msg.attachment && (
+            <div className="veil-media-bubble-container">
+              <MediaImage
+                attachment={msg.attachment}
+                isVideo={msg.attachment.mimeType?.startsWith('video/')}
+                onClick={() => {
+                  if (!isSelectionMode) onOpenMedia(msg);
+                }}
+                alt={msg.attachment.name}
+              />
+              <div className="veil-media-meta-overlay">
+                <span className="veil-media-time">
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                {msg.isOutgoing && <MessageStatus status={msg.status} />}
+              </div>
+            </div>
+          )}
+
+          {/* Standard File Attachment Card */}
+          {!isGrouped && msg.attachment && !isMedia && (
+            <AttachmentCard
+              name={msg.attachment.name}
+              sizeBytes={msg.attachment.sizeBytes}
+              mimeType={msg.attachment.mimeType}
+              status={downloadingAttachmentId === msg.id ? 'downloading' : 'ready'}
+              onDownload={() => onDownloadAttachment(msg)}
+            />
+          )}
+
+          {/* Voice Note Card */}
+          {msg.voice && (
+            <VoiceNoteCard
+              durationSeconds={msg.voice.durationSeconds}
+              currentTimeSeconds={playbackCurrentTime[msg.id] || 0}
+              playbackState={playingAudioId === msg.id ? 'playing' : 'idle'}
+              currentProgressPercent={playbackProgress[msg.id] || 0}
+              onPlayToggle={() => onToggleVoice(msg)}
+              onSeek={(percent) => onSeekVoice(msg, percent)}
+            />
+          )}
+
+          {/* Text Message Bubble */}
+          {hasVisibleTextBubble && (
+            <MessageBubble
+              id={msg.id}
+              senderName={msg.senderName}
+              isOutgoing={msg.isOutgoing}
+              text={msg.text}
+              timestamp={msg.timestamp}
+              status={msg.status}
+              replyTo={
+                msg.replyTo
+                  ? {
+                      messageId: msg.replyTo.messageId,
+                      senderName: msg.replyTo.senderName,
+                      text: msg.replyTo.text,
+                      attachmentType: msg.replyTo.attachmentType,
+                      thumbnailUrl: msg.replyTo.thumbnailUrl,
+                    }
+                  : undefined
+              }
+              onReplyClick={onJumpToMessage}
+              onReplyTrigger={() => onReplyTrigger(msg)}
+            />
+          )}
+        </div>
+      </div>
+    </React.Fragment>
+  );
+};
+
 export const ConversationView: React.FC = () => {
   const {
     activeSession,
@@ -654,164 +933,37 @@ export const ConversationView: React.FC = () => {
             const isUnreadFirst = index === firstUnreadIndex;
             const isSelected = selectedMessageIds.has(msg.id);
             const isHighlighted = highlightedMessageId === msg.id;
-            const isMedia =
-              msg.attachment &&
-              (msg.attachment.mimeType?.startsWith('image/') ||
-                msg.attachment.mimeType?.startsWith('video/'));
-            const isGrouped = msg.attachments && msg.attachments.length > 1;
-            const hasVisibleTextBubble = Boolean(
-              msg.text &&
-              !msg.text.startsWith('Attachment:') &&
-              !msg.text.includes('Attachment:') &&
-              msg.text !== 'Voice Message'
-            );
 
             return (
-              <React.Fragment key={msg.id}>
-                {isUnreadFirst && (
-                  <div ref={unreadRef} className="veil-unread-divider" role="separator">
-                    <span>Unread Messages</span>
-                  </div>
-                )}
-
-                <div
-                  id={`msg-${msg.id}`}
-                  className={`veil-msg-row ${msg.isOutgoing ? 'outgoing' : 'incoming'} ${
-                    isSelectionMode ? 'veil-msg-selectable' : ''
-                  } ${isHighlighted ? 'veil-message-highlight' : ''}`}
-                  onClick={() => {
-                    if (isSelectionMode) handleToggleSelectMessage(msg.id);
-                  }}
-                  onContextMenu={(e) => handleContextMenu(e, msg)}
-                >
-                  {isSelectionMode && (
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleToggleSelectMessage(msg.id)}
-                      className="veil-msg-checkbox"
-                      aria-label="Select message"
-                    />
-                  )}
-
-                  <div className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}>
-                    {/* Quoted Reply Reference for Non-Text Bubbles */}
-                    {msg.replyTo && !hasVisibleTextBubble && (
-                      <div style={{ marginBottom: '6px', maxWidth: '320px' }}>
-                        <ReplyPreview
-                          replyTo={{
-                            messageId: msg.replyTo.messageId,
-                            senderName: msg.replyTo.senderName,
-                            text: msg.replyTo.text,
-                            attachmentType: msg.replyTo.attachmentType,
-                            thumbnailUrl: msg.replyTo.thumbnailUrl,
-                          }}
-                          onClick={() => handleJumpToMessage(msg.replyTo!.messageId)}
-                        />
-                      </div>
-                    )}
-                    {/* Grouped Multi-Media Gallery Grid */}
-                    {isGrouped && msg.attachments && (
-                      <div className="veil-media-bubble-container">
-                        <GroupedMediaGrid
-                          attachments={msg.attachments}
-                          onOpenItem={(idx) => handleOpenGroupedMedia(msg, idx)}
-                        />
-                        <div className="veil-media-meta-overlay">
-                          <span className="veil-media-time">
-                            {new Date(msg.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          {msg.isOutgoing && <MessageStatus status={msg.status} />}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Single Media Image / Video Card */}
-                    {!isGrouped && isMedia && msg.attachment && (
-                      <div className="veil-media-bubble-container">
-                        <MediaImage
-                          attachment={msg.attachment}
-                          isVideo={msg.attachment.mimeType?.startsWith('video/')}
-                          onClick={() => {
-                            if (!isSelectionMode) handleOpenMedia(msg);
-                          }}
-                          alt={msg.attachment.name}
-                        />
-                        <div className="veil-media-meta-overlay">
-                          <span className="veil-media-time">
-                            {new Date(msg.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          {msg.isOutgoing && <MessageStatus status={msg.status} />}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Standard File Attachment Card */}
-                    {!isGrouped && msg.attachment && !isMedia && (
-                      <AttachmentCard
-                        name={msg.attachment.name}
-                        sizeBytes={msg.attachment.sizeBytes}
-                        mimeType={msg.attachment.mimeType}
-                        status={downloadingAttachmentId === msg.id ? 'downloading' : 'ready'}
-                        onDownload={() => handleDownloadAttachment(msg)}
-                      />
-                    )}
-
-                    {/* Voice Note Card */}
-                    {msg.voice && (
-                      <VoiceNoteCard
-                        durationSeconds={msg.voice.durationSeconds}
-                        currentTimeSeconds={playbackCurrentTime[msg.id] || 0}
-                        playbackState={playingAudioId === msg.id ? 'playing' : 'idle'}
-                        currentProgressPercent={playbackProgress[msg.id] || 0}
-                        onPlayToggle={() => handleToggleVoice(msg)}
-                        onSeek={(percent) => {
-                          VoicePlayer.seek(percent, msg.id);
-                          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
-                          setPlaybackCurrentTime((prev) => ({
-                            ...prev,
-                            [msg.id]: (percent / 100) * (msg.voice?.durationSeconds || 1),
-                          }));
-                        }}
-                      />
-                    )}
-
-                    {/* Text Message Bubble (Rendered if message has text and isn't raw media placeholder) */}
-                    {msg.text &&
-                      !msg.text.startsWith('Attachment:') &&
-                      !msg.text.includes('Attachment:') &&
-                      msg.text !== 'Voice Message' && (
-                        <MessageBubble
-                          id={msg.id}
-                          senderName={msg.senderName}
-                          isOutgoing={msg.isOutgoing}
-                          text={msg.text}
-                          timestamp={msg.timestamp}
-                          status={msg.status}
-                          replyTo={
-                            msg.replyTo
-                              ? {
-                                  messageId: msg.replyTo.messageId,
-                                  senderName: msg.replyTo.senderName,
-                                  text: msg.replyTo.text,
-                                  attachmentType: msg.replyTo.attachmentType,
-                                  thumbnailUrl: msg.replyTo.thumbnailUrl,
-                                }
-                              : undefined
-                          }
-                          onReplyClick={handleJumpToMessage}
-                          onReplyTrigger={() => setReplyTarget(msg)}
-                        />
-                      )}
-                  </div>
-                </div>
-              </React.Fragment>
+              <ConversationMessageRow
+                key={msg.id}
+                msg={msg}
+                isUnreadFirst={isUnreadFirst}
+                isSelected={isSelected}
+                isSelectionMode={isSelectionMode}
+                isHighlighted={isHighlighted}
+                downloadingAttachmentId={downloadingAttachmentId}
+                playbackProgress={playbackProgress}
+                playbackCurrentTime={playbackCurrentTime}
+                playingAudioId={playingAudioId}
+                unreadRef={unreadRef}
+                onToggleSelect={handleToggleSelectMessage}
+                onContextMenu={handleContextMenu}
+                onReplyTrigger={setReplyTarget}
+                onJumpToMessage={handleJumpToMessage}
+                onOpenGroupedMedia={handleOpenGroupedMedia}
+                onOpenMedia={handleOpenMedia}
+                onDownloadAttachment={handleDownloadAttachment}
+                onToggleVoice={handleToggleVoice}
+                onSeekVoice={(m, percent) => {
+                  VoicePlayer.seek(percent, m.id);
+                  setPlaybackProgress((prev) => ({ ...prev, [m.id]: percent }));
+                  setPlaybackCurrentTime((prev) => ({
+                    ...prev,
+                    [m.id]: (percent / 100) * (m.voice?.durationSeconds || 1),
+                  }));
+                }}
+              />
             );
           })
         )}

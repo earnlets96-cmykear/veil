@@ -4,13 +4,13 @@
  */
 
 import React from 'react';
-import { MicIcon, PaperclipIcon, ImageIcon, CloseIcon } from '../icons/index.ts';
+import { MicIcon, PaperclipIcon, ImageIcon, VideoIcon, CloseIcon } from '../icons/index.ts';
 
 export interface ReplyPreviewData {
   messageId: string;
   senderName?: string;
   text?: string;
-  attachmentType?: 'file' | 'voice' | 'image';
+  attachmentType?: 'file' | 'voice' | 'image' | 'video' | 'grouped' | string;
   thumbnailUrl?: string;
 }
 
@@ -31,21 +31,35 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
     if (replyTo.attachmentType === 'voice') {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <MicIcon size={14} color="var(--veil-accent-primary)" /> Voice note
+          <MicIcon size={14} color="var(--veil-accent-primary)" /> {replyTo.text || 'Voice note'}
         </span>
       );
     }
-    if (replyTo.attachmentType === 'file') {
+    if (replyTo.attachmentType === 'video') {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <PaperclipIcon size={14} color="var(--veil-accent-primary)" /> File attachment
+          <VideoIcon size={14} color="var(--veil-accent-primary)" /> {replyTo.text || 'Video'}
         </span>
       );
     }
     if (replyTo.attachmentType === 'image') {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <ImageIcon size={14} color="var(--veil-accent-primary)" /> Photo / Video
+          <ImageIcon size={14} color="var(--veil-accent-primary)" /> {replyTo.text || 'Photo'}
+        </span>
+      );
+    }
+    if (replyTo.attachmentType === 'grouped') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <ImageIcon size={14} color="var(--veil-accent-primary)" /> {replyTo.text || 'Media'}
+        </span>
+      );
+    }
+    if (replyTo.attachmentType === 'file') {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <PaperclipIcon size={14} color="var(--veil-accent-primary)" /> {replyTo.text || 'File attachment'}
         </span>
       );
     }

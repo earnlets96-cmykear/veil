@@ -75,16 +75,19 @@ export interface UIMessage {
     encryptionKeyBase64: string;
     nonceBase64: string;
   };
-  replyTo?: {
-    messageId: string;
-    senderName?: string;
-    text: string;
-    attachmentType?: string;
-  };
+  replyTo?: ReplyReference;
   privacy?: {
     allowSave?: boolean;
     allowForward?: boolean;
   };
+}
+
+export interface ReplyReference {
+  messageId: string;
+  senderName?: string;
+  text: string;
+  attachmentType?: 'image' | 'video' | 'file' | 'voice' | 'grouped' | string;
+  thumbnailUrl?: string;
 }
 
 import { DirectorySearchResult } from '../../server/types.ts';

@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useRef, KeyboardEvent } from 'react';
-import { useApp } from '../app/AppState.tsx';
+import { useApp, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview, Spinner, useToast } from './ui/index.ts';
 import {
@@ -228,10 +228,12 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
       {replyTarget && (
         <ReplyPreview
           replyTo={{
-            messageId: replyTarget.id,
-            senderName: replyTarget.senderName || (replyTarget.isOutgoing ? 'yourself' : 'Peer'),
-            text: replyTarget.text,
-            attachmentType: replyTarget.voice ? 'voice' : replyTarget.attachment ? 'file' : undefined,
+            ...resolveReplyReference(replyTarget)!,
+            thumbnailUrl:
+              replyTarget.attachment?.previewUrl ||
+              replyTarget.attachment?.localPreviewUrl ||
+              replyTarget.attachments?.[0]?.previewUrl ||
+              replyTarget.attachments?.[0]?.localPreviewUrl,
           }}
           onDismiss={() => setReplyTarget(null)}
         />
