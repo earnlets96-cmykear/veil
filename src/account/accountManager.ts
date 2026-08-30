@@ -19,7 +19,7 @@ import type { CloudClient } from '../network/cloudClient.ts';
 import { SpaceVaultManager } from '../spaces/vault.ts';
 import { SpaceIdentityManager } from '../identity/manager.ts';
 import type { EncryptedSpaceStore } from '../storage/spaceStore.ts';
-import type { IStorageAdapter } from '../storage/types.ts';
+import type { IStorageAdapter, StoredRecord } from '../storage/types.ts';
 import type { SpaceSession } from '../spaces/session.ts';
 import type { IdentityDocument } from '../identity/document.ts';
 import type { KdfParameters } from '../types/index.ts';
@@ -34,6 +34,22 @@ export interface IdentityBackupPayload {
   signingPrivateKeyBase64: string;
   keyAgreementPrivateKeyBase64: string;
   createdAt: number;
+}
+
+interface RecoverySnapshotV2Space {
+  spaceId: string;
+  spaceName: string;
+  masterKeyBase64: string;
+  identityDocument: IdentityDocument;
+  signingPrivateKeyBase64: string;
+  keyAgreementPrivateKeyBase64: string;
+  encryptedRecords: StoredRecord[];
+}
+
+interface RecoverySnapshotV2 {
+  version: 2;
+  createdAt: number;
+  spaces: RecoverySnapshotV2Space[];
 }
 
 export class AccountManager {
@@ -97,47 +113,7 @@ export class AccountManager {
       throw new Error('Failed to load generated identity');
     }
 
-    // 3. Create zero-knowledge encrypted identity backup
-    const salt = randomBytes(32);
-    const kdfConfig: KdfParameters = {
-      algorithm: 'argon2id',
-      salt: bytesToBase64(salt),
-      timeCost: activeKdfParams?.timeCost ?? 3,
-      memoryCost: activeKdfParams?.memoryCost ?? 65536,
-      parallelism: activeKdfParams?.parallelism ?? 1,
-      keyLength: 32,
-    };
-
-    const kek = deriveKeyArgon2id(password, salt, kdfConfig);
-    const masterKey = session.getMasterKey();
-
-    const backupPayload: IdentityBackupPayload = {
-      version: 1,
-      spaceId: session.spaceId,
-      spaceName,
-      masterKeyBase64: bytesToBase64(masterKey),
-      identityDocument: identityDoc,
-      signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
-      keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
-      createdAt: Date.now(),
-    };
-
-    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`);
-    const { nonce, ciphertext } = encryptXChaCha20Poly1305(
-      kek,
-      JSON.stringify(backupPayload),
-      aad
-    );
-
-    zeroize(kek);
-
-    const encryptedVaultBlob = JSON.stringify({
-      format: 'VEIL-IDENTITY-BACKUP-v1',
-      nonce: bytesToBase64(nonce),
-      ciphertext: bytesToBase64(ciphertext),
-    });
-
-    // 4. Register account on cloud server
+    // 3. Register account on cloud server
     const regResult = await this.cloudClient.registerAccount({
       username: cleanUsername,
       password,
@@ -147,8 +123,8 @@ export class AccountManager {
       deviceKeyAgreementPub: identityDoc.keyAgreementPublicKey,
     });
 
-    // 5. Store zero-knowledge backup blob on cloud server
-    await this.cloudClient.setRecoveryVault(encryptedVaultBlob, kdfConfig);
+    // 4. Store a zero-knowledge v2 snapshot after authenticated registration.
+    await this.createOrUpdateRecoveryVault(session, password, cleanUsername, activeKdfParams);
 
     // 6. Save cloud session credentials inside encrypted space store
     if (regResult.session && regResult.session.sessionToken) {
@@ -184,7 +160,7 @@ export class AccountManager {
     identityDoc: IdentityDocument;
   }> {
     const { username, password } = params;
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
     const deviceId = `dev_${bytesToHex(randomBytes(8))}`;
     const deviceName = params.deviceName || 'Restored Device';
 
@@ -233,15 +209,15 @@ export class AccountManager {
 
     const nonce = base64ToBytes(vaultBlob.nonce);
     const ciphertext = base64ToBytes(vaultBlob.ciphertext);
-    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`);
+    const isV2 = vaultBlob.format === 'VEIL-RECOVERY-SNAPSHOT-v2';
+    const aad = new TextEncoder().encode(`${isV2 ? 'VEIL-RECOVERY-SNAPSHOT-v2' : 'VEIL-IDENTITY-BACKUP-v1'}|user:${cleanUsername}`);
 
-    let backupData: IdentityBackupPayload;
+    let backupData: IdentityBackupPayload | RecoverySnapshotV2;
     try {
       const decryptedBytes = decryptXChaCha20Poly1305(kek, nonce, ciphertext, aad);
       backupData = JSON.parse(new TextDecoder().decode(decryptedBytes));
       RuntimeDiagnostics.recovery('vaultDecryptionSuccess', {
-        spaceId: backupData.spaceId,
-        identityId: backupData.identityDocument?.identityId,
+        snapshotVersion: (backupData as RecoverySnapshotV2).version,
       });
     } catch (_e) {
       RuntimeDiagnostics.recovery('vaultDecryptionFailed', {
@@ -252,13 +228,18 @@ export class AccountManager {
       zeroize(kek);
     }
 
-    const recoveredMasterKey = base64ToBytes(backupData.masterKeyBase64);
+    const snapshot = isV2 ? backupData as RecoverySnapshotV2 : null;
+    if (snapshot && (!Array.isArray(snapshot.spaces) || snapshot.spaces.length === 0)) {
+      throw new Error('Recovery snapshot is malformed or contains no Spaces');
+    }
+    const first = snapshot ? snapshot.spaces[0] : backupData as IdentityBackupPayload;
+    const recoveredMasterKey = base64ToBytes(first.masterKeyBase64);
 
     try {
       // 2. Recreate Space locally using original Master Key and Space ID
       const spaceHeader = this.vault.createSpace({
-        spaceId: backupData.spaceId,
-        name: backupData.spaceName,
+        spaceId: first.spaceId,
+        name: first.spaceName,
         password,
         masterKey: recoveredMasterKey,
         kdfParams: params.customKdfParams || kdfParams,
@@ -270,9 +251,12 @@ export class AccountManager {
       const session = this.vault.unlockSpace(password, spaceHeader.spaceId);
 
       // 4. Save identity documents and private keys into local store
-      this.store.set(session, 'veil:identity:document', backupData.identityDocument);
-      this.store.set(session, 'veil:identity:signing-private', backupData.signingPrivateKeyBase64);
-      this.store.set(session, 'veil:identity:ka-private', backupData.keyAgreementPrivateKeyBase64);
+      this.store.set(session, 'veil:identity:document', first.identityDocument);
+      this.store.set(session, 'veil:identity:signing-private', first.signingPrivateKeyBase64);
+      this.store.set(session, 'veil:identity:ka-private', first.keyAgreementPrivateKeyBase64);
+      if (snapshot) {
+        for (const record of first.encryptedRecords) await this.storageAdapter.saveRecord(session.spaceId, record);
+      }
 
       // 5. Save restored cloud session credentials inside encrypted space store
       if (restoreRes.session && restoreRes.session.sessionToken) {
@@ -287,13 +271,13 @@ export class AccountManager {
 
       RuntimeDiagnostics.recovery('spaceRestoredSuccess', {
         spaceId: session.spaceId,
-        identityId: backupData.identityDocument?.identityId,
+        restoredSpaces: snapshot ? snapshot.spaces.length : 1,
       });
 
       return {
         account: restoreRes.account,
         session,
-        identityDoc: backupData.identityDocument,
+        identityDoc: first.identityDocument,
       };
     } finally {
       zeroize(recoveredMasterKey);
@@ -325,21 +309,22 @@ export class AccountManager {
     };
 
     const kek = deriveKeyArgon2id(password, salt, kdfConfig);
-    const masterKey = session.getMasterKey();
-
-    const backupPayload: IdentityBackupPayload = {
-      version: 1,
-      spaceId: session.spaceId,
-      spaceName: session.name,
-      masterKeyBase64: bytesToBase64(masterKey),
-      identityDocument: loadedId.document,
-      signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
-      keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
+    const backupPayload: RecoverySnapshotV2 = {
+      version: 2,
       createdAt: Date.now(),
+      spaces: [{
+        spaceId: session.spaceId,
+        spaceName: session.name,
+        masterKeyBase64: bytesToBase64(session.getMasterKey()),
+        identityDocument: loadedId.document,
+        signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
+        keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
+        encryptedRecords: await this.storageAdapter.listRecords(session.spaceId),
+      }],
     };
 
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
-    const aad = new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`);
+    const aad = new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${cleanUsername}`);
     const { nonce, ciphertext } = encryptXChaCha20Poly1305(
       kek,
       JSON.stringify(backupPayload),
@@ -349,7 +334,7 @@ export class AccountManager {
     zeroize(kek);
 
     const encryptedVaultBlob = JSON.stringify({
-      format: 'VEIL-IDENTITY-BACKUP-v1',
+      format: 'VEIL-RECOVERY-SNAPSHOT-v2',
       nonce: bytesToBase64(nonce),
       ciphertext: bytesToBase64(ciphertext),
     });

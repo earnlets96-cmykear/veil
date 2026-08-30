@@ -46,6 +46,7 @@ export class ContactManager {
       prekeyBundle: invitation.prekeyBundle,
       mailboxId: invitation.mailboxId,
       avatar: invitation.avatar,
+      accountUsername: invitation.accountUsername?.trim().toLowerCase().replace(/^@/, ''),
     };
 
     if (existingIdx >= 0) {
