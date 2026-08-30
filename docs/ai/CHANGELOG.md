@@ -4,6 +4,28 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Track 3] - 2026-08-30
+
+### Fixed & Verified
+- **Contact Avatar Propagation & Direct Conversation Hydration**:
+  - Ensured every direct conversation creation/update path (`startDirectChat`, `addContactFromInvitation`, `acceptContactRequest`, `handleInboundResponse`, `processInboundWirePayload`) copies the canonical `contact.avatar` into `UIConversation`.
+  - In `loadState`, backfilled `avatar` from the canonical contact record if missing in stored conversations.
+- **Conversation Header Avatar Rendering (`ConversationView.tsx`)**:
+  - Updated conversation header to pass `imageUrl={activeConversation?.avatar || activeContact?.avatar}` with existing deterministic initials/gradient fallback when avatar is absent.
+- **Per-Contact Chat Privacy Controls in Contact Details (`ContactDetailsModal.tsx`)**:
+  - Added dedicated "Chat Privacy & Media Permissions" section in `ContactDetailsModal` with save and forward toggles.
+  - Bound toggles strictly to canonical `Contact.identityId` via existing `updateContactMediaPermissions`.
+  - Added clear non-DRM client-side advisory notice.
+- **Symmetry & Identity Isolation**:
+  - Validated that A-to-B and B-to-A media privacy policies remain completely independent across encrypted space stores.
+  - Validated that display-name collisions cannot mutate another canonical contact's privacy policy.
+- **Verification**:
+  - All 9 Track 3 tests pass (`tests/phase45c-contact-avatar-privacy.test.tsx`).
+  - Track 1 and Track 2 focused test suites continue to pass 100%.
+  - Web production build, release manifest generation, and Capacitor Android sync pass cleanly.
+
+---
+
 ## [Track 2] - 2026-08-30
 
 ### Fixed & Verified

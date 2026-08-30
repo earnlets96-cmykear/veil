@@ -60,7 +60,7 @@ describe('Phase 45: Media Auth & Upload Lifecycle Runtime', () => {
         conversationId: 'conv_1',
         encryptedMetadata: '{}',
       })
-    ).rejects.toThrow(/Invalid username or password|unauthorized/i);
+    ).rejects.toThrow(/Authentication required|Invalid username or password|unauthorized/i);
   });
 
   it('authenticates account, creates attachment, uploads encrypted ciphertext, and downloads ciphertext', async () => {

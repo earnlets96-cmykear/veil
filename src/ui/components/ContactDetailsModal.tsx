@@ -37,6 +37,7 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
     contacts,
     closeModal,
     updateContactVerification,
+    updateContactMediaPermissions,
   } = useApp();
 
   const { showToast } = useToast();
@@ -274,6 +275,80 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
               <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#444444', textAlign: 'center' }}>
                 Scan or compare this visual verification code on your contact's device.
               </div>
+            </div>
+          )}
+
+          {/* Chat Privacy / Media Permissions Section */}
+          {contact && (
+            <div
+              style={{
+                padding: '0.85rem 1rem',
+                backgroundColor: 'var(--veil-bg-base)',
+                border: '1px solid var(--veil-border)',
+                borderRadius: 'var(--veil-radius-md)',
+                marginTop: '1rem',
+                marginBottom: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '0.5rem' }}>
+                <ShieldIcon size={14} color="var(--veil-accent-primary)" />
+                <span style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+                  Chat Privacy &amp; Media Permissions
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: 'var(--veil-text-xs)',
+                    color: 'var(--veil-text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span>Allow recipient to save my media</span>
+                  <input
+                    type="checkbox"
+                    checked={contact.metadata?.allowSave !== 'false'}
+                    onChange={(e) =>
+                      updateContactMediaPermissions(contact.identityId, { allowSave: e.target.checked })
+                    }
+                    style={{ accentColor: 'var(--veil-accent-primary)', cursor: 'pointer' }}
+                  />
+                </label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: 'var(--veil-text-xs)',
+                    color: 'var(--veil-text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span>Allow recipient to forward my media</span>
+                  <input
+                    type="checkbox"
+                    checked={contact.metadata?.allowForward !== 'false'}
+                    onChange={(e) =>
+                      updateContactMediaPermissions(contact.identityId, { allowForward: e.target.checked })
+                    }
+                    style={{ accentColor: 'var(--veil-accent-primary)', cursor: 'pointer' }}
+                  />
+                </label>
+              </div>
+              <p
+                style={{
+                  color: 'var(--veil-text-muted)',
+                  fontSize: '0.7rem',
+                  lineHeight: 1.4,
+                  marginTop: '0.5rem',
+                  marginBottom: 0,
+                }}
+              >
+                These settings configure default permissions for attachments sent to this contact. Client-side controls cannot prevent screen captures or external cameras.
+              </p>
             </div>
           )}
 

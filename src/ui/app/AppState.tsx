@@ -270,13 +270,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 0. Ensure persistent cloud session is active
     await ensureCloudSession(session);
 
-    // 1. Load active conversations
-    const storedConvs = (await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations')) || [];
-    setConversations(storedConvs);
-
-    // 2. Load contacts
+    // 1. Load contacts
     const storedContacts = await contactManager.listContacts(session);
     setContacts(storedContacts);
+
+    // 2. Load active conversations & hydrate contact avatars
+    const storedConvs = (await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations')) || [];
+    const hydratedConvs = storedConvs.map((conv) => {
+      if (conv.type === 'direct') {
+        const contact = storedContacts.find((c) => c.identityId === conv.id);
+        if (contact?.avatar && conv.avatar !== contact.avatar) {
+          return { ...conv, avatar: contact.avatar };
+        }
+      }
+      return conv;
+    });
+    setConversations(hydratedConvs);
 
     // 3. Load contact requests
     const storedRequests = await contactRequestManager.listRequests(session);
@@ -373,12 +382,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const targetContact = updatedContacts.find((c) => c.identityId === resp.peerIdentityId);
               if (targetContact) {
                 setConversations((prev) => {
-                  if (prev.some((c) => c.id === targetContact.identityId)) return prev;
+                  if (prev.some((c) => c.id === targetContact.identityId)) {
+                    return prev.map((c) =>
+                      c.id === targetContact.identityId
+                        ? { ...c, name: targetContact.name, avatar: targetContact.avatar || c.avatar, fingerprint: targetContact.fingerprint }
+                        : c
+                    );
+                  }
                   const newConv: UIConversation = {
                     id: targetContact.identityId,
                     type: 'direct',
                     name: targetContact.name,
                     avatarSeed: targetContact.identityId,
+                    avatar: targetContact.avatar,
                     fingerprint: targetContact.fingerprint,
                     isVerified: targetContact.verificationStatus === 'VERIFIED',
                     unreadCount: 0,
@@ -509,6 +525,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   ? {
                       ...c,
                       name: matchingContact?.name || c.name,
+                      avatar: matchingContact?.avatar || c.avatar,
                       lastMessage: incomingMsg.text,
                       timestamp: incomingMsg.timestamp,
                       unreadCount: (c.unreadCount || 0) + 1,
@@ -523,6 +540,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 type: 'direct',
                 name: matchingContact?.name || senderDoc.identityId.slice(0, 10),
                 avatarSeed: incomingMsg.conversationId,
+                avatar: matchingContact?.avatar,
                 fingerprint: senderDoc.fingerprint,
                 isVerified: matchingContact?.verificationStatus === 'VERIFIED',
                 unreadCount: 1,
@@ -1774,6 +1792,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           version: 1,
           identityId: targetProfile.identityId,
           name: targetProfile.displayName || targetProfile.username,
+          avatar: targetProfile.avatar,
           signingPublicKey: targetProfile.prekeyBundle.identityDocument.signingPublicKey,
           keyAgreementPublicKey: targetProfile.prekeyBundle.identityDocument.keyAgreementPublicKey,
           fingerprint: targetProfile.prekeyBundle.identityDocument.fingerprint,
@@ -1789,13 +1808,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           type: 'direct',
           name: contact.name,
           avatarSeed: contact.identityId,
+          avatar: contact.avatar,
           fingerprint: contact.fingerprint,
           isVerified: false,
           unreadCount: 0,
           peerDoc: targetProfile.prekeyBundle?.identityDocument,
         };
         setConversations((prev) => {
-          if (prev.some((c) => c.id === contact.identityId)) return prev;
+          if (prev.some((c) => c.id === contact.identityId)) {
+            return prev.map((c) =>
+              c.id === contact.identityId ? { ...c, name: contact.name, avatar: contact.avatar || c.avatar, fingerprint: contact.fingerprint } : c
+            );
+          }
           const updated = [newConv, ...prev];
           store.setAsync(activeSession, 'veil:ui:conversations', updated);
           return updated;
@@ -1839,6 +1863,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         type: 'direct',
         name: contact.name,
         avatarSeed: contact.identityId,
+        avatar: contact.avatar,
         fingerprint: contact.fingerprint,
         isVerified: false,
         unreadCount: 0,
@@ -1848,7 +1873,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setConversations((prev) => {
         if (prev.some((c) => c.id === contact.identityId)) {
           return prev.map((c) =>
-            c.id === contact.identityId ? { ...c, name: contact.name, fingerprint: contact.fingerprint } : c
+            c.id === contact.identityId ? { ...c, name: contact.name, avatar: contact.avatar || c.avatar, fingerprint: contact.fingerprint } : c
           );
         }
         const updated = [newConv, ...prev];
@@ -2081,12 +2106,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const targetContact = updatedContacts.find((c) => c.identityId === req.peerIdentityId);
       if (targetContact) {
         setConversations((prev) => {
-          if (prev.some((c) => c.id === targetContact.identityId)) return prev;
+          if (prev.some((c) => c.id === targetContact.identityId)) {
+            return prev.map((c) =>
+              c.id === targetContact.identityId
+                ? { ...c, name: targetContact.name, avatar: targetContact.avatar || c.avatar, fingerprint: targetContact.fingerprint }
+                : c
+            );
+          }
           const newConv: UIConversation = {
             id: targetContact.identityId,
             type: 'direct',
             name: targetContact.name,
             avatarSeed: targetContact.identityId,
+            avatar: targetContact.avatar,
             fingerprint: targetContact.fingerprint,
             isVerified: targetContact.verificationStatus === 'VERIFIED',
             unreadCount: 0,

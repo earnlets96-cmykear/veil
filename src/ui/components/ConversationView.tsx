@@ -548,9 +548,10 @@ export const ConversationView: React.FC = () => {
               aria-label="View contact details"
             >
               <Avatar
-                seed={activeConversation?.avatarSeed || activeContact?.avatarSeed || conversationName}
                 name={conversationName}
+                imageUrl={activeConversation?.avatar || activeContact?.avatar}
                 size="md"
+                isGroup={activeConversation?.type === 'group'}
               />
               <div className="veil-chat-header-titles">
                 <div className="veil-chat-header-name">
