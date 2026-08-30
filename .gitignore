@@ -39,3 +39,6 @@ dist-ssr
 .veil_*.json
 .veil_acceptance_db_*
 *.tmp.*
+
+# Isolated agent worktrees
+.worktrees/
