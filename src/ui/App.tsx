@@ -69,7 +69,7 @@ export const App: React.FC = () => {
           <button
             type="button"
             className="veil-button veil-button-secondary veil-button-sm"
-            onClick={() => openModal({ type: 'settings' })}
+            onClick={() => openModal({ type: 'settings', initialCategory: 'privacy' })}
             style={{
               backgroundColor: '#ffffff',
               color: 'var(--veil-accent-primary)',
@@ -88,7 +88,9 @@ export const App: React.FC = () => {
       <ConversationView />
 
       {/* Modals */}
-      {activeModal?.type === 'settings' && <SettingsModal />}
+      {activeModal?.type === 'settings' && (
+        <SettingsModal initialCategory={activeModal.initialCategory} />
+      )}
       {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
       {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
       {activeModal?.type === 'newChat' && <NewChatModal />}

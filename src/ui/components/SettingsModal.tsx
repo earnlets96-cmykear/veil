@@ -22,6 +22,7 @@ import {
   Button,
   IconButton,
   Input,
+  PasswordInput,
   StatusIndicator,
   Spinner,
   useToast,
@@ -44,7 +45,7 @@ import {
   ChevronRightIcon,
 } from './icons/index.ts';
 
-type SettingsCategory =
+export type SettingsCategory =
   | 'overview'
   | 'profile'
   | 'account'
@@ -54,7 +55,11 @@ type SettingsCategory =
   | 'storage'
   | 'about';
 
-export const SettingsModal: React.FC = () => {
+export interface SettingsModalProps {
+  initialCategory?: SettingsCategory;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 'overview' }) => {
   const {
     activeSession,
     closeModal,
@@ -75,7 +80,13 @@ export const SettingsModal: React.FC = () => {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('overview');
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory);
+
+  React.useEffect(() => {
+    if (initialCategory) {
+      setActiveCategory(initialCategory);
+    }
+  }, [initialCategory]);
 
   // Password Change State
   const [oldPassword, setOldPassword] = useState('');
@@ -131,7 +142,9 @@ export const SettingsModal: React.FC = () => {
 
   // Settings State
   const [autoLockVal, setAutoLockVal] = useState('5');
-  const [notifLevel, setNotifLevel] = useState<NotificationPrivacyMode>(notificationDispatcher.getPrivacyMode());
+  const [notifLevel, setNotifLevel] = useState<NotificationPrivacyMode>(
+    notificationDispatcher?.getPrivacyMode?.() || 'SENDER_ONLY'
+  );
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showPairingSas, setShowPairingSas] = useState(false);
   const [themeVal, setThemeVal] = useState(() => {
@@ -172,9 +185,9 @@ export const SettingsModal: React.FC = () => {
     { id: 'dev_primary', name: 'Primary Device (This Client)', lastSeen: Date.now() },
   ]);
 
-  const loadedIdentity = activeSession ? idMgr.loadIdentity(activeSession, store) : null;
+  const loadedIdentity = activeSession && idMgr && store ? idMgr.loadIdentity(activeSession, store) : null;
   const fingerprint = loadedIdentity?.document.fingerprint || 'E2EE-IDENTITY';
-  const invitationLink = exportMyInvitation();
+  const invitationLink = exportMyInvitation?.() || null;
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

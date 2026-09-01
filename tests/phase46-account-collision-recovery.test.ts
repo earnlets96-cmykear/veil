@@ -23,9 +23,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as path from 'path';
+import * as fs from 'fs';
 import { RelayServer } from '../src/server/relayServer.ts';
 import { MemoryRelayStore } from '../src/server/storage/memoryRelayStore.ts';
+import { PersistentFileRelayStore } from '../src/server/storage/persistentRelayStore.ts';
 import { MemoryCloudDatabase } from '../src/server/cloud/database/memoryCloudDatabase.ts';
+import { SqlCloudDatabase } from '../src/server/cloud/database/sqlCloudDatabase.ts';
 import { LocalDiskObjectStorage } from '../src/server/cloud/storage/localDiskObjectStorage.ts';
 import { CloudClient } from '../src/network/cloudClient.ts';
 import { SpaceVaultManager } from '../src/spaces/vault.ts';
@@ -490,5 +494,182 @@ describe('VEIL Phase 46: Account Identity Collision, Password Change & Recovery 
       const serialized = JSON.stringify(entry);
       expect(serialized).not.toContain(TEST_PASS);
     }
+  });
+
+  it('18. Verifies durable SqlCloudDatabase persistence layer across cold server restarts and fresh-client recovery', async () => {
+    const TEMP_SQL_DIR = path.join(process.cwd(), '.veil_test_sql_recovery_suite');
+    if (fs.existsSync(TEMP_SQL_DIR)) fs.rmSync(TEMP_SQL_DIR, { recursive: true, force: true });
+    fs.mkdirSync(TEMP_SQL_DIR, { recursive: true });
+
+    const dbDir = path.join(TEMP_SQL_DIR, 'db');
+    const relayDir = path.join(TEMP_SQL_DIR, 'relay');
+    const objDir = path.join(TEMP_SQL_DIR, 'objects');
+
+    const ORIGINAL_PASS = 'SqlSecurePass12345!';
+    const USERNAME = 'sql_durable_alice';
+
+    // -------------------------------------------------------------------------
+    // Phase 1: Start Server 1 with SqlCloudDatabase on disk
+    // -------------------------------------------------------------------------
+    let db1 = new SqlCloudDatabase({ diskPath: dbDir });
+    let store1 = new PersistentFileRelayStore(relayDir);
+    let storage1 = new LocalDiskObjectStorage(objDir);
+    await db1.init();
+    await store1.init();
+    await storage1.init();
+
+    let server1 = new RelayServer({ port: 0, host: '127.0.0.1', logLevel: 'none' }, store1, db1, storage1);
+    let addr1 = await server1.start();
+    let url1 = `http://127.0.0.1:${addr1.port}`;
+
+    // Client 1: Register account on Server 1
+    const clientStorage1 = new MemoryStorageAdapter();
+    const vault1 = new SpaceVaultManager();
+    const idMgr1 = new SpaceIdentityManager();
+    const storeEnc1 = new EncryptedSpaceStore(clientStorage1);
+    const client1 = new CloudClient(url1);
+    const accountMgr1 = new AccountManager(client1, vault1, idMgr1, storeEnc1, clientStorage1);
+
+    const regRes = await accountMgr1.registerAccount({
+      username: USERNAME,
+      password: ORIGINAL_PASS,
+      spaceName: 'Primary Corporate Vault',
+      customKdfParams: FAST_TEST_KDF_PARAMS,
+    });
+
+    const space1Id = regRes.session.spaceId;
+    const space1MasterKey = regRes.session.getMasterKey();
+    const space1IdentityId = regRes.identityDoc.identityId;
+    const space1SigningPub = regRes.identityDoc.signingPublicKey;
+    const accountId = regRes.account.accountId;
+
+    // Mutate Space 1: Add confidential contacts & messages
+    await storeEnc1.setAsync(regRes.session, 'veil:contacts:list', {
+      contacts: [
+        { id: 'c_bob', username: 'bob', displayName: 'Bob Smith', verified: true },
+        { id: 'c_carol', username: 'carol', displayName: 'Carol Danvers', verified: true },
+      ],
+    });
+
+    // Add Space 2: Secret Operations
+    const space2Header = vault1.createSpace({
+      name: 'Secret Operations',
+      password: ORIGINAL_PASS,
+      kdfParams: FAST_TEST_KDF_PARAMS,
+      canonicalUsername: USERNAME,
+      accountId,
+    });
+    await vault1.saveEnvelopeToStorage(space2Header, clientStorage1);
+    const session2 = vault1.unlockSpace(ORIGINAL_PASS, space2Header.spaceId);
+    const id2 = idMgr1.createIdentity(session2, storeEnc1);
+    const space2Id = session2.spaceId;
+    const space2MasterKey = session2.getMasterKey();
+    const space2IdentityId = id2.identityId;
+
+    await storeEnc1.setAsync(session2, 'veil:operations:log', {
+      mission: 'Alpha-9',
+      clearance: 'TopSecret',
+      records: ['Log A', 'Log B'],
+    });
+
+    // Update cloud recovery snapshot on Server 1 with all spaces & partition records
+    await accountMgr1.createOrUpdateRecoveryVault(session2, ORIGINAL_PASS, USERNAME, FAST_TEST_KDF_PARAMS);
+
+    // Verify recovery_states table row in db1
+    const recRow1 = await db1.getRecoveryState(accountId);
+    expect(recRow1).not.toBeNull();
+    expect(recRow1?.accountId).toBe(accountId);
+    expect(recRow1?.encryptedVaultBlob).toContain('VEIL-RECOVERY-SNAPSHOT-v2');
+
+    // -------------------------------------------------------------------------
+    // Phase 2: Shut down Server 1 completely (Cold Stop)
+    // -------------------------------------------------------------------------
+    await server1.stop();
+    await db1.close();
+    await store1.close();
+    await storage1.close();
+
+    // -------------------------------------------------------------------------
+    // Phase 3: Start Server 2 from exact same disk path (Cold Restart)
+    // -------------------------------------------------------------------------
+    let db2 = new SqlCloudDatabase({ diskPath: dbDir });
+    let store2 = new PersistentFileRelayStore(relayDir);
+    let storage2 = new LocalDiskObjectStorage(objDir);
+    await db2.init();
+    await store2.init();
+    await storage2.init();
+
+    // Verify row survived cold server restart on disk
+    const recRow2 = await db2.getRecoveryState(accountId);
+    expect(recRow2).not.toBeNull();
+    expect(recRow2?.accountId).toBe(accountId);
+    expect(recRow2?.encryptedVaultBlob).toBe(recRow1?.encryptedVaultBlob);
+
+    let server2 = new RelayServer({ port: 0, host: '127.0.0.1', logLevel: 'none' }, store2, db2, storage2);
+    let addr2 = await server2.start();
+    let url2 = `http://127.0.0.1:${addr2.port}`;
+
+    // -------------------------------------------------------------------------
+    // Phase 4: Client 2 on fresh device (Destroy all local client storage)
+    // -------------------------------------------------------------------------
+    const freshClientStorage = new MemoryStorageAdapter(); // 0 envelopes, 0 records
+    const freshVault = new SpaceVaultManager();
+    const freshIdMgr = new SpaceIdentityManager();
+    const freshStoreEnc = new EncryptedSpaceStore(freshClientStorage);
+    const freshClient = new CloudClient(url2);
+    const freshAccountMgr = new AccountManager(freshClient, freshVault, freshIdMgr, freshStoreEnc, freshClientStorage);
+
+    expect(freshVault.listEnvelopes().length).toBe(0);
+
+    // Restore from restarted cloud server
+    const restoreRes = await freshAccountMgr.restoreAccount({
+      username: `@${USERNAME.toUpperCase()}`, // with @ and uppercase to verify normalization
+      password: ORIGINAL_PASS,
+      customKdfParams: FAST_TEST_KDF_PARAMS,
+    });
+
+    // 1. Verify Space 1 cryptographic continuity
+    expect(restoreRes.session.spaceId).toBe(space1Id);
+    expect(restoreRes.session.getMasterKey()).toEqual(space1MasterKey);
+    expect(restoreRes.identityDoc.identityId).toBe(space1IdentityId);
+    expect(restoreRes.identityDoc.signingPublicKey).toBe(space1SigningPub);
+
+    // 2. Verify all Spaces reconstructed in fresh local vault
+    const restoredEnvelopes = freshVault.listEnvelopes();
+    expect(restoredEnvelopes.length).toBe(2);
+    expect(restoredEnvelopes.map((e) => e.spaceId).sort()).toEqual([space1Id, space2Id].sort());
+
+    // 3. Verify Space 2 unlock and cryptographic continuity
+    const restoredSession2 = freshVault.unlockSpace(ORIGINAL_PASS, space2Id);
+    expect(restoredSession2.getMasterKey()).toEqual(space2MasterKey);
+    const restoredId2 = freshIdMgr.loadIdentity(restoredSession2, freshStoreEnc);
+    expect(restoredId2?.document.identityId).toBe(space2IdentityId);
+
+    // 4. Verify partition records restored and decrypted
+    const restoredContacts = await freshStoreEnc.getAsync(restoreRes.session, 'veil:contacts:list');
+    expect(restoredContacts).toEqual({
+      contacts: [
+        { id: 'c_bob', username: 'bob', displayName: 'Bob Smith', verified: true },
+        { id: 'c_carol', username: 'carol', displayName: 'Carol Danvers', verified: true },
+      ],
+    });
+
+    const restoredOps = await freshStoreEnc.getAsync(restoredSession2, 'veil:operations:log');
+    expect(restoredOps).toEqual({
+      mission: 'Alpha-9',
+      clearance: 'TopSecret',
+      records: ['Log A', 'Log B'],
+    });
+
+    // 5. Verify post-recovery password change flag
+    const secFlag = freshStoreEnc.get(restoreRes.session, 'veil:account:recovery_security');
+    expect(secFlag?.recoveryPasswordChangeRequired).toBe(true);
+
+    // Clean up
+    await server2.stop();
+    await db2.close();
+    await store2.close();
+    await storage2.close();
+    if (fs.existsSync(TEMP_SQL_DIR)) fs.rmSync(TEMP_SQL_DIR, { recursive: true, force: true });
   });
 });

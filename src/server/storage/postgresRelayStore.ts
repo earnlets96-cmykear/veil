@@ -186,9 +186,10 @@ export class PostgresRelayStore implements IRelayStore {
 
   public async registerProfile(profile: SignedProfileDocument): Promise<void> {
     this.assertInit();
-    const existing = await this.getProfileByUsername(profile.username);
+    const cleanUsername = profile.username.trim().toLowerCase().replace(/^@/, '');
+    const existing = await this.getProfileByUsername(cleanUsername);
     if (existing && existing.identityId !== profile.identityId) {
-      throw new Error(`CONFLICT: Username @${profile.username} is already registered to a different identity`);
+      throw new Error(`CONFLICT: Username @${cleanUsername} is already registered to a different identity`);
     }
 
     const signingPublicKey =
@@ -203,6 +204,12 @@ export class PostgresRelayStore implements IRelayStore {
 
     if (!signingPublicKey || !keyAgreementPublicKey) {
       throw new Error('INVALID_PROFILE: Missing signing or key agreement public key in profile document');
+    }
+
+    // Clean up any old username previously registered by this identity
+    const prev = await this.getProfileByIdentity(profile.identityId);
+    if (prev && prev.username.toLowerCase() !== cleanUsername) {
+      await this.pg.query(`DELETE FROM directory_profiles WHERE username = $1`, [prev.username.toLowerCase()]);
     }
 
     const sql = `
@@ -226,7 +233,7 @@ export class PostgresRelayStore implements IRelayStore {
     `;
 
     await this.pg.query(sql, [
-      profile.username.toLowerCase(),
+      cleanUsername,
       profile.identityId,
       profile.displayName || null,
       avatarUrl,

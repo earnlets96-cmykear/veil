@@ -25,7 +25,7 @@ export const RestoreAccountModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await restoreAccount(username.trim().toLowerCase(), password);
+      await restoreAccount(username.trim().toLowerCase().replace(/^@/, ''), password);
       closeModal();
     } catch (err: any) {
       setError(err.message || 'Failed to restore account: invalid credentials or network error.');
@@ -63,7 +63,7 @@ export const RestoreAccountModal: React.FC = () => {
               <input
                 type="text"
                 className="veil-input"
-                placeholder="alice"
+                placeholder="e.g. alice or @alice"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required

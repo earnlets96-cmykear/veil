@@ -257,12 +257,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Auto-register / authenticate cloud session deterministically for this Space
         const identity = idMgr.loadIdentity(session, store);
         const storedProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
-        const username = (
+        const envelope = vault.getEnvelope(session.spaceId);
+        const rawUsername =
           savedCloudSession?.username ||
           storedProfile?.username ||
-          session.name.toLowerCase().replace(/[^a-z0-9_]/g, '') ||
-          `user_${session.spaceId.slice(0, 8)}`
-        ).replace(/^@/, '');
+          envelope?.canonicalUsername;
+
+        if (!rawUsername) {
+          return false;
+        }
+        const username = normalizeUsername(rawUsername);
 
         if (customPassword) cloudCredentials.current.set(session.spaceId, customPassword);
         const authPassword = cloudCredentials.current.get(session.spaceId);
@@ -367,20 +371,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // Auto-register public profile in Directory so Space is immediately routeable
       const identity = idMgr.loadIdentity(session, store);
-      const cloudSession = store.get<any>(session, 'veil:cloud:session');
-      const username = storedProfile?.username || cloudSession?.username || session.name.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      if (identity && username && binding) {
+      const cloudSession = await store.getAsync<any>(session, 'veil:cloud:session');
+      const envelope = vault.getEnvelope(session.spaceId);
+      const rawUsername =
+        storedProfile?.username ||
+        cloudSession?.username ||
+        envelope?.canonicalUsername;
+
+      if (identity && rawUsername && binding) {
+        const username = normalizeUsername(rawUsername);
         const prekeyBundle = prekeyManager.createPrekeyBundle(session);
         const autoProfile = createSignedProfile(
           identity.document.identityId,
           identity.signingPrivateKey,
           username,
-          storedProfile?.displayName || session.name,
+          storedProfile?.displayName || username,
           binding.mailboxId,
           prekeyBundle,
           storedProfile?.avatar || undefined
         );
-        await directoryClient.registerProfile(autoProfile);
+        try {
+          await directoryClient.registerProfile(autoProfile);
+        } catch (_dErr) {}
         await store.setAsync(session, 'veil:user:profile', autoProfile);
         setMyProfile(autoProfile);
       }
@@ -814,12 +826,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const createSpace = useCallback(
     async (name: string, passphrase: string, explicitUsername?: string) => {
-      const cleanUsername = normalizeUsername(
-        explicitUsername || name || `user_${bytesToHex(randomBytes(4))}`
-      );
-
       // If no active session, register a distinct account
       if (!activeSession) {
+        if (!explicitUsername || !explicitUsername.trim()) {
+          throw new Error('An account username is required to create an account');
+        }
+        const cleanUsername = normalizeUsername(explicitUsername);
         const { session } = await accountManager.registerAccount({
           username: cleanUsername,
           password: passphrase,
@@ -836,7 +848,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               loadedId.document.identityId,
               loadedId.signingPrivateKey,
               cleanUsername,
-              name
+              cleanUsername
             );
             await store.setAsync(session, 'veil:user:profile', signedProfile);
             setMyProfile(signedProfile);
@@ -865,8 +877,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // If session is already active, create additional space on the current account
       const activeCloud = await store.getAsync<any>(activeSession, 'veil:cloud:session');
       const activeProfile = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:user:profile');
-      const activeUsername = normalizeUsername(activeProfile?.username || activeCloud?.username || cleanUsername);
-      const activeAccountId = activeCloud?.accountId || '';
+      const activeEnvelope = vault.getEnvelope(activeSession.spaceId);
+      const activeUsername = normalizeUsername(
+        activeProfile?.username || activeCloud?.username || activeEnvelope?.canonicalUsername || ''
+      );
+      if (!activeUsername) {
+        throw new Error('Cannot create secondary Space: active account username not found');
+      }
+      const activeAccountId = activeCloud?.accountId || activeEnvelope?.accountId || '';
 
       await sessionController.createSpace(name, passphrase, false, activeUsername, activeAccountId);
       setKnownSpacesCount(vault.listEnvelopes().length);
@@ -880,7 +898,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             loadedId.document.identityId,
             loadedId.signingPrivateKey,
             activeUsername,
-            name
+            activeProfile?.displayName || activeUsername
           );
           await store.setAsync(session, 'veil:user:profile', signedProfile);
           setMyProfile(signedProfile);
@@ -907,7 +925,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!activeSession) throw new Error('No active Space session');
       const profile = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:user:profile');
       const cloudSess = await store.getAsync<any>(activeSession, 'veil:cloud:session');
-      const username = normalizeUsername(profile?.username || cloudSess?.username || '');
+      const envelope = vault.getEnvelope(activeSession.spaceId);
+      const username = normalizeUsername(profile?.username || cloudSess?.username || envelope?.canonicalUsername || '');
       await accountManager.changePassword({
         session: activeSession,
         oldPassword,
@@ -915,6 +934,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         username,
       });
       setRecoveryPasswordChangeRequired(false);
+      await store.setAsync(activeSession, 'veil:account:recovery_security', {
+        recoveryPasswordChangeRequired: false,
+        updatedAt: Date.now(),
+      });
     },
     [activeSession]
   );
@@ -1783,19 +1806,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
       setKnownSpacesCount(vault.listEnvelopes().length);
       setRecoveryPasswordChangeRequired(true);
+      await store.setAsync(session, 'veil:account:recovery_security', {
+        recoveryPasswordChangeRequired: true,
+        restoredAt: Date.now(),
+      });
 
-      // Rehydrate user profile with recovered username
+      // Rehydrate user profile with recovered username and re-register directory profile
       try {
         const loadedId = idMgr.loadIdentity(session, store);
         if (loadedId) {
+          const existingProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
           const signedProfile = createSignedProfile(
             loadedId.document.identityId,
             loadedId.signingPrivateKey,
             cleanUsername,
-            session.name
+            existingProfile?.displayName || cleanUsername
           );
           await store.setAsync(session, 'veil:user:profile', signedProfile);
           setMyProfile(signedProfile);
+
+          const binding = await netManager.getOrCreateMailbox(session);
+          const prekeyBundle = prekeyManager.createPrekeyBundle(session);
+          const profileToRegister = createSignedProfile(
+            loadedId.document.identityId,
+            loadedId.signingPrivateKey,
+            cleanUsername,
+            existingProfile?.displayName || cleanUsername,
+            binding.mailboxId,
+            prekeyBundle,
+            existingProfile?.avatar || undefined
+          );
+          try {
+            await directoryClient.registerProfile(profileToRegister);
+          } catch (_dErr) {}
         }
       } catch (_pErr) {}
 
@@ -1861,7 +1904,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             loadedIdentity.document.identityId,
             loadedIdentity.signingPrivateKey,
             username,
-            session.name,
+            username,
             binding.mailboxId,
             prekeyBundle
           );
@@ -2000,10 +2043,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
     } catch (_e) {}
 
+    const envelope = vault.getEnvelope(activeSession.spaceId);
+    const profile = myProfile;
+    const invDisplayName = profile?.displayName || profile?.username || envelope?.canonicalUsername || activeSession.name;
+
     const invitation = InvitationManager.createInvitation(
       identity.document,
       identity.signingPrivateKey,
-      activeSession.name,
+      invDisplayName,
       undefined,
       mailboxId,
       prekeyBundle
@@ -2149,13 +2196,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!identity) throw new Error('Identity not loaded');
         const binding = await netManager.getOrCreateMailbox(activeSession);
         const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
-        const cloudSession = store.get<any>(activeSession, 'veil:cloud:session');
-        const fallbackUsername = cloudSession?.username || `user_${identity.document.identityId.slice(0, 8)}`;
+        const cloudSession = await store.getAsync<any>(activeSession, 'veil:cloud:session');
+        const envelope = vault.getEnvelope(activeSession.spaceId);
+        const resolvedUsername = normalizeUsername(cloudSession?.username || envelope?.canonicalUsername || '');
+        if (!resolvedUsername) {
+          throw new Error('Cannot send contact request: account username is not established');
+        }
         profileToSend = createSignedProfile(
           identity.document.identityId,
           identity.signingPrivateKey,
-          fallbackUsername,
-          activeSession.name,
+          resolvedUsername,
+          resolvedUsername,
           binding.mailboxId,
           prekeyBundle
         );
@@ -2181,13 +2232,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!identity) throw new Error('Identity not loaded');
         const binding = await netManager.getOrCreateMailbox(activeSession);
         const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
-        const cloudSession = store.get<any>(activeSession, 'veil:cloud:session');
-        const fallbackUsername = cloudSession?.username || `user_${identity.document.identityId.slice(0, 8)}`;
+        const cloudSession = await store.getAsync<any>(activeSession, 'veil:cloud:session');
+        const envelope = vault.getEnvelope(activeSession.spaceId);
+        const resolvedUsername = normalizeUsername(cloudSession?.username || envelope?.canonicalUsername || '');
+        if (!resolvedUsername) {
+          throw new Error('Cannot accept contact request: account username is not established');
+        }
         profileToSend = createSignedProfile(
           identity.document.identityId,
           identity.signingPrivateKey,
-          fallbackUsername,
-          activeSession.name,
+          resolvedUsername,
+          resolvedUsername,
           binding.mailboxId,
           prekeyBundle
         );

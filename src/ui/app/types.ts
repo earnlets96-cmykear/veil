@@ -112,7 +112,18 @@ export type ActiveModal =
   | { type: 'contactDetails'; conversationId: string }
   | { type: 'contactRequests' }
   | { type: 'findUser' }
-  | { type: 'settings' }
+  | {
+      type: 'settings';
+      initialCategory?:
+        | 'overview'
+        | 'profile'
+        | 'account'
+        | 'privacy'
+        | 'notifications'
+        | 'appearance'
+        | 'storage'
+        | 'about';
+    }
   | { type: 'profile'; peerId?: string; peerUsername?: string; searchResult?: DirectorySearchResult }
   | { type: 'panicLock' }
   | null;

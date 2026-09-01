@@ -289,7 +289,7 @@ export class AccountManager {
 
       // 5. Save restored cloud session credentials inside encrypted space store
       if (restoreRes.session && restoreRes.session.sessionToken) {
-        this.store.set(session, 'veil:cloud:session', {
+        await this.store.setAsync(session, 'veil:cloud:session', {
           sessionToken: restoreRes.session.sessionToken,
           accountId: restoreRes.account.accountId,
           deviceId: restoreRes.device.deviceId,
@@ -299,7 +299,7 @@ export class AccountManager {
       }
 
       // 6. Set post-recovery password change required flag
-      this.store.set(session, 'veil:account:recovery_security', {
+      await this.store.setAsync(session, 'veil:account:recovery_security', {
         recoveryPasswordChangeRequired: true,
         restoredAt: Date.now(),
       });
@@ -363,7 +363,7 @@ export class AccountManager {
     await this.createOrUpdateRecoveryVault(session, newPassword, cleanUsername, params.newKdfParams, oldPassword);
 
     // 4. Clear recoveryPasswordChangeRequired in store
-    this.store.set(session, 'veil:account:recovery_security', {
+    await this.store.setAsync(session, 'veil:account:recovery_security', {
       recoveryPasswordChangeRequired: false,
       updatedAt: Date.now(),
     });

@@ -8,22 +8,13 @@ import { Button, IconButton, PasswordInput } from './ui/index.ts';
 import { CloseIcon, PlusIcon } from './icons/index.ts';
 
 export const CreateSpaceModal: React.FC = () => {
-  const { createSpace, closeModal } = useApp();
+  const { createSpace, closeModal, activeSession } = useApp();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
-  const [usernameEdited, setUsernameEdited] = useState(false);
   const [passphrase, setPassphrase] = useState('');
   const [confirmPassphrase, setConfirmPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleNameChange = (val: string) => {
-    setName(val);
-    if (!usernameEdited) {
-      const slug = val.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      setUsername(slug);
-    }
-  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,9 +25,14 @@ export const CreateSpaceModal: React.FC = () => {
       return;
     }
 
-    const effectiveUsername = (username.trim() || name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '')).replace(/^@/, '');
-    if (!effectiveUsername) {
-      setError('Please provide a valid alphanumeric username.');
+    if (!activeSession && (!username || !username.trim())) {
+      setError('Please provide an account username.');
+      return;
+    }
+
+    const effectiveUsername = username.trim().toLowerCase().replace(/^@/, '');
+    if (!activeSession && (!effectiveUsername || !/^[a-z0-9_]{3,32}$/.test(effectiveUsername))) {
+      setError('Username must be 3-32 characters, using letters, numbers, and underscores.');
       return;
     }
 
@@ -44,7 +40,7 @@ export const CreateSpaceModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await createSpace(name.trim(), passphrase, effectiveUsername);
+      await createSpace(name.trim(), passphrase, effectiveUsername || undefined);
       closeModal();
     } catch (err: any) {
       setError(err.message || 'Failed to create Space.');
@@ -84,7 +80,7 @@ export const CreateSpaceModal: React.FC = () => {
                 className="veil-input"
                 placeholder="Personal"
                 value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 required
                 autoFocus
               />
@@ -107,11 +103,8 @@ export const CreateSpaceModal: React.FC = () => {
                 className="veil-input"
                 placeholder="alice"
                 value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  setUsernameEdited(true);
-                }}
-                required
+                onChange={(e) => setUsername(e.target.value)}
+                required={!activeSession}
               />
             </div>
 
