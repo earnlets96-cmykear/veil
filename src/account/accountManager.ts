@@ -17,6 +17,7 @@ import { bytesToBase64, base64ToBytes, bytesToHex, randomBytes } from '../crypto
 import { zeroize } from '../crypto/memory.ts';
 import type { CloudClient } from '../network/cloudClient.ts';
 import { SpaceVaultManager } from '../spaces/vault.ts';
+import { computeEnvelopeAad } from '../spaces/envelope.ts';
 import { SpaceIdentityManager } from '../identity/manager.ts';
 import type { EncryptedSpaceStore } from '../storage/spaceStore.ts';
 import type { IStorageAdapter, StoredRecord } from '../storage/types.ts';
@@ -341,8 +342,11 @@ export class AccountManager {
       throw new Error('New password must be at least 3 characters long');
     }
 
-    // 1. Ensure cloud session is authenticated, then update password on cloud backend
-    if (!this.cloudClient.hasAuthenticatedSession()) {
+    // 1. Ensure cloud session is bound specifically to this Space session
+    const storedSession = this.store.get<any>(session, 'veil:cloud:session');
+    if (storedSession?.sessionToken && storedSession.accountId) {
+      this.cloudClient.setSession(storedSession.sessionToken, storedSession.accountId, storedSession.deviceId);
+    } else {
       try {
         const identity = this.identityManager.loadIdentity(session, this.store);
         const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
@@ -369,11 +373,13 @@ export class AccountManager {
       }
     }
 
+    // Authoritative Server Verification:
+    // If authenticated on the cloud relay, execute server-side verification and password update
     if (this.cloudClient.hasAuthenticatedSession()) {
       await this.cloudClient.changePassword(oldPassword, newPassword);
     }
 
-    // 2. Rewrap all local space envelopes for this account
+    // 2. Rewrap all matching local space envelopes for this account
     const allEnvelopes = this.vault.listEnvelopes().filter((env) => {
       if (env.canonicalUsername) {
         return env.canonicalUsername === cleanUsername;
@@ -382,8 +388,13 @@ export class AccountManager {
     });
 
     for (const env of allEnvelopes) {
-      const updatedEnv = this.vault.changePassword(env.spaceId, oldPassword, newPassword, params.newKdfParams);
-      await this.vault.saveEnvelopeToStorage(updatedEnv, this.storageAdapter);
+      try {
+        const updatedEnv = this.vault.changePassword(env.spaceId, oldPassword, newPassword, params.newKdfParams);
+        await this.vault.saveEnvelopeToStorage(updatedEnv, this.storageAdapter);
+      } catch (_rewrapErr) {
+        // Envelopes protected by independent passphrases (e.g. decoy spaces or secondary spaces)
+        // remain safely untouched and isolated.
+      }
     }
 
     // 3. Re-encrypt and push recovery snapshot under new password

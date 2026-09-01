@@ -109,9 +109,12 @@ const sessionController = new SessionController(vault, store, storageAdapter, id
 const contactManager = new ContactManager(store);
 const notificationDispatcher = new NotificationDispatcher('SENDER_ONLY');
 const searchEngine = new LocalSearchEngine();
-const directoryClient = new DirectoryClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787');
+const directoryClient = new DirectoryClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787', appConfig.requestTimeoutMs || 30000);
 const contactRequestManager = new ContactRequestManager(store, contactManager, idMgr, netManager);
-const cloudClient = new CloudClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787');
+const cloudClient = new CloudClient({
+  baseUrl: appConfig.relayHttpUrl || 'http://127.0.0.1:8787',
+  requestTimeoutMs: appConfig.requestTimeoutMs || 30000,
+});
 const accountManager = new AccountManager(cloudClient, vault, idMgr, store, storageAdapter);
 const syncEngine = new SyncEngine(store, cloudClient);
 
@@ -927,6 +930,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const cloudSess = await store.getAsync<any>(activeSession, 'veil:cloud:session');
       const envelope = vault.getEnvelope(activeSession.spaceId);
       const username = normalizeUsername(profile?.username || cloudSess?.username || envelope?.canonicalUsername || '');
+      
+      if (cloudSess?.sessionToken && !cloudClient.hasAuthenticatedSession()) {
+        cloudClient.setSession(cloudSess.sessionToken, cloudSess.accountId, cloudSess.deviceId);
+      }
+
       await accountManager.changePassword({
         session: activeSession,
         oldPassword,

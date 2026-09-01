@@ -18,7 +18,7 @@ export class DirectoryClient {
   private baseUrl: string;
   private timeoutMs: number;
 
-  constructor(baseUrl: string, timeoutMs = 15000) {
+  constructor(baseUrl: string, timeoutMs = 30000) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.timeoutMs = timeoutMs;
   }

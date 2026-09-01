@@ -642,6 +642,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                       value={oldPassword}
                       onChange={(e) => setOldPassword(e.target.value)}
                       placeholder="Current passphrase"
+                      disabled={passwordChangeLoading}
                       required
                     />
                   </div>
@@ -654,6 +655,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="New passphrase"
+                      disabled={passwordChangeLoading}
                       required
                     />
                   </div>
@@ -666,9 +668,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm new passphrase"
+                      disabled={passwordChangeLoading}
                       required
                     />
                   </div>
+
+                  {passwordChangeLoading && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem', padding: '0.6rem 0.85rem', backgroundColor: 'var(--veil-bg-tertiary)', borderRadius: 'var(--veil-radius-sm)', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>
+                      <Spinner size="xs" />
+                      <span>Updating account passphrase &amp; rewrapping encryption keys...</span>
+                    </div>
+                  )}
 
                   <Button
                     type="submit"
@@ -676,7 +686,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                     loading={passwordChangeLoading}
                     disabled={passwordChangeLoading || !oldPassword || !newPassword || !confirmPassword}
                   >
-                    Change Passphrase
+                    {passwordChangeLoading ? 'Updating Passphrase...' : 'Change Passphrase'}
                   </Button>
                 </form>
               </div>

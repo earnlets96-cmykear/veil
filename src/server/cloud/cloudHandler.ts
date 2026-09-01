@@ -41,6 +41,10 @@ export class CloudHandler {
       await this.handleRestore(req, res);
       return true;
     }
+    if (pathname === '/v1/account/recovery/health' && method === 'GET') {
+      await this.handleRecoveryHealth(req, res);
+      return true;
+    }
     if (pathname === '/v1/account/recovery/reset-password' && method === 'POST') {
       await this.handlePasswordReset(req, res);
       return true;
@@ -65,14 +69,25 @@ export class CloudHandler {
           this.sendJson(res, 400, { error: 'Missing oldPassword or newPassword' });
           return true;
         }
+        const chgStart = Date.now();
         try {
-          await this.accountService.changePassword({
+          const timing = await this.accountService.changePassword({
             accountId: account.accountId,
             oldPassword: body.oldPassword,
             newPassword: body.newPassword,
           });
+          const totalElapsed = Date.now() - chgStart;
+          if (typeof console !== 'undefined') {
+            console.log(
+              `[VEIL-CLOUD] [CHANGE_PASSWORD] status=200 auth_verify_ms=${timing?.authVerifyMs ?? 0} new_password_hash_ms=${timing?.newHashMs ?? 0} db_update_ms=${timing?.dbUpdateMs ?? 0} total_ms=${totalElapsed}`
+            );
+          }
           this.sendJson(res, 200, { success: true });
         } catch (err: any) {
+          const totalElapsed = Date.now() - chgStart;
+          if (typeof console !== 'undefined') {
+            console.log(`[VEIL-CLOUD] [CHANGE_PASSWORD] status=400 error="${err.message}" total_ms=${totalElapsed}`);
+          }
           this.sendJson(res, 400, { error: err.message || 'Failed to change password' });
         }
         return true;
@@ -212,6 +227,7 @@ export class CloudHandler {
   // ===========================================================================
 
   private async handleRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const startTime = Date.now();
     try {
       const body = await this.parseJsonBody(req);
       const result = await this.accountService.registerAccount({
@@ -223,13 +239,22 @@ export class CloudHandler {
         deviceKeyAgreementPub: body.deviceKeyAgreementPub,
         recoveryAnchor: body.recoveryAnchor,
       });
+      const elapsedMs = Date.now() - startTime;
+      if (typeof console !== 'undefined') {
+        console.log(`[VEIL-CLOUD] [REGISTER] status=201 elapsed=${elapsedMs}ms`);
+      }
       this.sendJson(res, 201, result);
     } catch (err: any) {
+      const elapsedMs = Date.now() - startTime;
+      if (typeof console !== 'undefined') {
+        console.log(`[VEIL-CLOUD] [REGISTER] status=400 error="${err.message}" elapsed=${elapsedMs}ms`);
+      }
       this.sendJson(res, 400, { error: err.message });
     }
   }
 
   private async handleLogin(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const startTime = Date.now();
     try {
       const body = await this.parseJsonBody(req);
       const result = await this.accountService.loginAccount({
@@ -240,13 +265,22 @@ export class CloudHandler {
         deviceSigningPub: body.deviceSigningPub,
         deviceKeyAgreementPub: body.deviceKeyAgreementPub,
       });
+      const elapsedMs = Date.now() - startTime;
+      if (typeof console !== 'undefined') {
+        console.log(`[VEIL-CLOUD] [LOGIN] status=200 elapsed=${elapsedMs}ms`);
+      }
       this.sendJson(res, 200, result);
     } catch (err: any) {
+      const elapsedMs = Date.now() - startTime;
+      if (typeof console !== 'undefined') {
+        console.log(`[VEIL-CLOUD] [LOGIN] status=401 error="${err.message}" elapsed=${elapsedMs}ms`);
+      }
       this.sendJson(res, 401, { error: err.message });
     }
   }
 
   private async handleRestore(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const startTime = Date.now();
     try {
       const body = await this.parseJsonBody(req);
       const loginResult = await this.accountService.loginAccount({
@@ -258,13 +292,52 @@ export class CloudHandler {
         deviceKeyAgreementPub: body.deviceKeyAgreementPub,
       });
 
+      const dbStart = Date.now();
       const recovery = await this.db.getRecoveryState(loginResult.account.accountId);
-      this.sendJson(res, 200, {
+      const dbLatencyMs = Date.now() - dbStart;
+      const elapsedMs = Date.now() - startTime;
+
+      const payload = {
         ...loginResult,
         recovery,
+      };
+      const payloadBytes = JSON.stringify(payload).length;
+
+      if (typeof console !== 'undefined') {
+        console.log(
+          `[VEIL-CLOUD] [RESTORE] status=200 hasRecovery=${!!recovery?.encryptedVaultBlob} dbLatency=${dbLatencyMs}ms totalElapsed=${elapsedMs}ms bytes=${payloadBytes}`
+        );
+      }
+
+      this.sendJson(res, 200, payload);
+    } catch (err: any) {
+      const elapsedMs = Date.now() - startTime;
+      if (typeof console !== 'undefined') {
+        console.log(`[VEIL-CLOUD] [RESTORE] status=401 error="${err.message}" elapsed=${elapsedMs}ms`);
+      }
+      this.sendJson(res, 401, { error: err.message });
+    }
+  }
+
+  private async handleRecoveryHealth(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const startTime = Date.now();
+    try {
+      const dbStart = Date.now();
+      await this.db.init();
+      const dbLatencyMs = Date.now() - dbStart;
+      this.sendJson(res, 200, {
+        status: 'ok',
+        database: 'connected',
+        recoveryTable: 'connected',
+        queryLatencyMs: dbLatencyMs,
+        elapsedMs: Date.now() - startTime,
       });
     } catch (err: any) {
-      this.sendJson(res, 401, { error: err.message });
+      this.sendJson(res, 500, {
+        status: 'error',
+        error: err.message || 'Database unreachable',
+        elapsedMs: Date.now() - startTime,
+      });
     }
   }
 

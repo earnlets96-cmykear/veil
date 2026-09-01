@@ -23,7 +23,7 @@ const DEV_CONFIG: AppConfig = {
   relayHttpUrl: 'http://127.0.0.1:8787',
   relayWsUrl: 'ws://127.0.0.1:8787/v1/ws',
   enforceTls: false,
-  requestTimeoutMs: 10000,
+  requestTimeoutMs: 30000,
   maxOutboundQueueSize: 500,
   maxAttachmentSizeBytes: 10 * 1024 * 1024, // 10 MiB
   defaultNotificationMode: 'SENDER_ONLY',
@@ -47,7 +47,7 @@ const PROD_CONFIG: AppConfig = {
   relayHttpUrl: PRODUCTION_RELAY_URL,
   relayWsUrl: PRODUCTION_RELAY_WS_URL,
   enforceTls: true,
-  requestTimeoutMs: 15000,
+  requestTimeoutMs: 30000,
   maxOutboundQueueSize: 1000,
   maxAttachmentSizeBytes: 25 * 1024 * 1024, // 25 MiB
   defaultNotificationMode: 'SENDER_ONLY',

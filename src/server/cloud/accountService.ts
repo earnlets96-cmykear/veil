@@ -50,14 +50,16 @@ export class AccountService {
 
   /**
    * Hashes a password using Argon2id with a unique 32-byte salt.
+   * Uses 16 MiB (16384 KiB) and 2 iterations for production cloud containers (sub-second compute),
+   * or 2 MiB / 1 iteration for automated test suites.
    */
   private async hashPassword(password: string, salt: Uint8Array): Promise<string> {
     const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
     const kdfParams = {
       algorithm: 'argon2id' as const,
       salt: bytesToBase64(salt),
-      timeCost: isTest ? 1 : 3,
-      memoryCost: isTest ? 2048 : 65536,
+      timeCost: isTest ? 1 : 2,
+      memoryCost: isTest ? 2048 : 16384,
       parallelism: 1,
       keyLength: 32,
     };
@@ -261,7 +263,7 @@ export class AccountService {
     accountId: string;
     oldPassword: string;
     newPassword: string;
-  }): Promise<void> {
+  }): Promise<{ authVerifyMs: number; newHashMs: number; dbUpdateMs: number }> {
     const account = await this.db.getAccountById(params.accountId);
     if (!account) {
       throw new Error('Account not found');
@@ -271,12 +273,15 @@ export class AccountService {
       throw new Error('Current password is required');
     }
 
+    const authVerifyStart = Date.now();
     const salt = base64ToBytes(account.authSalt);
     const computedOldHash = await this.hashPassword(params.oldPassword, salt);
     const match = constantTimeEquals(
       new TextEncoder().encode(account.authHash),
       new TextEncoder().encode(computedOldHash)
     );
+    const authVerifyMs = Date.now() - authVerifyStart;
+
     if (!match) {
       throw new Error('Invalid current password');
     }
@@ -285,14 +290,20 @@ export class AccountService {
       throw new Error('New password must be at least 3 characters long');
     }
 
+    const newHashStart = Date.now();
     const newSalt = randomBytes(32);
     const newHash = await this.hashPassword(params.newPassword, newSalt);
+    const newHashMs = Date.now() - newHashStart;
 
+    const dbUpdateStart = Date.now();
     account.authHash = newHash;
     account.authSalt = bytesToBase64(newSalt);
     account.updatedAt = Date.now();
 
     await this.db.updateAccount(account);
+    const dbUpdateMs = Date.now() - dbUpdateStart;
+
+    return { authVerifyMs, newHashMs, dbUpdateMs };
   }
 
   /**

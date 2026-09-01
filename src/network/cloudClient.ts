@@ -28,11 +28,15 @@ export class CloudClient {
   constructor(config: string | CloudClientConfig) {
     if (typeof config === 'string') {
       this.baseUrl = config.replace(/\/+$/, '');
-      this.timeoutMs = 10000;
+      this.timeoutMs = 30000;
     } else {
       this.baseUrl = (config?.baseUrl || 'http://127.0.0.1:8787').replace(/\/+$/, '');
-      this.timeoutMs = config?.requestTimeoutMs || 10000;
+      this.timeoutMs = config?.requestTimeoutMs || 30000;
     }
+  }
+
+  public getBaseUrl(): string {
+    return this.baseUrl;
   }
 
   public setOnUnauthorized(handler: (() => Promise<boolean>) | null): void {
@@ -213,7 +217,7 @@ export class CloudClient {
   }
 
   public async changePassword(oldPassword: string, newPassword: string): Promise<void> {
-    await this.request('/v1/account/change-password', 'POST', { oldPassword, newPassword });
+    await this.request('/v1/account/change-password', 'POST', { oldPassword, newPassword }, 60000);
   }
 
   public async listDevices(): Promise<DeviceEntity[]> {
@@ -226,12 +230,16 @@ export class CloudClient {
   }
 
   public async setRecoveryVault(encryptedVaultBlob: string, kdfParams: any): Promise<void> {
-    await this.request('/v1/account/recovery/vault/set', 'POST', { encryptedVaultBlob, kdfParams });
+    await this.request('/v1/account/recovery/vault/set', 'POST', { encryptedVaultBlob, kdfParams }, 60000);
   }
 
   public async getRecoveryVault(): Promise<RecoveryStateEntity | null> {
-    const res = await this.request<{ recovery: RecoveryStateEntity | null }>('/v1/account/recovery/vault/get', 'GET');
+    const res = await this.request<{ recovery: RecoveryStateEntity | null }>('/v1/account/recovery/vault/get', 'GET', undefined, 60000);
     return res.recovery;
+  }
+
+  public async getRecoveryHealth(): Promise<{ status: string; db: string; recoveryTable: string; queryLatencyMs?: number }> {
+    return await this.request('/v1/account/recovery/health', 'GET', undefined, 10000);
   }
 
   // ===========================================================================
@@ -239,12 +247,12 @@ export class CloudClient {
   // ===========================================================================
 
   public async syncSpaces(spaces: CloudSpaceEntity[]): Promise<CloudSpaceEntity[]> {
-    const res = await this.request<{ spaces: CloudSpaceEntity[] }>('/v1/cloud/spaces/sync', 'POST', { spaces });
+    const res = await this.request<{ spaces: CloudSpaceEntity[] }>('/v1/cloud/spaces/sync', 'POST', { spaces }, 60000);
     return res.spaces;
   }
 
   public async listSpaces(): Promise<CloudSpaceEntity[]> {
-    const res = await this.request<{ spaces: CloudSpaceEntity[] }>('/v1/cloud/spaces', 'GET');
+    const res = await this.request<{ spaces: CloudSpaceEntity[] }>('/v1/cloud/spaces', 'GET', undefined, 60000);
     return res.spaces;
   }
 
