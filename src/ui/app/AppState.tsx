@@ -218,6 +218,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [recoveryPasswordChangeRequired, setRecoveryPasswordChangeRequired] = useState(false);
   const cloudCredentials = useRef(new Map<string, string>());
+  const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
+  const syncTimeoutRef = useRef<any>(null);
+
+  const scheduleCloudSync = useCallback((session: SpaceSession) => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    syncTimeoutRef.current = setTimeout(async () => {
+      try {
+        const creds = activeCredentialsRef.current.get(session.spaceId);
+        if (creds?.passphrase && creds?.username) {
+          await accountManager.createOrUpdateRecoveryVault(session, creds.passphrase, creds.username);
+        }
+      } catch (err) {
+        console.warn('[VEIL-SYNC] Background cloud snapshot sync error:', err);
+      }
+    }, 500);
+  }, []);
 
   const ensureCloudSession = useCallback(
     async (session: SpaceSession, forceReauth = false, customPassword?: string): Promise<boolean> => {
@@ -271,8 +289,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         const username = normalizeUsername(rawUsername);
 
-        if (customPassword) cloudCredentials.current.set(session.spaceId, customPassword);
-        const authPassword = cloudCredentials.current.get(session.spaceId);
+        if (customPassword) {
+          cloudCredentials.current.set(session.spaceId, customPassword);
+          activeCredentialsRef.current.set(session.spaceId, {
+            passphrase: customPassword,
+            username,
+          });
+        }
+        const authPassword = customPassword || cloudCredentials.current.get(session.spaceId);
         if (!authPassword) return false;
 
         const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
@@ -363,6 +387,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // 6. Update Search Engine Index
     searchEngine.updateIndex(storedContacts, storedConvs, storedMsgs);
+
+    // 6.1 Reconcile with cloud sync engine
+    try {
+      if (cloudClient.getSessionToken()) {
+        await syncEngine.sync(session);
+        const postSyncConvs = await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations');
+        if (postSyncConvs) setConversations(postSyncConvs);
+        const postSyncMsgs = await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages');
+        if (postSyncMsgs) setMessages(postSyncMsgs);
+      }
+    } catch (_syncErr) {}
 
     // 7. Ensure Mailbox, Prekey pool, and Directory registration are initialized
     try {
@@ -821,6 +856,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const restored = await accountManager.restoreAccount({
               username: cleanUsername,
               password: passphrase,
+              allowFreshSpaceCreation: true,
             });
             session = restored.session;
           } catch (cloudErr: any) {
@@ -844,6 +880,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const profile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
       const cloudSess = await store.getAsync<any>(session, 'veil:cloud:session');
       const canonicalU = normalizeUsername(cleanUsername || profile?.username || cloudSess?.username || '');
+      if (canonicalU) {
+        activeCredentialsRef.current.set(session.spaceId, {
+          passphrase,
+          username: canonicalU,
+        });
+        cloudCredentials.current.set(session.spaceId, passphrase);
+      }
       if (canonicalU && typeof localStorage !== 'undefined') {
         try {
           localStorage.setItem('veil:last_username', canonicalU);
@@ -869,6 +912,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setKnownSpacesCount(vault.listEnvelopes().length);
         setActiveSession(session);
         sessionController.recordUserActivity();
+        activeCredentialsRef.current.set(session.spaceId, {
+          passphrase,
+          username: cleanUsername,
+        });
+        cloudCredentials.current.set(session.spaceId, passphrase);
 
         try {
           const loadedId = idMgr.loadIdentity(session, store);
@@ -1071,6 +1119,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
 
+      scheduleCloudSync(activeSession);
+
       // Resolve recipient contact for mailboxId and prekeyBundle
       const freshContacts = await contactManager.listContacts(activeSession);
       let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
@@ -1154,6 +1204,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           return updated;
         });
 
+        scheduleCloudSync(activeSession);
+
         if (typeof console !== 'undefined' && console.debug) {
           console.debug(`[VEIL-UI] Outbound message sent: msgId=${msgId.slice(0, 8)}, convId=${conversationId.slice(0, 8)}, state=SENT_TO_RELAY`);
         }
@@ -1175,6 +1227,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           store.setAsync(activeSession, 'veil:ui:messages', updated);
           return updated;
         });
+
+        scheduleCloudSync(activeSession);
 
         if (typeof console !== 'undefined' && console.warn) {
           console.warn(`[VEIL-UI] Outbound message send failed, queued locally: msgId=${msgId.slice(0, 8)}, error=${sendErr?.message || sendErr}`);
@@ -1865,6 +1919,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const { session } = await accountManager.restoreAccount({
         username: cleanUsername,
         password,
+        isEmergencyRecovery: true,
       });
       setActiveSession(session);
       sessionController.recordUserActivity();

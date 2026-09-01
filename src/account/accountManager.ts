@@ -197,6 +197,9 @@ export class AccountManager {
     }
 
     if (!restoreRes.recovery || !restoreRes.recovery.encryptedVaultBlob) {
+      if (!params.allowFreshSpaceCreation) {
+        throw new Error('Account has no encrypted identity backup on cloud server');
+      }
       RuntimeDiagnostics.recovery('missingRecoveryVaultFallback', {
         accountId: restoreRes.account?.accountId,
       });
@@ -231,42 +234,69 @@ export class AccountManager {
       };
     }
 
-    const recoveryRecord = restoreRes.recovery;
+    const recoveryRecord = restoreRes.recovery || restoreRes.recoveryVault;
     const kdfParams: KdfParameters =
       typeof recoveryRecord.kdfParams === 'string'
         ? JSON.parse(recoveryRecord.kdfParams)
         : recoveryRecord.kdfParams;
 
-    const vaultBlob = JSON.parse(recoveryRecord.encryptedVaultBlob);
-    const salt = base64ToBytes(kdfParams.salt);
-    const kek = deriveKeyArgon2id(password, salt, kdfParams);
+    const vaultBlob =
+      typeof recoveryRecord.encryptedVaultBlob === 'string'
+        ? JSON.parse(recoveryRecord.encryptedVaultBlob)
+        : recoveryRecord;
 
-    const nonce = base64ToBytes(vaultBlob.nonce);
-    const ciphertext = base64ToBytes(vaultBlob.ciphertext);
-    const isV2 = vaultBlob.format === 'VEIL-RECOVERY-SNAPSHOT-v2';
+    const blobBytes = base64ToBytes(vaultBlob.ciphertext || vaultBlob.encryptedBlob || '');
+    const nonceBytes = base64ToBytes(vaultBlob.nonce || '');
+    const rawSalt = kdfParams?.salt || vaultBlob.salt;
+    const saltBytes = typeof rawSalt === 'string' ? base64ToBytes(rawSalt) : new Uint8Array(16);
 
-    const candidateAads: (Uint8Array | undefined)[] = [
-      new TextEncoder().encode(`${isV2 ? 'VEIL-RECOVERY-SNAPSHOT-v2' : 'VEIL-IDENTITY-BACKUP-v1'}|user:${cleanUsername}`),
-      new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${cleanUsername}`),
-      new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`),
-      new TextEncoder().encode('VEIL-RECOVERY-SNAPSHOT-v2'),
-      new TextEncoder().encode('VEIL-IDENTITY-BACKUP-v1'),
-      new TextEncoder().encode(`user:${cleanUsername}`),
-      undefined,
-    ];
+    // Derive KEK from password and vault salt
+    const kek = deriveKeyArgon2id(
+      password,
+      saltBytes,
+      params.customKdfParams || kdfParams
+    );
 
     let backupData: IdentityBackupPayload | RecoverySnapshotV2 | null = null;
-    let lastDecryptError: any = null;
+    let isV2 = false;
 
     try {
+      // Universal multi-format AAD fallback decryption
+      const candidateAads: (Uint8Array | undefined)[] = [
+        new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${cleanUsername}`),
+        new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`),
+        new TextEncoder().encode('VEIL-RECOVERY-SNAPSHOT-v2'),
+        new TextEncoder().encode('VEIL-IDENTITY-BACKUP-v1'),
+        new TextEncoder().encode(`user:${cleanUsername}`),
+        undefined,
+      ];
+
       for (const aad of candidateAads) {
         try {
-          const decryptedBytes = decryptXChaCha20Poly1305(kek, nonce, ciphertext, aad);
-          backupData = JSON.parse(new TextDecoder().decode(decryptedBytes));
-          if (backupData) break;
-        } catch (e) {
-          lastDecryptError = e;
-        }
+          const decryptedBytes = decryptXChaCha20Poly1305(kek, nonceBytes, blobBytes, aad);
+          const parsed = JSON.parse(new TextDecoder().decode(decryptedBytes));
+          if (parsed && typeof parsed === 'object') {
+            backupData = parsed;
+            if ((parsed as RecoverySnapshotV2).version === 2 && Array.isArray((parsed as RecoverySnapshotV2).spaces)) {
+              isV2 = true;
+            }
+            break;
+          }
+        } catch (_ignore) {}
+      }
+
+      // Final fallback for legacy single JSON without AAD
+      if (!backupData) {
+        try {
+          const decryptedBytes = decryptXChaCha20Poly1305(kek, nonceBytes, blobBytes);
+          const parsed = JSON.parse(new TextDecoder().decode(decryptedBytes));
+          if (parsed && typeof parsed === 'object') {
+            backupData = parsed;
+            if ((parsed as RecoverySnapshotV2).version === 2 && Array.isArray((parsed as RecoverySnapshotV2).spaces)) {
+              isV2 = true;
+            }
+          }
+        } catch (_ignore) {}
       }
 
       if (!backupData) {
@@ -312,7 +342,11 @@ export class AccountManager {
       this.store.set(session, 'veil:identity:signing-private', first.signingPrivateKeyBase64);
       this.store.set(session, 'veil:identity:ka-private', first.keyAgreementPrivateKeyBase64);
       if (snapshot) {
-        for (const record of first.encryptedRecords) await this.storageAdapter.saveRecord(session.spaceId, record);
+        for (const record of first.encryptedRecords) {
+          await this.storageAdapter.saveRecord(session.spaceId, record);
+        }
+        await this.store.loadPartitionFromStorage(session);
+
         for (const space of snapshot.spaces.slice(1)) {
           const masterKey = base64ToBytes(space.masterKeyBase64);
           try {
@@ -330,7 +364,10 @@ export class AccountManager {
             this.store.set(restoredSpace, 'veil:identity:document', space.identityDocument);
             this.store.set(restoredSpace, 'veil:identity:signing-private', space.signingPrivateKeyBase64);
             this.store.set(restoredSpace, 'veil:identity:ka-private', space.keyAgreementPrivateKeyBase64);
-            for (const record of space.encryptedRecords) await this.storageAdapter.saveRecord(restoredSpace.spaceId, record);
+            for (const record of space.encryptedRecords) {
+              await this.storageAdapter.saveRecord(restoredSpace.spaceId, record);
+            }
+            await this.store.loadPartitionFromStorage(restoredSpace);
           } finally {
             zeroize(masterKey);
           }
@@ -348,9 +385,9 @@ export class AccountManager {
         });
       }
 
-      // 6. Set post-recovery password change required flag
+      // 6. Set post-recovery security flag ONLY if explicit emergency recovery
       await this.store.setAsync(session, 'veil:account:recovery_security', {
-        recoveryPasswordChangeRequired: true,
+        recoveryPasswordChangeRequired: !!params.isEmergencyRecovery,
         restoredAt: Date.now(),
       });
 
@@ -383,8 +420,10 @@ export class AccountManager {
     newPassword: string;
     username: string;
     newKdfParams?: Partial<KdfParameters>;
+    customKdfParams?: Partial<KdfParameters>;
   }): Promise<void> {
     const { session, oldPassword, newPassword, username } = params;
+    const effectiveKdf = params.newKdfParams || params.customKdfParams;
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
 
     if (!newPassword || newPassword.length < 3) {
@@ -409,26 +448,13 @@ export class AccountManager {
         });
         if (logRes.session?.sessionToken) {
           this.cloudClient.setSession(logRes.session.sessionToken, logRes.account.accountId, logRes.device.deviceId);
-          await this.store.setAsync(session, 'veil:cloud:session', {
-            sessionToken: logRes.session.sessionToken,
-            accountId: logRes.account.accountId,
-            deviceId: logRes.device.deviceId,
-            expiresAt: logRes.session.expiresAt,
-            username: cleanUsername,
-          });
         }
-      } catch (_authErr) {
-        // Local-only / offline fallback
-      }
+      } catch (_authErr) {}
     }
 
-    // Authoritative Server Verification:
-    // If authenticated on the cloud relay, execute server-side verification and password update
-    if (this.cloudClient.hasAuthenticatedSession()) {
-      await this.cloudClient.changePassword(oldPassword, newPassword);
-    }
+    await this.cloudClient.changePassword(oldPassword, newPassword);
 
-    // 2. Rewrap all matching local space envelopes for this account
+    // 2. Rewrap and update all local Space envelopes bound to this account
     const allEnvelopes = this.vault.listEnvelopes().filter((env) => {
       if (env.canonicalUsername) {
         return env.canonicalUsername === cleanUsername;
@@ -438,7 +464,7 @@ export class AccountManager {
 
     for (const env of allEnvelopes) {
       try {
-        const updatedEnv = this.vault.changePassword(env.spaceId, oldPassword, newPassword, params.newKdfParams);
+        const updatedEnv = this.vault.changePassword(env.spaceId, oldPassword, newPassword, effectiveKdf);
         await this.vault.saveEnvelopeToStorage(updatedEnv, this.storageAdapter);
       } catch (_rewrapErr) {
         // Envelopes protected by independent passphrases (e.g. decoy spaces or secondary spaces)
@@ -447,7 +473,7 @@ export class AccountManager {
     }
 
     // 3. Re-encrypt and push recovery snapshot under new password
-    await this.createOrUpdateRecoveryVault(session, newPassword, cleanUsername, params.newKdfParams, oldPassword);
+    await this.createOrUpdateRecoveryVault(session, newPassword, cleanUsername, effectiveKdf, oldPassword);
 
     // 4. Clear recoveryPasswordChangeRequired in store
     await this.store.setAsync(session, 'veil:account:recovery_security', {

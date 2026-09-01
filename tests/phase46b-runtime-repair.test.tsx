@@ -626,6 +626,7 @@ describe('VEIL Phase 46B: Security Settings, Password Change & Recovery Forensic
         username,
         password: oldPass,
         customKdfParams: FAST_TEST_KDF_PARAMS,
+        isEmergencyRecovery: true,
       });
 
       // Verify security flag is set in storage

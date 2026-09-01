@@ -278,6 +278,7 @@ describe('VEIL Phase 46: Account Identity Collision, Password Change & Recovery 
         username: 'recovered_user',
         password: SAME_PASSWORD,
         customKdfParams: FAST_TEST_KDF_PARAMS,
+        isEmergencyRecovery: true,
       });
 
       // Verify exact identityId match
@@ -626,6 +627,7 @@ describe('VEIL Phase 46: Account Identity Collision, Password Change & Recovery 
       username: `@${USERNAME.toUpperCase()}`, // with @ and uppercase to verify normalization
       password: ORIGINAL_PASS,
       customKdfParams: FAST_TEST_KDF_PARAMS,
+      isEmergencyRecovery: true,
     });
 
     // 1. Verify Space 1 cryptographic continuity

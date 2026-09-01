@@ -15,10 +15,26 @@ import { ContactDetailsModal } from './components/ContactDetailsModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
-import { ShieldIcon } from './components/icons/index.ts';
+import { ShieldIcon, CloseIcon } from './components/icons/index.ts';
 
 export const App: React.FC = () => {
   const { activeSession, activeChatId, activeModal, recoveryPasswordChangeRequired, openModal } = useApp();
+  const [isBannerDismissed, setIsBannerDismissed] = React.useState(() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem('veil:recovery_banner_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissBanner = () => {
+    setIsBannerDismissed(true);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('veil:recovery_banner_dismissed', 'true');
+      }
+    } catch {}
+  };
 
   React.useEffect(() => {
     try {
@@ -41,7 +57,7 @@ export const App: React.FC = () => {
 
   return (
     <div className={`veil-app-layout ${activeChatId ? 'has-active-chat' : ''}`}>
-      {recoveryPasswordChangeRequired && (
+      {recoveryPasswordChangeRequired && !isBannerDismissed && (
         <div
           className="veil-recovery-banner"
           style={{
@@ -66,22 +82,44 @@ export const App: React.FC = () => {
             <ShieldIcon size={16} />
             <span>Account recovered — set a new password to secure this device.</span>
           </div>
-          <button
-            type="button"
-            className="veil-button veil-button-secondary veil-button-sm"
-            onClick={() => openModal({ type: 'settings', initialCategory: 'privacy' })}
-            style={{
-              backgroundColor: '#ffffff',
-              color: 'var(--veil-accent-primary)',
-              border: 'none',
-              fontWeight: 600,
-              padding: '0.25rem 0.75rem',
-              borderRadius: 'var(--veil-radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            Change Password
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="veil-button veil-button-secondary veil-button-sm"
+              onClick={() => openModal({ type: 'settings', initialCategory: 'privacy' })}
+              style={{
+                backgroundColor: '#ffffff',
+                color: 'var(--veil-accent-primary)',
+                border: 'none',
+                fontWeight: 600,
+                padding: '0.25rem 0.75rem',
+                borderRadius: 'var(--veil-radius-sm)',
+                cursor: 'pointer',
+              }}
+            >
+              Change Password
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissBanner}
+              title="Dismiss notice"
+              aria-label="Dismiss notice"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#ffffff',
+                cursor: 'pointer',
+                padding: '0.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 'var(--veil-radius-sm)',
+                opacity: 0.8,
+              }}
+            >
+              <CloseIcon size={14} />
+            </button>
+          </div>
         </div>
       )}
       <Sidebar />

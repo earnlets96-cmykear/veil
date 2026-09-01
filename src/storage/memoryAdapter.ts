@@ -5,7 +5,7 @@
  * and explicitly configured non-persistent environments.
  */
 
-import { IStorageAdapter, StoredRecord } from './types.ts';
+import type { IStorageAdapter, StoredRecord } from './types.ts';
 import type { SpaceHeaderEnvelope } from '../types/index.ts';
 
 export class MemoryStorageAdapter implements IStorageAdapter {

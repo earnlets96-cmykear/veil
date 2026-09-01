@@ -2,6 +2,31 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase52] - 2026-09-02
+
+### Added
+- **Definitive Cloud Account, Cross-Device Sync & Chat Persistence Acceptance Suite (`tests/phase52-cloud-account-sync.test.ts`)**:
+  - Validates cross-device chat & message persistence from Device A to a fresh Device B with zero local storage.
+  - Validates bidirectional chat synchronization between Device B and Device A.
+  - Validates password change preserves 100% of conversations, messages, contacts, and identities.
+  - Validates multiple independent accounts remain strictly isolated.
+  - Validates username uniqueness and collision rejection at database level.
+- **Continuous Background Cloud Snapshot Synchronization (`src/ui/app/AppState.tsx`)**:
+  - Implemented debounced `scheduleCloudSync` on outbound and inbound messages to guarantee cloud recovery snapshot reflects current conversations and messages.
+- **Full Partition Rehydration on Fresh Device Restore (`src/account/accountManager.ts`)**:
+  - Added `store.loadPartitionFromStorage(session)` for all restored spaces to ensure conversations, messages, and contacts are loaded into memory upon login.
+- **Dismissible Security Banner with SVG Iconography (`src/ui/App.tsx`)**:
+  - Made the post-recovery password banner dismissible and persisted in local storage.
+  - Replaced Unicode cross with `<CloseIcon size={14} />` conforming to SVG UI guidelines.
+- **Normal Login UX vs Emergency Account Recovery Distinction (`src/account/accountManager.ts`, `src/ui/app/AppState.tsx`)**:
+  - Fresh device login with username and password is treated as a normal login without forcing a password change.
+
+### Verification
+- 344 test files / 942 automated tests passing (100% clean pass, 0 failures).
+- Real live production probe against `https://veil-rga0.onrender.com` passed 100% (2 conversations, 5 messages, 2 contacts synced across devices).
+- Web production build passing (`npm run build` in 1.78s).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`./gradlew assembleDebug` BUILD SUCCESSFUL in 20s).
+
 ## [1.0.0-phase51] - 2026-09-02
 
 ### Added
