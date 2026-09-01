@@ -64,8 +64,8 @@ export const LockScreen: React.FC = () => {
 
     try {
       await unlockSpace(passphrase, cleanUsername);
-    } catch (_err: any) {
-      setError('Invalid username or passphrase.');
+    } catch (err: any) {
+      setError(err?.message || 'Invalid username or passphrase.');
       setPassphrase('');
       setLoadingPhase('idle');
     }

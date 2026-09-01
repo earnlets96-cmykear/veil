@@ -197,10 +197,38 @@ export class AccountManager {
     }
 
     if (!restoreRes.recovery || !restoreRes.recovery.encryptedVaultBlob) {
-      RuntimeDiagnostics.recovery('missingRecoveryVault', {
+      RuntimeDiagnostics.recovery('missingRecoveryVaultFallback', {
         accountId: restoreRes.account?.accountId,
       });
-      throw new Error('Account has no encrypted identity backup on cloud server');
+      // Account exists in cloud but has no recovery snapshot -> initialize fresh device Space
+      const spaceHeader = this.vault.createSpace({
+        name: `${cleanUsername}'s Space`,
+        password,
+        kdfParams: params.customKdfParams || DEFAULT_KDF_PARAMS,
+        canonicalUsername: cleanUsername,
+        accountId: restoreRes.account.accountId,
+      });
+      await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
+      const session = this.vault.unlockSpace(password, spaceHeader.spaceId);
+      const identity = this.idMgr.createIdentity(session, this.store);
+
+      if (restoreRes.session && restoreRes.session.sessionToken) {
+        await this.store.setAsync(session, 'veil:cloud:session', {
+          sessionToken: restoreRes.session.sessionToken,
+          accountId: restoreRes.account.accountId,
+          deviceId: restoreRes.device.deviceId,
+          expiresAt: restoreRes.session.expiresAt,
+          username: cleanUsername,
+        });
+      }
+
+      await this.createOrUpdateRecoveryVault(session, password, cleanUsername, params.customKdfParams);
+
+      return {
+        account: restoreRes.account,
+        session,
+        identityDoc: identity.document,
+      };
     }
 
     const recoveryRecord = restoreRes.recovery;
@@ -216,20 +244,41 @@ export class AccountManager {
     const nonce = base64ToBytes(vaultBlob.nonce);
     const ciphertext = base64ToBytes(vaultBlob.ciphertext);
     const isV2 = vaultBlob.format === 'VEIL-RECOVERY-SNAPSHOT-v2';
-    const aad = new TextEncoder().encode(`${isV2 ? 'VEIL-RECOVERY-SNAPSHOT-v2' : 'VEIL-IDENTITY-BACKUP-v1'}|user:${cleanUsername}`);
 
-    let backupData: IdentityBackupPayload | RecoverySnapshotV2;
+    const candidateAads: (Uint8Array | undefined)[] = [
+      new TextEncoder().encode(`${isV2 ? 'VEIL-RECOVERY-SNAPSHOT-v2' : 'VEIL-IDENTITY-BACKUP-v1'}|user:${cleanUsername}`),
+      new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${cleanUsername}`),
+      new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`),
+      new TextEncoder().encode('VEIL-RECOVERY-SNAPSHOT-v2'),
+      new TextEncoder().encode('VEIL-IDENTITY-BACKUP-v1'),
+      new TextEncoder().encode(`user:${cleanUsername}`),
+      undefined,
+    ];
+
+    let backupData: IdentityBackupPayload | RecoverySnapshotV2 | null = null;
+    let lastDecryptError: any = null;
+
     try {
-      const decryptedBytes = decryptXChaCha20Poly1305(kek, nonce, ciphertext, aad);
-      backupData = JSON.parse(new TextDecoder().decode(decryptedBytes));
+      for (const aad of candidateAads) {
+        try {
+          const decryptedBytes = decryptXChaCha20Poly1305(kek, nonce, ciphertext, aad);
+          backupData = JSON.parse(new TextDecoder().decode(decryptedBytes));
+          if (backupData) break;
+        } catch (e) {
+          lastDecryptError = e;
+        }
+      }
+
+      if (!backupData) {
+        RuntimeDiagnostics.recovery('vaultDecryptionFailed', {
+          error: 'Invalid password or corrupted backup payload',
+        });
+        throw new Error('Failed to decrypt identity backup: invalid password or corrupted backup');
+      }
+
       RuntimeDiagnostics.recovery('vaultDecryptionSuccess', {
         snapshotVersion: (backupData as RecoverySnapshotV2).version,
       });
-    } catch (_e) {
-      RuntimeDiagnostics.recovery('vaultDecryptionFailed', {
-        error: 'Invalid password or corrupted backup payload',
-      });
-      throw new Error('Failed to decrypt identity backup: invalid password or corrupted backup');
     } finally {
       zeroize(kek);
     }

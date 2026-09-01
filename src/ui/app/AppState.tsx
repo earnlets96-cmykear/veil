@@ -810,8 +810,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const unlockSpace = useCallback(
     async (passphrase: string, username?: string) => {
       const cleanUsername = username ? normalizeUsername(username) : undefined;
-      const session = await sessionController.unlock(passphrase, cleanUsername);
+      let session: SpaceSession | null = null;
+
+      try {
+        session = await sessionController.unlock(passphrase, cleanUsername);
+      } catch (localErr) {
+        // If username is provided, attempt cloud authentication / restoration fallback
+        if (cleanUsername) {
+          try {
+            const restored = await accountManager.restoreAccount({
+              username: cleanUsername,
+              password: passphrase,
+            });
+            session = restored.session;
+          } catch (cloudErr: any) {
+            throw new Error(cloudErr?.message || 'Invalid username or password');
+          }
+        } else {
+          throw localErr;
+        }
+      }
+
+      if (!session) {
+        throw new Error('Invalid username or password');
+      }
+
       setActiveSession(session);
+      sessionController.recordUserActivity();
+      setKnownSpacesCount(vault.listEnvelopes().length);
       await loadSpaceData(session);
       await ensureCloudSession(session, false, passphrase);
 

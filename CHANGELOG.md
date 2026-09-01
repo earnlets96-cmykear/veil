@@ -2,6 +2,28 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase51] - 2026-09-02
+
+### Added
+- **Dedicated Phase 51 Acceptance Suite (`tests/phase51-cross-device-auth.test.ts`)**:
+  - Validates full cross-device login and restoration on fresh clients with 0 local envelopes.
+  - Verifies identical recovery of Space Master Key, Ed25519 identity, and stored notes.
+  - Verifies cross-device password change propagation and verification.
+  - Verifies decoy accounts with independent credentials enter distinct cloud accounts.
+  - Verifies database-level duplicate username rejection.
+- **Unified Cross-Device Login Flow (`src/ui/app/AppState.tsx`)**:
+  - Seamlessly bridges local space unlocking with automatic cloud authentication and zero-knowledge recovery on fresh devices and web browsers.
+- **Multi-Format AAD Decryption Fallback (`src/account/accountManager.ts`)**:
+  - Added support for legacy and modern AAD formats across all previous recovery snapshot versions.
+- **Graceful Cloud Account Fallback (`src/account/accountManager.ts`)**:
+  - Initializes fresh device space and recovery vault when a cloud account exists without a prior snapshot.
+
+### Verification
+- 8 test suites / 52 automated tests passing (100% clean pass, 0 failures).
+- Real live production probe against `https://veil-rga0.onrender.com` passed 100%.
+- Web production build passing (`npm run build` in 1.94s).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`./gradlew assembleDebug` BUILD SUCCESSFUL in 20s).
+
 ## [1.0.0-phase50c] - 2026-09-01
 
 ### Added
