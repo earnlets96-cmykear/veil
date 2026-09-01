@@ -557,7 +557,7 @@ export class RelayServer {
   }
 
   private async handleDirectorySearch(query: string, res: ServerResponse): Promise<void> {
-    const q = query.trim();
+    const q = query.trim().toLowerCase().replace(/^@/, '');
     if (!q || q.length < 1) {
       this.sendError(res, 'BAD_REQUEST', 'Search query must not be empty', 400);
       return;

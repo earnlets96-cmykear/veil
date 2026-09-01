@@ -84,8 +84,8 @@ export class DirectoryClient {
    * Searches the public directory by username or display name with anti-enumeration constraints.
    */
   public async searchProfiles(query: string): Promise<DirectorySearchResult[]> {
-    const q = query.trim();
-    if (!q || q.length < 3) {
+    const q = query.trim().toLowerCase().replace(/^@/, '');
+    if (!q || q.length < 1) {
       return [];
     }
 

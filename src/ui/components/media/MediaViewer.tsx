@@ -270,13 +270,15 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   };
 
   const handleVideoSeek = (targetPercent: number) => {
-    if (!videoRef.current || !videoDuration) return;
-    const targetSeconds = (targetPercent / 100) * videoDuration;
-    videoRef.current.currentTime = targetSeconds;
-    setVideoProgress(targetSeconds);
+    if (!videoRef.current || !videoDuration || !Number.isFinite(videoDuration) || videoDuration <= 0) return;
+    const clampedPercent = Math.max(0, Math.min(100, Number.isFinite(targetPercent) ? targetPercent : 0));
+    const targetSeconds = (clampedPercent / 100) * videoDuration;
+    const clampedSeconds = Math.max(0, Math.min(videoDuration, targetSeconds));
+    videoRef.current.currentTime = clampedSeconds;
+    setVideoProgress(clampedSeconds);
     RuntimeDiagnostics.video('seekExecuted', {
-      targetPercent,
-      targetSeconds,
+      targetPercent: clampedPercent,
+      targetSeconds: clampedSeconds,
       actualCurrentTime: videoRef.current.currentTime,
       duration: videoDuration,
     });

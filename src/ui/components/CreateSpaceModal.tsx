@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { Button, IconButton, PasswordInput } from './ui/index.ts';
 import { CloseIcon, PlusIcon } from './icons/index.ts';
+import { getErrorMessage } from '../../utils/errors.ts';
 
 export const CreateSpaceModal: React.FC = () => {
   const { createSpace, closeModal, activeSession } = useApp();
@@ -43,7 +44,7 @@ export const CreateSpaceModal: React.FC = () => {
       await createSpace(name.trim(), passphrase, effectiveUsername || undefined);
       closeModal();
     } catch (err: any) {
-      setError(err.message || 'Failed to create Space.');
+      setError(getErrorMessage(err, 'Failed to create Space.'));
     } finally {
       setIsLoading(false);
     }

@@ -78,8 +78,8 @@ export class RecoveryVault {
     customKdfParams?: Partial<KdfParameters>
   ): EncryptedRecoveryFile {
     this.assertSession(session);
-    if (!passphrase || passphrase.length < 8) {
-      throw new Error('Recovery passphrase must be at least 8 characters long');
+    if (!passphrase || passphrase.length < 3) {
+      throw new Error('Recovery passphrase must be at least 3 characters long');
     }
 
     const salt = getRandomBytes(32);

@@ -150,7 +150,7 @@ describe('VEIL Phase 46B: Security Settings, Password Change & Recovery Forensic
       );
       expect(markup).toContain('Change Account Passphrase');
       expect(markup).toContain('Current Passphrase');
-      expect(markup).toContain('New Passphrase (min 8 chars)');
+      expect(markup).toContain('New Passphrase (min 3 chars)');
       expect(markup).toContain('Confirm New Passphrase');
       expect(markup).not.toContain('ReferenceError');
     });

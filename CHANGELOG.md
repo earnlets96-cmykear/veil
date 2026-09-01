@@ -2,6 +2,40 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase47] - 2026-09-01
+
+### Added
+- **Dedicated Phase 47 Regression Test Suite (`tests/phase47-runtime-media-account.test.tsx`)**:
+  - Validates 3-character minimum password enforcement across client, server, recovery vault, and UI helpers.
+  - Verifies full password change lifecycle, cloud session re-authentication, envelope rewrapping, and zero-knowledge recovery re-encryption.
+  - Tests same-device directory discovery normalization with leading `@` stripping and case insensitivity (`@bob`, `bob`, `BOB`, ` bob `).
+  - Validates video upload MIME type inference (`.mp4`, `.mov`, `.webm`, `.mkv`, `.avi`) and chunked XChaCha20 encryption pipeline.
+  - Verifies Telegram-style animated SVG circular spinner ring and determinate percentage upload progress indicator.
+  - Verifies `ProfileModal` reorganization into Telegram reference structure with categorized media counts.
+  - Validates centralized error normalization utility (`src/utils/errors.ts`) preventing `[object Object]` JSX leaks.
+- **Centralized Error Normalization Utility (`src/utils/errors.ts`)**:
+  - `getErrorMessage(error: unknown, fallbackMessage?: string): string`.
+- **Vector Icons (`src/ui/components/icons/Icons.tsx`)**:
+  - Added `PhoneIcon`, `MessageSquareIcon`, `BellIcon`, `BellOffIcon`, `QrCodeIcon`, `LinkIcon`, and `EditIcon`.
+
+### Changed
+- **Global Password Standard**:
+  - Reduced application-wide password/passphrase minimum length from 8 to 3 characters across client, server, and recovery vault.
+- **Profile Modal Layout (`src/ui/components/ProfileModal.tsx`)**:
+  - Rebuilt modal structure matching Telegram reference design with Header (large avatar, display name, online status, close button), Primary Actions (Message, Mute, Call, Safety), Identity Information (Mobile, `@username` with QR modal & copy button), Categorized Media section (Photos, Videos, Files, Audio, Shared Links, Voice Messages, GIFs, Groups in Common), and Contact Actions (Share Contact, Edit/Verify Safety Number, Delete Contact, Block User).
+- **Message Status Component (`src/ui/components/ui/MessageStatus.tsx`)**:
+  - Replaced static refresh icon with animated SVG circular spinner ring and determinate upload progress ring.
+- **Directory Search Query Normalization (`directoryClient.ts`, `relayServer.ts`, `postgresRelayStore.ts`, `persistentRelayStore.ts`, `memoryRelayStore.ts`, `NewChatModal.tsx`)**:
+  - Stripped leading `@` and trimmed queries before matching profiles.
+- **Android Video Upload & Player Refinements (`AppState.tsx`, `MediaViewer.tsx`)**:
+  - Added `inferMime` for missing MIME types on Android WebViews.
+  - Clamped seekbar scrubbing safely: `0 <= clampedSeconds <= duration`.
+
+### Verification
+- 338 / 338 test files passing (912 / 912 automated tests, 100% clean pass, 0 failures).
+- Web production build passing (`npm run build` in 1.74s).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`./gradlew assembleDebug` BUILD SUCCESSFUL in 20s).
+
 ## [1.0.0-phase46] - 2026-09-01
 
 ### Added

@@ -1,45 +1,52 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 46B (Forensic Runtime Repair: Security Settings, Password Change, Username Identity & Recovery)
+## Current Verified Phase: PHASE 47 (Password Change, Messaging UX, Same-Device Discovery, Video Upload & Profile UI Forensic Repair)
 - **Status**: **COMPLETE & VERIFIED 100%**
 - **Branch**: `main`
+- **Phase 47 Test Results**: **`tests/phase47-runtime-media-account.test.tsx` (7 comprehensive runtime, account, media & profile tests, 100% clean pass)**
 - **Phase 46B Test Results**: **`tests/phase46b-runtime-repair.test.tsx` (13 comprehensive security & UI tests, 100% clean pass)**
 - **Phase 46 Test Results**: **`tests/phase46-account-collision-recovery.test.ts` (7 comprehensive suites, 100% clean pass)**
-- **Full Test Suite**: **337 test files / 905 automated tests passing (100% clean pass)**
-- **Web App Build**: **PASS (`npm run build` built in 1.79s)**
+- **Full Test Suite**: **338 test files / 912 automated tests passing (100% clean pass)**
+- **Web App Build**: **PASS (`npm run build` built in 1.74s)**
 - **Release Manifest**: **PASS (`node scripts/release-build.mjs` - 6 artifacts)**
-- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.145s)**
-- **Android APK Build**: **PASS (`cmd.exe /c gradlew.bat assembleDebug` BUILD SUCCESSFUL in 17s)**
+- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.15s)**
+- **Android APK Build**: **PASS (`cd android && ./gradlew.bat assembleDebug` BUILD SUCCESSFUL in 20s)**
 - **Physical Android Verification**: **Ready for physical device deployment and live acceptance testing**
 
 ---
 
-## Phase 46B Verified Deliverables & Forensic Fixes
+## Phase 47 Verified Deliverables & Forensic Fixes
 
-1. **Settings Modal Crash Fix & Direct Category Routing**:
-   - Resolved fatal `ReferenceError: PasswordInput is not defined` by adding `PasswordInput` to the `./ui/index.ts` imports in `SettingsModal.tsx`.
-   - Added `initialCategory?: SettingsCategory` to `SettingsModalProps` and updated `ActiveModal` in `types.ts`.
-   - Wired the post-recovery banner "Change Password" button in `App.tsx` to directly open `SettingsModal` on the `'privacy'` tab.
+1. **Password Change Cloud Authentication & Zero-Knowledge Vault Synchronization**:
+   - In `src/account/accountManager.ts`: Ensured authenticated cloud session before invoking password change endpoint; automatically re-authenticates with server if session is unauthenticated; updates cloud auth hash; rewraps all local Space envelopes with fresh Argon2id salt/KDF; re-encrypts and syncs zero-knowledge recovery vault; updates stored session.
+   - In `src/ui/app/AppState.tsx`: Updated in-memory `cloudCredentials` ref upon password change and cleared `recoveryPasswordChangeRequired` flag.
 
-2. **Strict Canonical Username Architecture & Terminology Standard**:
-   - Replaced all legacy terminology ("Account Name", "Account") with "Username" in `RestoreAccountModal.tsx` and across the UI.
-   - Enforced canonical normalization across all inputs: `trim().toLowerCase().replace(/^@/, '')`.
-   - Removed automatic space-to-username slugification in `CreateSpaceModal.tsx`, requiring explicit, validated username input for new accounts.
+2. **Global Minimum Password Length Standardization to 3 Characters**:
+   - Standardized application-wide minimum password length to 3 characters across client validation, server validation (`src/server/cloud/accountService.ts`), recovery vault export (`src/recovery/recoveryVault.ts`), account management (`src/account/accountManager.ts`), and UI helper labels (`min 3 chars`).
 
-3. **Directory Profile Identity Ownership Enforcement**:
-   - Updated `src/server/storage/postgresRelayStore.ts` `registerProfile` to query existing profiles before upserting.
-   - Rejects hijacking attempts with `CONFLICT: Username @{username} is already registered to a different identity` when the existing profile belongs to a different `identityId`.
-   - Atomically deletes obsolete username mappings when an identity legitimately renames their profile.
+3. **Telegram-Style Message Sending / Uploading Indicator**:
+   - Replaced static refresh icon in `MessageStatus.tsx` with an animated SVG circular spinner ring for `SENDING` and `UPLOADING` states.
+   - Added determinate progress ring displaying upload percentage (`0-100%`) when `uploadProgress` is provided.
+   - Complies strictly with VEIL SVG icon policy (zero Unicode emoji symbols).
 
-4. **Elimination of Dangerous `session.name` Fallbacks & Cold Cache Race Conditions**:
-   - Replaced synchronous `store.get` with asynchronous `store.getAsync` across `AppState.tsx` and `AccountManager.ts`.
-   - Removed all fallback paths that derived usernames from `session.name` (such as `"mainspace"`). Space usernames are now resolved strictly via:
-     1. Stored signed profile (`veil:user:profile`)
-     2. Stored cloud session (`veil:cloud:session`)
-     3. Header envelope canonical username (`envelope.canonicalUsername`)
-   - Restored accounts rehydrate their directory profile using their canonical username and Ed25519 identity keys without corruption.
+4. **Same-Device Account Discovery & Leading `@` Query Normalization**:
+   - Normalized directory queries across `directoryClient.ts`, `relayServer.ts`, `postgresRelayStore.ts`, `persistentRelayStore.ts`, `memoryRelayStore.ts`, and `NewChatModal.tsx` by stripping leading `@` and trimming/lowercasing queries.
+   - Users can now find peers whether searching `@alice`, `alice`, `ALICE`, or ` alice `.
 
-5. **Durable Multi-Space Persistence & Zero-Leakage Cryptographic Lifecycle**:
-   - Verified that password changes rewrap local space envelopes with fresh salt/KDF, update server Argon2id auth hashes, and re-encrypt zero-knowledge recovery vaults.
-   - Confirmed that multi-space accounts and encrypted partition records persist durably across server restarts and fresh-client restores.
-   - Verified zero plaintext passwords, master keys, or signing keys leak into diagnostics or telemetry logs.
+5. **Physical Android Video Upload & MIME Type Inference**:
+   - Added `inferMime` in `AppState.tsx` to detect video formats (`.mp4`, `.mov`, `.webm`, `.mkv`, `.avi`, `.m4v`, `.3gp`) when `file.type` is empty on Android WebViews.
+   - Generates working object URL previews, handles chunked XChaCha20 encryption, and preserves correct MIME headers during R2/S3 cloud upload.
+
+6. **Video Player Refinements & Clamped Seeking**:
+   - In `MediaViewer.tsx`, ensured seek scrub calculations are clamped to `0 <= targetTime <= duration`, safe against `NaN` or uninitialized duration values, and preserved playback element without destroying video URLs or restarting playback from zero.
+
+7. **Telegram-Style Profile Modal Organization**:
+   - Rebuilt `ProfileModal.tsx` according to Telegram reference design:
+     - Header: Large Avatar, Display Name, Online/Seen Status, Close X
+     - Primary Actions: Message, Mute/Unmute, Call, Safety Number verification
+     - Identity Information: Phone/Mobile, `@username` with QR code modal & copy button
+     - Media Section: Categorized media counts (Photos, Videos, Files, Audio, Shared Links, Voice Messages, GIFs, Groups in Common)
+     - Contact Actions: Share Contact, Edit/Verify Safety Number, Delete Contact, Block User.
+
+8. **Centralized Error Normalization (`src/utils/errors.ts`)**:
+   - Implemented `getErrorMessage(error: unknown, fallbackMessage?: string): string` to prevent raw JavaScript error objects from leaking to JSX as `[object Object]`.

@@ -337,11 +337,38 @@ export class AccountManager {
     const { session, oldPassword, newPassword, username } = params;
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
 
-    if (!newPassword || newPassword.length < 8) {
-      throw new Error('New password must be at least 8 characters long');
+    if (!newPassword || newPassword.length < 3) {
+      throw new Error('New password must be at least 3 characters long');
     }
 
-    // 1. Update password on cloud backend (if session is authenticated)
+    // 1. Ensure cloud session is authenticated, then update password on cloud backend
+    if (!this.cloudClient.hasAuthenticatedSession()) {
+      try {
+        const identity = this.identityManager.loadIdentity(session, this.store);
+        const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
+        const logRes = await this.cloudClient.loginAccount({
+          username: cleanUsername,
+          password: oldPassword,
+          deviceId,
+          deviceName: session.name,
+          deviceSigningPub: identity?.document.signingPublicKey,
+          deviceKeyAgreementPub: identity?.document.keyAgreementPublicKey,
+        });
+        if (logRes.session?.sessionToken) {
+          this.cloudClient.setSession(logRes.session.sessionToken, logRes.account.accountId, logRes.device.deviceId);
+          await this.store.setAsync(session, 'veil:cloud:session', {
+            sessionToken: logRes.session.sessionToken,
+            accountId: logRes.account.accountId,
+            deviceId: logRes.device.deviceId,
+            expiresAt: logRes.session.expiresAt,
+            username: cleanUsername,
+          });
+        }
+      } catch (_authErr) {
+        // Local-only / offline fallback
+      }
+    }
+
     if (this.cloudClient.hasAuthenticatedSession()) {
       await this.cloudClient.changePassword(oldPassword, newPassword);
     }

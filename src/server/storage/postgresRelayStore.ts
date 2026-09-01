@@ -315,7 +315,7 @@ export class PostgresRelayStore implements IRelayStore {
 
   public async searchProfiles(query: string, limit: number): Promise<DirectorySearchResult[]> {
     this.assertInit();
-    const prefix = query.toLowerCase().replace(/[%_]/g, '');
+    const prefix = query.toLowerCase().trim().replace(/^@/, '').replace(/[%_]/g, '');
     const sql = `
       SELECT identity_id as "identityId", username, display_name as "displayName",
              avatar_url as "avatarUrl", signature as "profileSignature"

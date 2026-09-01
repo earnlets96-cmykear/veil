@@ -10,6 +10,7 @@ import { useApp } from '../app/AppState.tsx';
 import { InvitationManager } from '../../contacts/invitationManager.ts';
 import { DirectorySearchResult } from '../../server/types.ts';
 import { CloseIcon, SearchIcon, ShareIcon, CheckIcon } from './icons/index.ts';
+import { getErrorMessage } from '../../utils/errors.ts';
 
 export const NewChatModal: React.FC = () => {
   const {
@@ -40,9 +41,10 @@ export const NewChatModal: React.FC = () => {
 
   // Live Directory Search Debounced
   useEffect(() => {
-    const q = searchUsername.trim().replace(/^@/, '');
-    if (q.length < 1) {
+    const q = searchUsername.trim().toLowerCase().replace(/^@/, '');
+    if (!q || q.length < 1) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
@@ -59,7 +61,7 @@ export const NewChatModal: React.FC = () => {
         }
       } catch (err: any) {
         if (isMounted) {
-          setError(err.message || 'Directory search failed');
+          setError(getErrorMessage(err, 'Directory search failed'));
           setIsSearching(false);
         }
       }
@@ -85,7 +87,7 @@ export const NewChatModal: React.FC = () => {
         closeModal();
       }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Failed to send contact request');
+      setError(getErrorMessage(err, 'Failed to send contact request'));
     } finally {
       setLoading(false);
     }
@@ -138,7 +140,7 @@ export const NewChatModal: React.FC = () => {
       }
       closeModal();
     } catch (err: any) {
-      setError(err.message || 'Invalid or tampered invitation.');
+      setError(getErrorMessage(err, 'Invalid or tampered invitation.'));
     } finally {
       setLoading(false);
     }

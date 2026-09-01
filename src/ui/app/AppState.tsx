@@ -933,6 +933,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         newPassword,
         username,
       });
+      cloudCredentials.current.set(activeSession.spaceId, newPassword);
       setRecoveryPasswordChangeRequired(false);
       await store.setAsync(activeSession, 'veil:account:recovery_security', {
         recoveryPasswordChangeRequired: false,
@@ -1176,10 +1177,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setReplyTargetState(null);
 
       // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
+      const inferMime = (f: File): string => {
+        if (f.type && f.type !== 'application/octet-stream' && f.type !== '') {
+          return f.type;
+        }
+        const ext = f.name.split('.').pop()?.toLowerCase() || '';
+        const vExts: Record<string, string> = {
+          mp4: 'video/mp4',
+          mov: 'video/quicktime',
+          webm: 'video/webm',
+          mkv: 'video/x-matroska',
+          avi: 'video/x-msvideo',
+          m4v: 'video/mp4',
+          '3gp': 'video/3gpp',
+        };
+        if (vExts[ext]) return vExts[ext];
+        const imgExts: Record<string, string> = {
+          jpg: 'image/jpeg',
+          jpeg: 'image/jpeg',
+          png: 'image/png',
+          webp: 'image/webp',
+          gif: 'image/gif',
+          svg: 'image/svg+xml',
+        };
+        if (imgExts[ext]) return imgExts[ext];
+        return f.type || 'application/octet-stream';
+      };
+
       const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
         const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
+        const effectiveMime = inferMime(file);
         let initialPreviewUrl: string | undefined;
-        if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+        if (effectiveMime.startsWith('image/') || effectiveMime.startsWith('video/')) {
           try {
             initialPreviewUrl = URL.createObjectURL(file);
           } catch (_e) {}
@@ -1188,7 +1217,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           attachmentId,
           name: file.name,
           sizeBytes: file.size,
-          mimeType: file.type || 'application/octet-stream',
+          mimeType: effectiveMime,
           previewUrl: initialPreviewUrl,
           localPreviewUrl: initialPreviewUrl,
           state: idx < 2 ? ('UPLOADING' as const) : ('QUEUED' as const),
@@ -1212,8 +1241,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         targetContact?.name,
       ].filter(Boolean) as string[]);
 
+      const firstMime = initialAttachments[0]?.mimeType || '';
       const summaryText =
-        files.length === 1 && !files[0].type.startsWith('image/') && !files[0].type.startsWith('video/')
+        files.length === 1 && !firstMime.startsWith('image/') && !firstMime.startsWith('video/')
           ? `Attachment: ${files[0].name}`
           : '';
 

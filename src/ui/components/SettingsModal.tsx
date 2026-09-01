@@ -16,6 +16,7 @@ import { useApp } from '../app/AppState.tsx';
 import { NotificationPrivacyMode } from '../../notifications/types.ts';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
+import { getErrorMessage } from '../../utils/errors.ts';
 import {
   Avatar,
   Badge,
@@ -38,17 +39,25 @@ import {
   InfoIcon,
   ArrowLeftIcon,
   CloseIcon,
+  LogOutIcon,
+  EyeIcon,
+  EyeOffIcon,
   CopyIcon,
   CheckIcon,
+  DownloadIcon,
+  ShareIcon,
   RefreshCwIcon,
   TrashIcon,
+  MoonIcon,
+  SmartphoneIcon,
+  BellIcon,
   ChevronRightIcon,
 } from './icons/index.ts';
 
 export type SettingsCategory =
   | 'overview'
-  | 'profile'
   | 'account'
+  | 'devices'
   | 'privacy'
   | 'notifications'
   | 'appearance'
@@ -74,6 +83,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     updatePrivacySettings,
     registerUsername,
     lockSpace,
+    knownSpacesCount,
     changeAccountPassword,
   } = useApp();
 
@@ -99,8 +109,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!oldPassword || !newPassword || passwordChangeLoading) return;
-    if (newPassword.length < 8) {
-      setPasswordChangeError('New password must be at least 8 characters long.');
+    if (newPassword.length < 3) {
+      setPasswordChangeError('New password must be at least 3 characters long.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -124,7 +134,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
       setConfirmPassword('');
       showToast({ type: 'success', message: 'Password updated successfully!' });
     } catch (err: any) {
-      setPasswordChangeError(err.message || 'Failed to change password. Verify your current password.');
+      setPasswordChangeError(getErrorMessage(err, 'Failed to change password. Verify your current password.'));
     } finally {
       setPasswordChangeLoading(false);
     }
@@ -638,7 +648,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
 
                   <div style={{ marginBottom: '0.75rem' }}>
                     <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-secondary)', marginBottom: '0.35rem' }}>
-                      New Passphrase (min 8 chars)
+                      New Passphrase (min 3 chars)
                     </label>
                     <PasswordInput
                       value={newPassword}

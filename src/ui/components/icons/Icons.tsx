@@ -486,3 +486,63 @@ export const CameraIcon: React.FC<IconProps> = ({ size = 20, className = '', col
   </svg>
 );
 
+export const PhoneIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+);
+
+export const MessageSquareIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+export const BellIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
+export const BellOffIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    <path d="M18.63 13A17.89 17.89 0 0 1 18 8" />
+    <path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14" />
+    <path d="M18 8a6 6 0 0 0-9.33-5" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
+export const QrCodeIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" />
+    <rect x="5" y="5" width="3" height="3" fill={color || 'currentColor'} stroke="none" />
+    <rect x="16" y="5" width="3" height="3" fill={color || 'currentColor'} stroke="none" />
+    <rect x="5" y="16" width="3" height="3" fill={color || 'currentColor'} stroke="none" />
+    <line x1="14" y1="14" x2="14" y2="14.01" />
+    <line x1="14" y1="17" x2="17" y2="17" />
+    <line x1="17" y1="14" x2="21" y2="14" />
+    <line x1="21" y1="17" x2="21" y2="21" />
+    <line x1="14" y1="21" x2="17" y2="21" />
+  </svg>
+);
+
+export const LinkIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+);
+
+export const EditIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+
+

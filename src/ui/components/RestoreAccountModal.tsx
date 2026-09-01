@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { Button, IconButton, PasswordInput } from './ui/index.ts';
 import { CloseIcon, RefreshCwIcon } from './icons/index.ts';
+import { getErrorMessage } from '../../utils/errors.ts';
 
 export const RestoreAccountModal: React.FC = () => {
   const { restoreAccount, closeModal } = useApp();
@@ -28,7 +29,7 @@ export const RestoreAccountModal: React.FC = () => {
       await restoreAccount(username.trim().toLowerCase().replace(/^@/, ''), password);
       closeModal();
     } catch (err: any) {
-      setError(err.message || 'Failed to restore account: invalid credentials or network error.');
+      setError(getErrorMessage(err, 'Failed to restore account: invalid credentials or network error.'));
     } finally {
       setIsLoading(false);
     }

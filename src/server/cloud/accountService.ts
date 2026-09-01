@@ -85,13 +85,13 @@ export class AccountService {
     recoveryAnchor?: string;
   }): Promise<AuthResult> {
     const cleanUsername = params.username.trim().toLowerCase().replace(/^@/, '');
+    if (!params.password || params.password.length < 3) {
+      throw new Error('Password must be at least 3 characters long');
+    }
+
     const existing = await this.db.getAccountByUsername(cleanUsername);
     if (existing) {
       throw new Error(`Username ${params.username} is already registered`);
-    }
-
-    if (!params.password || params.password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
     }
 
     const accountId = `acc_${bytesToHex(randomBytes(16))}`;
@@ -281,8 +281,8 @@ export class AccountService {
       throw new Error('Invalid current password');
     }
 
-    if (!params.newPassword || params.newPassword.length < 8) {
-      throw new Error('New password must be at least 8 characters long');
+    if (!params.newPassword || params.newPassword.length < 3) {
+      throw new Error('New password must be at least 3 characters long');
     }
 
     const newSalt = randomBytes(32);
@@ -317,8 +317,8 @@ export class AccountService {
       throw new Error('Account recovery failed: invalid recovery credentials');
     }
 
-    if (!params.newPassword || params.newPassword.length < 8) {
-      throw new Error('New password must be at least 8 characters long');
+    if (!params.newPassword || params.newPassword.length < 3) {
+      throw new Error('New password must be at least 3 characters long');
     }
 
     const newSalt = randomBytes(32);

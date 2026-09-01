@@ -254,7 +254,7 @@ export class PersistentFileRelayStore implements IRelayStore {
 
   public async searchProfiles(query: string, limit: number): Promise<DirectorySearchResult[]> {
     this.assertInit();
-    const q = query.toLowerCase().trim();
+    const q = query.toLowerCase().trim().replace(/^@/, '');
     if (!q) return [];
 
     const results: DirectorySearchResult[] = [];
