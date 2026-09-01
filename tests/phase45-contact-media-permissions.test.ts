@@ -14,6 +14,7 @@ import { EncryptedSpaceStore } from '../src/storage/spaceStore.ts';
 import { MemoryAdapter } from '../src/storage/memoryAdapter.ts';
 import { ContactManager } from '../src/contacts/contactManager.ts';
 import { Contact } from '../src/contacts/types.ts';
+import { FAST_TEST_KDF_PARAMS } from '../src/crypto/kdf.ts';
 
 describe('Phase 45: Contact Profile Media Permissions', () => {
   it('stores and updates allowSave and allowForward permissions per contact', async () => {
@@ -22,7 +23,7 @@ describe('Phase 45: Contact Profile Media Permissions', () => {
     const store = new EncryptedSpaceStore(storage);
     const contactManager = new ContactManager(store);
 
-    vault.createSpace({ name: 'Personal', password: 'SecretPass123!' });
+    vault.createSpace({ name: 'Personal', password: 'SecretPass123!', kdfParams: FAST_TEST_KDF_PARAMS });
     const session = vault.unlockSpace('SecretPass123!');
 
     const bobContact: Contact = {
@@ -85,7 +86,7 @@ describe('Phase 45: Contact Profile Media Permissions', () => {
     const store = new EncryptedSpaceStore(storage);
     const contactManager = new ContactManager(store);
 
-    vault.createSpace({ name: 'Personal', password: 'SecretPass123!' });
+    vault.createSpace({ name: 'Personal', password: 'SecretPass123!', kdfParams: FAST_TEST_KDF_PARAMS });
     const session = vault.unlockSpace('SecretPass123!');
 
     const charlieContact: Contact = {

@@ -1338,6 +1338,22 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Achieves complete production messaging UX and real-device validation.
 - **Consequences**: VEIL is certified for production-grade phone-to-phone messaging.
 
+---
+
+## ADR-125: Deterministic Canonical Username Targeted Unlocking & Multi-Account Envelope Binding
+
+- **Date**: 2026-09-01
+- **Status**: Accepted
+- **Context**: On shared or multi-account devices, multiple accounts can be registered with identical passwords. Password-only iteration in `SpaceVaultManager.unlockSpace` resulted in Map iteration collision where whichever account envelope matched first in iteration order unlocked, masking the other account. Furthermore, closing and reopening the app unlocked whichever account was iterated first.
+- **Decision**:
+  1. Bind `canonicalUsername` and `accountId` directly onto `SpaceHeaderEnvelope`.
+  2. Provide `SpaceVaultManager.unlockSpaceByUsername` / `unlockSpaceByUsernameAsync` matching `canonicalUsername` before attempting KEK derivation and MAC verification.
+  3. Include an editable, accessible `Account Username` input field on `LockScreen` pre-filled from `localStorage.getItem('veil:last_username')` and normalized via `trim().toLowerCase().replace(/^@/, '')`.
+  4. Implement `POST /v1/account/change-password` and `AccountManager.changePassword` with local envelope rewrapping and recovery snapshot re-encryption.
+  5. Enforce post-recovery password change flag `veil:account:recovery_security` with a visual security indicator until the password is changed.
+- **Reason**: Guarantees deterministic, collision-free multi-account coexistence on a single device, eliminates account masking, and secures account recovery lifecycles.
+- **Consequences**: Multiple accounts with identical passwords can safely coexist on the same client device without overwriting or hijacking each other. Recovery snapshots reliably restore all spaces and records.
+
 
 
 

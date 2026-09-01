@@ -2,6 +2,48 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase46] - 2026-09-01
+
+### Added
+- **Dedicated Phase 46 Regression Test Suite (`tests/phase46-account-collision-recovery.test.ts`)**:
+  - Validates multi-account coexistence on a single device with identical passwords.
+  - Verifies deterministic targeted unlocking by canonical username (`unlockSpaceByUsername`, `unlockSpaceByUsernameAsync`).
+  - Proves strict account & cryptographic space isolation (no account masking or envelope overtaking).
+  - Tests canonical username normalization across uppercase, whitespace, and leading `@` prefixes (`@Dagmawi`, `DAGMAWI`, ` dagmawi ` -> `dagmawi`).
+  - Verifies multi-account switching and cold restart survival from local storage.
+  - Tests full lifecycle fresh-store cloud recovery restoring all spaces, Ed25519 identity documents byte-for-byte, and encrypted records.
+  - Tests end-to-end password change lifecycle (`POST /v1/account/change-password`, envelope KEK rewrap, recovery snapshot re-encryption).
+  - Verifies old password rejection on both client and cloud server after password change.
+  - Validates post-recovery security indicator banner and persistent requirement flag.
+  - Proves zero secret/credential logging and zero plaintext password persistence in storage.
+- **Server Password Change Route (`src/server/cloud/cloudHandler.ts`, `src/server/cloud/accountService.ts`)**:
+  - `POST /v1/account/change-password` endpoint validating old Argon2id hash, enforcing minimum length 8, and computing fresh 32-byte salt and Argon2id hash.
+- **Client & Manager Password Change API (`src/network/cloudClient.ts`, `src/account/accountManager.ts`)**:
+  - `CloudClient.changePassword(oldPassword, newPassword)`.
+  - `AccountManager.changePassword({ session, oldPassword, newPassword, username, newKdfParams })`.
+- **Targeted Space Unlocking (`src/spaces/vault.ts`, `src/ui/app/sessionController.ts`, `src/ui/app/AppState.tsx`)**:
+  - `SpaceVaultManager.unlockSpaceByUsername` and `unlockSpaceByUsernameAsync`.
+  - `SessionController.unlock(passphrase, username?)`.
+  - `AppState.unlockSpace(passphrase, username?)`.
+
+### Changed
+- **LockScreen Account Selection (`src/ui/components/LockScreen.tsx`)**:
+  - Added editable, accessible `Account Username` input field pre-filled from `localStorage.getItem('veil:last_username')`.
+  - Configured intelligent autofocus (focuses passphrase field if username is pre-filled, or username field if empty).
+- **Multi-Account Creation Isolation (`src/ui/app/AppState.tsx`)**:
+  - Separated lock screen space creation (which registers distinct cloud accounts tagged with canonical username) from active session space creation (which adds spaces to current account).
+- **Cloud Recovery Snapshot Architecture (`src/account/accountManager.ts`)**:
+  - Refreshed all local space records before uploading snapshot and preserved index ordering across space mutations.
+  - Supported `oldPasswordForPreviousSnapshot` parameter during password change to ensure zero space loss when re-encrypting.
+- **Settings & UI Post-Recovery Indicator (`src/ui/components/SettingsModal.tsx`, `src/ui/App.tsx`)**:
+  - Added "Change Account Passphrase" card under Settings -> Privacy & Security.
+  - Added post-recovery security notification banner with `<ShieldIcon size={16} />` across top layout.
+
+### Verification
+- 337 / 337 test files passing (897 / 897 automated tests, 100% clean pass, 0 failures).
+- Web production build passing (`npm run build` in 1.71s).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`./gradlew assembleDebug` BUILD SUCCESSFUL in 18s).
+
 ## [1.0.0-phase44a] - 2026-08-30
 
 ### Added

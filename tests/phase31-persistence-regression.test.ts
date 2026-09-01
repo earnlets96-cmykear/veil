@@ -87,10 +87,10 @@ describe('Phase 31: Persistence Regression & Backend Restart Survival', () => {
       expect(mailboxEntity).toBeTruthy();
       expect(mailboxEntity?.mailboxId).toBe(mailboxId);
 
-      // Verify health check returns database connected
-      const healthRes = await fetch(`${baseUrl}/health`);
+      // Verify readiness check returns database connected
+      const healthRes = await fetch(`${baseUrl}/readyz`);
       const healthData = await healthRes.json();
-      expect(healthData.status).toBe('ok');
+      expect(healthData.status).toBe('ready');
       expect(healthData.database).toBe('connected');
     } finally {
       await server.stop();

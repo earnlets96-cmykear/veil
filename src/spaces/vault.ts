@@ -19,6 +19,8 @@ export interface CreateSpaceOptions {
   kdfParams?: Partial<KdfParameters>;
   spaceId?: string; // Optional custom ID (used for testing or deterministic seeding)
   masterKey?: Uint8Array; // Optional master key (used for recovery/import)
+  canonicalUsername?: string;
+  accountId?: string;
 }
 
 export class SpaceVaultManager {
@@ -53,7 +55,7 @@ export class SpaceVaultManager {
    * and registers the envelope.
    */
   public createSpace(options: CreateSpaceOptions): SpaceHeaderEnvelope {
-    const { name, password, isDecoy = false, kdfParams, spaceId = crypto.randomUUID(), masterKey } = options;
+    const { name, password, isDecoy = false, kdfParams, spaceId = crypto.randomUUID(), masterKey, canonicalUsername, accountId } = options;
 
     if (!password || password.length === 0) {
       throw new Error('Password must not be empty');
@@ -107,6 +109,8 @@ export class SpaceVaultManager {
           ciphertext: bytesToBase64(ciphertext),
         },
         createdAt: Date.now(),
+        canonicalUsername: canonicalUsername ? canonicalUsername.trim().toLowerCase().replace(/^@/, '') : undefined,
+        accountId,
       };
 
       validateSpaceEnvelope(envelope);
@@ -118,6 +122,132 @@ export class SpaceVaultManager {
       zeroize(smk);
       zeroize(saltBytes);
     }
+  }
+
+  /**
+   * Deterministically unlocks a Space belonging to an exact canonical username.
+   * Eliminates password-only account collisions when multiple accounts share the same password.
+   *
+   * @param username The canonical username of the target account
+   * @param password The unlock credential
+   * @returns Active unlocked SpaceSession
+   * @throws Generic error on invalid password or missing matching envelope
+   */
+  public unlockSpaceByUsername(username: string, password: string): SpaceSession {
+    if (!username || username.trim().length === 0) {
+      throw new Error('Unable to unlock Space: empty username');
+    }
+    if (!password || password.length === 0) {
+      throw new Error('Unable to unlock Space: empty password');
+    }
+
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    const candidateEnvelopes = Array.from(this.envelopes.values()).filter(
+      (env) => env.canonicalUsername === cleanUsername
+    );
+
+    if (candidateEnvelopes.length === 0) {
+      throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
+    }
+
+    for (const envelope of candidateEnvelopes) {
+      let candidateKek: Uint8Array | null = null;
+      let decryptedSmk: Uint8Array | null = null;
+
+      try {
+        validateSpaceEnvelope(envelope);
+        candidateKek = deriveKeyArgon2id(password, envelope.kdfParams.salt, envelope.kdfParams);
+
+        const nonceBytes = base64ToBytes(envelope.encryptedMasterKey.nonce);
+        const ciphertextBytes = base64ToBytes(envelope.encryptedMasterKey.ciphertext);
+
+        const aad = computeEnvelopeAad(
+          envelope.spaceId,
+          envelope.version,
+          envelope.encryptedMasterKey.algorithm,
+          envelope.kdfParams.salt
+        );
+
+        decryptedSmk = decryptXChaCha20Poly1305(candidateKek, nonceBytes, ciphertextBytes, aad);
+
+        const session = new SpaceSession(
+          envelope.spaceId,
+          envelope.name,
+          envelope.isDecoy,
+          decryptedSmk
+        );
+
+        this.activeSessions.set(envelope.spaceId, session);
+        return session;
+      } catch (_err) {
+        continue;
+      } finally {
+        if (candidateKek) zeroize(candidateKek);
+        if (decryptedSmk) zeroize(decryptedSmk);
+      }
+    }
+
+    throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
+  }
+
+  /**
+   * Async version of unlockSpaceByUsername that runs Argon2id in a Web Worker.
+   */
+  public async unlockSpaceByUsernameAsync(username: string, password: string): Promise<SpaceSession> {
+    if (!username || username.trim().length === 0) {
+      throw new Error('Unable to unlock Space: empty username');
+    }
+    if (!password || password.length === 0) {
+      throw new Error('Unable to unlock Space: empty password');
+    }
+
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    const candidateEnvelopes = Array.from(this.envelopes.values()).filter(
+      (env) => env.canonicalUsername === cleanUsername
+    );
+
+    if (candidateEnvelopes.length === 0) {
+      throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
+    }
+
+    for (const envelope of candidateEnvelopes) {
+      let candidateKek: Uint8Array | null = null;
+      let decryptedSmk: Uint8Array | null = null;
+
+      try {
+        validateSpaceEnvelope(envelope);
+        candidateKek = await deriveKeyArgon2idAsync(password, envelope.kdfParams.salt, envelope.kdfParams);
+
+        const nonceBytes = base64ToBytes(envelope.encryptedMasterKey.nonce);
+        const ciphertextBytes = base64ToBytes(envelope.encryptedMasterKey.ciphertext);
+
+        const aad = computeEnvelopeAad(
+          envelope.spaceId,
+          envelope.version,
+          envelope.encryptedMasterKey.algorithm,
+          envelope.kdfParams.salt
+        );
+
+        decryptedSmk = decryptXChaCha20Poly1305(candidateKek, nonceBytes, ciphertextBytes, aad);
+
+        const session = new SpaceSession(
+          envelope.spaceId,
+          envelope.name,
+          envelope.isDecoy,
+          decryptedSmk
+        );
+
+        this.activeSessions.set(envelope.spaceId, session);
+        return session;
+      } catch (_err) {
+        continue;
+      } finally {
+        if (candidateKek) zeroize(candidateKek);
+        if (decryptedSmk) zeroize(decryptedSmk);
+      }
+    }
+
+    throw new Error('Unable to unlock Space: invalid credentials or corrupted envelope');
   }
 
   /**

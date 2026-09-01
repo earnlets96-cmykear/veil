@@ -115,6 +115,10 @@ const cloudClient = new CloudClient(appConfig.relayHttpUrl || 'http://127.0.0.1:
 const accountManager = new AccountManager(cloudClient, vault, idMgr, store, storageAdapter);
 const syncEngine = new SyncEngine(store, cloudClient);
 
+export function normalizeUsername(u: string): string {
+  return (u || '').trim().toLowerCase().replace(/^@/, '');
+}
+
 export interface AppContextType {
   storageReady: boolean;
   storageError: string | null;
@@ -125,20 +129,22 @@ export interface AppContextType {
   myProfile: SignedProfileDocument | null;
   activeChatId: string | null;
   messages: Record<string, UIMessage[]>;
-  activeModal: ActiveModal;
+  activeModal: ActiveModal | null;
   networkState: NetworkState;
   knownSpacesCount: number;
   searchResults: SearchResult[];
   searchQuery: string;
   config: AppConfig;
   replyTarget: UIMessage | null;
+  recoveryPasswordChangeRequired: boolean;
 
   privacySettings: UserPrivacySettings;
   updatePrivacySettings: (settings: Partial<UserPrivacySettings>) => Promise<void>;
 
   // Actions
-  unlockSpace: (passphrase: string) => Promise<void>;
+  unlockSpace: (passphrase: string, username?: string) => Promise<void>;
   createSpace: (name: string, passphrase: string, explicitUsername?: string) => Promise<void>;
+  changeAccountPassword: (oldPassword: string, newPassword: string) => Promise<void>;
   restoreAccount: (username: string, password: string) => Promise<void>;
   registerCloudAccount: (username: string, password: string, spaceName?: string) => Promise<void>;
   lockSpace: () => void;
@@ -207,6 +213,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [knownSpacesCount, setKnownSpacesCount] = useState(0);
   const [searchQuery, setSearchQueryState] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [recoveryPasswordChangeRequired, setRecoveryPasswordChangeRequired] = useState(false);
   const cloudCredentials = useRef(new Map<string, string>());
 
   const ensureCloudSession = useCallback(
@@ -308,6 +315,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // 0. Ensure persistent cloud session is active
     await ensureCloudSession(session);
+
+    // 0.1 Check post-recovery security requirements
+    const recoverySec = await store.getAsync<{ recoveryPasswordChangeRequired?: boolean }>(session, 'veil:account:recovery_security');
+    setRecoveryPasswordChangeRequired(!!recoverySec?.recoveryPasswordChangeRequired);
 
     // 1. Load contacts
     const storedContacts = await contactManager.listContacts(session);
@@ -782,25 +793,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [activeSession]);
 
   const unlockSpace = useCallback(
-    async (passphrase: string) => {
-      const session = await sessionController.unlock(passphrase);
+    async (passphrase: string, username?: string) => {
+      const cleanUsername = username ? normalizeUsername(username) : undefined;
+      const session = await sessionController.unlock(passphrase, cleanUsername);
       setActiveSession(session);
       await loadSpaceData(session);
       await ensureCloudSession(session, false, passphrase);
+
+      const profile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
+      const cloudSess = await store.getAsync<any>(session, 'veil:cloud:session');
+      const canonicalU = normalizeUsername(cleanUsername || profile?.username || cloudSess?.username || '');
+      if (canonicalU && typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('veil:last_username', canonicalU);
+        } catch (_e) {}
+      }
     },
     [ensureCloudSession, loadSpaceData]
   );
 
   const createSpace = useCallback(
     async (name: string, passphrase: string, explicitUsername?: string) => {
-      const cleanUsername = (
-        (explicitUsername || name).trim().toLowerCase().replace(/[^a-z0-9_]/g, '') ||
-        `user_${bytesToHex(randomBytes(4))}`
-      ).replace(/^@/, '');
+      const cleanUsername = normalizeUsername(
+        explicitUsername || name || `user_${bytesToHex(randomBytes(4))}`
+      );
 
-      // If fresh install / first space, register account remotely and persist recovery vault fail-closed
-      const knownCount = vault.listEnvelopes().length;
-      if (knownCount === 0) {
+      // If no active session, register a distinct account
+      if (!activeSession) {
         const { session } = await accountManager.registerAccount({
           username: cleanUsername,
           password: passphrase,
@@ -810,7 +829,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setActiveSession(session);
         sessionController.recordUserActivity();
 
-        // Create and persist initial profile with chosen username
         try {
           const loadedId = idMgr.loadIdentity(session, store);
           if (loadedId) {
@@ -833,25 +851,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           username: cleanUsername,
         });
 
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('veil:last_username', cleanUsername);
+          } catch (_e) {}
+        }
+
         await loadSpaceData(session);
         await ensureCloudSession(session, false, passphrase);
         return;
       }
 
-      // If existing device with prior spaces, create additional space envelope and push updated recovery vault
-      await sessionController.createSpace(name, passphrase);
+      // If session is already active, create additional space on the current account
+      const activeCloud = await store.getAsync<any>(activeSession, 'veil:cloud:session');
+      const activeProfile = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:user:profile');
+      const activeUsername = normalizeUsername(activeProfile?.username || activeCloud?.username || cleanUsername);
+      const activeAccountId = activeCloud?.accountId || '';
+
+      await sessionController.createSpace(name, passphrase, false, activeUsername, activeAccountId);
       setKnownSpacesCount(vault.listEnvelopes().length);
-      const session = await sessionController.unlock(passphrase);
+      const session = await sessionController.unlock(passphrase, activeUsername);
       setActiveSession(session);
 
-      // Create and persist initial profile with chosen username
       try {
         const loadedId = idMgr.loadIdentity(session, store);
         if (loadedId) {
           const signedProfile = createSignedProfile(
             loadedId.document.identityId,
             loadedId.signingPrivateKey,
-            cleanUsername,
+            activeUsername,
             name
           );
           await store.setAsync(session, 'veil:user:profile', signedProfile);
@@ -861,17 +889,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await store.setAsync(session, 'veil:cloud:session', {
         sessionToken: cloudClient.getSessionToken() || '',
-        accountId: cloudClient.getAccountId() || '',
+        accountId: activeAccountId,
         deviceId: cloudClient.getDeviceId() || '',
         expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        username: cleanUsername,
+        username: activeUsername,
       });
 
       await loadSpaceData(session);
       await ensureCloudSession(session, false, passphrase);
-      await accountManager.createOrUpdateRecoveryVault(session, passphrase, cleanUsername);
+      await accountManager.createOrUpdateRecoveryVault(session, passphrase, activeUsername);
     },
-    [ensureCloudSession, loadSpaceData]
+    [activeSession, ensureCloudSession, loadSpaceData]
+  );
+
+  const changeAccountPassword = useCallback(
+    async (oldPassword: string, newPassword: string) => {
+      if (!activeSession) throw new Error('No active Space session');
+      const profile = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:user:profile');
+      const cloudSess = await store.getAsync<any>(activeSession, 'veil:cloud:session');
+      const username = normalizeUsername(profile?.username || cloudSess?.username || '');
+      await accountManager.changePassword({
+        session: activeSession,
+        oldPassword,
+        newPassword,
+        username,
+      });
+      setRecoveryPasswordChangeRequired(false);
+    },
+    [activeSession]
   );
 
   const lockSpace = useCallback(() => {
@@ -1729,7 +1774,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const restoreAccount = useCallback(
     async (username: string, password: string) => {
-      const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+      const cleanUsername = normalizeUsername(username);
       const { session } = await accountManager.restoreAccount({
         username: cleanUsername,
         password,
@@ -1737,6 +1782,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setActiveSession(session);
       sessionController.recordUserActivity();
       setKnownSpacesCount(vault.listEnvelopes().length);
+      setRecoveryPasswordChangeRequired(true);
 
       // Rehydrate user profile with recovered username
       try {
@@ -1760,6 +1806,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
         username: cleanUsername,
       });
+
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('veil:last_username', cleanUsername);
+        } catch (_e) {}
+      }
 
       await loadSpaceData(session);
       await ensureCloudSession(session, false, password);
@@ -2244,8 +2296,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     searchQuery,
     config: appConfig,
     replyTarget,
+    recoveryPasswordChangeRequired,
     unlockSpace,
     createSpace,
+    changeAccountPassword,
     restoreAccount,
     registerCloudAccount,
     lockSpace,

@@ -69,12 +69,55 @@ export const SettingsModal: React.FC = () => {
     updatePrivacySettings,
     registerUsername,
     lockSpace,
+    changeAccountPassword,
   } = useApp();
 
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('overview');
+
+  // Password Change State
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword || passwordChangeLoading) return;
+    if (newPassword.length < 8) {
+      setPasswordChangeError('New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeError('New passwords do not match.');
+      return;
+    }
+    if (oldPassword === newPassword) {
+      setPasswordChangeError('New password must be different from current password.');
+      return;
+    }
+
+    setPasswordChangeLoading(true);
+    setPasswordChangeError(null);
+    setPasswordChangeSuccess(null);
+
+    try {
+      await changeAccountPassword(oldPassword, newPassword);
+      setPasswordChangeSuccess('Password changed successfully! Local keys rewrapped and recovery vault updated.');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      showToast({ type: 'success', message: 'Password updated successfully!' });
+    } catch (err: any) {
+      setPasswordChangeError(err.message || 'Failed to change password. Verify your current password.');
+    } finally {
+      setPasswordChangeLoading(false);
+    }
+  };
 
   // Profile Form State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -546,6 +589,75 @@ export const SettingsModal: React.FC = () => {
           {/* 4. PRIVACY & SECURITY SUB-PAGE */}
           {activeCategory === 'privacy' && (
             <div className="veil-settings-subpage">
+              {/* Change Passphrase Card */}
+              <div className="veil-card" style={{ marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  Change Account Passphrase
+                </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  Rewraps your Space Master Key locally with Argon2id &amp; XChaCha20, updates cloud authentication, and re-encrypts your zero-knowledge recovery vault.
+                </p>
+
+                <form onSubmit={handleChangePasswordSubmit}>
+                  {passwordChangeError && (
+                    <div className="veil-alert veil-alert-danger" role="alert" style={{ marginBottom: '0.75rem' }}>
+                      <AlertCircleIcon size={16} />
+                      <span>{passwordChangeError}</span>
+                    </div>
+                  )}
+                  {passwordChangeSuccess && (
+                    <div className="veil-alert veil-alert-success" role="alert" style={{ marginBottom: '0.75rem', backgroundColor: 'var(--veil-accent-primary-subtle)', color: 'var(--veil-accent-primary)', border: '1px solid var(--veil-accent-primary-alpha)', padding: '0.65rem 0.85rem', borderRadius: 'var(--veil-radius-sm)', fontSize: 'var(--veil-text-xs)' }}>
+                      <span>{passwordChangeSuccess}</span>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-secondary)', marginBottom: '0.35rem' }}>
+                      Current Passphrase
+                    </label>
+                    <PasswordInput
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      placeholder="Current passphrase"
+                      required
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-secondary)', marginBottom: '0.35rem' }}>
+                      New Passphrase (min 8 chars)
+                    </label>
+                    <PasswordInput
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="New passphrase"
+                      required
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-secondary)', marginBottom: '0.35rem' }}>
+                      Confirm New Passphrase
+                    </label>
+                    <PasswordInput
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new passphrase"
+                      required
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    loading={passwordChangeLoading}
+                    disabled={passwordChangeLoading || !oldPassword || !newPassword || !confirmPassword}
+                  >
+                    Change Passphrase
+                  </Button>
+                </form>
+              </div>
+
               <div className="veil-card">
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
                   Inactivity Auto-Lock

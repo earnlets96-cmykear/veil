@@ -59,6 +59,24 @@ export class CloudHandler {
         this.sendJson(res, 200, { success: true });
         return true;
       }
+      if (pathname === '/v1/account/change-password' && method === 'POST') {
+        const body = await this.parseJsonBody(req);
+        if (!body?.oldPassword || !body?.newPassword) {
+          this.sendJson(res, 400, { error: 'Missing oldPassword or newPassword' });
+          return true;
+        }
+        try {
+          await this.accountService.changePassword({
+            accountId: account.accountId,
+            oldPassword: body.oldPassword,
+            newPassword: body.newPassword,
+          });
+          this.sendJson(res, 200, { success: true });
+        } catch (err: any) {
+          this.sendJson(res, 400, { error: err.message || 'Failed to change password' });
+        }
+        return true;
+      }
       if (pathname === '/v1/account/devices' && method === 'GET') {
         const devices = await this.db.listDevices(account.accountId);
         this.sendJson(res, 200, { devices });

@@ -27,6 +27,8 @@ export interface SpaceHeaderEnvelope {
   kdfParams: KdfParameters;
   encryptedMasterKey: EncryptedEnvelope;
   createdAt: number;
+  canonicalUsername?: string;
+  accountId?: string;
 }
 
 export interface IdentityDocument {

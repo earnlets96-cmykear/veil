@@ -212,6 +212,10 @@ export class CloudClient {
     this.setSession(null, null, null);
   }
 
+  public async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await this.request('/v1/account/change-password', 'POST', { oldPassword, newPassword });
+  }
+
   public async listDevices(): Promise<DeviceEntity[]> {
     const res = await this.request<{ devices: DeviceEntity[] }>('/v1/account/devices', 'GET');
     return res.devices;

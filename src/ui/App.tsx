@@ -15,9 +15,10 @@ import { ContactDetailsModal } from './components/ContactDetailsModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
+import { ShieldIcon } from './components/icons/index.ts';
 
 export const App: React.FC = () => {
-  const { activeSession, activeChatId, activeModal } = useApp();
+  const { activeSession, activeChatId, activeModal, recoveryPasswordChangeRequired, openModal } = useApp();
 
   React.useEffect(() => {
     try {
@@ -40,6 +41,49 @@ export const App: React.FC = () => {
 
   return (
     <div className={`veil-app-layout ${activeChatId ? 'has-active-chat' : ''}`}>
+      {recoveryPasswordChangeRequired && (
+        <div
+          className="veil-recovery-banner"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            backgroundColor: 'var(--veil-accent-primary)',
+            color: '#ffffff',
+            padding: '0.6rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            fontSize: 'var(--veil-text-xs)',
+            fontWeight: 500,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ShieldIcon size={16} />
+            <span>Account recovered — set a new password to secure this device.</span>
+          </div>
+          <button
+            type="button"
+            className="veil-button veil-button-secondary veil-button-sm"
+            onClick={() => openModal({ type: 'settings' })}
+            style={{
+              backgroundColor: '#ffffff',
+              color: 'var(--veil-accent-primary)',
+              border: 'none',
+              fontWeight: 600,
+              padding: '0.25rem 0.75rem',
+              borderRadius: 'var(--veil-radius-sm)',
+              cursor: 'pointer',
+            }}
+          >
+            Change Password
+          </button>
+        </div>
+      )}
       <Sidebar />
       <ConversationView />
 

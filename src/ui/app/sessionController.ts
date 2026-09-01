@@ -60,11 +60,14 @@ export class SessionController {
   }
 
   /**
-   * Unlocks a Space using credential-selected envelope authentication.
+   * Unlocks a Space using credential-selected envelope authentication,
+   * optionally targeting a specific canonical username to prevent multi-account password collisions.
    */
-  public async unlock(passphrase: string): Promise<SpaceSession> {
+  public async unlock(passphrase: string, username?: string): Promise<SpaceSession> {
     // 1. Unlock session via SpaceVaultManager (async to keep UI responsive)
-    const session = await this.vault.unlockSpaceAsync(passphrase);
+    const session = username && username.trim().length > 0
+      ? await this.vault.unlockSpaceByUsernameAsync(username, passphrase)
+      : await this.vault.unlockSpaceAsync(passphrase);
 
     // 2. Load persisted encrypted partition from storage adapter
     await this.store.loadPartitionFromStorage(session);
@@ -83,8 +86,14 @@ export class SessionController {
   /**
    * Creates a new isolated Space and persists its envelope to storage.
    */
-  public async createSpace(name: string, passphrase: string, isDecoy = false): Promise<{ spaceId: string }> {
-    const envelope = this.vault.createSpace({ name, password: passphrase, isDecoy });
+  public async createSpace(
+    name: string,
+    passphrase: string,
+    isDecoy = false,
+    canonicalUsername?: string,
+    accountId?: string
+  ): Promise<{ spaceId: string }> {
+    const envelope = this.vault.createSpace({ name, password: passphrase, isDecoy, canonicalUsername, accountId });
     await this.vault.saveEnvelopeToStorage(envelope, this.storageAdapter);
     return { spaceId: envelope.spaceId };
   }

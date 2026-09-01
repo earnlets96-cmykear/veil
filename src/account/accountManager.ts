@@ -101,6 +101,7 @@ export class AccountManager {
       name: spaceName,
       password,
       kdfParams: activeKdfParams,
+      canonicalUsername: cleanUsername,
     });
     await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
 
@@ -123,6 +124,10 @@ export class AccountManager {
       deviceKeyAgreementPub: identityDoc.keyAgreementPublicKey,
     });
 
+    // Tag envelope with accountId and save
+    spaceHeader.accountId = regResult.account.accountId;
+    await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
+
     // 4. Store a zero-knowledge v2 snapshot after authenticated registration.
     await this.createOrUpdateRecoveryVault(session, password, cleanUsername, activeKdfParams);
 
@@ -133,7 +138,7 @@ export class AccountManager {
         accountId: regResult.account.accountId,
         deviceId: regResult.device.deviceId,
         expiresAt: regResult.session.expiresAt,
-        username: username.toLowerCase(),
+        username: cleanUsername,
       });
     }
 
@@ -243,6 +248,8 @@ export class AccountManager {
         password,
         masterKey: recoveredMasterKey,
         kdfParams: params.customKdfParams || kdfParams,
+        canonicalUsername: cleanUsername,
+        accountId: restoreRes.account.accountId,
       });
 
       await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
@@ -265,6 +272,8 @@ export class AccountManager {
               password,
               masterKey,
               kdfParams: params.customKdfParams || kdfParams,
+              canonicalUsername: cleanUsername,
+              accountId: restoreRes.account.accountId,
             });
             await this.vault.saveEnvelopeToStorage(header, this.storageAdapter);
             const restoredSpace = this.vault.unlockSpace(password, header.spaceId);
@@ -289,6 +298,12 @@ export class AccountManager {
         });
       }
 
+      // 6. Set post-recovery password change required flag
+      this.store.set(session, 'veil:account:recovery_security', {
+        recoveryPasswordChangeRequired: true,
+        restoredAt: Date.now(),
+      });
+
       RuntimeDiagnostics.recovery('spaceRestoredSuccess', {
         spaceId: session.spaceId,
         restoredSpaces: snapshot ? snapshot.spaces.length : 1,
@@ -305,13 +320,64 @@ export class AccountManager {
   }
 
   /**
+   * Changes the user's password end-to-end:
+   * 1. Updates password on cloud backend.
+   * 2. Rewraps all local Space envelopes for this account.
+   * 3. Saves updated envelopes to persistent storage.
+   * 4. Re-encrypts and uploads recovery vault snapshot under new password.
+   * 5. Clears post-recovery password change requirement.
+   */
+  public async changePassword(params: {
+    session: SpaceSession;
+    oldPassword: string;
+    newPassword: string;
+    username: string;
+    newKdfParams?: Partial<KdfParameters>;
+  }): Promise<void> {
+    const { session, oldPassword, newPassword, username } = params;
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error('New password must be at least 8 characters long');
+    }
+
+    // 1. Update password on cloud backend (if session is authenticated)
+    if (this.cloudClient.hasAuthenticatedSession()) {
+      await this.cloudClient.changePassword(oldPassword, newPassword);
+    }
+
+    // 2. Rewrap all local space envelopes for this account
+    const allEnvelopes = this.vault.listEnvelopes().filter((env) => {
+      if (env.canonicalUsername) {
+        return env.canonicalUsername === cleanUsername;
+      }
+      return env.spaceId === session.spaceId;
+    });
+
+    for (const env of allEnvelopes) {
+      const updatedEnv = this.vault.changePassword(env.spaceId, oldPassword, newPassword, params.newKdfParams);
+      await this.vault.saveEnvelopeToStorage(updatedEnv, this.storageAdapter);
+    }
+
+    // 3. Re-encrypt and push recovery snapshot under new password
+    await this.createOrUpdateRecoveryVault(session, newPassword, cleanUsername, params.newKdfParams, oldPassword);
+
+    // 4. Clear recoveryPasswordChangeRequired in store
+    this.store.set(session, 'veil:account:recovery_security', {
+      recoveryPasswordChangeRequired: false,
+      updatedAt: Date.now(),
+    });
+  }
+
+  /**
    * Pushes/refreshes a zero-knowledge recovery vault for an existing Space session.
    */
   public async createOrUpdateRecoveryVault(
     session: SpaceSession,
     password: string,
     username: string,
-    customKdfParams?: Partial<KdfParameters>
+    customKdfParams?: Partial<KdfParameters>,
+    oldPasswordForPreviousSnapshot?: string
   ): Promise<void> {
     const loadedId = this.idMgr.loadIdentity(session, this.store);
     if (!loadedId) {
@@ -336,17 +402,37 @@ export class AccountManager {
         const blob = JSON.parse(previous.encryptedVaultBlob);
         if (blob.format === 'VEIL-RECOVERY-SNAPSHOT-v2') {
           const oldParams: KdfParameters = typeof previous.kdfParams === 'string' ? JSON.parse(previous.kdfParams) : previous.kdfParams;
-          const oldKek = deriveKeyArgon2id(password, base64ToBytes(oldParams.salt), oldParams);
+          const prevPassword = oldPasswordForPreviousSnapshot || password;
+          const oldKek = deriveKeyArgon2id(prevPassword, base64ToBytes(oldParams.salt), oldParams);
           try {
-            const bytes = decryptXChaCha20Poly1305(oldKek, base64ToBytes(blob.nonce), base64ToBytes(blob.ciphertext), new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${username.trim().toLowerCase().replace(/^@/, '')}`));
+            const bytes = decryptXChaCha20Poly1305(
+              oldKek,
+              base64ToBytes(blob.nonce),
+              base64ToBytes(blob.ciphertext),
+              new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${username.trim().toLowerCase().replace(/^@/, '')}`)
+            );
             const previousSnapshot = JSON.parse(new TextDecoder().decode(bytes)) as RecoverySnapshotV2;
-            if (previousSnapshot.version === 2 && Array.isArray(previousSnapshot.spaces)) priorSpaces = previousSnapshot.spaces;
-          } finally { zeroize(oldKek); }
+            if (previousSnapshot.version === 2 && Array.isArray(previousSnapshot.spaces)) {
+              priorSpaces = previousSnapshot.spaces;
+            }
+          } finally {
+            zeroize(oldKek);
+          }
         }
       }
     } catch (_e) {
       // A missing or legacy snapshot is safely replaced by the current v2 snapshot.
     }
+    // Refresh records for all prior spaces from local storage adapter
+    for (const pSpace of priorSpaces) {
+      try {
+        const freshRecords = await this.storageAdapter.listRecords(pSpace.spaceId);
+        if (freshRecords && freshRecords.length > 0) {
+          pSpace.encryptedRecords = freshRecords;
+        }
+      } catch (_e) {}
+    }
+
     const currentSpace: RecoverySnapshotV2Space = {
       spaceId: session.spaceId,
       spaceName: session.name,
@@ -356,10 +442,20 @@ export class AccountManager {
       keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
       encryptedRecords: await this.storageAdapter.listRecords(session.spaceId),
     };
+
+    const existingIdx = priorSpaces.findIndex((s) => s.spaceId === session.spaceId);
+    let finalSpaces: RecoverySnapshotV2Space[];
+    if (existingIdx >= 0) {
+      finalSpaces = [...priorSpaces];
+      finalSpaces[existingIdx] = currentSpace;
+    } else {
+      finalSpaces = [...priorSpaces, currentSpace];
+    }
+
     const backupPayload: RecoverySnapshotV2 = {
       version: 2,
       createdAt: Date.now(),
-      spaces: [...priorSpaces.filter((space) => space.spaceId !== session.spaceId), currentSpace],
+      spaces: finalSpaces,
     };
 
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');

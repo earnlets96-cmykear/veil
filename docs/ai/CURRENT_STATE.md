@@ -1,45 +1,44 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 45E (Final Media + Reply Runtime Forensic Repair)
+## Current Verified Phase: PHASE 46 (Account Identity Collision, Password Change & Recovery Persistence Forensic Repair)
 - **Status**: **COMPLETE & VERIFIED 100%**
 - **Branch**: `main`
-- **Phase 45E Test Results**: **7 / 7 test files passing (19 / 19 automated tests, 100% clean pass)**
-- **Full Phase 45 Regression Suites**: **25 test files / 80 tests passing (100% clean pass)**
-- **Full Test Suite**: **334 test files / 881 tests passing (100% clean pass)**
-- **Web App Build**: **PASS (`npm run build` in 1.95s)**
+- **Phase 46 Test Results**: **`tests/phase46-account-collision-recovery.test.ts` (6 comprehensive suites / 17 security scenarios, 100% clean pass)**
+- **Full Test Suite**: **337 test files / 897 automated tests passing (100% clean pass)**
+- **Web App Build**: **PASS (`npm run build` in 1.71s)**
 - **Release Manifest**: **PASS (`node scripts/release-build.mjs` - 6 artifacts)**
-- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.20s)**
-- **Android APK Build**: **PASS (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 20s)**
+- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.14s)**
+- **Android APK Build**: **PASS (`./gradlew assembleDebug` BUILD SUCCESSFUL in 18s)**
 - **Physical Android Verification**: **USER PHYSICAL TEST — User to perform manual physical device verification**
 
 ---
 
-## Phase 45E Verified Deliverables & Forensic Fixes
+## Phase 46 Verified Deliverables & Forensic Fixes
 
-1. **Persistent Reply Stale-Closure & Rendering Fix**:
-   - Implemented `replyTargetRef` in `src/ui/app/AppState.tsx` synchronized with `replyTarget` state.
-   - Guaranteed `sendMessage`, `sendAttachments`, and `sendVoiceMessage` always capture real-time active reply without stale React closures dropping quotes.
-   - Enhanced `src/styles/veil-components.css` with high-contrast Telegram-style quoted reply rendering for outgoing and incoming messages.
+1. **Deterministic Account Selection & Password Collision Elimination**:
+   - Extended `SpaceHeaderEnvelope` with `canonicalUsername` and `accountId`.
+   - Added `SpaceVaultManager.unlockSpaceByUsername` and `unlockSpaceByUsernameAsync` matching `canonicalUsername` before attempting KEK derivation and MAC verification.
+   - Updated `LockScreen.tsx` with an editable, normalized Username input field pre-filled from `localStorage.getItem('veil:last_username')` and focusing on the passphrase field when pre-filled.
+   - Enforced canonical username normalization (`trim` -> `toLowerCase` -> remove leading `@`).
 
-2. **Attachment & Voice Note Recipient Authorization ("Not Found" Fix)**:
-   - Fixed `targetUsername` resolution in `src/ui/app/AppState.tsx` to handle `@`-trimmed usernames, canonical identity IDs, and fallback display names.
-   - Updated `cloudClient.createAttachment` and `VoiceRecorder.encryptAndUploadVoiceNote` to pass `recipientUsername`, `recipientAccountId`, and `recipientIdentityId`.
-   - Updated `src/server/cloud/cloudHandler.ts` `handleAttachmentDownload` to authorize downloads by matching `recipientUsername`, `recipientAccountId`, or `recipientIdentityId`.
+2. **Local Multi-Account Coexistence Without Overtaking**:
+   - Updated `AppState.tsx` `createSpace` to distinguish between adding spaces to an existing cloud session versus creating new distinct accounts from the lock screen.
+   - Multiple accounts with identical passphrases coexist in local storage with 100% isolation; each account's data, SMK, and records remain completely separate and unmasked.
 
-3. **Audio Playback & Physical Seeking State Machine**:
-   - Verified physical seeking in `src/attachments/voicePlayer.ts` setting `audio.currentTime` directly with safe duration boundary checks.
-   - Verified ephemeral Object URL lifecycle (retained during playback, revoked strictly on `stop()` or when new audio starts).
-   - Ensured single-audio mutex playback state.
+3. **Cloud Recovery Snapshot Architecture & Live Persistence**:
+   - Snapshot format: `VEIL-RECOVERY-SNAPSHOT-v2` encrypted with Argon2id + XChaCha20-Poly1305 and bound via AAD `VEIL-RECOVERY-SNAPSHOT-v2|user:${canonicalUsername}`.
+   - Enhanced `AccountManager.createOrUpdateRecoveryVault` to preserve space index ordering and refresh encrypted records for all local spaces of that account from storage before upload.
+   - Verified fresh-store recovery restores all spaces, Ed25519 identity documents byte-for-byte, and encrypted partition records.
 
-4. **Video Upload Pipeline & Player State Machine**:
-   - Enforced zero-leak wire serialization (`toWireAttachment`, `toWireReplyReference`, `assertWireSafe`).
-   - Implemented sleek video playback controls and scrubbing state machine in `src/ui/components/media/MediaViewer.tsx`.
+4. **End-to-End Password Change Lifecycle**:
+   - Backend route: `POST /v1/account/change-password` verifying old Argon2id hash, enforcing 8-character minimum, and generating fresh 32-byte salt and hash.
+   - Client flow: `AccountManager.changePassword` updates server auth hash, rewraps local space envelopes via `vault.changePassword`, and re-encrypts the zero-knowledge recovery snapshot using `newPassword`.
+   - Old password is unconditionally rejected on both client and server; new password unlocks all spaces and allows cloud login and fresh-store recovery.
 
-5. **Phase 45E Test Suites**:
-   - `tests/phase45e-audio-runtime.test.ts`
-   - `tests/phase45e-video-upload-runtime.test.ts`
-   - `tests/phase45e-video-player.test.tsx`
-   - `tests/phase45e-reply-end-to-end.test.ts`
-   - `tests/phase45e-reply-rendering.test.tsx`
-   - `tests/phase45e-attachment-integrity.test.ts`
-   - `tests/phase45e-runtime-redaction.test.ts`
+5. **Post-Recovery Password Change Requirement**:
+   - `AccountManager.restoreAccount` persists `veil:account:recovery_security` with `recoveryPasswordChangeRequired: true`.
+   - `App.tsx` renders a sleek, non-intrusive post-recovery security banner with `<ShieldIcon size={16} />` and action button to change password.
+   - Changing password resets `recoveryPasswordChangeRequired` to `false` and persists state.
+
+6. **Regression Test Suites**:
+   - `tests/phase46-account-collision-recovery.test.ts` (6 comprehensive suites verifying all 17 security mandates).

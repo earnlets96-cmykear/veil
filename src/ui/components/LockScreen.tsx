@@ -26,6 +26,13 @@ import {
 
 export const LockScreen: React.FC = () => {
   const { unlockSpace, openModal, panicLock, storageReady, storageError } = useApp();
+  const [username, setUsername] = useState(() => {
+    try {
+      return (typeof localStorage !== 'undefined' ? localStorage.getItem('veil:last_username') : null) || '';
+    } catch (_e) {
+      return '';
+    }
+  });
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loadingPhase, setLoadingPhase] = useState<'idle' | 'deriving' | 'loading_data'>('idle');
@@ -45,15 +52,20 @@ export const LockScreen: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    if (!cleanUsername) {
+      setError('Please enter your account username.');
+      return;
+    }
     if (!passphrase.trim() || loadingPhase !== 'idle') return;
 
     setError(null);
     setLoadingPhase('deriving');
 
     try {
-      await unlockSpace(passphrase);
+      await unlockSpace(passphrase, cleanUsername);
     } catch (_err: any) {
-      setError('Invalid passphrase or Space envelope not found.');
+      setError('Invalid username or passphrase.');
       setPassphrase('');
       setLoadingPhase('idle');
     }
@@ -174,6 +186,35 @@ export const LockScreen: React.FC = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label
+              htmlFor="username-input"
+              style={{
+                display: 'block',
+                fontSize: 'var(--veil-text-xs)',
+                fontWeight: 600,
+                color: 'var(--veil-text-secondary)',
+                marginBottom: '0.5rem',
+                letterSpacing: '0.03em',
+              }}
+            >
+              Account Username
+            </label>
+            <input
+              id="username-input"
+              type="text"
+              className="veil-input"
+              placeholder="e.g. dagmawi"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
+              autoFocus={!username}
+              required
+              aria-label="Account username"
+              style={{ width: '100%' }}
+            />
+          </div>
+
           <div style={{ marginBottom: '1.25rem' }}>
             <label
               htmlFor="passphrase-input"
@@ -193,7 +234,7 @@ export const LockScreen: React.FC = () => {
               value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
               disabled={isLoading}
-              autoFocus
+              autoFocus={!!username}
               required
               aria-label="Space passphrase"
             />

@@ -255,6 +255,47 @@ export class AccountService {
   }
 
   /**
+   * Changes an account's authentication password after verifying the existing password.
+   */
+  public async changePassword(params: {
+    accountId: string;
+    oldPassword: string;
+    newPassword: string;
+  }): Promise<void> {
+    const account = await this.db.getAccountById(params.accountId);
+    if (!account) {
+      throw new Error('Account not found');
+    }
+
+    if (!params.oldPassword) {
+      throw new Error('Current password is required');
+    }
+
+    const salt = base64ToBytes(account.authSalt);
+    const computedOldHash = await this.hashPassword(params.oldPassword, salt);
+    const match = constantTimeEquals(
+      new TextEncoder().encode(account.authHash),
+      new TextEncoder().encode(computedOldHash)
+    );
+    if (!match) {
+      throw new Error('Invalid current password');
+    }
+
+    if (!params.newPassword || params.newPassword.length < 8) {
+      throw new Error('New password must be at least 8 characters long');
+    }
+
+    const newSalt = randomBytes(32);
+    const newHash = await this.hashPassword(params.newPassword, newSalt);
+
+    account.authHash = newHash;
+    account.authSalt = bytesToBase64(newSalt);
+    account.updatedAt = Date.now();
+
+    await this.db.updateAccount(account);
+  }
+
+  /**
    * Performs authentication recovery (password reset with valid recovery anchor).
    */
   public async resetPasswordWithRecoveryAnchor(params: {
