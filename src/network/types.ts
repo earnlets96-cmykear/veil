@@ -46,6 +46,8 @@ export interface QueuedOutboundEnvelope {
   retryCount: number;
   lastAttemptAt?: number;
   errorMessage?: string;
+  messageId?: string;
+  conversationId?: string;
 }
 
 export interface QueuedInboundEnvelope {

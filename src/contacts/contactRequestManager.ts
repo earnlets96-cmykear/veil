@@ -383,7 +383,9 @@ export class ContactRequestManager {
     }
 
     // Also mark contact as BLOCKED if present
-    await this.contactManager.blockContact(session, identityId);
+    if (this.contactManager && typeof this.contactManager.blockContact === 'function') {
+      await this.contactManager.blockContact(session, identityId);
+    }
 
     // Update request state to BLOCKED
     const requests = await this.listRequests(session);
@@ -403,7 +405,9 @@ export class ContactRequestManager {
     blocklist = blocklist.filter((id) => id !== identityId);
     await this.store.setAsync(session, BLOCKLIST_STORAGE_KEY, blocklist);
 
-    await this.contactManager.unblockContact(session, identityId);
+    if (this.contactManager && typeof this.contactManager.unblockContact === 'function') {
+      await this.contactManager.unblockContact(session, identityId);
+    }
   }
 
   /**

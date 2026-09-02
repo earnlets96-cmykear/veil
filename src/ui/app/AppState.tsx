@@ -91,6 +91,7 @@ import { readReceiptManager } from '../../messaging/readReceipts.ts';
 import { inferMediaMime } from '../../attachments/mimeUtils.ts';
 import { presenceManager } from '../../presence/presenceManager.ts';
 import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
+import { DeletedMessageTombstone } from '../../storage/types.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -144,6 +145,10 @@ export interface AppContextType {
 
   privacySettings: UserPrivacySettings;
   updatePrivacySettings: (settings: Partial<UserPrivacySettings>) => Promise<void>;
+
+  muteSettings: Record<string, boolean>;
+  isConversationMuted: (conversationId: string) => boolean;
+  toggleMuteConversation: (conversationId: string) => Promise<boolean>;
 
   // Actions
   unlockSpace: (passphrase: string, username?: string) => Promise<void>;
@@ -218,6 +223,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchQuery, setSearchQueryState] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [recoveryPasswordChangeRequired, setRecoveryPasswordChangeRequired] = useState(false);
+  const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
   const cloudCredentials = useRef(new Map<string, string>());
   const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
   const syncTimeoutRef = useRef<any>(null);
@@ -237,6 +243,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }, 500);
   }, []);
+
+  const isConversationMuted = useCallback(
+    (conversationId: string): boolean => {
+      return !!muteSettings[conversationId];
+    },
+    [muteSettings]
+  );
+
+  const toggleMuteConversation = useCallback(
+    async (conversationId: string): Promise<boolean> => {
+      if (!activeSession) return false;
+      const nextVal = !muteSettings[conversationId];
+      const updated = { ...muteSettings, [conversationId]: nextVal };
+      setMuteSettings(updated);
+      if (nextVal) {
+        notificationDispatcher.muteConversation(conversationId);
+      } else {
+        notificationDispatcher.unmuteConversation(conversationId);
+      }
+      await store.setAsync(activeSession, 'veil:contacts:mute_settings', updated);
+      scheduleCloudSync(activeSession);
+      return nextVal;
+    },
+    [activeSession, muteSettings, scheduleCloudSync]
+  );
 
   const ensureCloudSession = useCallback(
     async (session: SpaceSession, forceReauth = false, customPassword?: string): Promise<boolean> => {
@@ -382,6 +413,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     setPrivacySettings(storedPrivacy);
 
+    // 4.1 Load conversation mute settings
+    const storedMute = (await store.getAsync<Record<string, boolean>>(session, 'veil:contacts:mute_settings')) || {};
+    setMuteSettings(storedMute);
+    const mutedList = Object.keys(storedMute).filter((id) => storedMute[id]);
+    notificationDispatcher.setMutedConversations(mutedList);
+
     // 5. Load message history
     const storedMsgs = (await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages')) || {};
     setMessages(storedMsgs);
@@ -419,6 +456,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (identity && rawUsername && binding) {
         const username = normalizeUsername(rawUsername);
+        let resolvedAvatar = storedProfile?.avatar || undefined;
+        if (!resolvedAvatar) {
+          try {
+            const dirProfile = await directoryClient.getProfileByUsername(username);
+            if (dirProfile?.avatar) {
+              resolvedAvatar = dirProfile.avatar;
+            }
+          } catch (_dpErr) {}
+        }
+
         const prekeyBundle = prekeyManager.createPrekeyBundle(session);
         const autoProfile = createSignedProfile(
           identity.document.identityId,
@@ -427,18 +474,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           storedProfile?.displayName || username,
           binding.mailboxId,
           prekeyBundle,
-          storedProfile?.avatar || undefined
+          storedProfile?.bio || undefined,
+          resolvedAvatar
         );
         try {
           await directoryClient.registerProfile(autoProfile);
         } catch (_dErr) {}
         await store.setAsync(session, 'veil:user:profile', autoProfile);
         setMyProfile(autoProfile);
+        if (resolvedAvatar && !storedPrivacy.avatar) {
+          storedPrivacy.avatar = resolvedAvatar;
+          await store.setAsync(session, 'veil:user:privacy_settings', storedPrivacy);
+          setPrivacySettings(storedPrivacy);
+        }
       }
     } catch (_e) {}
 
     // 8. Connect NetworkManager for real-time WebSocket delivery & sync
     try {
+      // Wire outbound queue flush listener for monotonic status updates
+      netManager.onOutboundFlushed = ({ messageId, conversationId }) => {
+        if (!messageId) return;
+        setMessages((prev) => {
+          let didMutate = false;
+          const updated = { ...prev };
+          for (const [cId, list] of Object.entries(updated)) {
+            if (conversationId && cId !== conversationId) continue;
+            const idx = list.findIndex((m) => m.id === messageId);
+            if (idx !== -1) {
+              const currentStatus = list[idx].status;
+              if (currentStatus === 'QUEUED' || currentStatus === 'SENDING' || currentStatus === 'FAILED') {
+                const newList = [...list];
+                newList[idx] = { ...newList[idx], status: 'SENT_TO_RELAY' };
+                updated[cId] = newList;
+                didMutate = true;
+              }
+            }
+          }
+          if (didMutate) {
+            store.setAsync(session, 'veil:ui:messages', updated);
+            scheduleCloudSync(session);
+            return updated;
+          }
+          return prev;
+        });
+      };
+
       await netManager.startListening(session, async (payload) => {
         // Check for Contact Requests or Responses
         try {
@@ -516,6 +597,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const result = await convManager.processInboundWirePayload(session, payload);
           const { storedMessage, senderDoc, senderMailboxId, attachment, attachments, replyTo, voice, receipt } = result;
 
+          // Phase 55 P0-2: Check blocking immediately
+          const isSenderBlocked = await contactRequestManager.isBlocked(session, senderDoc.identityId);
+          const currentContacts = await contactManager.listContacts(session);
+          let matchingContact = currentContacts.find(
+            (c) => c.identityId === storedMessage.conversationId || c.identityId === senderDoc.identityId
+          );
+
+          if (isSenderBlocked || matchingContact?.status === 'BLOCKED') {
+            RuntimeDiagnostics.receive('blockedMessageDropped', {
+              senderId: senderDoc.identityId,
+              conversationId: storedMessage.conversationId,
+              messageId: storedMessage.messageId,
+            });
+            return;
+          }
+
           if (receipt) {
             setMessages((prev) => {
               const { updatedMessages, didChange } = readReceiptManager.processInboundReceipt(
@@ -556,10 +653,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             objectIds: incomingAttachments?.map((a: any) => a.objectId) || (attachment ? [attachment.objectId] : []),
           });
 
-          const currentContacts = await contactManager.listContacts(session);
-          let matchingContact = currentContacts.find(
-            (c) => c.identityId === incomingMsg.conversationId || c.identityId === senderDoc.identityId
-          );
+          if (!matchingContact) {
+            matchingContact = currentContacts.find(
+              (c) => c.identityId === incomingMsg.conversationId || c.identityId === senderDoc.identityId
+            );
+          }
 
           if (senderMailboxId && (!matchingContact || !matchingContact.mailboxId)) {
             try {
@@ -658,9 +756,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
           });
 
-          // Dispatch notification
+          // Dispatch notification (honors muted conversations)
           notificationDispatcher.dispatch({
             id: incomingMsg.id,
+            conversationId: incomingMsg.conversationId,
             senderName: matchingContact?.name || senderDoc.identityId.slice(0, 8),
             text: incomingMsg.text,
             timestamp: Date.now(),
@@ -677,6 +776,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           try {
             const parsed = JSON.parse(payload);
             if (parsed && parsed.conversationId && (parsed.text || parsed.attachment || parsed.voice)) {
+              const isBlocked = (await contactRequestManager.isBlocked(session, parsed.senderId)) ||
+                (await contactRequestManager.isBlocked(session, parsed.conversationId));
+              if (isBlocked) return;
+
               const incomingMsg: UIMessage = {
                 id: parsed.id || `msg_${Date.now()}`,
                 conversationId: parsed.conversationId,
@@ -700,6 +803,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
               notificationDispatcher.dispatch({
                 id: incomingMsg.id,
+                conversationId: incomingMsg.conversationId,
                 senderName: parsed.senderName || 'Peer',
                 text: parsed.text,
                 timestamp: Date.now(),
@@ -1148,6 +1252,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (conversationId: string, text: string) => {
       if (!activeSession || !text.trim()) return;
 
+      // Phase 55 P0-2: Check if recipient is blocked
+      const isBlocked = (await contactRequestManager.isBlocked(activeSession, conversationId)) ||
+        contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
+      if (isBlocked) {
+        throw new Error('Cannot send message: this user is blocked. Unblock them to resume messaging.');
+      }
+
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
@@ -1253,7 +1364,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           targetContact?.name,
         ].filter(Boolean) as string[]);
 
-        await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+        await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+          messageId: msgId,
+          conversationId,
+        });
 
         setMessages((prev) => {
           const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
@@ -1308,6 +1422,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       options?: { allowSave?: boolean; allowForward?: boolean }
     ) => {
       if (!activeSession || files.length === 0) return;
+
+      // Phase 55 P0-2: Check if recipient is blocked
+      const isBlocked = (await contactRequestManager.isBlocked(activeSession, conversationId)) ||
+        contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
+      if (isBlocked) {
+        throw new Error('Cannot send attachments: this user is blocked. Unblock them to resume messaging.');
+      }
+
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
@@ -1662,7 +1784,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
             }
 
-            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+              messageId: msgId,
+              conversationId,
+            });
 
             RuntimeDiagnostics.wire('wireDispatched', {
               msgId,
@@ -1707,6 +1832,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const sendVoiceMessage = useCallback(
     async (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => {
       if (!activeSession) return;
+
+      // Phase 55 P0-2: Check if recipient is blocked
+      const isBlocked = (await contactRequestManager.isBlocked(activeSession, conversationId)) ||
+        contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
+      if (isBlocked) {
+        throw new Error('Cannot send voice note: this user is blocked. Unblock them to resume messaging.');
+      }
+
       sessionController.recordUserActivity();
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -1807,7 +1940,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             });
           }
 
-          await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+          await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+            messageId: msgId,
+            conversationId,
+          });
 
           setMessages((prev) => {
             const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
@@ -1846,6 +1982,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!activeSession) return;
       sessionController.recordUserActivity();
 
+      // Phase 55 P0-1: Record deletion tombstone in encrypted space store
+      const tombstone: DeletedMessageTombstone = {
+        messageId,
+        conversationId,
+        deletedAt: Date.now(),
+      };
+      const existingTombstones = (await store.getAsync<DeletedMessageTombstone[]>(activeSession, 'veil:ui:deleted_messages')) || [];
+      const updatedTombstones = [...existingTombstones.filter((t) => t.messageId !== messageId), tombstone];
+      await store.setAsync(activeSession, 'veil:ui:deleted_messages', updatedTombstones);
+
       setMessages((prev) => {
         const list = prev[conversationId] || [];
         const filtered = list.filter((m) => m.id !== messageId);
@@ -1871,8 +2017,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
+
+      scheduleCloudSync(activeSession);
     },
-    [activeSession, contacts, conversations, messages]
+    [activeSession, contacts, conversations, messages, scheduleCloudSync]
   );
 
   const deleteMessagesLocally = useCallback(
@@ -1880,6 +2028,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!activeSession || messageIds.length === 0) return;
       sessionController.recordUserActivity();
       const idSet = new Set(messageIds);
+
+      // Phase 55 P0-1: Record deletion tombstones in encrypted space store
+      const now = Date.now();
+      const newTombstones: DeletedMessageTombstone[] = messageIds.map((id) => ({
+        messageId: id,
+        conversationId,
+        deletedAt: now,
+      }));
+      const existingTombstones = (await store.getAsync<DeletedMessageTombstone[]>(activeSession, 'veil:ui:deleted_messages')) || [];
+      const updatedTombstones = [
+        ...existingTombstones.filter((t) => !idSet.has(t.messageId)),
+        ...newTombstones,
+      ];
+      await store.setAsync(activeSession, 'veil:ui:deleted_messages', updatedTombstones);
 
       setMessages((prev) => {
         const list = prev[conversationId] || [];
@@ -1906,8 +2068,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
+
+      scheduleCloudSync(activeSession);
     },
-    [activeSession, contacts, conversations, messages]
+    [activeSession, contacts, conversations, messages, scheduleCloudSync]
   );
 
   const retryFailedMessage = useCallback(
@@ -2274,9 +2438,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // 1. Always persist profile and privacy settings locally first (offline-first resilience)
       await store.setAsync(activeSession, 'veil:user:profile', profile);
       if (bio !== undefined || avatar !== undefined) {
-        await updatePrivacySettings({ bio, avatar });
+        await updatePrivacySettings({ bio, avatar: avatarToUse });
       }
       setMyProfile(profile);
+      scheduleCloudSync(activeSession);
 
       // 2. Attempt cloud directory registration
       let cloudSyncPending = false;
@@ -2301,7 +2466,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         cloudSyncPending,
       };
     },
-    [activeSession, myProfile, privacySettings, updatePrivacySettings]
+    [activeSession, myProfile, privacySettings, updatePrivacySettings, scheduleCloudSync]
   );
 
   const searchDirectory = useCallback(
@@ -2471,6 +2636,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     myProfile,
     privacySettings,
     updatePrivacySettings,
+    muteSettings,
+    isConversationMuted,
+    toggleMuteConversation,
     activeChatId,
     messages,
     activeModal,

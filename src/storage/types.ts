@@ -15,6 +15,12 @@ export interface StoredRecord {
   updatedAt: number;
 }
 
+export interface DeletedMessageTombstone {
+  messageId: string;
+  conversationId: string;
+  deletedAt: number;
+}
+
 export interface StorageMetadata {
   key: 'storage_metadata';
   schemaVersion: number;

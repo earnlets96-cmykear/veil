@@ -11,4 +11,5 @@ export interface NotificationEvent {
   isGroup?: boolean;
   groupName?: string;
   timestamp: number;
+  conversationId?: string;
 }

@@ -44,6 +44,7 @@ export class NetworkManager {
   private messageHandlers = new Map<string, (payload: string) => Promise<void>>();
   private stateListeners: ((state: NetworkState) => void)[] = [];
   private lastKnownState: NetworkState = 'offline';
+  public onOutboundFlushed?: (flushed: { queueId: string; messageId?: string; conversationId?: string }) => void;
 
   constructor(store: EncryptedSpaceStore, config: Partial<NetworkConfig> = {}) {
     this.store = store;
@@ -139,7 +140,8 @@ export class NetworkManager {
     session: SpaceSession,
     targetMailboxId: string,
     payload: string,
-    ttlSeconds?: number
+    ttlSeconds?: number,
+    metadata?: { messageId?: string; conversationId?: string }
   ): Promise<QueuedOutboundEnvelope> {
     this.assertSession(session);
 
@@ -153,6 +155,8 @@ export class NetworkManager {
       status: 'QUEUED',
       createdAt: Date.now(),
       retryCount: 0,
+      messageId: metadata?.messageId,
+      conversationId: metadata?.conversationId,
     };
 
     // 1. Always persist to encrypted outbound queue first (crash safety)
@@ -166,6 +170,13 @@ export class NetworkManager {
       // Successfully accepted by relay -> remove from outbound queue
       await this.queue.removeOutbound(session, queueId);
       item.status = 'SENT_TO_RELAY';
+      if (this.onOutboundFlushed) {
+        this.onOutboundFlushed({
+          queueId,
+          messageId: metadata?.messageId,
+          conversationId: metadata?.conversationId,
+        });
+      }
       if (typeof console !== 'undefined' && console.debug) {
         console.debug(`[VEIL-NET] Outbound: queueId=${queueId.slice(0, 8)}, mailbox=${maskMailbox(targetMailboxId)}, transport=http, state=SENT_TO_RELAY`);
       }
@@ -197,6 +208,13 @@ export class NetworkManager {
         await this.http.sendEnvelope(item.mailboxId, item.payload, item.ttlSeconds);
         await this.queue.removeOutbound(session, item.queueId);
         flushedCount++;
+        if (this.onOutboundFlushed) {
+          this.onOutboundFlushed({
+            queueId: item.queueId,
+            messageId: item.messageId,
+            conversationId: item.conversationId,
+          });
+        }
         if (typeof console !== 'undefined' && console.debug) {
           console.debug(`[VEIL-NET] Outbound flush: queueId=${item.queueId.slice(0, 8)}, mailbox=${maskMailbox(item.mailboxId)}, state=SENT_TO_RELAY`);
         }

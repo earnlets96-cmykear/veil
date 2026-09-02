@@ -113,14 +113,28 @@ export class CloudHandler {
           this.sendJson(res, 400, { error: 'Missing encryptedVaultBlob or kdfParams' });
           return true;
         }
+
+        if (body.expectedUpdatedAt !== undefined) {
+          const current = await this.db.getRecoveryState(account.accountId);
+          if (current && current.updatedAt !== body.expectedUpdatedAt) {
+            this.sendJson(res, 409, {
+              error: 'CONCURRENCY_CONFLICT',
+              message: 'Recovery vault has been updated by another device.',
+              currentUpdatedAt: current.updatedAt,
+            });
+            return true;
+          }
+        }
+
+        const newUpdatedAt = Date.now();
         await this.db.saveRecoveryState({
           accountId: account.accountId,
           recoveryId: `rec_${bytesToHex(randomBytes(8))}`,
           encryptedVaultBlob: body.encryptedVaultBlob,
           kdfParams: typeof body.kdfParams === 'string' ? body.kdfParams : JSON.stringify(body.kdfParams),
-          updatedAt: Date.now(),
+          updatedAt: newUpdatedAt,
         });
-        this.sendJson(res, 200, { success: true });
+        this.sendJson(res, 200, { success: true, updatedAt: newUpdatedAt });
         return true;
       }
       if (pathname === '/v1/account/recovery/vault/get' && method === 'GET') {

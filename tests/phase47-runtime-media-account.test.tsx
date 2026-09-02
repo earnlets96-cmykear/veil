@@ -415,10 +415,10 @@ describe('Phase 47 Forensic Runtime Verification', () => {
       </ToastProvider>
     );
 
-    // Assert Header & Primary Actions exist
+    // Assert Header & Primary Actions exist (Phase 55: Call button removed)
     expect(html).toContain('Message');
     expect(html).toContain('Mute');
-    expect(html).toContain('Call');
+    expect(html).not.toContain('Call');
     expect(html).toContain('Safety');
 
     // Assert Identity info

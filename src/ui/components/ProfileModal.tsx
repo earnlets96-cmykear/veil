@@ -42,7 +42,6 @@ import {
   FileAudioIcon,
   MicIcon,
   LinkIcon,
-  PhoneIcon,
   MessageSquareIcon,
   BellIcon,
   BellOffIcon,
@@ -84,6 +83,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     directoryClient,
     idMgr,
     store,
+    isConversationMuted,
+    toggleMuteConversation,
   } = useApp();
 
   const { showToast } = useToast();
@@ -100,7 +101,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const [copiedUsername, setCopiedUsername] = useState(false);
   const [copiedFingerprint, setCopiedFingerprint] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isMuted, setIsMuted] = useState(Boolean(peerConv?.isMuted));
 
   // Self Profile Form State
   const [isEditing, setIsEditing] = useState(false);
@@ -127,6 +127,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const loadedIdentity = activeSession ? idMgr.loadIdentity(activeSession, store) : null;
 
   const effectiveIdentityId = peerId || searchResult?.identityId || peerContact?.identityId || peerDoc?.identityId;
+  const isMuted = (effectiveIdentityId && typeof isConversationMuted === 'function') ? isConversationMuted(effectiveIdentityId) : false;
   const effectiveUsername = (
     searchResult?.username ||
     peerUsername ||
@@ -285,9 +286,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     setErrorMessage(null);
 
     try {
-      if (cleanUsername !== myProfile?.username) {
-        await registerUsername(cleanUsername, displayNameInput.trim() || undefined);
-      }
+      await registerUsername(
+        cleanUsername,
+        displayNameInput.trim() || undefined,
+        bioInput.trim() || undefined,
+        avatarPreview || undefined
+      );
 
       await updatePrivacySettings({
         bio: bioInput.trim() || undefined,
@@ -331,19 +335,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     }
   };
 
-  const handleToggleMute = () => {
-    setIsMuted(!isMuted);
-    showToast({
-      type: 'info',
-      message: !isMuted ? `Muted notifications from ${effectiveDisplayName}` : `Unmuted notifications from ${effectiveDisplayName}`,
-    });
-  };
-
-  const handleCall = () => {
-    showToast({
-      type: 'info',
-      message: 'Secure E2EE voice call initiated...',
-    });
+  const handleToggleMute = async () => {
+    if (!effectiveIdentityId) return;
+    if (typeof toggleMuteConversation === 'function') {
+      const nowMuted = await toggleMuteConversation(effectiveIdentityId);
+      showToast({
+        type: 'info',
+        message: nowMuted ? `Muted notifications from ${effectiveDisplayName}` : `Unmuted notifications from ${effectiveDisplayName}`,
+      });
+    }
   };
 
   const handleOpenSafetyNumberModal = () => {
@@ -517,12 +517,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           </div>
         </div>
 
-        {/* 2. Primary Actions Bar: Message | Mute | Call | More */}
+        {/* 2. Primary Actions Bar: Message | Mute | Safety */}
         {isPeer && relState !== 'BLOCKED' && (
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
+              gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '6px',
               padding: '0.75rem 1rem',
               backgroundColor: 'var(--veil-bg-surface)',
@@ -547,16 +547,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
             >
               {isMuted ? <BellOffIcon size={18} color="var(--veil-text-muted)" /> : <BellIcon size={18} color="var(--veil-accent-primary)" />}
               <span style={{ fontSize: '0.72rem' }}>{isMuted ? 'Unmute' : 'Mute'}</span>
-            </button>
-
-            <button
-              type="button"
-              className="veil-btn veil-btn-secondary"
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '0.5rem 0.25rem', height: 'auto' }}
-              onClick={handleCall}
-            >
-              <PhoneIcon size={18} color="var(--veil-accent-primary)" />
-              <span style={{ fontSize: '0.72rem' }}>Call</span>
             </button>
 
             <button

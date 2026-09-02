@@ -2,7 +2,46 @@
 
 All notable changes to the VEIL project are documented in this file.
 
-## [1.0.0-phase53] - 2026-09-02
+## [1.0.0-phase55] - 2026-09-02
+
+### Added & Fixed (P0 Forensic Hardening)
+- **Local Delete Cloud Anti-Resurrection Architecture (`src/storage/types.ts`, `src/ui/app/AppState.tsx`, `src/account/accountManager.ts`)**:
+  - Implemented `DeletedMessageTombstone` interface recording `{ messageId, conversationId, deletedAt }`.
+  - Persisted tombstones under `'veil:ui:deleted_messages'` in `deleteMessageLocally` and `deleteMessagesLocally`.
+  - Triggered immediate `scheduleCloudSync(activeSession)` upon local message deletion.
+  - Integrated tombstone reconciliation into `AccountManager.mergeRecordsForSpace` to prune deleted messages during cloud snapshot merges.
+- **Active Conversation Inbound/Outbound Blocking Enforcement (`src/ui/app/AppState.tsx`, `src/contacts/contactRequestManager.ts`)**:
+  - Wired real-time blocked check in `AppState.tsx` inbound wire message listener: immediately drops messages from blocked senders.
+  - Enforced outbound check in `sendMessage`, `sendAttachments`, and `sendVoiceMessage` to prevent sending to blocked recipients.
+  - Added safe optional chaining in `ContactRequestManager.blockUser` and `unblockUser`.
+- **Persistent Chat Mute & Notification Suppression (`src/notifications/types.ts`, `src/notifications/notificationDispatcher.ts`, `src/ui/app/AppState.tsx`, `src/ui/components/ProfileModal.tsx`)**:
+  - Added `conversationId?: string` to `NotificationEvent`.
+  - Implemented `mutedConversations: Set<string>`, `muteConversation()`, `unmuteConversation()`, and `isConversationMuted()` in `NotificationDispatcher`.
+  - Suppressed notifications in `prepareNotification()` if the event's `conversationId` is muted.
+  - Stored persistent mute settings under `'veil:contacts:mute_settings'` in `AppState.tsx`.
+  - Connected `ProfileModal.tsx` directly to `isConversationMuted` and `toggleMuteConversation`.
+- **Deceptive Call Button Removal & Action Bar Polish (`src/ui/components/ProfileModal.tsx`)**:
+  - Removed mock `handleCall` handler and `PhoneIcon` button from `ProfileModal.tsx`.
+  - Refactored primary actions bar to a clean 3-button grid (`repeat(3, 1fr)`): Message, Mute/Unmute, and Safety Number.
+- **Offline Outbound Queue Flush Monotonic Synchronization (`src/network/types.ts`, `src/network/networkManager.ts`, `src/ui/app/AppState.tsx`)**:
+  - Added `messageId` and `conversationId` metadata to `QueuedOutboundEnvelope`.
+  - Added `onOutboundFlushed` event callback to `NetworkManager` for both online transmission and offline queue drainage.
+  - Connected `onOutboundFlushed` in `AppState.tsx` to advance UI message statuses monotonically (`FAILED`/`QUEUED`/`SENDING` -> `SENT_TO_RELAY`) without regressing higher states (`DELIVERED` or `READ`).
+- **Deterministic Multi-Device Snapshot Concurrency Deep Merge (`src/account/accountManager.ts`, `src/network/cloudClient.ts`, `src/server/cloud/cloudHandler.ts`)**:
+  - Implemented `AccountManager.mergeRecordsForSpace` for deterministic deep union of messages, conversations, contacts, mute settings, and tombstones.
+  - Added optimistic concurrency check (`expectedUpdatedAt`) in `CloudClient.setRecoveryVault` and `cloudHandler.ts` returning HTTP 409 Conflict.
+- **Profile Data & Picture Persistence Hardening (`src/network/cloudClient.ts`, `src/ui/components/ProfileModal.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Enforced local token validation in `CloudClient.uploadAttachment` and `downloadAttachment` to reject malformed bearer tokens before network emission.
+  - Updated `handleSaveProfile` to always register and publish signed profile updates.
+  - Added directory avatar hydration fallback in `AppState.loadSpaceData`.
+- **Automated Regression Suite (`tests/phase55-forensic-p0.test.ts`)**:
+  - 7 automated tests validating tombstones, blocking, mute suppression, call button removal, queue flush events, concurrency merge, and avatar signatures.
+
+### Verification
+- 348 test files / 963 automated tests passing (100% clean pass).
+- Real live production probe against `https://veil-rga0.onrender.com` passed 100% (`scratch/verify_phase55_prod.mjs` verifying multi-device sync, OCC, and fresh restore across 3 devices).
+- Production web bundle build passing (`npm run build` in 2.19s).
+- Native Android debug APK assembled cleanly via Gradle wrapper (`./gradlew assembleDebug` BUILD SUCCESSFUL in 22s).
 
 ### Added
 - **Direct Binary Streaming Media Pipeline (`src/server/cloud/cloudHandler.ts`, `src/network/cloudClient.ts`)**:

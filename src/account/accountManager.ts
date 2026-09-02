@@ -536,13 +536,37 @@ export class AccountManager {
     } catch (_e) {
       // A missing or legacy snapshot is safely replaced by the current v2 snapshot.
     }
-    // Refresh records for all prior spaces from local storage adapter
+
+    const existingIdx = priorSpaces.findIndex((s) => s.spaceId === session.spaceId);
+    let remoteRecordsForSessionSpace: StoredRecord[] = [];
+    if (existingIdx >= 0) {
+      remoteRecordsForSessionSpace = priorSpaces[existingIdx].encryptedRecords || [];
+    }
+
+    // Refresh records for any other prior spaces from local storage adapter if present
     for (const pSpace of priorSpaces) {
+      if (pSpace.spaceId === session.spaceId) continue;
       try {
         const freshRecords = await this.storageAdapter.listRecords(pSpace.spaceId);
         if (freshRecords && freshRecords.length > 0) {
           pSpace.encryptedRecords = freshRecords;
         }
+      } catch (_e) {}
+    }
+
+    // Perform deterministic deep merge between local records and remote snapshot records
+    const localRecords = await this.storageAdapter.listRecords(session.spaceId);
+    let finalMergedRecords = localRecords;
+
+    if (remoteRecordsForSessionSpace.length > 0) {
+      finalMergedRecords = this.mergeRecordsForSpace(session, localRecords, remoteRecordsForSessionSpace);
+
+      // Persist merged records locally into storage adapter and in-memory store
+      for (const rec of finalMergedRecords) {
+        await this.storageAdapter.saveRecord(session.spaceId, rec);
+      }
+      try {
+        await this.store.loadPartitionFromStorage(session);
       } catch (_e) {}
     }
 
@@ -553,10 +577,9 @@ export class AccountManager {
       identityDocument: loadedId.document,
       signingPrivateKeyBase64: bytesToBase64(loadedId.signingPrivateKey),
       keyAgreementPrivateKeyBase64: bytesToBase64(loadedId.keyAgreementPrivateKey),
-      encryptedRecords: await this.storageAdapter.listRecords(session.spaceId),
+      encryptedRecords: finalMergedRecords,
     };
 
-    const existingIdx = priorSpaces.findIndex((s) => s.spaceId === session.spaceId);
     let finalSpaces: RecoverySnapshotV2Space[];
     if (existingIdx >= 0) {
       finalSpaces = [...priorSpaces];
@@ -588,6 +611,234 @@ export class AccountManager {
     });
 
     await this.cloudClient.setRecoveryVault(encryptedVaultBlob, kdfConfig);
+  }
+
+  /**
+   * Deterministically merges local and remote encrypted partition records for a Space.
+   * Ensures message status monotonicity, applies tombstones (anti-resurrection),
+   * and merges conversations, contacts, mute settings, blocklists, and profiles.
+   */
+  private mergeRecordsForSpace(
+    session: SpaceSession,
+    localRecords: StoredRecord[],
+    remoteRecords: StoredRecord[]
+  ): StoredRecord[] {
+    const storageKey = session.getStorageKey();
+    const localMap = new Map<string, StoredRecord>(localRecords.map((r) => [r.key, r]));
+    const remoteMap = new Map<string, StoredRecord>(remoteRecords.map((r) => [r.key, r]));
+    const allKeys = new Set<string>([...localMap.keys(), ...remoteMap.keys()]);
+    const mergedRecords: StoredRecord[] = [];
+
+    const decryptRec = <T>(rec: StoredRecord): T | null => {
+      try {
+        const nonce = base64ToBytes(rec.nonce);
+        const ciphertext = base64ToBytes(rec.ciphertext);
+        const bytes = decryptXChaCha20Poly1305(storageKey, nonce, ciphertext);
+        const text = new TextDecoder().decode(bytes);
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          return text as unknown as T;
+        }
+      } catch {
+        return null;
+      }
+    };
+
+    const encryptRec = (key: string, val: unknown, updatedAt: number): StoredRecord => {
+      const text = typeof val === 'string' ? val : JSON.stringify(val);
+      const { nonce, ciphertext } = encryptXChaCha20Poly1305(storageKey, text);
+      return {
+        spaceId: session.spaceId,
+        key,
+        nonce: bytesToBase64(nonce),
+        ciphertext: bytesToBase64(ciphertext),
+        updatedAt,
+      };
+    };
+
+    // 1. Gather all tombstones from local and remote
+    const localTombstonesRec = localMap.get('veil:ui:deleted_messages');
+    const remoteTombstonesRec = remoteMap.get('veil:ui:deleted_messages');
+    const localTombstones = (localTombstonesRec ? decryptRec<any[]>(localTombstonesRec) : null) || [];
+    const remoteTombstones = (remoteTombstonesRec ? decryptRec<any[]>(remoteTombstonesRec) : null) || [];
+    const tombstoneMap = new Map<string, number>();
+
+    for (const t of [...localTombstones, ...remoteTombstones]) {
+      if (t?.messageId) {
+        const existing = tombstoneMap.get(t.messageId) || 0;
+        tombstoneMap.set(t.messageId, Math.max(existing, Number(t.deletedAt) || 0));
+      }
+    }
+
+    const mergedTombstonesList = Array.from(tombstoneMap.entries()).map(([messageId, deletedAt]) => ({
+      messageId,
+      deletedAt,
+    }));
+
+    // Status ranking for strict forward monotonicity
+    const statusRank: Record<string, number> = {
+      FAILED: 0,
+      QUEUED: 1,
+      SENDING: 2,
+      SENT_TO_RELAY: 3,
+      DELIVERED: 4,
+      DELIVERED_TO_RECIPIENT: 4,
+      READ: 5,
+    };
+
+    for (const key of allKeys) {
+      if (key === 'veil:ui:deleted_messages') {
+        mergedRecords.push(
+          encryptRec(key, mergedTombstonesList, Date.now())
+        );
+        continue;
+      }
+
+      const localRec = localMap.get(key);
+      const remoteRec = remoteMap.get(key);
+
+      if (!remoteRec && localRec) {
+        mergedRecords.push(localRec);
+        continue;
+      }
+      if (!localRec && remoteRec) {
+        mergedRecords.push(remoteRec);
+        continue;
+      }
+
+      if (localRec && remoteRec) {
+        if (key === 'veil:ui:messages') {
+          const localMessages = decryptRec<Record<string, any[]>>(localRec) || {};
+          const remoteMessages = decryptRec<Record<string, any[]>>(remoteRec) || {};
+          const mergedMessages: Record<string, any[]> = {};
+
+          const convIds = new Set([...Object.keys(localMessages), ...Object.keys(remoteMessages)]);
+          for (const convId of convIds) {
+            const lList = Array.isArray(localMessages[convId]) ? localMessages[convId] : [];
+            const rList = Array.isArray(remoteMessages[convId]) ? remoteMessages[convId] : [];
+            const msgMap = new Map<string, any>();
+
+            for (const m of [...lList, ...rList]) {
+              if (!m?.id) continue;
+              const tombstoneDelAt = tombstoneMap.get(m.id);
+              if (tombstoneDelAt !== undefined && tombstoneDelAt >= (Number(m.timestamp) || 0)) {
+                // Tombstone exists: skip message
+                continue;
+              }
+
+              const existing = msgMap.get(m.id);
+              if (!existing) {
+                msgMap.set(m.id, m);
+              } else {
+                const existingRank = statusRank[existing.status] ?? 0;
+                const newRank = statusRank[m.status] ?? 0;
+                const winnerStatus = newRank >= existingRank ? m.status : existing.status;
+                const mergedMsg = {
+                  ...existing,
+                  ...m,
+                  status: winnerStatus,
+                  attachment: m.attachment || existing.attachment,
+                  attachments: m.attachments || existing.attachments,
+                  voice: m.voice || existing.voice,
+                  replyTo: m.replyTo || existing.replyTo,
+                };
+                msgMap.set(m.id, mergedMsg);
+              }
+            }
+
+            const sorted = Array.from(msgMap.values()).sort(
+              (a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)
+            );
+            mergedMessages[convId] = sorted;
+          }
+
+          mergedRecords.push(
+            encryptRec(key, mergedMessages, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key === 'veil:ui:conversations') {
+          const localConvs = decryptRec<any[]>(localRec) || [];
+          const remoteConvs = decryptRec<any[]>(remoteRec) || [];
+          const convMap = new Map<string, any>();
+
+          for (const c of [...localConvs, ...remoteConvs]) {
+            if (!c?.id) continue;
+            const existing = convMap.get(c.id);
+            if (!existing) {
+              convMap.set(c.id, c);
+            } else {
+              const keepNew = (Number(c.timestamp) || 0) >= (Number(existing.timestamp) || 0);
+              convMap.set(c.id, {
+                ...existing,
+                ...c,
+                lastMessage: keepNew ? (c.lastMessage ?? existing.lastMessage) : (existing.lastMessage ?? c.lastMessage),
+                timestamp: Math.max(Number(existing.timestamp) || 0, Number(c.timestamp) || 0),
+                unreadCount: keepNew ? (c.unreadCount ?? existing.unreadCount) : (existing.unreadCount ?? c.unreadCount),
+                avatar: c.avatar || existing.avatar,
+                name: c.name || existing.name,
+              });
+            }
+          }
+
+          mergedRecords.push(
+            encryptRec(key, Array.from(convMap.values()), Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key === 'veil:contacts:list') {
+          const localContacts = decryptRec<any[]>(localRec) || [];
+          const remoteContacts = decryptRec<any[]>(remoteRec) || [];
+          const contactMap = new Map<string, any>();
+
+          for (const ct of [...localContacts, ...remoteContacts]) {
+            if (!ct?.identityId) continue;
+            const existing = contactMap.get(ct.identityId);
+            if (!existing) {
+              contactMap.set(ct.identityId, ct);
+            } else {
+              const isVerified = existing.verificationStatus === 'VERIFIED' || ct.verificationStatus === 'VERIFIED';
+              const isBlocked = existing.status === 'BLOCKED' || ct.status === 'BLOCKED';
+              contactMap.set(ct.identityId, {
+                ...existing,
+                ...ct,
+                verificationStatus: isVerified ? 'VERIFIED' : (ct.verificationStatus || existing.verificationStatus),
+                status: isBlocked ? 'BLOCKED' : (ct.status || existing.status),
+                avatar: ct.avatar || existing.avatar,
+                name: ct.name || existing.name,
+              });
+            }
+          }
+
+          mergedRecords.push(
+            encryptRec(key, Array.from(contactMap.values()), Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key === 'veil:contacts:mute_settings') {
+          const localMute = decryptRec<Record<string, boolean>>(localRec) || {};
+          const remoteMute = decryptRec<Record<string, boolean>>(remoteRec) || {};
+          const mergedMute = { ...remoteMute, ...localMute };
+          mergedRecords.push(
+            encryptRec(key, mergedMute, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key === 'veil:blocklist:list') {
+          const localBlock = decryptRec<string[]>(localRec) || [];
+          const remoteBlock = decryptRec<string[]>(remoteRec) || [];
+          const mergedBlock = Array.from(new Set([...localBlock, ...remoteBlock]));
+          mergedRecords.push(
+            encryptRec(key, mergedBlock, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key === 'veil:user:profile') {
+          const localProf = decryptRec<any>(localRec);
+          const remoteProf = decryptRec<any>(remoteRec);
+          const winner = ((Number(localProf?.issuedAt) || 0) >= (Number(remoteProf?.issuedAt) || 0)) ? localProf : remoteProf;
+          mergedRecords.push(
+            encryptRec(key, winner, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else {
+          const winnerRec = localRec.updatedAt >= remoteRec.updatedAt ? localRec : remoteRec;
+          mergedRecords.push(winnerRec);
+        }
+      }
+    }
+
+    return mergedRecords;
   }
 }
 

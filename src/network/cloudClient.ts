@@ -229,8 +229,12 @@ export class CloudClient {
     await this.request('/v1/account/devices/revoke', 'POST', { deviceId });
   }
 
-  public async setRecoveryVault(encryptedVaultBlob: string, kdfParams: any): Promise<void> {
-    await this.request('/v1/account/recovery/vault/set', 'POST', { encryptedVaultBlob, kdfParams }, 60000);
+  public async setRecoveryVault(
+    encryptedVaultBlob: string,
+    kdfParams: any,
+    expectedUpdatedAt?: number
+  ): Promise<{ success: boolean; updatedAt?: number }> {
+    return await this.request('/v1/account/recovery/vault/set', 'POST', { encryptedVaultBlob, kdfParams, expectedUpdatedAt }, 60000);
   }
 
   public async getRecoveryVault(): Promise<RecoveryStateEntity | null> {
@@ -298,6 +302,7 @@ export class CloudClient {
   }
 
   public async uploadAttachment(objectId: string, rawCiphertext: Uint8Array): Promise<void> {
+    this.requireAuthenticatedSession();
     const timeoutMs = Math.max(180000, Math.ceil(rawCiphertext.length / 50000) * 1000);
     const computedHash = bytesToHex(sha256(rawCiphertext));
 
@@ -348,6 +353,7 @@ export class CloudClient {
   }
 
   public async downloadAttachment(objectId: string): Promise<Uint8Array> {
+    this.requireAuthenticatedSession();
     const timeoutMs = 180000;
 
     // Try raw binary download first

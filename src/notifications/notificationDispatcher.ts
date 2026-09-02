@@ -10,9 +10,26 @@ import { NotificationEvent, NotificationPrivacyMode } from './types.ts';
 export class NotificationDispatcher {
   private privacyMode: NotificationPrivacyMode = 'SENDER_ONLY';
   private isLocked = false;
+  private mutedConversations = new Set<string>();
 
   constructor(initialMode: NotificationPrivacyMode = 'SENDER_ONLY') {
     this.privacyMode = initialMode;
+  }
+
+  public setMutedConversations(mutedIds: string[] | Set<string>): void {
+    this.mutedConversations = new Set(mutedIds);
+  }
+
+  public isConversationMuted(conversationId: string): boolean {
+    return this.mutedConversations.has(conversationId);
+  }
+
+  public muteConversation(conversationId: string): void {
+    this.mutedConversations.add(conversationId);
+  }
+
+  public unmuteConversation(conversationId: string): void {
+    this.mutedConversations.delete(conversationId);
   }
 
   public setPrivacyMode(mode: NotificationPrivacyMode): void {
@@ -33,6 +50,11 @@ export class NotificationDispatcher {
   public prepareNotification(event: NotificationEvent): { title: string; body: string } | null {
     if (this.isLocked) {
       // Locked space suppresses all plaintext/sender notifications
+      return null;
+    }
+
+    if (event.conversationId && this.mutedConversations.has(event.conversationId)) {
+      // Suppressed because conversation is muted
       return null;
     }
 
