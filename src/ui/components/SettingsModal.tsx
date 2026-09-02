@@ -223,17 +223,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     setProfileError(null);
 
     try {
+      const avatarToPass = avatarPreview !== null ? (avatarPreview || undefined) : '';
       await updatePrivacySettings({
         phoneNumber: phoneInput.trim() || undefined,
         bio: bioInput.trim() || undefined,
-        avatar: avatarPreview || undefined,
+        avatar: avatarToPass,
       });
 
       await registerUsername(
         usernameInput.trim(),
         displayNameInput.trim() || undefined,
         bioInput.trim() || undefined,
-        avatarPreview || undefined
+        avatarToPass
       );
 
       showToast({ type: 'success', message: 'Profile successfully updated and published!' });

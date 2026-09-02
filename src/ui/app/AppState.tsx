@@ -181,6 +181,7 @@ export interface AppContextType {
 
   // Phase 23 & Phase 32 Actions
   registerUsername: (username: string, displayName?: string, bio?: string, avatar?: string) => Promise<SignedProfileDocument>;
+  deleteAvatar: () => Promise<void>;
   searchDirectory: (query: string) => Promise<DirectorySearchResult[]>;
   sendContactRequest: (targetUsername: string, greeting?: string) => Promise<void>;
   acceptContactRequest: (requestId: string) => Promise<void>;
@@ -456,8 +457,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       if (identity && rawUsername && binding) {
         const username = normalizeUsername(rawUsername);
-        let resolvedAvatar = storedProfile?.avatar || undefined;
-        if (!resolvedAvatar) {
+        const avatarTombstone = await store.getAsync<{ deletedAt: number }>(session, 'veil:avatar:tombstone');
+        const isAvatarDeleted = avatarTombstone && avatarTombstone.deletedAt >= (storedProfile?.issuedAt || 0);
+
+        let resolvedAvatar = isAvatarDeleted ? undefined : (storedProfile?.avatar || storedPrivacy?.avatar || undefined);
+        if (!resolvedAvatar && !isAvatarDeleted) {
           try {
             const dirProfile = await directoryClient.getProfileByUsername(username);
             if (dirProfile?.avatar) {
@@ -474,7 +478,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           storedProfile?.displayName || username,
           binding.mailboxId,
           prekeyBundle,
-          storedProfile?.bio || undefined,
           resolvedAvatar
         );
         try {
@@ -482,8 +485,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } catch (_dErr) {}
         await store.setAsync(session, 'veil:user:profile', autoProfile);
         setMyProfile(autoProfile);
-        if (resolvedAvatar && !storedPrivacy.avatar) {
+        if (resolvedAvatar && storedPrivacy.avatar !== resolvedAvatar) {
           storedPrivacy.avatar = resolvedAvatar;
+          await store.setAsync(session, 'veil:user:privacy_settings', storedPrivacy);
+          setPrivacySettings(storedPrivacy);
+        } else if (isAvatarDeleted && storedPrivacy.avatar) {
+          storedPrivacy.avatar = undefined;
           await store.setAsync(session, 'veil:user:privacy_settings', storedPrivacy);
           setPrivacySettings(storedPrivacy);
         }
@@ -2400,6 +2407,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updatePrivacySettings = useCallback(
     async (updated: Partial<UserPrivacySettings>) => {
       if (!activeSession) return;
+      if (updated.avatar === null || updated.avatar === '') {
+        updated.avatar = undefined;
+        await store.setAsync(activeSession, 'veil:avatar:tombstone', { deletedAt: Date.now() });
+      } else if (updated.avatar) {
+        await store.deleteAsync(activeSession, 'veil:avatar:tombstone');
+      }
       const next = { ...privacySettings, ...updated };
       setPrivacySettings(next);
       await store.setAsync(activeSession, 'veil:user:privacy_settings', next);
@@ -2416,7 +2429,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const binding = await netManager.getOrCreateMailbox(activeSession);
       const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
 
-      let avatarToUse = avatar !== undefined ? avatar : (privacySettings.avatar || myProfile?.avatar);
+      let avatarToUse: string | undefined;
+      if (avatar === null || avatar === '') {
+        avatarToUse = undefined;
+        await store.setAsync(activeSession, 'veil:avatar:tombstone', { deletedAt: Date.now() });
+      } else if (avatar !== undefined) {
+        avatarToUse = avatar;
+        await store.deleteAsync(activeSession, 'veil:avatar:tombstone');
+      } else {
+        const tombstone = await store.getAsync<{ deletedAt: number }>(activeSession, 'veil:avatar:tombstone');
+        const isDeleted = tombstone && tombstone.deletedAt >= (myProfile?.issuedAt || 0);
+        avatarToUse = isDeleted ? undefined : (privacySettings.avatar || myProfile?.avatar);
+      }
+
       if (avatarToUse && avatarToUse.length > 32 * 1024) {
         try {
           avatarToUse = await processAvatarImage(avatarToUse);
@@ -2468,6 +2493,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     },
     [activeSession, myProfile, privacySettings, updatePrivacySettings, scheduleCloudSync]
   );
+
+  const deleteAvatar = useCallback(async () => {
+    if (!activeSession) return;
+    await store.setAsync(activeSession, 'veil:avatar:tombstone', { deletedAt: Date.now() });
+    await updatePrivacySettings({ avatar: undefined });
+    if (myProfile) {
+      await registerUsername(myProfile.username, myProfile.displayName, privacySettings.bio, '');
+    }
+  }, [activeSession, myProfile, privacySettings.bio, updatePrivacySettings, registerUsername]);
 
   const searchDirectory = useCallback(
     async (query: string) => {
@@ -2677,6 +2711,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ensureCloudSession,
     updateContactMediaPermissions,
     registerUsername,
+    deleteAvatar,
     searchDirectory,
     sendContactRequest,
     acceptContactRequest,

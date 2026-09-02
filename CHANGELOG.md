@@ -2,6 +2,32 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase56] - 2026-09-03
+
+### Added & Fixed (Profile Persistence, Telegram-Grade UI/UX & Video Optimization)
+- **Profile Picture Lifecycle & Persistence Across Reload, Login & Cloud Sync (`src/ui/app/AppState.tsx`, `src/account/accountManager.ts`)**:
+  - Corrected parameter inversion bug in `loadSpaceData` where `bio` was passed as `avatar` and `avatar` was passed as `expiresInSeconds`, which previously erased user avatars on every space unlock/reload.
+  - Added support for `src` alias and numeric pixel sizes in `src/ui/components/ui/Avatar.tsx` to prevent fallback to initials when valid images are loaded.
+  - Implemented deterministic avatar tombstone tracking under `'veil:avatar:tombstone'` (`{ deletedAt: number }`) to prevent deleted avatars from resurrecting while safeguarding against blank offline profile overwrites.
+- **Telegram-Grade Profile Modal Redesign (`src/ui/components/ProfileModal.tsx`)**:
+  - Overhauled profile modal into a Telegram-style interface featuring an 88px Avatar hero header with a camera overlay button for photo upload.
+  - Added instant client-side WebP compression (<32 KB) with automatic profile re-signing, directory publication, and recovery snapshot update.
+  - Added dedicated "Remove Photo" action in both modal header and edit form with tombstone recording.
+  - Implemented 3-button peer action bar: Message, Mute/Unmute, and Safety Number.
+  - Implemented 12-block formatted fingerprint card with one-click copy and identity verification toggle.
+  - Enforced strict SVG icon system (zero raw Unicode emoji controls).
+- **UI/UX Whole-App Polish (`src/ui/components/Sidebar.tsx`, `src/ui/components/ui/MessageStatus.tsx`, `src/ui/components/SettingsModal.tsx`)**:
+  - Added subtle `BellOffIcon` to muted chat rows in `Sidebar.tsx` and styled muted unread pills with reduced contrast.
+  - Refined message delivery check semantics (`CheckIcon` for relay, `CheckCheckIcon` for recipient delivered, colored for read).
+  - Propagated avatar removal tombstones in `SettingsModal.tsx`.
+- **Adaptive Chunking & Video Upload Performance Optimization (`src/attachments/attachmentPipeline.ts`)**:
+  - Implemented bounded adaptive chunk sizing (`getOptimalChunkSize`): 64 KiB ($\le 1\text{ MB}$), 256 KiB ($1-10\text{ MB}$), 512 KiB ($10-50\text{ MB}$), 1 MiB ($> 50\text{ MB}$).
+  - Fixed slice boundary calculation bug in `AttachmentPipeline.chunkAndEncrypt`.
+  - Benchmarked 2MB–100MB payloads: achieved 16x chunk reduction, relieved memory pressure, and exceeded 55 MB/s reassembly throughput with byte-for-byte SHA-256 integrity.
+- **Automated Verification & Production Probes (`tests/phase56-profile-media-perf.test.ts`, `scratch/verify_phase56_prod.ts`)**:
+  - 7 automated tests validating profile persistence, multi-device restoration, anti-resurrection tombstones, cryptographic signatures, and video upload benchmarks (100% PASS).
+  - Production verification probe passed 6/6 against live Render backend `https://veil-rga0.onrender.com`.
+
 ## [1.0.0-phase55] - 2026-09-02
 
 ### Added & Fixed (P0 Forensic Hardening)

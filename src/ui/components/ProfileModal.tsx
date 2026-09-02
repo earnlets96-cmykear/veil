@@ -50,6 +50,7 @@ import {
   EditIcon,
   UsersIcon,
   MoreVerticalIcon,
+  CameraIcon,
 } from './icons/index.ts';
 
 interface ProfileModalProps {
@@ -85,6 +86,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     store,
     isConversationMuted,
     toggleMuteConversation,
+    deleteAvatar,
   } = useApp();
 
   const { showToast } = useToast();
@@ -117,6 +119,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const [avatarPreview, setAvatarPreview] = useState<string | null>(privacySettings.avatar || myProfile?.avatar || null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setAvatarPreview(privacySettings.avatar || myProfile?.avatar || null);
+    }
+  }, [privacySettings.avatar, myProfile?.avatar, isEditing]);
 
   // Add Contact Form State for Non-Contacts
   const [showAddGreeting, setShowAddGreeting] = useState(false);
@@ -268,8 +276,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     try {
       const processed = await processAvatarImage(file);
       setAvatarPreview(processed);
+      if (!isEditing && myProfile) {
+        setIsSaving(true);
+        await registerUsername(myProfile.username, myProfile.displayName, privacySettings.bio, processed);
+        await updatePrivacySettings({ avatar: processed });
+        showToast({ type: 'success', message: 'Profile photo updated!' });
+      }
     } catch (err: any) {
       showToast({ type: 'error', message: getErrorMessage(err, 'Failed to process avatar image') });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    try {
+      setAvatarPreview(null);
+      if (!isEditing && myProfile) {
+        setIsSaving(true);
+        await deleteAvatar();
+        showToast({ type: 'info', message: 'Profile photo removed' });
+      }
+    } catch (err: any) {
+      showToast({ type: 'error', message: getErrorMessage(err, 'Failed to remove avatar') });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -286,11 +317,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     setErrorMessage(null);
 
     try {
+      const avatarToPass = avatarPreview !== null ? (avatarPreview || undefined) : '';
       await registerUsername(
         cleanUsername,
         displayNameInput.trim() || undefined,
         bioInput.trim() || undefined,
-        avatarPreview || undefined
+        avatarToPass
       );
 
       await updatePrivacySettings({
@@ -298,13 +330,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
         phoneNumber: phoneInput.trim() || undefined,
         phoneVisibility,
         profileVisibility,
-        avatar: avatarPreview || undefined,
+        avatar: avatarToPass,
       });
 
       setIsEditing(false);
       showToast({ type: 'success', message: 'Profile updated successfully!' });
     } catch (err: any) {
-      setErrorMessage(getErrorMessage(err, 'Failed to save profile changes.'));
+      setErrorMessage(getErrorMessage(err, 'Failed to update profile'));
     } finally {
       setIsSaving(false);
     }
@@ -473,10 +505,35 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           <div style={{ display: 'inline-block', position: 'relative', marginBottom: '0.75rem' }}>
             <Avatar
               name={isPeer ? effectiveDisplayName : myProfile?.displayName || activeSession?.name || 'Self'}
-              src={isPeer ? peerDoc?.avatar || peerContact?.avatar : avatarPreview || undefined}
-              size={84}
+              imageUrl={isPeer ? (peerDoc?.avatar || peerContact?.avatar) : (avatarPreview || myProfile?.avatar || undefined)}
+              size={88}
             />
-            {relState === 'CONTACT_VERIFIED' && (
+            {!isPeer && (
+              <button
+                type="button"
+                className="veil-avatar-camera-btn"
+                onClick={() => fileInputRef.current?.click()}
+                title="Change Avatar Photo"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  backgroundColor: 'var(--veil-accent-primary)',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid var(--veil-bg-surface)',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                }}
+              >
+                <CameraIcon size={14} color="#ffffff" />
+              </button>
+            )}
+            {isPeer && relState === 'CONTACT_VERIFIED' && (
               <div
                 style={{
                   position: 'absolute',
@@ -573,10 +630,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           {!isPeer && isEditing ? (
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleAvatarSelect} />
-              <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
                 <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-                  Change Avatar Photo
+                  <CameraIcon size={14} />
+                  <span>{avatarPreview ? 'Change Photo' : 'Upload Photo'}</span>
                 </Button>
+                {avatarPreview && (
+                  <Button type="button" variant="danger" size="sm" onClick={handleRemovePhoto}>
+                    <TrashIcon size={14} />
+                    <span>Remove Photo</span>
+                  </Button>
+                )}
               </div>
 
               <div>

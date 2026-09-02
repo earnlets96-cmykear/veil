@@ -15,25 +15,43 @@ import {
   bytesToHex,
 } from '../crypto/utils.ts';
 
-const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KiB
+export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KiB
+
+/**
+ * Calculates bounded optimal chunk size based on payload byte length.
+ * Drastically reduces chunk count, base64 inflation, and object allocations
+ * for large media (videos/archives) while preserving forward/backward compatibility.
+ */
+export function getOptimalChunkSize(totalBytes: number): number {
+  if (totalBytes <= 1024 * 1024) {
+    return 64 * 1024; // 64 KiB for <= 1 MB
+  } else if (totalBytes <= 10 * 1024 * 1024) {
+    return 256 * 1024; // 256 KiB for 1-10 MB
+  } else if (totalBytes <= 50 * 1024 * 1024) {
+    return 512 * 1024; // 512 KiB for 10-50 MB
+  } else {
+    return 1024 * 1024; // 1 MiB for > 50 MB
+  }
+}
 
 export class AttachmentPipeline {
   private static activeBlobUrls: Set<string> = new Set();
 
   /**
-   * Chunks and encrypts a file buffer.
+   * Chunks and encrypts a file buffer with adaptive chunking.
    */
   public static chunkAndEncrypt(
     data: Uint8Array,
     name: string,
     mimeType: string,
     encryptionKey: Uint8Array,
-    chunkSize = DEFAULT_CHUNK_SIZE,
+    chunkSize?: number,
     existingAttachmentId?: string
   ): { metadata: AttachmentMetadata; chunks: EncryptedAttachmentChunk[] } {
     const attachmentId = existingAttachmentId || `att_${bytesToHex(randomBytes(8))}`;
     const totalBytes = data.length;
-    const chunkCount = Math.max(1, Math.ceil(totalBytes / chunkSize));
+    const effectiveChunkSize = chunkSize || getOptimalChunkSize(totalBytes);
+    const chunkCount = Math.max(1, Math.ceil(totalBytes / effectiveChunkSize));
     const fullHash = bytesToHex(sha256(data));
 
     const metadata: AttachmentMetadata = {
@@ -42,15 +60,15 @@ export class AttachmentPipeline {
       mimeType,
       sizeBytes: totalBytes,
       chunkCount,
-      chunkSize,
+      chunkSize: effectiveChunkSize,
       sha256Hash: fullHash,
     };
 
     const chunks: EncryptedAttachmentChunk[] = [];
 
     for (let i = 0; i < chunkCount; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, totalBytes);
+      const start = i * effectiveChunkSize;
+      const end = Math.min(start + effectiveChunkSize, totalBytes);
       const slice = data.subarray(start, end);
 
       const aad = new TextEncoder().encode(`${attachmentId}:${i}:${chunkCount}`);

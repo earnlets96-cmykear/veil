@@ -676,6 +676,19 @@ export class AccountManager {
       deletedAt,
     }));
 
+    // Gather avatar deletion tombstone from local and remote
+    const localAvatarTombstoneRec = localMap.get('veil:avatar:tombstone');
+    const remoteAvatarTombstoneRec = remoteMap.get('veil:avatar:tombstone');
+    let avatarTombstoneDeletedAt = 0;
+    if (localAvatarTombstoneRec) {
+      const t = decryptRec<{ deletedAt: number }>(localAvatarTombstoneRec);
+      if (t?.deletedAt) avatarTombstoneDeletedAt = Math.max(avatarTombstoneDeletedAt, Number(t.deletedAt) || 0);
+    }
+    if (remoteAvatarTombstoneRec) {
+      const t = decryptRec<{ deletedAt: number }>(remoteAvatarTombstoneRec);
+      if (t?.deletedAt) avatarTombstoneDeletedAt = Math.max(avatarTombstoneDeletedAt, Number(t.deletedAt) || 0);
+    }
+
     // Status ranking for strict forward monotonicity
     const statusRank: Record<string, number> = {
       FAILED: 0,
@@ -695,14 +708,37 @@ export class AccountManager {
         continue;
       }
 
+      if (key === 'veil:avatar:tombstone') {
+        if (avatarTombstoneDeletedAt > 0) {
+          mergedRecords.push(
+            encryptRec(key, { deletedAt: avatarTombstoneDeletedAt }, Date.now())
+          );
+        }
+        continue;
+      }
+
       const localRec = localMap.get(key);
       const remoteRec = remoteMap.get(key);
 
       if (!remoteRec && localRec) {
+        if (key === 'veil:user:profile' && avatarTombstoneDeletedAt > 0) {
+          const prof = decryptRec<any>(localRec);
+          if (prof && avatarTombstoneDeletedAt >= (Number(prof.issuedAt) || 0)) {
+            mergedRecords.push(encryptRec(key, { ...prof, avatar: undefined, avatarUrl: undefined }, localRec.updatedAt));
+            continue;
+          }
+        }
         mergedRecords.push(localRec);
         continue;
       }
       if (!localRec && remoteRec) {
+        if (key === 'veil:user:profile' && avatarTombstoneDeletedAt > 0) {
+          const prof = decryptRec<any>(remoteRec);
+          if (prof && avatarTombstoneDeletedAt >= (Number(prof.issuedAt) || 0)) {
+            mergedRecords.push(encryptRec(key, { ...prof, avatar: undefined, avatarUrl: undefined }, remoteRec.updatedAt));
+            continue;
+          }
+        }
         mergedRecords.push(remoteRec);
         continue;
       }
@@ -711,19 +747,18 @@ export class AccountManager {
         if (key === 'veil:ui:messages') {
           const localMessages = decryptRec<Record<string, any[]>>(localRec) || {};
           const remoteMessages = decryptRec<Record<string, any[]>>(remoteRec) || {};
+          const allConvIds = Array.from(new Set([...Object.keys(localMessages), ...Object.keys(remoteMessages)]));
           const mergedMessages: Record<string, any[]> = {};
 
-          const convIds = new Set([...Object.keys(localMessages), ...Object.keys(remoteMessages)]);
-          for (const convId of convIds) {
-            const lList = Array.isArray(localMessages[convId]) ? localMessages[convId] : [];
-            const rList = Array.isArray(remoteMessages[convId]) ? remoteMessages[convId] : [];
+          for (const convId of allConvIds) {
+            const lList = localMessages[convId] || [];
+            const rList = remoteMessages[convId] || [];
             const msgMap = new Map<string, any>();
 
             for (const m of [...lList, ...rList]) {
               if (!m?.id) continue;
-              const tombstoneDelAt = tombstoneMap.get(m.id);
-              if (tombstoneDelAt !== undefined && tombstoneDelAt >= (Number(m.timestamp) || 0)) {
-                // Tombstone exists: skip message
+              // If deleted via tombstone, skip it entirely (anti-resurrection)
+              if (tombstoneMap.has(m.id)) {
                 continue;
               }
 
@@ -731,9 +766,10 @@ export class AccountManager {
               if (!existing) {
                 msgMap.set(m.id, m);
               } else {
-                const existingRank = statusRank[existing.status] ?? 0;
-                const newRank = statusRank[m.status] ?? 0;
-                const winnerStatus = newRank >= existingRank ? m.status : existing.status;
+                const lRank = statusRank[existing.status] ?? 0;
+                const rRank = statusRank[m.status] ?? 0;
+                const winnerStatus = rRank >= lRank ? m.status : existing.status;
+
                 const mergedMsg = {
                   ...existing,
                   ...m,
@@ -827,9 +863,34 @@ export class AccountManager {
         } else if (key === 'veil:user:profile') {
           const localProf = decryptRec<any>(localRec);
           const remoteProf = decryptRec<any>(remoteRec);
-          const winner = ((Number(localProf?.issuedAt) || 0) >= (Number(remoteProf?.issuedAt) || 0)) ? localProf : remoteProf;
+          let winner = ((Number(localProf?.issuedAt) || 0) >= (Number(remoteProf?.issuedAt) || 0)) ? localProf : remoteProf;
+
+          // If avatar was explicitly deleted by tombstone at or after winner's issuedAt, ensure it stays deleted
+          if (avatarTombstoneDeletedAt && avatarTombstoneDeletedAt >= (Number(winner?.issuedAt) || 0)) {
+            if (winner) {
+              winner = { ...winner, avatar: undefined, avatarUrl: undefined };
+            }
+          } else if (!winner?.avatar && (localProf?.avatar || remoteProf?.avatar)) {
+            // Neither device deleted avatar, but an offline re-keying produced an empty avatar profile
+            const fallbackAvatar = localProf?.avatar || remoteProf?.avatar;
+            winner = { ...winner, avatar: fallbackAvatar, avatarUrl: fallbackAvatar };
+          }
           mergedRecords.push(
             encryptRec(key, winner, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key === 'veil:user:privacy_settings') {
+          const localPriv = decryptRec<any>(localRec) || {};
+          const remotePriv = decryptRec<any>(remoteRec) || {};
+          const isDeleted = avatarTombstoneDeletedAt > 0 && avatarTombstoneDeletedAt >= Math.max(localRec.updatedAt, remoteRec.updatedAt);
+          const mergedPriv = {
+            ...remotePriv,
+            ...localPriv,
+            avatar: isDeleted ? undefined : (localPriv.avatar || remotePriv.avatar),
+            bio: localPriv.bio || remotePriv.bio,
+            phoneNumber: localPriv.phoneNumber || remotePriv.phoneNumber,
+          };
+          mergedRecords.push(
+            encryptRec(key, mergedPriv, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
           );
         } else {
           const winnerRec = localRec.updatedAt >= remoteRec.updatedAt ? localRec : remoteRec;

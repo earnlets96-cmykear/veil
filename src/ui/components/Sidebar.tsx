@@ -34,6 +34,7 @@ import {
   VideoIcon,
   FileIcon,
   MicIcon,
+  BellOffIcon,
 } from './icons/index.ts';
 
 export const Sidebar: React.FC = () => {
@@ -59,6 +60,7 @@ export const Sidebar: React.FC = () => {
     sendContactRequest,
     exportMyInvitation,
     myProfile,
+    isConversationMuted,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
@@ -532,6 +534,7 @@ export const Sidebar: React.FC = () => {
           ) : (
             filteredConversations.map((conv) => {
               const isSelected = activeChatId === conv.id;
+              const isMuted = typeof isConversationMuted === 'function' && isConversationMuted(conv.id);
               return (
                 <div
                   key={conv.id}
@@ -556,18 +559,26 @@ export const Sidebar: React.FC = () => {
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{conv.name}</span>
-                      {conv.timestamp && (
-                        <span className="veil-conversation-time">
-                          {formatConversationTime(conv.timestamp)}
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {isMuted && <BellOffIcon size={12} color="var(--veil-text-muted)" aria-label="Muted" />}
+                        {conv.timestamp && (
+                          <span className="veil-conversation-time">
+                            {formatConversationTime(conv.timestamp)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="veil-conversation-preview">
                       {renderMessageSnippet(conv.lastMessage)}
                     </div>
                   </div>
                   {conv.unreadCount > 0 && (
-                    <span className="veil-unread-pill">{conv.unreadCount}</span>
+                    <span
+                      className="veil-unread-pill"
+                      style={isMuted ? { backgroundColor: 'var(--veil-text-muted)', opacity: 0.8 } : undefined}
+                    >
+                      {conv.unreadCount}
+                    </span>
                   )}
                 </div>
               );

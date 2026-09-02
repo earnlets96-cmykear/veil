@@ -13,7 +13,8 @@ export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export interface AvatarProps {
   name?: string;
   imageUrl?: string;
-  size?: AvatarSize;
+  src?: string; // Phase 56: Compatibility alias for imageUrl
+  size?: AvatarSize | number;
   isSquare?: boolean;
   isGroup?: boolean;
   status?: 'online' | 'offline';
@@ -24,6 +25,7 @@ export interface AvatarProps {
 export const Avatar: React.FC<AvatarProps> = ({
   name = 'User',
   imageUrl,
+  src,
   size = 'md',
   isSquare = false,
   isGroup = false,
@@ -31,7 +33,9 @@ export const Avatar: React.FC<AvatarProps> = ({
   className = '',
   'aria-label': ariaLabel,
 }) => {
-  const sizeClass = `veil-avatar-${size}`;
+  const effectiveImageUrl = imageUrl || src;
+  const isNumericSize = typeof size === 'number';
+  const sizeClass = isNumericSize ? '' : `veil-avatar-${size}`;
   const shapeClass = isSquare || isGroup ? 'veil-avatar-square' : '';
 
   const getInitials = (str: string) => {
@@ -52,6 +56,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   };
 
   const getGroupIconSize = () => {
+    if (isNumericSize) return Math.max(14, Math.round((size as number) * 0.3));
     switch (size) {
       case 'xs': return 12;
       case 'sm': return 14;
@@ -62,19 +67,30 @@ export const Avatar: React.FC<AvatarProps> = ({
     }
   };
 
+  const numericStyle = isNumericSize
+    ? {
+        width: `${size}px`,
+        height: `${size}px`,
+        minWidth: `${size}px`,
+        minHeight: `${size}px`,
+        fontSize: `${Math.max(12, Math.round((size as number) * 0.38))}px`,
+      }
+    : {};
+
   return (
     <div
       className={`veil-avatar ${sizeClass} ${shapeClass} ${className}`.trim()}
       style={{
-        background: imageUrl ? 'none' : getGradient(name, isGroup),
-        backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
+        ...numericStyle,
+        background: effectiveImageUrl ? 'none' : getGradient(name, isGroup),
+        backgroundImage: effectiveImageUrl ? `url(${effectiveImageUrl})` : undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
       role="img"
       aria-label={ariaLabel || (isGroup ? 'Group Avatar' : 'Peer Avatar')}
     >
-      {!imageUrl && (
+      {!effectiveImageUrl && (
         <span aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {isGroup ? <UsersIcon size={getGroupIconSize()} color="#ffffff" /> : getInitials(name)}
         </span>
