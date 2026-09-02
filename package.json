@@ -6,7 +6,7 @@
   "description": "VEIL: Privacy-First Messenger with Multi-Space Cryptographic Architecture",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/release-build.mjs",
     "build:release": "node scripts/release-build.mjs",
     "verify:release": "npm test && npm run build && node scripts/release-build.mjs",
     "preview": "vite preview",
