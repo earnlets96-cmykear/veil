@@ -88,6 +88,7 @@ import {
   toWireAttachments,
 } from '../../attachments/types.ts';
 import { readReceiptManager } from '../../messaging/readReceipts.ts';
+import { inferMediaMime } from '../../attachments/mimeUtils.ts';
 import { presenceManager } from '../../presence/presenceManager.ts';
 import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
 
@@ -522,7 +523,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 prev,
                 senderDoc.identityId
               );
-              if (didChange) store.setAsync(session, 'veil:ui:messages', updatedMessages);
+              if (didChange) {
+                store.setAsync(session, 'veil:ui:messages', updatedMessages);
+                scheduleCloudSync(session);
+              }
               return didChange ? updatedMessages : prev;
             });
             return;
@@ -1033,6 +1037,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sessionController.panicLock();
   }, []);
 
+  const markConversationAsRead = useCallback(
+    (conversationId: string) => {
+      if (!activeSession || !conversationId) return;
+      setConversations((prev) => {
+        let didUpdate = false;
+        const updated = prev.map((c) => {
+          if ((c.id === conversationId || c.name === conversationId) && c.unreadCount > 0) {
+            didUpdate = true;
+            return { ...c, unreadCount: 0 };
+          }
+          return c;
+        });
+        if (didUpdate) {
+          store.setAsync(activeSession, 'veil:ui:conversations', updated);
+          scheduleCloudSync(activeSession);
+        }
+        return didUpdate ? updated : prev;
+      });
+
+      // Dispatch read receipt wire message if there are inbound messages
+      try {
+        const contact = contacts.find((c) => c.identityId === conversationId || c.name === conversationId);
+        const candidateKeys = [
+          conversationId,
+          contact?.identityId,
+          contact?.name,
+        ].filter(Boolean) as string[];
+
+        let convMsgs: UIMessage[] = [];
+        for (const k of candidateKeys) {
+          if (messages[k] && messages[k].length > 0) {
+            convMsgs = messages[k];
+            break;
+          }
+        }
+
+        const lastInbound = [...convMsgs].reverse().find((m) => !m.isOutgoing);
+        if (lastInbound) {
+          const targetMailboxId = contact?.mailboxId || conversationId;
+          const peerDocument =
+            contact?.prekeyBundle?.identityDocument ||
+            conversations.find((c) => c.id === conversationId || c.name === conversationId)?.peerDoc;
+          if (peerDocument && targetMailboxId) {
+            readReceiptManager.scheduleReadReceipt(
+              contact?.identityId || conversationId,
+              lastInbound.id,
+              async (receipt) => {
+                const wirePayload = await convManager.encryptAndPackReceipt(activeSession, peerDocument, receipt);
+                await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
+              }
+            );
+          }
+        }
+      } catch (_e) {}
+    },
+    [activeSession, messages, contacts, conversations, scheduleCloudSync]
+  );
+
   const selectConversation = useCallback(
     (id: string | null) => {
       setActiveChatId(id);
@@ -1058,10 +1120,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
           return prev;
         });
+        markConversationAsRead(id);
       }
       sessionController.recordUserActivity();
     },
-    [activeSession, contacts]
+    [activeSession, contacts, markConversationAsRead]
   );
 
   const setSearchQuery = useCallback((query: string) => {
@@ -1265,36 +1328,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setReplyTargetState(null);
 
       // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
-      const inferMime = (f: File): string => {
-        if (f.type && f.type !== 'application/octet-stream' && f.type !== '') {
-          return f.type;
-        }
-        const ext = f.name.split('.').pop()?.toLowerCase() || '';
-        const vExts: Record<string, string> = {
-          mp4: 'video/mp4',
-          mov: 'video/quicktime',
-          webm: 'video/webm',
-          mkv: 'video/x-matroska',
-          avi: 'video/x-msvideo',
-          m4v: 'video/mp4',
-          '3gp': 'video/3gpp',
-        };
-        if (vExts[ext]) return vExts[ext];
-        const imgExts: Record<string, string> = {
-          jpg: 'image/jpeg',
-          jpeg: 'image/jpeg',
-          png: 'image/png',
-          webp: 'image/webp',
-          gif: 'image/gif',
-          svg: 'image/svg+xml',
-        };
-        if (imgExts[ext]) return imgExts[ext];
-        return f.type || 'application/octet-stream';
-      };
-
       const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
         const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
-        const effectiveMime = inferMime(file);
+        const effectiveMime = inferMediaMime(file);
         let initialPreviewUrl: string | undefined;
         if (effectiveMime.startsWith('image/') || effectiveMime.startsWith('video/')) {
           try {
@@ -1502,16 +1538,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 await cloudClient.uploadAttachment(objectId, rawCiphertext);
               };
 
+              const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);
               try {
                 const timeoutPromise = new Promise<never>((_, reject) =>
-                  setTimeout(() => reject(new Error('Upload timeout (30s limit exceeded)')), 30000)
+                  setTimeout(
+                    () => reject(new Error(`Upload timeout (${Math.round(uploadTimeoutMs / 1000)}s limit exceeded)`)),
+                    uploadTimeoutMs
+                  )
                 );
                 await Promise.race([uploadWithSession(), timeoutPromise]);
               } catch (uploadErr: any) {
                 const reauthed = await ensureCloudSession(activeSession, true);
                 if (reauthed) {
                   const timeoutPromise = new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Upload timeout (30s limit exceeded)')), 30000)
+                    setTimeout(
+                      () => reject(new Error(`Upload timeout (${Math.round(uploadTimeoutMs / 1000)}s limit exceeded)`)),
+                      uploadTimeoutMs
+                    )
                   );
                   await Promise.race([uploadWithSession(), timeoutPromise]);
                 } else {
@@ -1879,39 +1922,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, messages, deleteMessageLocally, sendMessage]
   );
 
-  const markConversationAsRead = useCallback(
-    (conversationId: string) => {
-      if (!activeSession) return;
-      setConversations((prev) => {
-        const updated = prev.map((c) =>
-          c.id === conversationId ? { ...c, unreadCount: 0 } : c
-        );
-        store.setAsync(activeSession, 'veil:ui:conversations', updated);
-        return updated;
-      });
-
-      // Dispatch read receipt wire message if there are inbound messages
-      try {
-        const convMsgs = messages[conversationId] || [];
-        const lastInbound = [...convMsgs].reverse().find((m) => !m.isOutgoing);
-        if (lastInbound) {
-          const contact = contacts.find((c) => c.identityId === conversationId || c.name === conversationId);
-          const targetMailboxId = contact?.mailboxId || conversationId;
-          readReceiptManager.scheduleReadReceipt(
-            conversationId,
-            lastInbound.id,
-            async (receipt) => {
-              const peerDocument = contact?.prekeyBundle?.identityDocument || conversations.find((c) => c.id === conversationId)?.peerDoc;
-              if (!peerDocument || !targetMailboxId) return;
-              const wirePayload = await convManager.encryptAndPackReceipt(activeSession, peerDocument, receipt);
-              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
-            }
-          );
-        }
-      } catch (_e) {}
-    },
-    [activeSession, messages, contacts, conversations]
-  );
 
   const restoreAccount = useCallback(
     async (username: string, password: string) => {

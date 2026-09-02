@@ -462,12 +462,16 @@ export const ConversationView: React.FC = () => {
     }
   }, [activeChatId, activeMessages.length, firstUnreadIndex]);
 
-  // Auto-clear unread messages counter when active
+  // Auto-clear unread messages counter and dispatch read receipts when active
   useEffect(() => {
-    if (activeChatId && activeConversation && activeConversation.unreadCount > 0) {
-      markConversationAsRead(activeChatId);
+    if (activeChatId) {
+      const hasUnread = (activeConversation && activeConversation.unreadCount > 0) || false;
+      const hasInbound = activeMessages.some((m) => !m.isOutgoing);
+      if (hasUnread || hasInbound) {
+        markConversationAsRead(activeChatId);
+      }
     }
-  }, [activeChatId, activeConversation, markConversationAsRead]);
+  }, [activeChatId, activeConversation?.unreadCount, activeMessages.length, markConversationAsRead]);
 
   // Handle Jump-to-message
   const handleJumpToMessage = useCallback((targetMsgId: string) => {

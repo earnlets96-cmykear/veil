@@ -598,7 +598,7 @@ export class ConversationManager {
         return { ...parsed, senderIdentityId };
       }
       if (parsed.type === 'READ_RECEIPT' && parsed.lastReadMessageId && typeof parsed.readAt === 'number') {
-        return { ...parsed, senderIdentityId };
+        return { ...parsed, senderIdentityId, readerIdentityId: parsed.readerIdentityId || senderIdentityId };
       }
     } catch (_error) {}
     return null;

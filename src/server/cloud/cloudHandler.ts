@@ -159,8 +159,13 @@ export class CloudHandler {
         await this.handleAttachmentCreate(req, res, account.accountId);
         return true;
       }
-      if (pathname === '/v1/cloud/attachments/upload' && method === 'POST') {
+      if ((pathname === '/v1/cloud/attachments/upload' || pathname === '/v1/cloud/attachments/upload-raw') && method === 'POST') {
         await this.handleAttachmentUpload(req, res, account.accountId);
+        return true;
+      }
+      if (pathname.startsWith('/v1/cloud/attachments/download-raw/') && method === 'GET') {
+        const objectId = pathname.substring('/v1/cloud/attachments/download-raw/'.length);
+        await this.handleAttachmentDownloadRaw(req, res, account.accountId, objectId);
         return true;
       }
       if (pathname.startsWith('/v1/cloud/attachments/download/') && method === 'GET') {
@@ -201,8 +206,8 @@ export class CloudHandler {
       let data = '';
       req.on('data', (chunk) => {
         data += chunk;
-        if (data.length > 50 * 1024 * 1024) { // 50MB limit
-          reject(new Error('Payload too large'));
+        if (data.length > 100 * 1024 * 1024) { // 100MB limit
+          reject(new Error('Payload too large: exceeds 100MB limit'));
         }
       });
       req.on('end', () => {
@@ -212,6 +217,25 @@ export class CloudHandler {
         } catch (e) {
           reject(new Error('Invalid JSON'));
         }
+      });
+      req.on('error', (err) => reject(err));
+    });
+  }
+
+  private async parseRawBody(req: IncomingMessage, maxBytes = 100 * 1024 * 1024): Promise<Uint8Array> {
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let totalBytes = 0;
+      req.on('data', (chunk: Buffer) => {
+        totalBytes += chunk.length;
+        if (totalBytes > maxBytes) {
+          reject(new Error(`Payload too large: exceeds maximum size limit of ${maxBytes} bytes`));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        resolve(new Uint8Array(Buffer.concat(chunks)));
       });
       req.on('error', (err) => reject(err));
     });
@@ -556,11 +580,25 @@ export class CloudHandler {
 
   private async handleAttachmentUpload(req: IncomingMessage, res: ServerResponse, accountId: string): Promise<void> {
     try {
-      const body = await this.parseJsonBody(req);
-      const { objectId, ciphertextBase64 } = body;
+      const contentType = (req.headers['content-type'] || '').toLowerCase();
+      let objectId: string;
+      let rawCiphertext: Uint8Array;
 
-      if (!objectId || !ciphertextBase64) {
-        return this.sendJson(res, 400, { error: 'Missing objectId or ciphertextBase64' });
+      if (contentType.includes('application/octet-stream') || req.url?.includes('upload-raw')) {
+        const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        objectId = (req.headers['x-object-id'] as string) || url.searchParams.get('objectId') || '';
+        if (!objectId) {
+          return this.sendJson(res, 400, { error: 'Missing objectId (via X-Object-Id header or ?objectId query param)' });
+        }
+        rawCiphertext = await this.parseRawBody(req, 100 * 1024 * 1024);
+      } else {
+        const body = await this.parseJsonBody(req);
+        objectId = body.objectId;
+        const ciphertextBase64 = body.ciphertextBase64;
+        if (!objectId || !ciphertextBase64) {
+          return this.sendJson(res, 400, { error: 'Missing objectId or ciphertextBase64' });
+        }
+        rawCiphertext = base64ToBytes(ciphertextBase64);
       }
 
       const attRecord = await this.db.getAttachmentByObjectId(objectId);
@@ -568,7 +606,6 @@ export class CloudHandler {
         return this.sendJson(res, 404, { error: 'Attachment object not found or access denied' });
       }
 
-      const rawCiphertext = base64ToBytes(ciphertextBase64);
       const computedHash = bytesToHex(sha256(rawCiphertext));
 
       if (computedHash !== attRecord.ciphertextHash) {
@@ -578,12 +615,92 @@ export class CloudHandler {
       await this.storage.upload(objectId, rawCiphertext);
 
       attRecord.status = 'COMMITTED';
+      attRecord.ciphertextSize = rawCiphertext.length;
       attRecord.updatedAt = Date.now();
       await this.db.saveAttachment(attRecord);
 
       this.sendJson(res, 200, { success: true, objectId, status: 'COMMITTED' });
     } catch (err: any) {
       this.sendJson(res, 400, { error: err.message });
+    }
+  }
+
+  private async handleAttachmentDownloadRaw(
+    req: IncomingMessage,
+    res: ServerResponse,
+    accountId: string,
+    objectId: string
+  ): Promise<void> {
+    try {
+      if (!accountId) {
+        return this.sendJson(res, 401, { error: 'Unauthorized: authentication required' });
+      }
+
+      const attRecord = await this.db.getAttachmentByObjectId(objectId);
+      if (!attRecord || attRecord.status === 'DELETED') {
+        return this.sendJson(res, 404, { error: 'Attachment not found or deleted' });
+      }
+
+      if (attRecord.accountId !== accountId) {
+        const requesterSpaces = await this.db.listSpaces(accountId);
+        const hasSpaceAccess = requesterSpaces.some((s) => s.spaceId === attRecord.spaceId);
+
+        let isRecipient = false;
+        if (attRecord.encryptedMetadata) {
+          try {
+            const metaObj = JSON.parse(attRecord.encryptedMetadata);
+            if (
+              metaObj.recipientAccountId === accountId ||
+              (Array.isArray(metaObj.allowedAccounts) && metaObj.allowedAccounts.includes(accountId))
+            ) {
+              isRecipient = true;
+            } else if (metaObj.recipientUsername) {
+              const reqAccount = await this.db.getAccountById(accountId);
+              if (
+                reqAccount &&
+                reqAccount.username.toLowerCase().replace(/^@/, '').trim() ===
+                  metaObj.recipientUsername.toLowerCase().replace(/^@/, '').trim()
+              ) {
+                isRecipient = true;
+              }
+            } else if (metaObj.recipientIdentityId) {
+              const reqAccount = await this.db.getAccountById(accountId);
+              if (
+                reqAccount &&
+                (reqAccount.accountId === metaObj.recipientIdentityId ||
+                  requesterSpaces.some((s) => s.spaceId === metaObj.recipientIdentityId))
+              ) {
+                isRecipient = true;
+              }
+            }
+          } catch (_e) {}
+        }
+
+        if (!hasSpaceAccess && !isRecipient) {
+          return this.sendJson(res, 404, { error: 'Attachment not found or access denied' });
+        }
+      }
+
+      let data: Uint8Array | null = null;
+      try {
+        data = await this.storage.download(objectId);
+      } catch (_e) {
+        data = null;
+      }
+
+      if (!data) {
+        return this.sendJson(res, 404, { error: 'Attachment not found or missing from storage' });
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': String(data.length),
+        'X-Ciphertext-Hash': attRecord.ciphertextHash,
+        'X-Attachment-Id': attRecord.attachmentId,
+      });
+      res.end(Buffer.from(data));
+    } catch (err: any) {
+      this.sendJson(res, 500, { error: err.message || 'Internal server error' });
     }
   }
 

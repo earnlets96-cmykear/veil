@@ -2,6 +2,36 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase53] - 2026-09-02
+
+### Added
+- **Direct Binary Streaming Media Pipeline (`src/server/cloud/cloudHandler.ts`, `src/network/cloudClient.ts`)**:
+  - Implemented `/v1/cloud/attachments/upload-raw` (`application/octet-stream`) and `/v1/cloud/attachments/download-raw/:objectId`.
+  - Eliminates double base64 expansion and JSON serialization explosion for multi-megabyte video uploads.
+  - Raised server body parser limit from 50MB to 100MB with streaming `Buffer.concat` handling.
+  - Maintains automatic fallback to base64 JSON upload/download for backward compatibility with older servers.
+- **Dynamic Upload & Download Timeout Scaling (`src/server/cloud/storage/s3ObjectStorage.ts`, `src/ui/app/AppState.tsx`, `src/ui/utils/mediaCache.ts`)**:
+  - Increased Cloudflare R2 / S3 timeout from 15s to 180s in `s3ObjectStorage.ts`, eliminating Render `AbortController` timeouts during video storage operations.
+  - Replaced hardcoded 30s timeout guards in client-side upload pipeline and media cache download with dynamic timeouts proportional to payload size (`Math.max(180000, Math.ceil(size / 50000) * 1000)`).
+- **Multi-Tier MIME Type Detection & Magic Byte Sniffing (`src/attachments/mimeUtils.ts`, `src/ui/components/media/AttachmentPreviewModal.tsx`)**:
+  - Implemented `inferMediaMime` to strip MIME parameters (`video/mp4; codecs=...`), map standard extensions, and sniff magic byte signatures for MP4 (`ftyp`), WebM/MKV (`0x1A45DFA3`), and AVI (`RIFF....AVI `).
+  - Ensures video files picked on Android or web with empty or generic MIME types correctly display video preview modals and badges.
+- **Cryptographic Read Receipt Alignment & Monotonicity Enforcement (`src/messaging/readReceipts.ts`, `src/messaging/conversationManager.ts`)**:
+  - Fixed inbound read receipt peer verification in `ReadReceiptManager.processInboundReceipt`: resolves conversation perspective inversion between sender and recipient.
+  - Implemented multi-key matching across authenticated peer ID, reader identity ID, conversation ID, and message ID lookup.
+  - Enforced strict monotonicity invariant: messages in `READ` status can never regress on delayed delivery receipts.
+- **Continuous Read Status Cloud Snapshot Synchronization (`src/ui/app/AppState.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - When messages transition to `READ` upon receipt processing, `scheduleCloudSync(session)` is called to persist updated statuses in the encrypted PostgreSQL cloud snapshot.
+  - Read receipts are automatically dispatched whenever opening chats with unread messages or when receiving incoming messages while in an active chat.
+- **Automated Regression Suites (`tests/phase53-video-upload.test.ts`, `tests/phase53-read-receipts.test.ts`)**:
+  - 13 comprehensive tests validating video upload pipeline, raw binary streaming, MIME sniffing, Double Ratchet roundtrip, and read receipt double-check progression.
+
+### Verification
+- 346 test files / 955 automated tests passing (100% clean pass).
+- Real live production probe against `https://veil-rga0.onrender.com` passed 100% (`scratch/verify_phase53_prod.mjs` verifying 2MB video upload/download to Cloudflare R2 and seen/read double-check delivery).
+- Web production build passing (`npm run build` in 1.84s).
+- Native Android debug APK assembled cleanly (`./gradlew.bat assembleDebug` BUILD SUCCESSFUL in 20s).
+
 ## [1.0.0-phase52] - 2026-09-02
 
 ### Added

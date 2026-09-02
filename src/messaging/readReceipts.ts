@@ -8,7 +8,7 @@
  * - Local-first offline-tolerant delivery state persistence.
  */
 
-import { UIMessage } from '../ui/app/types.ts';
+import { UIMessage, DeliveryStatus } from '../ui/app/types.ts';
 
 export interface DeliveryReceiptPayload {
   type: 'DELIVERY_RECEIPT';
@@ -28,7 +28,10 @@ export interface ReadReceiptPayload {
 export type ReceiptPayload = DeliveryReceiptPayload | ReadReceiptPayload;
 
 export class ReadReceiptManager {
-  private pendingReceipts: Map<string, { conversationId: string; lastMessageId: string }> = new Map();
+  private pendingReceipts: Map<
+    string,
+    { conversationId: string; lastMessageId: string; sendReceipt?: (receipt: ReadReceiptPayload) => Promise<void> }
+  > = new Map();
   private debounceTimer: any = null;
 
   /**
@@ -45,6 +48,7 @@ export class ReadReceiptManager {
     this.pendingReceipts.set(conversationId, {
       conversationId,
       lastMessageId,
+      sendReceipt,
     });
 
     if (this.debounceTimer) {
@@ -53,64 +57,88 @@ export class ReadReceiptManager {
 
     this.debounceTimer = setTimeout(async () => {
       await this.flushPendingReceipts(sendReceipt);
-    }, 400);
+    }, 300);
   }
 
   /**
    * Flushes all queued read receipts over the untrusted relay transport.
    */
-  public async flushPendingReceipts(sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>): Promise<void> {
+  public async flushPendingReceipts(fallbackSender?: (receipt: ReadReceiptPayload) => Promise<void>): Promise<void> {
     if (this.pendingReceipts.size === 0) return;
 
     const queue = Array.from(this.pendingReceipts.values());
     this.pendingReceipts.clear();
 
     for (const item of queue) {
+      const sender = item.sendReceipt || fallbackSender;
+      if (!sender) continue;
       try {
         const payload: ReadReceiptPayload = {
           type: 'READ_RECEIPT',
           conversationId: item.conversationId,
           lastReadMessageId: item.lastMessageId,
-          // This is replaced by the authenticated sender identity when the
-          // encrypted receipt envelope is created.
           readerIdentityId: '',
           readAt: Date.now(),
         };
-        await sendReceipt(payload);
+        await sender(payload);
       } catch (_e) {
-        // Safe swallow: receipts will re-sync on next conversation open
+        // If network send failed (e.g. offline), retain in queue to retry
+        this.pendingReceipts.set(item.conversationId, item);
       }
     }
   }
 
   /**
-   * Processes an inbound read receipt payload and updates matching outgoing message statuses to 'READ'.
+   * Processes an inbound read/delivery receipt payload and updates matching outgoing message statuses.
    */
   public processInboundReceipt(
     receipt: ReceiptPayload,
     messagesMap: Record<string, UIMessage[]>,
     authenticatedPeerId?: string
   ): { updatedMessages: Record<string, UIMessage[]>; didChange: boolean } {
-    const { conversationId } = receipt;
-    if (authenticatedPeerId && (
-      conversationId !== authenticatedPeerId ||
-      (receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId !== authenticatedPeerId)
-    )) {
-      return { updatedMessages: messagesMap, didChange: false };
+    // 1. Authenticate peer attribution
+    // If authenticatedPeerId is provided, the sender of the encrypted payload must match the expected reader/recipient
+    if (authenticatedPeerId) {
+      if (receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId && receipt.readerIdentityId !== authenticatedPeerId) {
+        return { updatedMessages: messagesMap, didChange: false };
+      }
     }
 
-    const targetKey = messagesMap[conversationId]
-      ? conversationId
-      : (receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId && messagesMap[receipt.readerIdentityId]
-          ? receipt.readerIdentityId
-          : conversationId);
+    // 2. Identify the target conversation key in messagesMap.
+    const receiptMessageId = receipt.type === 'READ_RECEIPT'
+      ? receipt.lastReadMessageId
+      : receipt.messageId;
+
+    let targetKey: string | undefined = undefined;
+
+    // Check direct candidate keys
+    const candidateKeys = [
+      authenticatedPeerId,
+      receipt.type === 'READ_RECEIPT' ? receipt.readerIdentityId : undefined,
+      receipt.conversationId,
+    ].filter(Boolean) as string[];
+
+    for (const k of candidateKeys) {
+      if (messagesMap[k] && messagesMap[k].length > 0) {
+        targetKey = k;
+        break;
+      }
+    }
+
+    // Fallback: search all conversations to find which one holds this message ID
+    if (!targetKey && receiptMessageId) {
+      targetKey = Object.keys(messagesMap).find((k) =>
+        messagesMap[k]?.some((m) => m.id === receiptMessageId)
+      );
+    }
+
+    if (!targetKey) {
+      return { updatedMessages: messagesMap, didChange: false };
+    }
 
     const list = messagesMap[targetKey];
     if (!list || list.length === 0) return { updatedMessages: messagesMap, didChange: false };
 
-    const receiptMessageId = receipt.type === 'READ_RECEIPT'
-      ? receipt.lastReadMessageId
-      : receipt.messageId;
     const receiptIndex = list.findIndex((message) => message.id === receiptMessageId);
     if (receiptIndex < 0) return { updatedMessages: messagesMap, didChange: false };
 
@@ -121,8 +149,12 @@ export class ReadReceiptManager {
         : index === receiptIndex;
       if (!acknowledged || !message.isOutgoing || message.status === 'FAILED') return message;
 
-      const nextStatus = receipt.type === 'READ_RECEIPT' ? 'READ' : 'DELIVERED_TO_RECIPIENT';
-      if (message.status === nextStatus || (message.status === 'READ' && nextStatus !== 'READ')) return message;
+      const nextStatus: DeliveryStatus = receipt.type === 'READ_RECEIPT' ? 'READ' : 'DELIVERED_TO_RECIPIENT';
+
+      // Strict monotonicity: A message already in 'READ' status MUST NEVER regress
+      if (message.status === nextStatus) return message;
+      if (message.status === 'READ' && nextStatus !== 'READ') return message;
+
       didChange = true;
       return { ...message, status: nextStatus };
     });

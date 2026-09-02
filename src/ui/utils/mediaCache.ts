@@ -86,9 +86,12 @@ class MediaCacheManager {
           throw new Error('Attachment lacks objectId or attachmentId for cloud retrieval');
         }
 
-        // 30s timeout boundary to prevent permanent "Decrypting" hang
+        const downloadTimeoutMs = Math.max(180000, Math.ceil((attachment.sizeBytes || 1024 * 1024) / 50000) * 1000);
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Media download timed out (30s limit exceeded)')), 30000);
+          setTimeout(
+            () => reject(new Error(`Media download timed out (${Math.round(downloadTimeoutMs / 1000)}s limit exceeded)`)),
+            downloadTimeoutMs
+          );
         });
 
         const downloadAndDecrypt = async (): Promise<DecryptedMedia> => {

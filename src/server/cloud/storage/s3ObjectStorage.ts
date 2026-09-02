@@ -66,7 +66,7 @@ export class S3ObjectStorage implements IObjectStorage {
         process.env.S3_REGION ||
         'auto',
       pathStyle: config?.pathStyle ?? true,
-      timeoutMs: config?.timeoutMs || 15000,
+      timeoutMs: config?.timeoutMs || 180000,
     };
 
     if (this.config.accessKeyId && this.config.secretAccessKey) {

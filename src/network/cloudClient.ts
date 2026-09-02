@@ -298,16 +298,101 @@ export class CloudClient {
   }
 
   public async uploadAttachment(objectId: string, rawCiphertext: Uint8Array): Promise<void> {
-    const ciphertextBase64 = bytesToBase64(rawCiphertext);
-    await this.request('/v1/cloud/attachments/upload', 'POST', { objectId, ciphertextBase64 }, 120000);
+    const timeoutMs = Math.max(180000, Math.ceil(rawCiphertext.length / 50000) * 1000);
+    const computedHash = bytesToHex(sha256(rawCiphertext));
+
+    // Try high-performance raw binary upload first
+    let rawUploadSucceeded = false;
+    if (this.sessionToken) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const url = `${this.baseUrl}/v1/cloud/attachments/upload-raw?objectId=${encodeURIComponent(objectId)}`;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/octet-stream',
+          'X-Object-Id': objectId,
+          'X-Ciphertext-Hash': computedHash,
+          'Authorization': `Bearer ${this.sessionToken}`,
+        };
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: rawCiphertext as unknown as BodyInit,
+          signal: controller.signal,
+        });
+
+        if (res.ok) {
+          rawUploadSucceeded = true;
+        } else if (res.status !== 404 && res.status !== 405) {
+          const errText = await res.text().catch(() => '');
+          throw new Error(`Raw upload error HTTP ${res.status}: ${errText}`);
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          throw new Error(`Upload timed out after ${timeoutMs}ms. Please try again.`);
+        }
+        if (err?.message?.includes('Raw upload error')) {
+          throw err;
+        }
+        // Fall back to JSON upload if network error or 404
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    if (!rawUploadSucceeded) {
+      // Fallback to standard base64 JSON upload
+      const ciphertextBase64 = bytesToBase64(rawCiphertext);
+      await this.request('/v1/cloud/attachments/upload', 'POST', { objectId, ciphertextBase64 }, timeoutMs);
+    }
   }
 
   public async downloadAttachment(objectId: string): Promise<Uint8Array> {
+    const timeoutMs = 180000;
+
+    // Try raw binary download first
+    if (this.sessionToken) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const url = `${this.baseUrl}/v1/cloud/attachments/download-raw/${encodeURIComponent(objectId)}`;
+        const headers: Record<string, string> = {
+          'Authorization': `Bearer ${this.sessionToken}`,
+        };
+        const res = await fetch(url, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        });
+
+        if (res.ok) {
+          const buffer = await res.arrayBuffer();
+          const raw = new Uint8Array(buffer);
+          const expectedHash = res.headers.get('x-ciphertext-hash');
+          if (expectedHash) {
+            const computedHash = bytesToHex(sha256(raw));
+            if (computedHash !== expectedHash) {
+              throw new Error('Attachment integrity error: downloaded ciphertext hash mismatch');
+            }
+          }
+          return raw;
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          throw new Error(`Download timed out after ${timeoutMs}ms. Please try again.`);
+        }
+        // Fall back to JSON download
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    // Fallback to standard base64 JSON download
     const res = await this.request<{ ciphertextBase64: string; ciphertextHash: string }>(
       `/v1/cloud/attachments/download/${objectId}`,
       'GET',
       undefined,
-      120000
+      timeoutMs
     );
     const raw = base64ToBytes(res.ciphertextBase64);
     const computedHash = bytesToHex(sha256(raw));

@@ -17,6 +17,7 @@ import {
   TrashIcon,
 } from '../icons/index.ts';
 import { Button, IconButton } from '../ui/index.ts';
+import { inferMediaMime } from '../../../attachments/mimeUtils.ts';
 
 export interface StagedAttachment {
   file: File;
@@ -42,11 +43,14 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
 
   useEffect(() => {
     const list: StagedAttachment[] = files.map((file) => {
-      const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
-      const isVideo = file.type.startsWith('video/');
+      const mime = inferMediaMime(file);
+      const isMedia = mime.startsWith('image/') || mime.startsWith('video/');
+      const isVideo = mime.startsWith('video/');
       let previewUrl: string | undefined;
       if (isMedia) {
-        previewUrl = URL.createObjectURL(file);
+        try {
+          previewUrl = URL.createObjectURL(file);
+        } catch (_e) {}
       }
       return { file, previewUrl, isMedia, isVideo };
     });
