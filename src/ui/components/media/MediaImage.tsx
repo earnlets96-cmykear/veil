@@ -148,7 +148,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
       try {
         let blobSource: Blob | null = null;
         if (media?.data) {
-          blobSource = new Blob([media.data], { type: attachment.mimeType || 'video/mp4' });
+          blobSource = new Blob([media.data as any], { type: attachment.mimeType || 'video/mp4' });
         } else {
           const res = await fetch(displayBlobUrl);
           blobSource = await res.blob();

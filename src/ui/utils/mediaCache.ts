@@ -40,6 +40,8 @@ export interface AttachmentPayload {
   url?: string;
   state?: string;
   error?: string;
+  allowSave?: boolean;
+  allowForward?: boolean;
 }
 
 class MediaCacheManager {

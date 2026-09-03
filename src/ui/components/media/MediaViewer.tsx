@@ -102,13 +102,13 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         }
       }
 
-      if (!currentItem.attachment || !activeSession) return;
+      if (!currentItem.attachment || !activeSession || !cloudClient) return;
 
       setLoadingMedia((prev) => ({ ...prev, [key]: true }));
       setMediaErrors((prev) => ({ ...prev, [key]: '' }));
 
       try {
-        if (!cloudClient.getSessionToken()) {
+        if (!cloudClient.getSessionToken() && ensureCloudSession) {
           await ensureCloudSession(activeSession);
         }
 

@@ -81,11 +81,7 @@ export function getRelationshipState(
     if (matchedContact.status === 'BLOCKED') {
       return 'BLOCKED';
     }
-    if (
-      matchedContact.verificationStatus === 'MISMATCH' ||
-      matchedContact.verificationStatus === 'FAILED' ||
-      matchedContact.verificationStatus === 'COMPROMISED'
-    ) {
+    if (matchedContact.verificationStatus === 'MISMATCH') {
       return 'KEY_CHANGED';
     }
     if (matchedContact.verificationStatus === 'VERIFIED') {

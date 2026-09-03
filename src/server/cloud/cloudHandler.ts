@@ -678,6 +678,11 @@ export class CloudHandler {
         const hasSpaceAccess = requesterSpaces.some((s) => s.spaceId === attRecord.spaceId);
 
         let isRecipient = false;
+
+        if ((attRecord as any).recipientAccountId === accountId) {
+          isRecipient = true;
+        }
+
         if (attRecord.encryptedMetadata) {
           try {
             const metaObj = JSON.parse(attRecord.encryptedMetadata);
@@ -686,12 +691,15 @@ export class CloudHandler {
               (Array.isArray(metaObj.allowedAccounts) && metaObj.allowedAccounts.includes(accountId))
             ) {
               isRecipient = true;
-            } else if (metaObj.recipientUsername) {
+            } else if (metaObj.recipientUsername || (attRecord as any).recipientUsername) {
+              const targetUser = (metaObj.recipientUsername || (attRecord as any).recipientUsername)
+                .toLowerCase()
+                .replace(/^@/, '')
+                .trim();
               const reqAccount = await this.db.getAccountById(accountId);
               if (
                 reqAccount &&
-                reqAccount.username.toLowerCase().replace(/^@/, '').trim() ===
-                  metaObj.recipientUsername.toLowerCase().replace(/^@/, '').trim()
+                reqAccount.username.toLowerCase().replace(/^@/, '').trim() === targetUser
               ) {
                 isRecipient = true;
               }

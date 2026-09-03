@@ -279,7 +279,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   ).length;
 
   const commonGroupsCount = (conversations || []).filter(
-    (c) => c.type === 'group' && c.participants?.includes(effectiveIdentityId || '')
+    (c) => c.type === 'group' && Boolean(c.groupState?.members && effectiveIdentityId && c.groupState.members[effectiveIdentityId])
   ).length;
 
   // Avatar Selection for Self Profile
@@ -582,7 +582,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
 
           {/* Online / Last seen status */}
           <div style={{ fontSize: '0.8rem', color: 'var(--veil-text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <StatusIndicator status={relState === 'BLOCKED' ? 'offline' : 'online'} size="sm" />
+            <StatusIndicator status={relState === 'BLOCKED' ? 'offline' : 'online'} />
             <span>{relState === 'BLOCKED' ? 'Blocked' : 'last seen recently'}</span>
           </div>
         </div>

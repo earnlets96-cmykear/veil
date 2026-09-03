@@ -320,10 +320,20 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
             <VoiceNoteCard
               durationSeconds={msg.voice.durationSeconds}
               currentTimeSeconds={playbackCurrentTime[msg.id] || 0}
-              playbackState={playingAudioId === msg.id ? 'playing' : 'idle'}
+              isOutgoing={msg.isOutgoing}
+              playbackState={
+                msg.status === 'UPLOADING'
+                  ? 'uploading'
+                  : msg.status === 'FAILED'
+                  ? 'error'
+                  : playingAudioId === msg.id
+                  ? 'playing'
+                  : 'ready'
+              }
               currentProgressPercent={playbackProgress[msg.id] || 0}
               onPlayToggle={() => onToggleVoice(msg)}
               onSeek={(percent) => onSeekVoice(msg, percent)}
+              onRetry={() => onToggleVoice(msg)}
             />
           )}
 
@@ -366,6 +376,7 @@ export const ConversationView: React.FC = () => {
     conversations,
     contacts,
     messages,
+    myProfile,
     sendMessage,
     sendAttachment,
     selectConversation,
@@ -509,7 +520,7 @@ export const ConversationView: React.FC = () => {
     }
 
     try {
-      if (!cloudClient.getSessionToken()) {
+      if (!cloudClient.hasAuthenticatedSession()) {
         await ensureCloudSession(activeSession);
       }
 
@@ -565,7 +576,11 @@ export const ConversationView: React.FC = () => {
       }
 
       if (cached && cached.data) {
-        const saved = await FileSaver.saveFile(cached.data, msg.attachment.name, msg.attachment.mimeType);
+        const saved = await FileSaver.saveFile({
+          data: cached.data,
+          filename: msg.attachment.name,
+          mimeType: msg.attachment.mimeType,
+        });
         if (saved) {
           showToast({
             type: 'success',
@@ -692,14 +707,14 @@ export const ConversationView: React.FC = () => {
       name: msg.attachment?.name || msg.voice?.objectId || 'Encrypted Message',
       mimeType: msg.attachment?.mimeType || msg.voice?.mimeType || 'text/plain',
       sizeBytes: msg.attachment?.sizeBytes || msg.voice?.sizeBytes,
-      durationSeconds: msg.voice?.durationSeconds || msg.attachment?.duration,
-      width: msg.attachment?.width,
-      height: msg.attachment?.height,
+      durationSeconds: msg.voice?.durationSeconds || (msg.attachment as any)?.duration,
+      width: (msg.attachment as any)?.width,
+      height: (msg.attachment as any)?.height,
       timestamp: msg.timestamp,
       senderName: msg.senderName || (msg.isOutgoing ? (activeSession?.name || myProfile?.displayName || 'You') : (activeContact?.name || conversationName || 'Contact')),
       status: msg.status,
-      allowSave: msg.attachment?.allowSave ?? msg.voice?.allowSave ?? true,
-      allowForward: msg.attachment?.allowForward ?? msg.voice?.allowForward ?? true,
+      allowSave: msg.attachment?.allowSave ?? (msg.voice as any)?.allowSave ?? true,
+      allowForward: msg.attachment?.allowForward ?? (msg.voice as any)?.allowForward ?? true,
     };
     setMediaInfoTarget(info);
   };
@@ -849,7 +864,7 @@ export const ConversationView: React.FC = () => {
               <div className="veil-chat-header-titles">
                 <div className="veil-chat-header-name">
                   <span>{conversationName}</span>
-                  {(activeContact?.verificationStatus === 'VERIFIED' || activeContact?.isVerified || activeConversation?.isVerified) && (
+                  {(activeContact?.verificationStatus === 'VERIFIED' || activeConversation?.isVerified) && (
                     <span className="veil-verified-badge" title="Identity Verified" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                       <CheckIcon size={12} color="var(--veil-accent-primary)" />
                       <span>Verified</span>

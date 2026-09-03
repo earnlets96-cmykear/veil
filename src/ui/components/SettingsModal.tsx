@@ -39,7 +39,6 @@ import {
   InfoIcon,
   ArrowLeftIcon,
   CloseIcon,
-  LogOutIcon,
   EyeIcon,
   EyeOffIcon,
   CopyIcon,
@@ -49,13 +48,13 @@ import {
   RefreshCwIcon,
   TrashIcon,
   MoonIcon,
-  SmartphoneIcon,
   BellIcon,
   ChevronRightIcon,
 } from './icons/index.ts';
 
 export type SettingsCategory =
   | 'overview'
+  | 'profile'
   | 'account'
   | 'devices'
   | 'privacy'

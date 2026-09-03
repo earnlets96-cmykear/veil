@@ -48,6 +48,7 @@ export interface AttachmentTransferProgress {
  */
 export interface WireAttachmentPayload {
   attachmentId: string;
+  groupId?: string;
   objectId?: string;
   name: string;
   mimeType: string;
@@ -67,6 +68,7 @@ export interface WireAttachmentPayload {
  */
 export interface LocalAttachmentPayload {
   attachmentId: string;
+  groupId?: string;
   objectId?: string;
   name: string;
   mimeType: string;
@@ -96,6 +98,7 @@ export function toWireAttachment(localAttachment: any): WireAttachmentPayload {
 
   const wire: WireAttachmentPayload = {
     attachmentId: String(localAttachment.attachmentId || ''),
+    groupId: localAttachment.groupId ? String(localAttachment.groupId) : undefined,
     objectId: localAttachment.objectId ? String(localAttachment.objectId) : undefined,
     name: String(localAttachment.name || 'attachment'),
     mimeType: String(localAttachment.mimeType || 'application/octet-stream'),

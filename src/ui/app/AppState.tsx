@@ -49,8 +49,8 @@ export function resolveReplyReference(
 
   const isSelf = Boolean(target.isOutgoing);
   const senderName = isSelf
-    ? (selfName || target.senderName || 'You')
-    : (peerName || target.senderName || 'Contact');
+    ? (selfName || (target.senderName && target.senderName !== 'You' && target.senderName !== 'Yourself' ? target.senderName : 'You'))
+    : (peerName || (target.senderName && target.senderName !== 'Contact' && target.senderName !== 'Peer' ? target.senderName : ''));
 
   return {
     messageId: target.id,
@@ -77,6 +77,7 @@ import { ConversationManager } from '../../messaging/conversationManager.ts';
 import { SpaceMailboxBinding } from '../../network/types.ts';
 import { PrekeyBundle } from '../../ratchet/types.ts';
 import { DirectoryClient } from '../../network/directoryClient.ts';
+import { GroupManager } from '../../group/groupManager.ts';
 import { ContactRequestManager, ContactRequest } from '../../contacts/contactRequestManager.ts';
 import { SignedProfileDocument, createSignedProfile, verifySignedProfile } from '../../identity/profile.ts';
 import { DirectorySearchResult } from '../../server/types.ts';
@@ -127,6 +128,7 @@ const cloudClient = new CloudClient({
 });
 const accountManager = new AccountManager(cloudClient, vault, idMgr, store, storageAdapter);
 const syncEngine = new SyncEngine(store, cloudClient);
+const groupManager = new GroupManager(store, idMgr);
 
 export function normalizeUsername(u: string): string {
   return (u || '').trim().toLowerCase().replace(/^@/, '');
@@ -183,7 +185,11 @@ export interface AppContextType {
   addContactFromInvitation: (invitation: InvitationPayload) => Promise<void>;
   exportMyInvitation: () => string | null;
   updateContactVerification: (identityId: string, status: VerificationStatus) => Promise<void>;
-  createGroup: (name: string, description?: string) => Promise<void>;
+  createGroup: (
+    name: string,
+    description?: string,
+    members?: Array<{ identityId: string; username?: string; displayName?: string; signingPublicKey?: string; mailboxId?: string }>
+  ) => Promise<void>;
   ensureCloudSession: (session: SpaceSession, forceReauth?: boolean, customPassword?: string) => Promise<boolean | void>;
   updateContactMediaPermissions: (identityId: string, permissions: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
 
@@ -235,6 +241,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
   const cloudCredentials = useRef(new Map<string, string>());
   const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
+  const syncTimeoutRef = useRef<any>(null);
   const searchIndexTimeoutRef = useRef<any>(null);
 
   const queueSearchIndexUpdate = useCallback(
@@ -265,6 +272,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, immediate ? 100 : 15000); // 15s idle debounce during active messaging to prevent Argon2 CPU spikes
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      if (searchIndexTimeoutRef.current) clearTimeout(searchIndexTimeoutRef.current);
+    };
+  }, []);
+
   const isConversationMuted = useCallback(
     (conversationId: string): boolean => {
       return !!muteSettings[conversationId];
@@ -292,7 +306,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const ensureCloudSession = useCallback(
     async (session: SpaceSession, forceReauth = false, customPassword?: string): Promise<boolean> => {
-      if (!forceReauth && cloudClient.getSessionToken()) return true;
+      if (!forceReauth && cloudClient.hasAuthenticatedSession()) return true;
 
       try {
         const savedCloudSession = (await store.getAsync<{
@@ -656,11 +670,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return;
           }
 
+          const incomingSenderName =
+            matchingContact?.name ||
+            (senderDoc as any).displayName ||
+            ((senderDoc as any).username ? `@${(senderDoc as any).username}` : undefined) ||
+            senderDoc.identityId.slice(0, 10);
+
           const incomingAttachments = attachments || (attachment ? [attachment] : undefined);
           const incomingMsg: UIMessage = {
             id: storedMessage.messageId,
             conversationId: storedMessage.conversationId,
             senderId: storedMessage.senderIdentityId,
+            senderName: incomingSenderName,
+            groupId: storedMessage.groupId,
             text: storedMessage.text,
             isOutgoing: false,
             timestamp: storedMessage.timestamp,
@@ -758,6 +780,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                       lastMessage: incomingMsg.text,
                       timestamp: incomingMsg.timestamp,
                       unreadCount: (c.unreadCount || 0) + 1,
+                      peerDoc: senderDoc || c.peerDoc,
+                      mailboxId: senderMailboxId || c.mailboxId,
                     }
                   : c
               );
@@ -776,6 +800,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 lastMessage: incomingMsg.text,
                 timestamp: incomingMsg.timestamp,
                 peerDoc: senderDoc,
+                mailboxId: senderMailboxId,
               };
               const updated = [newConv, ...prev];
               store.setAsync(session, 'veil:ui:conversations', updated);
@@ -1056,11 +1081,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         try {
           const loadedId = idMgr.loadIdentity(session, store);
           if (loadedId) {
+            const binding = await netManager.getOrCreateMailbox(session);
+            const prekeyBundle = prekeyManager.createPrekeyBundle(session);
             const signedProfile = createSignedProfile(
               loadedId.document.identityId,
               loadedId.signingPrivateKey,
               cleanUsername,
-              cleanUsername
+              cleanUsername,
+              binding.mailboxId,
+              prekeyBundle
             );
             await store.setAsync(session, 'veil:user:profile', signedProfile);
             setMyProfile(signedProfile);
@@ -1106,11 +1135,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         const loadedId = idMgr.loadIdentity(session, store);
         if (loadedId) {
+          const binding = await netManager.getOrCreateMailbox(session);
+          const prekeyBundle = prekeyManager.createPrekeyBundle(session);
           const signedProfile = createSignedProfile(
             loadedId.document.identityId,
             loadedId.signingPrivateKey,
             activeUsername,
-            activeProfile?.displayName || activeUsername
+            activeProfile?.displayName || activeUsername,
+            binding.mailboxId,
+            prekeyBundle
           );
           await store.setAsync(session, 'veil:user:profile', signedProfile);
           setMyProfile(signedProfile);
@@ -1206,19 +1239,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         const lastInbound = [...convMsgs].reverse().find((m) => !m.isOutgoing);
         if (lastInbound) {
-          const targetMailboxId = contact?.mailboxId || conversationId;
-          const peerDocument =
+          const conv = conversations.find((c) => c.id === conversationId || c.name === conversationId);
+          let peerDocument =
             contact?.prekeyBundle?.identityDocument ||
-            conversations.find((c) => c.id === conversationId || c.name === conversationId)?.peerDoc;
-          if (peerDocument && targetMailboxId) {
+            conv?.peerDoc;
+          let targetMailboxId = contact?.mailboxId || conv?.mailboxId;
+
+          const dispatchReceipt = (doc: IdentityDocument, mbxId: string) => {
             readReceiptManager.scheduleReadReceipt(
               contact?.identityId || conversationId,
               lastInbound.id,
               async (receipt) => {
-                const wirePayload = await convManager.encryptAndPackReceipt(activeSession, peerDocument, receipt);
-                await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload);
-              }
+                const wirePayload = await convManager.encryptAndPackReceipt(activeSession, doc, receipt);
+                await netManager.sendEnvelope(activeSession, mbxId, wirePayload);
+              },
+              activeSession.spaceId
             );
+          };
+
+          if (peerDocument && targetMailboxId) {
+            dispatchReceipt(peerDocument, targetMailboxId);
+          } else if (lastInbound.senderId) {
+            directoryClient.getProfileByIdentity(lastInbound.senderId).then((profile) => {
+              if (profile) {
+                dispatchReceipt(profile.prekeyBundle.identityDocument, profile.mailboxId);
+              }
+            }).catch(() => {});
           }
         }
       } catch (_e) {}
@@ -1279,9 +1325,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (conversationId: string, text: string) => {
       if (!activeSession || !text.trim()) return;
 
-      // Phase 55 P0-2: Check if recipient is blocked
-      const isBlocked = (await contactRequestManager.isBlocked(activeSession, conversationId)) ||
-        contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
+      // Phase 55 P0-2: In-memory block check (0ms overhead)
+      const isBlocked = contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
       if (isBlocked) {
         throw new Error('Cannot send message: this user is blocked. Unblock them to resume messaging.');
       }
@@ -1289,9 +1334,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      // Resolve recipient contact for mailboxId and prekeyBundle
-      const freshContacts = await contactManager.listContacts(activeSession);
-      let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      let targetContact = contacts.find((c) => c.identityId === conversationId || c.name === conversationId);
 
       const activeReply = resolveReplyReference(
         replyTargetRef.current || replyTarget,
@@ -1313,6 +1356,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       replyTargetRef.current = null;
       setReplyTargetState(null);
 
+      // Instant optimistic UI render (0ms)
       setMessages((prev) => {
         const list = prev[conversationId] || [];
         const updated = { ...prev, [conversationId]: [...list, newMsg] };
@@ -1329,121 +1373,131 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
 
-      // If contact is missing mailboxId or prekeyBundle, try on-the-fly Directory lookup
-      if (!targetContact?.mailboxId || !targetContact?.prekeyBundle) {
+      // Background encryption and network transmission (non-blocking for UI thread)
+      (async () => {
         try {
-          const lookupName = (targetContact?.name || conversationId).replace(/^@/, '').trim();
-          let profile = await directoryClient.getProfileByUsername(lookupName);
-          if (!profile && targetContact?.identityId) {
-            profile = await directoryClient.getProfileByIdentity(targetContact.identityId);
+          if (!targetContact) {
+            const freshContacts = await contactManager.listContacts(activeSession);
+            targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
           }
-          if (!profile && conversationId) {
-            profile = await directoryClient.getProfileByIdentity(conversationId);
+
+          // If contact is missing mailboxId or prekeyBundle, try on-the-fly Directory lookup
+          if (!targetContact?.mailboxId || !targetContact?.prekeyBundle) {
+            try {
+              const lookupName = (targetContact?.name || conversationId).replace(/^@/, '').trim();
+              let profile = await directoryClient.getProfileByUsername(lookupName);
+              if (!profile && targetContact?.identityId) {
+                profile = await directoryClient.getProfileByIdentity(targetContact.identityId);
+              }
+              if (!profile && conversationId) {
+                profile = await directoryClient.getProfileByIdentity(conversationId);
+              }
+              if (!profile) {
+                const results = await directoryClient.searchProfiles(lookupName);
+                if (results.length > 0) {
+                  profile = await directoryClient.getProfileByUsername(results[0].username);
+                }
+              }
+              if (profile) {
+                targetContact = await contactManager.addContactFromInvitation(activeSession, {
+                  version: 1,
+                  identityId: profile.identityId,
+                  name: profile.displayName || profile.username,
+                  signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
+                  keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+                  fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+                  mailboxId: profile.mailboxId,
+                  prekeyBundle: profile.prekeyBundle,
+                  createdAt: profile.issuedAt,
+                  expiresAt: profile.expiresAt || 0,
+                  signature: profile.signature,
+                });
+                setContacts((prev) => [...prev.filter((c) => c.identityId !== targetContact!.identityId), targetContact!]);
+              }
+            } catch (_e) {}
           }
-          if (!profile) {
-            const results = await directoryClient.searchProfiles(lookupName);
-            if (results.length > 0) {
-              profile = await directoryClient.getProfileByUsername(results[0].username);
+
+          const targetMailboxId = targetContact?.mailboxId || conversationId;
+
+          try {
+            let wirePayload: string;
+            if (targetContact?.prekeyBundle) {
+              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                activeSession,
+                targetContact.prekeyBundle,
+                text.trim(),
+                undefined,
+                activeReply
+              );
+              wirePayload = wirePayloadBase64;
+            } else {
+              wirePayload = JSON.stringify({
+                id: msgId,
+                conversationId,
+                senderId: activeSession.spaceId,
+                text: text.trim(),
+                replyTo: activeReply,
+              });
+            }
+
+            const keys = new Set([
+              conversationId,
+              targetContact?.identityId,
+              targetContact?.name,
+            ].filter(Boolean) as string[]);
+
+            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+              messageId: msgId,
+              conversationId,
+            });
+
+            setMessages((prev) => {
+              const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
+                m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
+              );
+              const updated = { ...prev };
+              for (const k of keys) {
+                updated[k] = list;
+              }
+              store.setAsync(activeSession, 'veil:ui:messages', updated);
+              return updated;
+            });
+
+            scheduleCloudSync(activeSession, false);
+
+            if (typeof console !== 'undefined' && console.debug) {
+              console.debug(`[VEIL-UI] Outbound message sent: msgId=${msgId.slice(0, 8)}, convId=${conversationId.slice(0, 8)}, state=SENT_TO_RELAY`);
+            }
+          } catch (sendErr: any) {
+            const isOffline = networkState === 'offline';
+            const failureStatus = isOffline ? ('QUEUED' as const) : ('FAILED' as const);
+
+            const keys = new Set([
+              conversationId,
+              targetContact?.identityId,
+              targetContact?.name,
+            ].filter(Boolean) as string[]);
+
+            setMessages((prev) => {
+              const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
+                m.id === msgId ? { ...m, status: failureStatus } : m
+              );
+              const updated = { ...prev };
+              for (const k of keys) {
+                updated[k] = list;
+              }
+              store.setAsync(activeSession, 'veil:ui:messages', updated);
+              return updated;
+            });
+
+            scheduleCloudSync(activeSession, false);
+
+            if (typeof console !== 'undefined' && console.warn) {
+              console.warn(`[VEIL-UI] Outbound message send failed: msgId=${msgId.slice(0, 8)}, status=${failureStatus}, error=${sendErr?.message || sendErr}`);
             }
           }
-          if (profile) {
-            targetContact = await contactManager.addContactFromInvitation(activeSession, {
-              version: 1,
-              identityId: profile.identityId,
-              name: profile.displayName || profile.username,
-              signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
-              keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
-              fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
-              mailboxId: profile.mailboxId,
-              prekeyBundle: profile.prekeyBundle,
-              createdAt: profile.issuedAt,
-              expiresAt: profile.expiresAt || 0,
-              signature: profile.signature,
-            });
-            setContacts((prev) => [...prev.filter((c) => c.identityId !== targetContact!.identityId), targetContact!]);
-          }
-        } catch (_e) {}
-      }
-
-      const targetMailboxId = targetContact?.mailboxId || conversationId;
-
-      try {
-        let wirePayload: string;
-        if (targetContact?.prekeyBundle) {
-          const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-            activeSession,
-            targetContact.prekeyBundle,
-            text.trim(),
-            undefined,
-            activeReply
-          );
-          wirePayload = wirePayloadBase64;
-        } else {
-          wirePayload = JSON.stringify({
-            id: msgId,
-            conversationId,
-            senderId: activeSession.spaceId,
-            text: text.trim(),
-            replyTo: activeReply,
-          });
-        }
-
-        const keys = new Set([
-          conversationId,
-          targetContact?.identityId,
-          targetContact?.name,
-        ].filter(Boolean) as string[]);
-
-        await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
-          messageId: msgId,
-          conversationId,
-        });
-
-        setMessages((prev) => {
-          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-            m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
-          );
-          const updated = { ...prev };
-          for (const k of keys) {
-            updated[k] = list;
-          }
-          store.setAsync(activeSession, 'veil:ui:messages', updated);
-          return updated;
-        });
-
-        scheduleCloudSync(activeSession, false);
-
-        if (typeof console !== 'undefined' && console.debug) {
-          console.debug(`[VEIL-UI] Outbound message sent: msgId=${msgId.slice(0, 8)}, convId=${conversationId.slice(0, 8)}, state=SENT_TO_RELAY`);
-        }
-      } catch (sendErr: any) {
-        const isOffline = networkState === 'offline';
-        const failureStatus = isOffline ? ('QUEUED' as const) : ('FAILED' as const);
-
-        const keys = new Set([
-          conversationId,
-          targetContact?.identityId,
-          targetContact?.name,
-        ].filter(Boolean) as string[]);
-
-        setMessages((prev) => {
-          const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-            m.id === msgId ? { ...m, status: failureStatus } : m
-          );
-          const updated = { ...prev };
-          for (const k of keys) {
-            updated[k] = list;
-          }
-          store.setAsync(activeSession, 'veil:ui:messages', updated);
-          return updated;
-        });
-
-        scheduleCloudSync(activeSession, false);
-
-        if (typeof console !== 'undefined' && console.warn) {
-          console.warn(`[VEIL-UI] Outbound message send failed: msgId=${msgId.slice(0, 8)}, status=${failureStatus}, error=${sendErr?.message || sendErr}`);
-        }
-      }
+        } catch (_bgErr) {}
+      })();
     },
     [activeSession, contacts, conversations, replyTarget, networkState, myProfile]
   );
@@ -1486,6 +1540,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       replyTargetRef.current = null;
       setReplyTargetState(null);
 
+      const batchGroupId = files.length > 1 ? `grp_media_${Date.now()}_${bytesToHex(randomBytes(4))}` : undefined;
+
       // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
       const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
         const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
@@ -1498,6 +1554,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         return {
           attachmentId,
+          groupId: batchGroupId,
           name: file.name,
           sizeBytes: file.size,
           mimeType: effectiveMime,
@@ -1534,6 +1591,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: msgId,
         conversationId,
         senderId: activeSession.spaceId,
+        groupId: batchGroupId,
         text: summaryText,
         isOutgoing: true,
         timestamp: Date.now(),
@@ -1653,17 +1711,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 sizeBytes: rawCiphertext.length,
               });
 
-              await ensureCloudSession(activeSession);
-              if (!cloudClient.getSessionToken()) {
+              if (!cloudClient.hasAuthenticatedSession()) {
+                await ensureCloudSession(activeSession);
+              }
+              if (!cloudClient.hasAuthenticatedSession()) {
                 await ensureCloudSession(activeSession, true);
               }
-
-              RuntimeDiagnostics.upload('uploadStarted', {
-                attachmentId: currentAtt.attachmentId,
-                mimeType: currentAtt.mimeType,
-                sizeBytes: rawCiphertext.length,
-                hasSession: !!cloudClient.getSessionToken(),
-              });
 
               let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
               const uploadWithSession = async () => {
@@ -1680,8 +1733,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     mimeType: metadata.mimeType,
                     sizeBytes: metadata.sizeBytes,
                     conversationId,
+                    groupId: batchGroupId,
                     recipientUsername: isGroup ? undefined : targetUsername,
-                    recipientAccountId: isGroup ? undefined : targetContact?.metadata?.accountId,
+                    recipientAccountId: isGroup ? undefined : recipientAccountId,
+                    recipientIdentityId: isGroup ? undefined : recipientIdentityId,
+                    allowedAccounts: recipientAccountId ? [recipientAccountId] : undefined,
                     allowSave,
                     allowForward,
                   }),
@@ -1689,7 +1745,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 if (!isGroup) {
                   createParams.recipientUsername = targetUsername;
-                  createParams.recipientAccountId = targetContact?.metadata?.accountId;
+                  createParams.recipientAccountId = recipientAccountId;
+                  createParams.recipientIdentityId = recipientIdentityId;
                 }
 
                 const createRes = await cloudClient.createAttachment(createParams);
@@ -1698,6 +1755,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               };
 
               const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);
+
+              RuntimeDiagnostics.upload('uploadStarted', {
+                attachmentId: currentAtt.attachmentId,
+                mimeType: currentAtt.mimeType,
+                sizeBytes: rawCiphertext.length,
+              });
+
               try {
                 const timeoutPromise = new Promise<never>((_, reject) =>
                   setTimeout(
@@ -1741,6 +1805,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               activeAttachments[idx] = {
                 attachmentId: metadata.attachmentId,
                 objectId,
+                groupId: batchGroupId,
                 name: metadata.name,
                 mimeType: metadata.mimeType,
                 sizeBytes: metadata.sizeBytes,
@@ -1790,11 +1855,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Run worker pool with max concurrency = 2
         await Promise.all([uploadWorker(), uploadWorker()]);
 
-        // If all attachments succeeded, dispatch wire message and mark SENT_TO_RELAY
-        if (!hasAnyError && activeAttachments.every((a) => a.state === 'SENT' && a.objectId)) {
+        // Partial tolerance: If at least one attachment succeeded, dispatch wire message with successful attachments
+        const successfulAttachments = activeAttachments.filter((a) => a.state === 'SENT' && a.objectId);
+
+        if (successfulAttachments.length > 0) {
           try {
-            const wireAttachments = toWireAttachments(activeAttachments);
-            const wireSingle = activeAttachments.length === 1 ? toWireAttachment(activeAttachments[0]) : undefined;
+            const wireAttachments = toWireAttachments(successfulAttachments);
+            const wireSingle = successfulAttachments.length === 1 ? toWireAttachment(successfulAttachments[0]) : undefined;
             const wireText = summaryText;
 
             let wirePayload: string;
@@ -1806,7 +1873,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 wireSingle,
                 activeReply,
                 undefined,
-                activeAttachments.length > 1 ? wireAttachments : undefined
+                successfulAttachments.length > 1 ? wireAttachments : undefined
               );
               wirePayload = wirePayloadBase64;
             } else {
@@ -1816,7 +1883,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 senderId: activeSession.spaceId,
                 text: wireText,
                 attachment: wireSingle,
-                attachments: activeAttachments.length > 1 ? wireAttachments : undefined,
+                attachments: successfulAttachments.length > 1 ? wireAttachments : undefined,
+                groupId: batchGroupId,
                 replyTo: activeReply,
               });
             }
@@ -1828,15 +1896,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
             RuntimeDiagnostics.wire('wireDispatched', {
               msgId,
-              attachmentCount: activeAttachments.length,
-              attachmentIds: activeAttachments.map((a) => a.attachmentId),
-              objectIds: activeAttachments.map((a) => a.objectId),
+              attachmentCount: successfulAttachments.length,
+              attachmentIds: successfulAttachments.map((a) => a.attachmentId),
+              objectIds: successfulAttachments.map((a) => a.objectId),
               previewUrlPresent: false,
             });
 
             MediaLogger.log({
               event: 'WIRE_DISPATCHED',
-              attachmentId: activeAttachments[0]?.attachmentId,
+              attachmentId: successfulAttachments[0]?.attachmentId,
             });
 
             updateTimeline(activeAttachments, 'SENT_TO_RELAY');
@@ -1943,8 +2011,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const arrayBuffer = await audioBlob.arrayBuffer();
           const rawBytes = new Uint8Array(arrayBuffer);
 
-          if (!cloudClient.getSessionToken()) {
+          if (!cloudClient.hasAuthenticatedSession()) {
             await ensureCloudSession(activeSession);
+          }
+          if (!cloudClient.hasAuthenticatedSession()) {
+            await ensureCloudSession(activeSession, true);
           }
 
           const voiceMeta = await VoiceRecorder.encryptAndUploadVoiceNote(
@@ -1956,6 +2027,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             {
               recipientUsername: targetUsername,
               recipientAccountId,
+              recipientIdentityId,
               allowedAccounts: recipientAccountId ? [recipientAccountId] : undefined,
             }
           );
@@ -2151,15 +2223,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const loadedId = idMgr.loadIdentity(session, store);
         if (loadedId) {
           const existingProfile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
-          const signedProfile = createSignedProfile(
-            loadedId.document.identityId,
-            loadedId.signingPrivateKey,
-            cleanUsername,
-            existingProfile?.displayName || cleanUsername
-          );
-          await store.setAsync(session, 'veil:user:profile', signedProfile);
-          setMyProfile(signedProfile);
-
           const binding = await netManager.getOrCreateMailbox(session);
           const prekeyBundle = prekeyManager.createPrekeyBundle(session);
           const profileToRegister = createSignedProfile(
@@ -2171,6 +2234,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             prekeyBundle,
             existingProfile?.avatar || undefined
           );
+          await store.setAsync(session, 'veil:user:profile', profileToRegister);
+          setMyProfile(profileToRegister);
           try {
             await directoryClient.registerProfile(profileToRegister);
           } catch (_dErr) {}
@@ -2406,15 +2471,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const createGroup = useCallback(
-    async (name: string) => {
+    async (
+      name: string,
+      description?: string,
+      members?: Array<{ identityId: string; username?: string; displayName?: string; signingPublicKey?: string; mailboxId?: string }>
+    ) => {
       if (!activeSession) return;
-      const groupId = `grp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      let state: any;
+      try {
+        const metadata = {
+          name,
+          description,
+        };
+        const groupRes = groupManager.createGroup(activeSession, metadata);
+        state = groupRes.state;
+
+        if (members && members.length > 0) {
+          for (const member of members) {
+            try {
+              if (member.identityId && member.signingPublicKey) {
+                const { distribution } = groupManager.addMember(
+                  activeSession,
+                  state.groupId,
+                  member.identityId,
+                  member.signingPublicKey,
+                  'MEMBER'
+                );
+                if (member.mailboxId) {
+                  const invitePayload = JSON.stringify({
+                    type: 'GROUP_INVITE',
+                    groupId: state.groupId,
+                    name,
+                    description,
+                    senderKeyDistribution: distribution,
+                  });
+                  netManager.sendEnvelope(activeSession, member.mailboxId, invitePayload).catch(() => {});
+                }
+              }
+            } catch (_mErr) {}
+          }
+        }
+      } catch (_gErr) {}
+
+      const groupId = state?.groupId || `grp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const newConv: UIConversation = {
         id: groupId,
         type: 'group',
         name,
         avatarSeed: groupId,
         unreadCount: 0,
+        groupState: state,
       };
 
       setConversations((prev) => {

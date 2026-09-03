@@ -4,7 +4,8 @@
 
 import { IdentityDocument } from '../../identity/document.ts';
 import { GroupState } from '../../group/types.ts';
-import { DeliveryStatus } from '../../network/types.ts';
+import type { DeliveryStatus } from '../../network/types.ts';
+export type { DeliveryStatus };
 
 export interface UIConversation {
   id: string; // Peer identity ID or Group ID
@@ -18,6 +19,7 @@ export interface UIConversation {
   timestamp?: number;
   unreadCount: number;
   peerDoc?: IdentityDocument;
+  mailboxId?: string;
   groupState?: GroupState;
 }
 
@@ -26,12 +28,14 @@ export interface UIMessage {
   conversationId: string;
   senderId: string;
   senderName?: string;
+  groupId?: string;
   text: string;
   isOutgoing: boolean;
   timestamp: number;
   status: DeliveryStatus;
   attachment?: {
     attachmentId?: string;
+    groupId?: string;
     name: string;
     sizeBytes: number;
     mimeType: string;
@@ -50,6 +54,7 @@ export interface UIMessage {
   };
   attachments?: Array<{
     attachmentId: string;
+    groupId?: string;
     name: string;
     sizeBytes: number;
     mimeType: string;

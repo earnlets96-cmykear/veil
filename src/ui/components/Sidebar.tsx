@@ -504,7 +504,20 @@ export const Sidebar: React.FC = () => {
                     if (e.key === 'Enter' || e.key === ' ') selectConversation(contact.identityId);
                   }}
                 >
-                  <Avatar name={contact.name} imageUrl={contact.avatar} size="md" />
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModal({
+                        type: 'profile',
+                        peerId: contact.identityId,
+                        peerUsername: contact.accountUsername || (contact.name?.startsWith('@') ? contact.name.slice(1) : undefined),
+                      });
+                    }}
+                    title="View Profile"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <Avatar name={contact.name} imageUrl={contact.avatar} size="md" />
+                  </div>
                   <div className="veil-conversation-info">
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{contact.name}</span>

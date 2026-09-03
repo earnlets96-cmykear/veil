@@ -24,8 +24,23 @@ import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerMod
 import { PermissionsModal } from './PermissionsModal.tsx';
 
 export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversationId }) => {
-  const { sendMessage, sendAttachment, sendVoiceMessage, replyTarget, setReplyTarget } = useApp();
+  const {
+    sendMessage,
+    sendAttachment,
+    sendAttachments,
+    sendVoiceMessage,
+    replyTarget,
+    setReplyTarget,
+    myProfile,
+    contacts,
+    conversations,
+  } = useApp();
   const { showToast } = useToast();
+
+  const activeConv = conversations.find((c) => c.id === conversationId);
+  const activeContact = contacts.find((c) => c.identityId === conversationId);
+  const peerName = activeContact?.name || activeConv?.name;
+  const selfName = myProfile?.displayName || myProfile?.username;
 
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -40,22 +55,19 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorderRef = useRef<VoiceRecorder | null>(null);
 
-  const handleSend = async () => {
-    if (!text.trim() || isSending) return;
+  const handleSend = () => {
+    if (!text.trim()) return;
     const msgText = text.trim();
     setText('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    setIsSending(true);
 
-    try {
-      await sendMessage(conversationId, msgText);
-    } catch (_err) {
+    // Fire-and-forget: AppState optimistically displays the message in 0ms
+    // while Double Ratchet encryption and relay transport proceed in the background.
+    sendMessage(conversationId, msgText).catch((_err) => {
       // Offline queue preserves message
-    } finally {
-      setIsSending(false);
-    }
+    });
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -228,7 +240,7 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
       {replyTarget && (
         <ReplyPreview
           replyTo={{
-            ...resolveReplyReference(replyTarget)!,
+            ...resolveReplyReference(replyTarget, selfName, peerName)!,
             thumbnailUrl:
               replyTarget.attachment?.previewUrl ||
               replyTarget.attachment?.localPreviewUrl ||
@@ -334,11 +346,11 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
               type="button"
               className="veil-btn-composer-send"
               onClick={handleSend}
-              disabled={!text.trim() || isSending}
+              disabled={!text.trim()}
               aria-label="Send Message"
               title="Send Message"
             >
-              {isSending ? <Spinner size="sm" aria-label="Sending..." /> : <SendIcon size={18} color="#ffffff" />}
+              <SendIcon size={18} color="#ffffff" />
             </button>
           </>
         )}

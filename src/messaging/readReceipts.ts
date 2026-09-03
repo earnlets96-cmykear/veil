@@ -30,7 +30,7 @@ export type ReceiptPayload = DeliveryReceiptPayload | ReadReceiptPayload;
 export class ReadReceiptManager {
   private pendingReceipts: Map<
     string,
-    { conversationId: string; lastMessageId: string; sendReceipt?: (receipt: ReadReceiptPayload) => Promise<void> }
+    { conversationId: string; lastMessageId: string; readerIdentityId?: string; sendReceipt?: (receipt: ReadReceiptPayload) => Promise<void> }
   > = new Map();
   private debounceTimer: any = null;
 
@@ -41,13 +41,15 @@ export class ReadReceiptManager {
   public scheduleReadReceipt(
     conversationId: string,
     lastMessageId: string,
-    sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>
+    sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>,
+    readerIdentityId?: string
   ): void {
     if (!conversationId || !lastMessageId) return;
 
     this.pendingReceipts.set(conversationId, {
       conversationId,
       lastMessageId,
+      readerIdentityId,
       sendReceipt,
     });
 
@@ -77,7 +79,7 @@ export class ReadReceiptManager {
           type: 'READ_RECEIPT',
           conversationId: item.conversationId,
           lastReadMessageId: item.lastMessageId,
-          readerIdentityId: '',
+          readerIdentityId: item.readerIdentityId || '',
           readAt: Date.now(),
         };
         await sender(payload);
@@ -91,11 +93,24 @@ export class ReadReceiptManager {
   /**
    * Processes an inbound read/delivery receipt payload and updates matching outgoing message statuses.
    */
-  public processInboundReceipt(
-    receipt: ReceiptPayload,
-    messagesMap: Record<string, UIMessage[]>,
+  public static processInboundReceipt(
+    arg1: any,
+    arg2: any,
     authenticatedPeerId?: string
   ): { updatedMessages: Record<string, UIMessage[]>; didChange: boolean } {
+    let receipt: ReceiptPayload;
+    let messagesMap: Record<string, UIMessage[]>;
+
+    if (arg1 && typeof arg1.type === 'string') {
+      receipt = arg1;
+      messagesMap = arg2;
+    } else if (arg2 && typeof arg2.type === 'string') {
+      receipt = arg2;
+      messagesMap = arg1;
+    } else {
+      return { updatedMessages: arg1 || {}, didChange: false };
+    }
+
     // 1. Authenticate peer attribution
     // If authenticatedPeerId is provided, the sender of the encrypted payload must match the expected reader/recipient
     if (authenticatedPeerId) {
@@ -171,3 +186,12 @@ export class ReadReceiptManager {
 }
 
 export const readReceiptManager = new ReadReceiptManager();
+export const processInboundReceipt = ReadReceiptManager.processInboundReceipt;
+export const scheduleReadReceipt = (
+  conversationId: string,
+  lastMessageId: string,
+  sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>,
+  readerIdentityId?: string
+) => readReceiptManager.scheduleReadReceipt(conversationId, lastMessageId, sendReceipt, readerIdentityId);
+export const flushPendingReceipts = (senderIdentityId?: string) => readReceiptManager.flushPendingReceipts(senderIdentityId);
+

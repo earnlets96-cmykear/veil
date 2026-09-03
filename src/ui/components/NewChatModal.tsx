@@ -22,6 +22,7 @@ export const NewChatModal: React.FC = () => {
     contactRequests,
     directoryClient,
     closeModal,
+    openModal,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'search' | 'invite'>('search');
@@ -299,7 +300,20 @@ export const NewChatModal: React.FC = () => {
                           border: '1px solid var(--veil-border-subtle)',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer' }}
+                          onClick={() => {
+                            openModal({
+                              type: 'profile',
+                              peerId: user.identityId,
+                              peerUsername: user.username,
+                              searchResult: user,
+                            });
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          title={`View profile for @${user.username}`}
+                        >
                           <div
                             style={{
                               width: '32px',

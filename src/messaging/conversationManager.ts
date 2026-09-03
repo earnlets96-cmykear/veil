@@ -35,6 +35,7 @@ export interface StoredMessage {
   conversationId: string;
   senderIdentityId: string;
   recipientIdentityId: string;
+  groupId?: string;
   text: string;
   isOutgoing: boolean;
   timestamp: number;
@@ -332,12 +333,13 @@ export class ConversationManager {
     const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
     const wireAttachment = attachment ? toWireAttachment(attachment) : undefined;
     const wireAttachments = toWireAttachments(attachments);
+    const wireGroupId = wireAttachment?.groupId || (wireAttachments && wireAttachments[0]?.groupId);
 
     // Sanitize senderDocument: never leak large inline avatar data into wire envelopes
     const cleanSenderDoc: IdentityDocument = {
       ...myDoc,
-      avatar: undefined,
     };
+    delete (cleanSenderDoc as any).avatar;
 
     const wireObj = {
       version: 1 as const,
@@ -348,6 +350,7 @@ export class ConversationManager {
       ratchetMessage: ratchetMsg,
       attachment: wireAttachment,
       attachments: wireAttachments,
+      groupId: wireGroupId,
       replyTo,
       voice,
     };
@@ -369,6 +372,7 @@ export class ConversationManager {
       conversationId: peerId,
       senderIdentityId: myDoc.identityId,
       recipientIdentityId: peerId,
+      groupId: wireGroupId,
       text,
       isOutgoing: true,
       timestamp: Date.now(),
@@ -405,11 +409,11 @@ export class ConversationManager {
       ? { ...receipt, conversationId: peerDocument.identityId, readerIdentityId: myDoc.identityId }
       : { ...receipt, conversationId: peerDocument.identityId };
     const ratchetMsg = ratchetSession.ratchetEncrypt(JSON.stringify(authenticatedReceipt));
-    const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
     const cleanSenderDoc: IdentityDocument = {
       ...myDoc,
-      avatar: undefined,
     };
+    delete (cleanSenderDoc as any).avatar;
+    const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
     const wireObj = {
       version: 1 as const,
       deliveryId: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -568,11 +572,13 @@ export class ConversationManager {
     // 5. Append to encrypted local conversation history
     const deliveryId = wireObj.deliveryId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const myDoc = this.idMgr.getPublicDocument(session, this.store);
+    const inboundGroupId = wireObj.groupId || wireObj.attachment?.groupId || (wireObj.attachments && wireObj.attachments[0]?.groupId);
     const storedMessage: StoredMessage = {
       messageId: deliveryId,
       conversationId: senderId,
       senderIdentityId: senderId,
       recipientIdentityId: myDoc?.identityId || 'local_user',
+      groupId: inboundGroupId,
       text,
       isOutgoing: false,
       timestamp: Date.now(),

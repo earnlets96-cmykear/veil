@@ -11,7 +11,7 @@
  *   yielding the exact same Ed25519 identityId byte-for-byte.
  */
 
-import { deriveKeyArgon2id, FAST_TEST_KDF_PARAMS } from '../crypto/kdf.ts';
+import { deriveKeyArgon2id, DEFAULT_KDF_PARAMS, FAST_TEST_KDF_PARAMS } from '../crypto/kdf.ts';
 import { encryptXChaCha20Poly1305, decryptXChaCha20Poly1305 } from '../crypto/aead.ts';
 import { bytesToBase64, base64ToBytes, bytesToHex, randomBytes } from '../crypto/utils.ts';
 import { zeroize } from '../crypto/memory.ts';
@@ -160,6 +160,8 @@ export class AccountManager {
     password: string;
     deviceName?: string;
     customKdfParams?: Partial<KdfParameters>;
+    allowFreshSpaceCreation?: boolean;
+    isEmergencyRecovery?: boolean;
   }): Promise<{
     account: any;
     session: SpaceSession;
@@ -230,7 +232,7 @@ export class AccountManager {
       return {
         account: restoreRes.account,
         session,
-        identityDoc: identity.document,
+        identityDoc: identity,
       };
     }
 
@@ -342,7 +344,7 @@ export class AccountManager {
       this.store.set(session, 'veil:identity:signing-private', first.signingPrivateKeyBase64);
       this.store.set(session, 'veil:identity:ka-private', first.keyAgreementPrivateKeyBase64);
       if (snapshot) {
-        for (const record of first.encryptedRecords) {
+        for (const record of (first as RecoverySnapshotV2Space).encryptedRecords || []) {
           await this.storageAdapter.saveRecord(session.spaceId, record);
         }
         await this.store.loadPartitionFromStorage(session);
@@ -436,7 +438,7 @@ export class AccountManager {
       this.cloudClient.setSession(storedSession.sessionToken, storedSession.accountId, storedSession.deviceId);
     } else {
       try {
-        const identity = this.identityManager.loadIdentity(session, this.store);
+        const identity = this.idMgr.loadIdentity(session, this.store);
         const deviceId = `dev_${identity ? identity.document.identityId.slice(0, 12) : bytesToHex(randomBytes(6))}`;
         const logRes = await this.cloudClient.loginAccount({
           username: cleanUsername,
