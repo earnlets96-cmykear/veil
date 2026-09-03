@@ -45,12 +45,12 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     ? attachment.previewUrl
     : null;
 
-  // Blob URLs are only trusted if actively loaded in media state or RAM cache
+  // Blob URLs are trusted if in RAM cache, media state, or provided preview
   const activeBlobUrl = media?.blobUrl || null;
-  const displayUrl = activeBlobUrl || durableThumbnail;
+  const displayUrl = activeBlobUrl || durableThumbnail || attachment.previewUrl || (attachment as any).url || null;
   const isShowingThumbnail = !activeBlobUrl && Boolean(durableThumbnail);
 
-  const [isLoading, setIsLoading] = useState(!media && !durableThumbnail);
+  const [isLoading, setIsLoading] = useState(!media && !displayUrl);
   const [error, setError] = useState<string | null>(null);
   const [videoThumbnailUrl, setVideoThumbnailUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);

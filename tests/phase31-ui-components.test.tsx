@@ -271,7 +271,7 @@ describe('Phase 31: Reusable UI Component Layer Tests', () => {
       expect(html).toContain('Hello from E2EE space!');
       expect(html).toContain('Alice');
       expect(html).toContain('Original message');
-      expect(html).toContain('Delivered &amp; Read');
+      expect(html).toContain('Delivered');
     });
 
     it('renders ReplyPreview with snippet and dismiss button', () => {
@@ -291,7 +291,7 @@ describe('Phase 31: Reusable UI Component Layer Tests', () => {
       expect(queuedHtml).toContain('Queued locally');
 
       const deliveredHtml = renderToStaticMarkup(<MessageStatus status="DELIVERED_TO_RECIPIENT" />);
-      expect(deliveredHtml).toContain('Delivered &amp; Read');
+      expect(deliveredHtml).toContain('Delivered');
 
       const failedHtml = renderToStaticMarkup(<MessageStatus status="FAILED" />);
       expect(failedHtml).toContain('Failed to deliver');

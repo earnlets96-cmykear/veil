@@ -548,6 +548,8 @@ export class CloudHandler {
         chunkSize,
         recipientAccountId,
         recipientUsername,
+        recipientIdentityId,
+        groupId,
         conversationId,
         allowedAccounts,
       } = body;
@@ -557,21 +559,36 @@ export class CloudHandler {
       }
 
       let metaPayload = encryptedMetadata || '';
-      if (recipientAccountId || recipientUsername || conversationId || allowedAccounts) {
-        let metaObj: any = {};
-        if (encryptedMetadata) {
-          try {
-            metaObj = JSON.parse(encryptedMetadata);
-          } catch (_e) {
-            metaObj = { raw: encryptedMetadata };
-          }
+      let metaObj: any = {};
+      if (encryptedMetadata) {
+        try {
+          metaObj = JSON.parse(encryptedMetadata);
+        } catch (_e) {
+          metaObj = { raw: encryptedMetadata };
         }
-        if (recipientAccountId) metaObj.recipientAccountId = recipientAccountId;
-        if (recipientUsername) metaObj.recipientUsername = recipientUsername;
-        if (conversationId) metaObj.conversationId = conversationId;
-        if (allowedAccounts) metaObj.allowedAccounts = allowedAccounts;
-        metaPayload = JSON.stringify(metaObj);
       }
+
+      let resolvedRecipientAccountId = recipientAccountId || metaObj.recipientAccountId;
+      const targetUser = recipientUsername || metaObj.recipientUsername;
+      if (!resolvedRecipientAccountId && targetUser) {
+        try {
+          const cleanUser = targetUser.toLowerCase().replace(/^@/, '').trim();
+          const targetAcc = await this.db.getAccountByUsername(cleanUser);
+          if (targetAcc) {
+            resolvedRecipientAccountId = targetAcc.accountId;
+          }
+        } catch (_e) {}
+      }
+
+      const resolvedGroupId = groupId || metaObj.groupId;
+
+      if (resolvedRecipientAccountId) metaObj.recipientAccountId = resolvedRecipientAccountId;
+      if (targetUser) metaObj.recipientUsername = targetUser;
+      if (recipientIdentityId || metaObj.recipientIdentityId) metaObj.recipientIdentityId = recipientIdentityId || metaObj.recipientIdentityId;
+      if (resolvedGroupId) metaObj.groupId = resolvedGroupId;
+      if (conversationId) metaObj.conversationId = conversationId;
+      if (allowedAccounts) metaObj.allowedAccounts = allowedAccounts;
+      metaPayload = JSON.stringify(metaObj);
 
       // Auto-provision space record if not yet registered on cloud backend
       const spaceRecord = await this.db.getSpace(accountId, spaceId);
@@ -602,6 +619,12 @@ export class CloudHandler {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+      if (resolvedRecipientAccountId) {
+        (record as any).recipientAccountId = resolvedRecipientAccountId;
+      }
+      if (resolvedGroupId) {
+        (record as any).groupId = resolvedGroupId;
+      }
 
       await this.db.saveAttachment(record);
       this.sendJson(res, 201, { attachment: record });
@@ -683,10 +706,16 @@ export class CloudHandler {
           isRecipient = true;
         }
 
+        if ((attRecord as any).groupId) {
+          isRecipient = true;
+        }
+
         if (attRecord.encryptedMetadata) {
           try {
             const metaObj = JSON.parse(attRecord.encryptedMetadata);
-            if (
+            if (metaObj.groupId) {
+              isRecipient = true;
+            } else if (
               metaObj.recipientAccountId === accountId ||
               (Array.isArray(metaObj.allowedAccounts) && metaObj.allowedAccounts.includes(accountId))
             ) {
@@ -765,20 +794,34 @@ export class CloudHandler {
         const hasSpaceAccess = requesterSpaces.some((s) => s.spaceId === attRecord.spaceId);
 
         let isRecipient = false;
+
+        if ((attRecord as any).recipientAccountId === accountId) {
+          isRecipient = true;
+        }
+
+        if ((attRecord as any).groupId) {
+          isRecipient = true;
+        }
+
         if (attRecord.encryptedMetadata) {
           try {
             const metaObj = JSON.parse(attRecord.encryptedMetadata);
-            if (
+            if (metaObj.groupId) {
+              isRecipient = true;
+            } else if (
               metaObj.recipientAccountId === accountId ||
               (Array.isArray(metaObj.allowedAccounts) && metaObj.allowedAccounts.includes(accountId))
             ) {
               isRecipient = true;
-            } else if (metaObj.recipientUsername) {
+            } else if (metaObj.recipientUsername || (attRecord as any).recipientUsername) {
+              const targetUser = (metaObj.recipientUsername || (attRecord as any).recipientUsername)
+                .toLowerCase()
+                .replace(/^@/, '')
+                .trim();
               const reqAccount = await this.db.getAccountById(accountId);
               if (
                 reqAccount &&
-                reqAccount.username.toLowerCase().replace(/^@/, '').trim() ===
-                  metaObj.recipientUsername.toLowerCase().replace(/^@/, '').trim()
+                reqAccount.username.toLowerCase().replace(/^@/, '').trim() === targetUser
               ) {
                 isRecipient = true;
               }

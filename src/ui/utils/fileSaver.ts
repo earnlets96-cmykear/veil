@@ -62,6 +62,14 @@ export class FileSaver {
     try {
       const base64Data = bytesToBase64(data);
 
+      // Check and request filesystem permissions if required by Android runtime
+      try {
+        const permStatus = await Filesystem.checkPermissions();
+        if (permStatus.publicStorage === 'prompt' || permStatus.publicStorage === 'prompt-with-rationale') {
+          await Filesystem.requestPermissions();
+        }
+      } catch (_permErr) {}
+
       // 1. Write file to Documents directory (user accessible)
       let fileResult;
       try {

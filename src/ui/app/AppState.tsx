@@ -13,6 +13,9 @@ import { SpaceIdentityManager } from '../../identity/manager.ts';
 import { NetworkManager } from '../../network/networkManager.ts';
 import { SessionController } from './sessionController.ts';
 import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyReference } from './types.ts';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { base64ToBytes } from '../../crypto/utils.ts';
 
 export function resolveReplyReference(
   target: UIMessage | null,
@@ -177,6 +180,7 @@ export interface AppContextType {
   sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
+  deleteMessageForEveryone: (conversationId: string, messageId: string) => Promise<void>;
   deleteMessagesLocally: (conversationId: string, messageIds: string[]) => Promise<void>;
   retryFailedMessage: (conversationId: string, messageId: string) => Promise<void>;
   markConversationAsRead: (conversationId: string) => void;
@@ -638,6 +642,159 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 });
               }
               return;
+            }
+          } else if (payload.includes('"type":"DELETE_MESSAGE"')) {
+            const parsed = JSON.parse(payload);
+            if (parsed.messageId && parsed.conversationId) {
+              const tombstone: DeletedMessageTombstone = {
+                messageId: parsed.messageId,
+                conversationId: parsed.conversationId,
+                deletedAt: parsed.deletedAt || Date.now(),
+              };
+              const existingTombstones = (await store.getAsync<DeletedMessageTombstone[]>(session, 'veil:ui:deleted_messages')) || [];
+              await store.setAsync(session, 'veil:ui:deleted_messages', [...existingTombstones.filter((t) => t.messageId !== parsed.messageId), tombstone]);
+              setMessages((prev) => {
+                const list = prev[parsed.conversationId] || [];
+                const filtered = list.filter((m) => m.id !== parsed.messageId);
+                const updated = { ...prev, [parsed.conversationId]: filtered };
+                store.setAsync(session, 'veil:ui:messages', updated);
+                return updated;
+              });
+              return;
+            }
+          } else if (payload.includes('"type":"GROUP_INVITE"')) {
+            const invite = JSON.parse(payload);
+            if (invite.groupId && invite.senderKeyDistribution) {
+              try {
+                let existingGroup = groupManager.loadGroupState(session, invite.groupId);
+                const members = invite.members || (existingGroup ? existingGroup.members : {});
+                if (!existingGroup) {
+                  existingGroup = {
+                    groupId: invite.groupId,
+                    version: 1,
+                    epoch: 1,
+                    creatorIdentityId: invite.creator?.identityId || '',
+                    encryptedMetadata: '',
+                    metadataNonce: '',
+                    members: members,
+                    actionHistory: [],
+                    updatedAt: Date.now(),
+                  };
+                  groupManager.saveGroupState(session, existingGroup);
+                }
+                if (invite.creator?.signingPublicKey) {
+                  const creatorKeyBytes = typeof invite.creator.signingPublicKey === 'string'
+                    ? base64ToBytes(invite.creator.signingPublicKey)
+                    : invite.creator.signingPublicKey;
+                  groupManager.processSenderKeyDistribution(
+                    session,
+                    invite.senderKeyDistribution,
+                    creatorKeyBytes
+                  );
+                }
+
+                setConversations((prev) => {
+                  if (prev.some((c) => c.id === invite.groupId)) return prev;
+                  const newConv: UIConversation = {
+                    id: invite.groupId,
+                    type: 'group',
+                    name: invite.name || 'New Group',
+                    avatarSeed: invite.groupId,
+                    unreadCount: 0,
+                    groupState: (existingGroup || {
+                      groupId: invite.groupId,
+                      version: 1,
+                      epoch: 1,
+                      creatorIdentityId: invite.creator?.identityId || '',
+                      encryptedMetadata: '',
+                      metadataNonce: '',
+                      members: members,
+                      actionHistory: [],
+                      updatedAt: Date.now(),
+                    }) as any,
+                    lastMessage: 'You were added to the group',
+                    timestamp: Date.now(),
+                  };
+                  const updated = [newConv, ...prev];
+                  store.setAsync(session, 'veil:ui:conversations', updated);
+                  return updated;
+                });
+
+                notificationDispatcher.dispatch({
+                  id: invite.groupId,
+                  senderName: invite.name || 'Group Invite',
+                  text: `You were invited to group "${invite.name}"`,
+                  timestamp: Date.now(),
+                });
+                return;
+              } catch (err) {
+                console.error('Failed to handle GROUP_INVITE:', err);
+              }
+            }
+          } else if (payload.includes('"type":"GROUP_MESSAGE"')) {
+            const parsed = JSON.parse(payload);
+            if (parsed.groupId && parsed.senderKeyMessage) {
+              try {
+                const senderKeyBytes = parsed.senderSigningKey ? base64ToBytes(parsed.senderSigningKey) : new Uint8Array(32);
+                const decrypted = groupManager.decryptGroupMessage(
+                  session,
+                  parsed.senderKeyMessage,
+                  senderKeyBytes
+                );
+                const plaintext = decrypted.text;
+                const senderIdentity = parsed.senderIdentityId || parsed.senderSigningKey || 'Group Member';
+                const incomingMsg: UIMessage = {
+                  id: parsed.deliveryId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                  conversationId: parsed.groupId,
+                  senderId: senderIdentity,
+                  senderName: parsed.senderName || senderIdentity.slice(0, 10),
+                  groupId: parsed.groupId,
+                  text: plaintext,
+                  isOutgoing: false,
+                  timestamp: parsed.timestamp || Date.now(),
+                  status: 'DELIVERED_TO_RECIPIENT',
+                  attachment: parsed.attachment,
+                  attachments: parsed.attachments,
+                  replyTo: parsed.replyTo,
+                  voice: parsed.voice,
+                };
+
+                setMessages((prev) => {
+                  const list = prev[parsed.groupId] || [];
+                  if (list.some((m) => m.id === incomingMsg.id)) return prev;
+                  const updated = { ...prev, [parsed.groupId]: [...list, incomingMsg] };
+                  store.setAsync(session, 'veil:ui:messages', updated);
+                  return updated;
+                });
+
+                setConversations((prev) => {
+                  const updated = prev.map((c) => {
+                    if (c.id === parsed.groupId) {
+                      return {
+                        ...c,
+                        lastMessage: plaintext || 'Media message',
+                        timestamp: incomingMsg.timestamp,
+                        unreadCount: activeChatId === parsed.groupId ? 0 : (c.unreadCount || 0) + 1,
+                      };
+                    }
+                    return c;
+                  });
+                  store.setAsync(session, 'veil:ui:conversations', updated);
+                  return updated;
+                });
+
+                if (activeChatId !== parsed.groupId) {
+                  notificationDispatcher.dispatch({
+                    id: incomingMsg.id,
+                    senderName: parsed.senderName || 'Group Member',
+                    text: plaintext || 'New group message',
+                    timestamp: incomingMsg.timestamp,
+                  });
+                }
+                return;
+              } catch (err) {
+                console.error('Failed to decrypt GROUP_MESSAGE:', err);
+              }
             }
           }
         } catch (_reqErr) {}
@@ -1429,23 +1586,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const targetMailboxId = targetContact?.mailboxId || conversationId;
 
           try {
-            let wirePayload: string;
-            if (targetContact?.prekeyBundle) {
-              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+            const targetConv = conversations.find((c) => c.id === conversationId);
+
+            if (targetConv?.type === 'group') {
+              const { payload: groupCiphertext } = groupManager.encryptGroupMessage(
                 activeSession,
-                targetContact.prekeyBundle,
-                text.trim(),
-                undefined,
-                activeReply
-              );
-              wirePayload = wirePayloadBase64;
-            } else {
-              wirePayload = JSON.stringify({
-                id: msgId,
                 conversationId,
-                senderId: activeSession.spaceId,
-                text: text.trim(),
+                text.trim()
+              );
+              const groupPayload = JSON.stringify({
+                type: 'GROUP_MESSAGE',
+                groupId: conversationId,
+                deliveryId: msgId,
+                senderIdentityId: activeSession.spaceId,
+                senderName: activeSession.name || myProfile?.displayName || 'Me',
+                senderKeyMessage: groupCiphertext,
                 replyTo: activeReply,
+                timestamp: Date.now(),
+              });
+
+              const members = targetConv.groupState?.members || {};
+              for (const memberId of Object.keys(members)) {
+                const member = members[memberId];
+                const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
+                if (mailbox && memberId !== activeSession.spaceId) {
+                  await netManager.sendEnvelope(activeSession, mailbox, groupPayload).catch(() => {});
+                }
+              }
+            } else {
+              let wirePayload: string;
+              if (targetContact?.prekeyBundle) {
+                const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                  activeSession,
+                  targetContact.prekeyBundle,
+                  text.trim(),
+                  undefined,
+                  activeReply,
+                  undefined,
+                  undefined,
+                  msgId
+                );
+                wirePayload = wirePayloadBase64;
+              } else {
+                wirePayload = JSON.stringify({
+                  id: msgId,
+                  deliveryId: msgId,
+                  conversationId,
+                  senderId: activeSession.spaceId,
+                  text: text.trim(),
+                  replyTo: activeReply,
+                });
+              }
+
+              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+                messageId: msgId,
+                conversationId,
               });
             }
 
@@ -1454,11 +1649,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               targetContact?.identityId,
               targetContact?.name,
             ].filter(Boolean) as string[]);
-
-            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
-              messageId: msgId,
-              conversationId,
-            });
 
             setMessages((prev) => {
               const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
@@ -1881,35 +2071,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const wireSingle = successfulAttachments.length === 1 ? toWireAttachment(successfulAttachments[0]) : undefined;
             const wireText = summaryText;
 
-            let wirePayload: string;
-            if (targetContact?.prekeyBundle) {
-              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-                activeSession,
-                targetContact.prekeyBundle,
-                wireText,
-                wireSingle,
-                activeReply,
-                undefined,
-                successfulAttachments.length > 1 ? wireAttachments : undefined
-              );
-              wirePayload = wirePayloadBase64;
-            } else {
-              wirePayload = JSON.stringify({
-                id: msgId,
-                conversationId,
-                senderId: activeSession.spaceId,
+            const targetConv = conversations.find((c) => c.id === conversationId);
+
+            if (targetConv?.type === 'group') {
+              const groupWirePayload = JSON.stringify({
+                type: 'GROUP_MESSAGE',
+                groupId: conversationId,
+                deliveryId: msgId,
+                senderIdentityId: activeSession.spaceId,
+                senderName: activeSession.name || myProfile?.displayName || 'Me',
                 text: wireText,
                 attachment: wireSingle,
                 attachments: successfulAttachments.length > 1 ? wireAttachments : undefined,
-                groupId: batchGroupId,
                 replyTo: activeReply,
+                timestamp: Date.now(),
+              });
+
+              const members = targetConv.groupState?.members || {};
+              for (const memberId of Object.keys(members)) {
+                const member = members[memberId];
+                const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
+                if (mailbox && memberId !== activeSession.spaceId) {
+                  await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload).catch(() => {});
+                }
+              }
+            } else {
+              let wirePayload: string;
+              if (targetContact?.prekeyBundle) {
+                const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                  activeSession,
+                  targetContact.prekeyBundle,
+                  wireText,
+                  wireSingle,
+                  activeReply,
+                  undefined,
+                  successfulAttachments.length > 1 ? wireAttachments : undefined,
+                  msgId
+                );
+                wirePayload = wirePayloadBase64;
+              } else {
+                wirePayload = JSON.stringify({
+                  id: msgId,
+                  deliveryId: msgId,
+                  conversationId,
+                  senderId: activeSession.spaceId,
+                  text: wireText,
+                  attachment: wireSingle,
+                  attachments: successfulAttachments.length > 1 ? wireAttachments : undefined,
+                  groupId: batchGroupId,
+                  replyTo: activeReply,
+                });
+              }
+
+              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+                messageId: msgId,
+                conversationId,
               });
             }
-
-            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
-              messageId: msgId,
-              conversationId,
-            });
 
             RuntimeDiagnostics.wire('wireDispatched', {
               msgId,
@@ -2049,32 +2267,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
           );
 
-          let wirePayload: string;
-          if (targetContact?.prekeyBundle) {
-            const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-              activeSession,
-              targetContact.prekeyBundle,
-              'Voice Message',
-              undefined,
-              activeReply,
-              voiceMeta
-            );
-            wirePayload = wirePayloadBase64;
-          } else {
-            wirePayload = JSON.stringify({
-              id: msgId,
-              conversationId,
-              senderId: activeSession.spaceId,
+          const targetConv = conversations.find((c) => c.id === conversationId);
+
+          if (targetConv?.type === 'group') {
+            const groupWirePayload = JSON.stringify({
+              type: 'GROUP_MESSAGE',
+              groupId: conversationId,
+              deliveryId: msgId,
+              senderIdentityId: activeSession.spaceId,
+              senderName: activeSession.name || myProfile?.displayName || 'Me',
               text: 'Voice Message',
               voice: voiceMeta,
               replyTo: activeReply,
+              timestamp: Date.now(),
+            });
+
+            const members = targetConv.groupState?.members || {};
+            for (const memberId of Object.keys(members)) {
+              const member = members[memberId];
+              const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
+              if (mailbox && memberId !== activeSession.spaceId) {
+                await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload).catch(() => {});
+              }
+            }
+          } else {
+            let wirePayload: string;
+            if (targetContact?.prekeyBundle) {
+              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                activeSession,
+                targetContact.prekeyBundle,
+                'Voice Message',
+                undefined,
+                activeReply,
+                voiceMeta,
+                undefined,
+                msgId
+              );
+              wirePayload = wirePayloadBase64;
+            } else {
+              wirePayload = JSON.stringify({
+                id: msgId,
+                deliveryId: msgId,
+                conversationId,
+                senderId: activeSession.spaceId,
+                text: 'Voice Message',
+                voice: voiceMeta,
+                replyTo: activeReply,
+              });
+            }
+
+            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+              messageId: msgId,
+              conversationId,
             });
           }
-
-          await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
-            messageId: msgId,
-            conversationId,
-          });
 
           setMessages((prev) => {
             const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
@@ -2152,6 +2398,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       scheduleCloudSync(activeSession);
     },
     [activeSession, contacts, conversations, messages, scheduleCloudSync]
+  );
+
+  const deleteMessageForEveryone = useCallback(
+    async (conversationId: string, messageId: string) => {
+      if (!activeSession) return;
+      sessionController.recordUserActivity();
+
+      // 1. Delete locally first
+      await deleteMessageLocally(conversationId, messageId);
+
+      // 2. Dispatch wire tombstone to peer or group
+      const deleteWirePayload = JSON.stringify({
+        type: 'DELETE_MESSAGE',
+        conversationId,
+        messageId,
+        deletedAt: Date.now(),
+      });
+
+      const targetConv = conversations.find((c) => c.id === conversationId);
+      if (targetConv?.type === 'group') {
+        const members = targetConv.groupState?.members || {};
+        for (const memberId of Object.keys(members)) {
+          const member = members[memberId];
+          const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
+          if (mailbox && memberId !== activeSession.spaceId) {
+            await netManager.sendEnvelope(activeSession, mailbox, deleteWirePayload).catch(() => {});
+          }
+        }
+      } else {
+        const targetContact = contacts.find((c) => c.identityId === conversationId);
+        const targetMailboxId = targetContact?.mailboxId || conversationId;
+        await netManager.sendEnvelope(activeSession, targetMailboxId, deleteWirePayload).catch(() => {});
+      }
+    },
+    [activeSession, conversations, contacts, deleteMessageLocally]
   );
 
   const deleteMessagesLocally = useCallback(
@@ -2521,6 +2802,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     name,
                     description,
                     senderKeyDistribution: distribution,
+                    senderSigningKey: activeSession.spaceId,
+                    creator: {
+                      identityId: activeSession.spaceId,
+                      displayName: activeSession.name || myProfile?.displayName || 'Creator',
+                      signingPublicKey: (activeSession as any).signingPublicKey || activeSession.spaceId,
+                    },
+                    members: state.members,
                   });
                   netManager.sendEnvelope(activeSession, member.mailboxId, invitePayload).catch(() => {});
                 }
@@ -2549,7 +2837,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setActiveChatId(groupId);
       setActiveModal(null);
     },
-    [activeSession]
+    [activeSession, myProfile]
   );
 
   const addGroupMember = useCallback(
@@ -2583,12 +2871,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       );
 
       const updatedState = groupManager.loadGroupState(activeSession, groupId);
+      const conv = conversations.find((c) => c.id === groupId);
 
       if (enriched.mailboxId) {
         const invitePayload = JSON.stringify({
           type: 'GROUP_INVITE',
           groupId,
+          name: conv?.name || 'Group',
+          description: (conv?.groupState as any)?.description || '',
           senderKeyDistribution: distribution,
+          senderSigningKey: activeSession.spaceId,
+          creator: {
+            identityId: activeSession.spaceId,
+            displayName: activeSession.name || myProfile?.displayName || 'Admin',
+            signingPublicKey: (activeSession as any).signingPublicKey || activeSession.spaceId,
+          },
+          members: updatedState ? updatedState.members : conv?.groupState?.members,
         });
         netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
       }
@@ -2926,6 +3224,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession]
   );
 
+  // Section 11: Android Hardware Back Button navigation hierarchy
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let backHandler: any;
+    const registerBack = async () => {
+      try {
+        backHandler = await CapacitorApp.addListener('backButton', () => {
+          if (activeModal) {
+            setActiveModal(null);
+            return;
+          }
+          if (activeChatId) {
+            setActiveChatId(null);
+            return;
+          }
+          if (searchQuery) {
+            setSearchQuery('');
+            return;
+          }
+          CapacitorApp.exitApp();
+        });
+      } catch (_e) {}
+    };
+
+    registerBack();
+
+    return () => {
+      if (backHandler && backHandler.remove) {
+        backHandler.remove();
+      }
+    };
+  }, [activeModal, activeChatId, searchQuery]);
+
   const value: AppContextType = {
     storageReady,
     storageError,
@@ -2964,6 +3296,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     sendVoiceMessage,
     setSearchQuery,
     deleteMessageLocally,
+    deleteMessageForEveryone,
     deleteMessagesLocally,
     retryFailedMessage,
     markConversationAsRead,

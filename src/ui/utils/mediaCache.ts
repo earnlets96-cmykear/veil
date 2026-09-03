@@ -49,6 +49,82 @@ export interface AttachmentPayload {
 class MediaCacheManager {
   private cache = new Map<string, DecryptedMedia>();
   private inFlight = new Map<string, Promise<DecryptedMedia>>();
+  private idbInstance: IDBDatabase | null = null;
+
+  private async getIDB(): Promise<IDBDatabase | null> {
+    if (this.idbInstance) return this.idbInstance;
+    if (typeof indexedDB === 'undefined') return null;
+    return new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('veil_media_cache', 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains('media')) {
+            req.result.createObjectStore('media', { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => {
+          this.idbInstance = req.result;
+          resolve(this.idbInstance);
+        };
+        req.onerror = () => resolve(null);
+      } catch (_e) {
+        resolve(null);
+      }
+    });
+  }
+
+  private async getFromIDB(key: string): Promise<DecryptedMedia | null> {
+    try {
+      const db = await this.getIDB();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('media', 'readonly');
+          const store = tx.objectStore('media');
+          const req = store.get(key);
+          req.onsuccess = () => {
+            const val = req.result;
+            if (val && val.data) {
+              const dataBytes = val.data instanceof Uint8Array ? val.data : new Uint8Array(val.data);
+              const blobUrl = AttachmentPipeline.createEphemeralBlobUrl(dataBytes, val.mimeType || 'application/octet-stream');
+              resolve({
+                id: val.id,
+                blobUrl,
+                data: dataBytes,
+                mimeType: val.mimeType,
+                name: val.name,
+                sizeBytes: dataBytes.length,
+              });
+            } else {
+              resolve(null);
+            }
+          };
+          req.onerror = () => resolve(null);
+        } catch (_e) {
+          resolve(null);
+        }
+      });
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  private async saveToIDB(key: string, item: DecryptedMedia): Promise<void> {
+    try {
+      const db = await this.getIDB();
+      if (!db) return;
+      const tx = db.transaction('media', 'readwrite');
+      const store = tx.objectStore('media');
+      store.put({
+        id: key,
+        data: item.data,
+        mimeType: item.mimeType,
+        name: item.name,
+        sizeBytes: item.sizeBytes,
+        timestamp: Date.now(),
+      });
+    } catch (_e) {}
+  }
 
   /**
    * Retrieves a cached decrypted media object or fetches and decrypts it on demand.
@@ -75,14 +151,25 @@ class MediaCacheManager {
       }
     }
 
-    // 2. Return existing in-flight promise if a fetch is already running for any matching key
+    // 2. Check durable IndexedDB cache (survives app restart without re-downloading)
+    for (const key of candidateKeys) {
+      const persisted = await this.getFromIDB(key);
+      if (persisted && persisted.blobUrl) {
+        for (const k of candidateKeys) {
+          this.cache.set(k, persisted);
+        }
+        return persisted;
+      }
+    }
+
+    // 3. Return existing in-flight promise if a fetch is already running for any matching key
     for (const key of candidateKeys) {
       if (this.inFlight.has(key)) {
         return this.inFlight.get(key)!;
       }
     }
 
-    // 3. Start asynchronous cloud download and AEAD decryption with a 30s timeout guard
+    // 4. Start asynchronous cloud download and AEAD decryption with a 30s timeout guard
     const fetchPromise = (async (): Promise<DecryptedMedia> => {
       try {
         const objectId = attachment.objectId || attachment.attachmentId;
@@ -124,7 +211,7 @@ class MediaCacheManager {
                 chunkSize: attachment.chunkSize || (64 * 1024),
                 sha256Hash: attachment.sha256Hash || '',
               };
-              plaintextBytes = AttachmentPipeline.decryptAndReassemble(meta, chunks, encryptionKey);
+              plaintextBytes = await AttachmentPipeline.decryptProgressive(meta, chunks, encryptionKey);
               RuntimeDiagnostics.decrypt('decryptionCompleted', {
                 attachmentId: meta.attachmentId,
                 chunkCount: chunks.length,
@@ -157,9 +244,10 @@ class MediaCacheManager {
             sizeBytes: plaintextBytes.length,
           };
 
-          // Store under all candidate keys
+          // Store under all candidate keys in RAM and durable IndexedDB
           for (const key of candidateKeys) {
             this.cache.set(key, mediaItem);
+            this.saveToIDB(key, mediaItem).catch(() => {});
           }
 
           return mediaItem;
@@ -219,7 +307,7 @@ class MediaCacheManager {
   /**
    * Clears and revokes all ephemeral media blobs from memory.
    */
-  public clear(): void {
+  public clear(wipeDurable = false): void {
     for (const item of this.cache.values()) {
       if (item.blobUrl && typeof URL !== 'undefined') {
         try {
@@ -229,6 +317,13 @@ class MediaCacheManager {
     }
     this.cache.clear();
     this.inFlight.clear();
+
+    if (wipeDurable && this.idbInstance) {
+      try {
+        const tx = this.idbInstance.transaction('media', 'readwrite');
+        tx.objectStore('media').clear();
+      } catch (_e) {}
+    }
   }
 }
 

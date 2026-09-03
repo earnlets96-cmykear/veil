@@ -2,6 +2,43 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-critical-stability] - 2026-09-04
+
+### Added & Fixed (Critical Stability Phase: Core Architecture & Runtime Correctness)
+- **Delivery + Read Receipts Monotonic Progression (`src/messaging/conversationManager.ts`, `src/ui/app/AppState.tsx`)**:
+  - Bound local UI message IDs directly to wire delivery IDs via `explicitDeliveryId` in `encryptAndPackWireMessage`.
+  - Resolved receipt message ID mapping mismatch in `readReceiptManager.processInboundReceipt`.
+  - Verified strict monotonic progression: `SENT_TO_RELAY` (1 tick) $\to$ `DELIVERED_TO_RECIPIENT` (2 gray ticks) $\to$ `READ` (2 colored ticks) locally and against live Render production relay.
+- **Real Group Messaging & Accurate Header Member Count (`src/ui/components/ConversationView.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Fixed member count calculation to inspect `Object.keys(groupState.members).length`.
+  - Hydrated initial group state upon `GROUP_INVITE` receipt in `AppState.tsx` before invoking `processSenderKeyDistribution`.
+  - Wired complete group fanout across member mailboxes for messages, attachments, and voice notes.
+- **Cloudflare R2 Media Authorization (`src/server/cloud/cloudHandler.ts`)**:
+  - Persisted recipient account ID, username, and group ID on attachment records.
+  - Authorized uploaders, direct recipients, and group members for both raw octet-stream and JSON base64 attachment downloads.
+- **Progressive Video Decryption (`src/attachments/attachmentPipeline.ts`, `src/ui/utils/mediaCache.ts`)**:
+  - Implemented `decryptSingleChunk` and `decryptProgressive` with chunk-by-chunk progressive streaming callbacks, eliminating multi-second playback blocking on large video media.
+- **Durable Photo Media Persistence (`src/ui/utils/mediaCache.ts`)**:
+  - Implemented dedicated IndexedDB media store (`veil_media_cache`), persisting decrypted media bytes across reloads and app restarts for 0ms instant restoration.
+- **Voice Playback & UI Isolation (`src/ui/components/ui/VoiceNoteCard.tsx`)**:
+  - Prevented pointer/click event bubbling to parent rows (`stopPropagation`, `preventDefault`).
+  - Locked card dimensions to a stable `minHeight: 52px` with high-contrast playback controls.
+- **Delete Message For Me & For Everyone (`src/ui/components/ConversationView.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Separated "Delete for Me" (local prune + tombstone) and "Delete for Everyone" (wire envelope dispatch `DELETE_MESSAGE` + local & remote tombstone anti-resurrection).
+- **Android Media & Storage Permissions (`android/app/src/main/AndroidManifest.xml`, `src/ui/utils/fileSaver.ts`)**:
+  - Added Android 13+ granular media permissions (`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO`) and runtime permission requests.
+- **Android Hardware Back Button (`src/ui/app/AppState.tsx`, `package.json`)**:
+  - Installed `@capacitor/app` and implemented hardware back button hierarchy (Modal $\to$ Active Chat $\to$ Search $\to$ Exit).
+- **Text Input & Backspace Interception (`capacitor.config.ts`, `src/ui/components/LockScreen.tsx`)**:
+  - Disabled Capacitor input capture (`android.captureInput: false`) to resolve soft keyboard backspace swallowing.
+  - Removed dynamic autofocus toggles on LockScreen.
+- **Verification & Packaging**:
+  - 12 vitest test suites passed (89/89 tests passing, 100% pass rate).
+  - TypeScript compiles with 0 errors (`npx tsc --noEmit`).
+  - Production web app built successfully (`npm run build`).
+  - Android debug APK assembled successfully (`.\gradlew.bat assembleDebug` in 21s).
+  - Live production relay test suite passed 100% against `https://veil-rga0.onrender.com`.
+
 ## [1.0.0-phase56b] - 2026-09-03
 
 ### Added & Fixed (Forensic Regression Fix, Real-Time Performance & Canonical Experience)

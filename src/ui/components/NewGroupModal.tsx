@@ -324,7 +324,7 @@ export const NewGroupModal: React.FC = () => {
                 <input
                   type="text"
                   className="veil-input"
-                  placeholder="🔍 Search @username..."
+                  placeholder="Search @username..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ paddingLeft: '2rem' }}

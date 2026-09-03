@@ -30,9 +30,9 @@ describe('Phase 40: Non-Blocking Concurrent Media Uploads & State-Machine', () =
     expect(att2.metadata.attachmentId).not.toBe(att3.metadata.attachmentId);
 
     // Verify distinct chunk counts
-    expect(att1.metadata.chunkCount).toBe(Math.ceil(video1Bytes.length / (64 * 1024)));
-    expect(att2.metadata.chunkCount).toBe(Math.ceil(video2Bytes.length / (64 * 1024)));
-    expect(att3.metadata.chunkCount).toBe(Math.ceil(imageBytes.length / (64 * 1024)));
+    expect(att1.metadata.chunkCount).toBe(Math.ceil(video1Bytes.length / att1.metadata.chunkSize));
+    expect(att2.metadata.chunkCount).toBe(Math.ceil(video2Bytes.length / att2.metadata.chunkSize));
+    expect(att3.metadata.chunkCount).toBe(Math.ceil(imageBytes.length / att3.metadata.chunkSize));
 
     // Decrypt all three independently
     const dec1 = AttachmentPipeline.decryptAndReassemble(att1.metadata, att1.chunks, key1);

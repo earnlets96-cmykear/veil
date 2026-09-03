@@ -102,15 +102,44 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
       role="region"
       aria-label={`${isOutgoing ? 'Sent' : 'Received'} Voice Note Player`}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      style={{
+        minHeight: '52px',
+        boxSizing: 'border-box',
+        userSelect: 'none',
+      }}
     >
       {isError ? (
         <button
           type="button"
           className="veil-voicenote-play-btn veil-voicenote-retry-btn"
-          onClick={onRetry || onPlayToggle}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onRetry) onRetry();
+            else if (onPlayToggle) onPlayToggle();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
           aria-label="Retry voice note"
           title="Retry voice note"
-          style={{ minWidth: '40px', minHeight: '40px', backgroundColor: 'var(--veil-danger, #ef4444)' }}
+          style={{
+            minWidth: '42px',
+            minHeight: '42px',
+            width: '42px',
+            height: '42px',
+            backgroundColor: 'var(--veil-danger, #ef4444)',
+            color: '#ffffff',
+            borderRadius: 'var(--veil-radius-full, 9999px)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            border: 'none',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
         >
           <RefreshCwIcon size={16} color="#ffffff" />
         </button>
@@ -118,11 +147,31 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
         <button
           type="button"
           className="veil-voicenote-play-btn"
-          onClick={onPlayToggle}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPlayToggle?.();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
           disabled={isLoading || isUploading}
           aria-label={isUploading ? 'Uploading voice message...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
           title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
-          style={{ minWidth: '40px', minHeight: '40px' }}
+          style={{
+            minWidth: '42px',
+            minHeight: '42px',
+            width: '42px',
+            height: '42px',
+            backgroundColor: 'var(--veil-accent-primary, #6366f1)',
+            color: '#ffffff',
+            borderRadius: 'var(--veil-radius-full, 9999px)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            border: 'none',
+            cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
+            flexShrink: 0,
+          }}
         >
           {isUploading ? (
             <Spinner size="sm" aria-label="Uploading audio..." />

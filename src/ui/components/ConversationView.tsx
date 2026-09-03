@@ -385,6 +385,7 @@ export const ConversationView: React.FC = () => {
     ensureCloudSession,
     setReplyTarget,
     deleteMessageLocally,
+    deleteMessageForEveryone,
     markConversationAsRead,
     retryFailedMessage,
   } = useApp();
@@ -719,10 +720,22 @@ export const ConversationView: React.FC = () => {
     setMediaInfoTarget(info);
   };
 
-  const handleDeleteContextMessage = (msg: UIMessage) => {
+  const handleDeleteForMe = (msg: UIMessage) => {
     if (activeChatId) {
       deleteMessageLocally(activeChatId, msg.id);
-      showToast({ type: 'info', message: 'Message deleted' });
+      showToast({ type: 'info', message: 'Message deleted for you' });
+    }
+    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+  };
+
+  const handleDeleteForEveryone = async (msg: UIMessage) => {
+    if (activeChatId) {
+      try {
+        await deleteMessageForEveryone(activeChatId, msg.id);
+        showToast({ type: 'info', message: 'Message deleted for everyone' });
+      } catch (err: any) {
+        showToast({ type: 'error', message: err.message || 'Failed to delete for everyone' });
+      }
     }
     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
   };
@@ -881,7 +894,7 @@ export const ConversationView: React.FC = () => {
                   <span className="veil-status-dot online" />
                   <span className="veil-status-text">
                     {activeConversation?.type === 'group'
-                      ? `${activeConversation.groupState?.members.length || 0} members • End-to-End Encrypted`
+                      ? `${Object.keys(activeConversation.groupState?.members || {}).length} members • End-to-End Encrypted`
                       : 'End-to-End Encrypted'}
                   </span>
                 </div>
@@ -1070,11 +1083,22 @@ export const ConversationView: React.FC = () => {
           <button
             type="button"
             className="veil-context-item veil-context-item-danger"
-            onClick={() => handleDeleteContextMessage(contextMenu.message!)}
+            onClick={() => handleDeleteForMe(contextMenu.message!)}
           >
             <TrashIcon size={16} />
-            <span>Delete Message</span>
+            <span>Delete for Me</span>
           </button>
+
+          {contextMenu.message?.isOutgoing && (
+            <button
+              type="button"
+              className="veil-context-item veil-context-item-danger"
+              onClick={() => handleDeleteForEveryone(contextMenu.message!)}
+            >
+              <TrashIcon size={16} />
+              <span>Delete for Everyone</span>
+            </button>
+          )}
         </div>
       )}
 

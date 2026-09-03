@@ -132,6 +132,70 @@ export class AttachmentPipeline {
     return assembled;
   }
 
+  /**
+   * Decrypts a single chunk independently with authenticating aad.
+   */
+  public static decryptSingleChunk(
+    metadata: AttachmentMetadata,
+    chunk: EncryptedAttachmentChunk,
+    encryptionKey: Uint8Array
+  ): Uint8Array {
+    const nonce = base64ToBytes(chunk.nonce);
+    const ciphertext = base64ToBytes(chunk.ciphertext);
+    const aad = new TextEncoder().encode(`${metadata.attachmentId}:${chunk.chunkIndex}:${metadata.chunkCount}`);
+    return decryptXChaCha20Poly1305(encryptionKey, nonce, ciphertext, aad);
+  }
+
+  /**
+   * Decrypts chunks progressively, invoking onChunkReady as each chunk is decrypted,
+   * returning the fully assembled buffer verified with SHA-256.
+   */
+  public static async decryptProgressive(
+    metadata: AttachmentMetadata,
+    chunks: EncryptedAttachmentChunk[],
+    encryptionKey: Uint8Array,
+    onPlayableChunk?: (chunkIndex: number, decryptedSlice: Uint8Array, totalDecryptedSoFar: number) => void
+  ): Promise<Uint8Array> {
+    if (chunks.length !== metadata.chunkCount) {
+      throw new Error(`Incomplete attachment: expected ${metadata.chunkCount} chunks, got ${chunks.length}`);
+    }
+
+    const sorted = [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
+    const decryptedSlices: Uint8Array[] = [];
+    let totalSize = 0;
+
+    for (let i = 0; i < sorted.length; i++) {
+      const chunk = sorted[i];
+      if (chunk.chunkIndex !== i) {
+        throw new Error(`Missing chunk at index ${i}`);
+      }
+
+      const slice = this.decryptSingleChunk(metadata, chunk, encryptionKey);
+      decryptedSlices.push(slice);
+      totalSize += slice.length;
+
+      if (onPlayableChunk) {
+        try {
+          onPlayableChunk(i, slice, totalSize);
+        } catch (_e) {}
+      }
+    }
+
+    const assembled = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const slice of decryptedSlices) {
+      assembled.set(slice, offset);
+      offset += slice.length;
+    }
+
+    const calculatedHash = bytesToHex(sha256(assembled));
+    if (calculatedHash !== metadata.sha256Hash) {
+      throw new Error('Attachment integrity check failed: SHA-256 hash mismatch');
+    }
+
+    return assembled;
+  }
+
   public static createEphemeralBlobUrl(data: Uint8Array, mimeType: string): string {
     if (typeof URL === 'undefined' || typeof Blob === 'undefined') {
       return '';

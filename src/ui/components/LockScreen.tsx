@@ -208,7 +208,7 @@ export const LockScreen: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
-              autoFocus={!username}
+              autoFocus
               required
               aria-label="Account username"
               style={{ width: '100%' }}
@@ -234,7 +234,6 @@ export const LockScreen: React.FC = () => {
               value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
               disabled={isLoading}
-              autoFocus={!!username}
               required
               aria-label="Space passphrase"
             />

@@ -297,7 +297,8 @@ export class ConversationManager {
     attachment?: any,
     replyTo?: { messageId: string; senderName?: string; text: string; attachmentType?: string },
     voice?: { durationSeconds: number; sizeBytes: number; objectId: string; mimeType: string; ciphertextHash: string; encryptionKeyBase64: string; nonceBase64: string },
-    attachments?: any[]
+    attachments?: any[],
+    explicitDeliveryId?: string
   ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {
     this.assertSession(session);
 
@@ -327,7 +328,7 @@ export class ConversationManager {
 
     // 1. Encrypt plaintext through Double Ratchet
     const ratchetMsg = ratchetSession.ratchetEncrypt(text, x3dhHeader);
-    const deliveryId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const deliveryId = explicitDeliveryId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     // 2. Package into WirePayload with strict allowlist serialization
     const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
