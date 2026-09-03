@@ -307,6 +307,42 @@ export class AccountService {
   }
 
   /**
+   * Changes an account's canonical username after verifying ownership.
+   * Validates uniqueness of the new username across the cloud database.
+   */
+  public async changeUsername(params: {
+    accountId: string;
+    newUsername: string;
+  }): Promise<{ oldUsername: string; newUsername: string }> {
+    const account = await this.db.getAccountById(params.accountId);
+    if (!account) {
+      throw new Error('Account not found');
+    }
+
+    const cleanNew = params.newUsername.trim().toLowerCase().replace(/^@/, '');
+    if (!cleanNew || cleanNew.length < 2) {
+      throw new Error('Username must be at least 2 characters long');
+    }
+
+    if (cleanNew === account.username) {
+      return { oldUsername: account.username, newUsername: cleanNew };
+    }
+
+    // Check uniqueness
+    const existing = await this.db.getAccountByUsername(cleanNew);
+    if (existing) {
+      throw new Error(`Username @${cleanNew} is already taken`);
+    }
+
+    const oldUsername = account.username;
+    account.username = cleanNew;
+    account.updatedAt = Date.now();
+    await this.db.updateAccount(account);
+
+    return { oldUsername, newUsername: cleanNew };
+  }
+
+  /**
    * Performs authentication recovery (password reset with valid recovery anchor).
    */
   public async resetPasswordWithRecoveryAnchor(params: {

@@ -1,17 +1,18 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 56 (Profile Persistence, Telegram-Grade Profile UI, and Video Upload Performance Optimization)
+## Current Verified Phase: PHASE 56B (Forensic Regression Fix, Real-Time Performance Hardening & Canonical Experience)
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
 - **Branch**: `main`
-- **Output Deliverables**: `docs/PHASE56_UI_UX_PROFILE_MEDIA_REPORT.md` & `tests/phase56-profile-media-perf.test.ts`
-- **Engineering Phase**: **PHASE 56 (Profile Lifecycle, Telegram-Grade UI/UX, Adaptive Video Chunking, Anti-Resurrection Tombstones)**
-- **Phase 56 Test Suite**: `tests/phase56-profile-media-perf.test.ts` (7/7 tests passing, 100% clean pass)
+- **Output Deliverables**: `docs/PHASE56B_FORENSIC_REGRESSION_REPORT.md` & `tests/phase56b-forensic-hardening.test.ts`
+- **Engineering Phase**: **PHASE 56B (Canonical Profile Routing, Receipt Unblocking, Grouped Media Persistence, Real-Time Debounce, Truthful Replies, Cloud Username Authentication)**
+- **Phase 56B Test Suite**: `tests/phase56b-forensic-hardening.test.ts` (25/25 tests passing, 100% clean pass)
+- **Phase 56 Regression Suite**: `tests/phase56-profile-media-perf.test.ts` (7/7 tests passing, 100% clean pass)
 - **Phase 55 Regression Suite**: `tests/phase55-forensic-p0.test.ts` (7/7 tests passing, 100% clean pass)
 - **Live Production Render Server Verification**: `scratch/verify_phase56_prod.ts` (6/6 passing against `https://veil-rga0.onrender.com`)
-- **Web App Build**: **PASS (`npm run build` in 1.81s)**
-- **Capacitor Sync**: **PASS (`npm run android:sync` in 0.16s)**
-- **Android APK Build**: **PASS (`cd android && ./gradlew.bat assembleDebug` BUILD SUCCESSFUL in 18s)**
-- **Android Hardware Status**: **`ANDROID HARDWARE RUNTIME: UNTESTED`** (no physical device or emulator connected on host)
+- **Web App Build**: **PASS (`npm run build` in 1.85s)**
+- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.15s)**
+- **Android APK Build**: **PASS (`.\gradlew.bat assembleDebug` BUILD SUCCESSFUL in 17s)**
+- **Android Hardware Status**: **`ANDROID HARDWARE RUNTIME: UNTESTED`** (honestly reported per Rule 4, no physical device or emulator connected on host)
 
 ---
 
@@ -40,3 +41,32 @@
 - **Root Cause**: Uploading 50 MB to 100 MB videos at 64 KiB produced 800–1,600 chunks, inducing 600+ MB heap spikes and crashing browser tabs.
 - **Fix**: Implemented bounded adaptive chunk sizing (`getOptimalChunkSize`): 64 KiB ($\le 1\text{ MB}$), 256 KiB ($1-10\text{ MB}$), 512 KiB ($10-50\text{ MB}$), 1 MiB ($> 50\text{ MB}$).
 - **Performance**: 16x reduction in chunk count, memory pressure relieved, and reassembly throughput exceeding 55 MB/s with full SHA-256 byte-for-byte integrity.
+
+---
+
+## Phase 56B Forensic Hardening Summary
+
+### 1. Canonical Profile Modal Unification (Issues 1 & 2)
+- **Root Cause**: ConversationView chat header previously routed to legacy `contactDetails` modal while contacts list routed to `ProfileModal`.
+- **Fix**: Routed conversation view header avatar and "More" action menu strictly to canonical `ProfileModal` with universal peerId and username resolution.
+
+### 2. Elimination of Chat UI Freezing & Message Latency (Issues 3–6)
+- **Root Cause**: Synchronous Argon2id cloud snapshot sync and synchronous full-database search indexing fired on every keystroke and send.
+- **Fix**: Decoupled cloud sync with a 15-second idle debounce; decoupled search indexing with a 250ms trailing debounce; made message wire dispatch non-blocking.
+
+### 3. Wire Receipt Unblocking & JUMBO Size Class (Issues 7 & 14)
+- **Root Cause**: Full base64 avatars were embedded in Double Ratchet wire messages and receipts, causing payloads to exceed the 32,764 byte limit and throwing unhandled padding errors that dropped receipts.
+- **Fix**: Explicitly stripped avatars from wire messages (`cleanSenderDoc`); expanded transport size classes to include `JUMBO` (128 KiB); fixed receipt processing to update all conversation alias keys.
+
+### 4. Truthful Reply Previews & Distinct Self/Peer Styling (Issues 8–10)
+- **Root Cause**: Reply references hardcoded `'Yourself'` and `'Peer'`.
+- **Fix**: Resolved actual display names from profile and contacts; added `isSelfReply` boolean; styled `.veil-reply-self` (accent border and tint) and `.veil-reply-peer` (emerald secondary border) distinctly.
+
+### 5. Username-Based Cloud Login & Live Username Change (Issues 11 & 12)
+- **Root Cause**: Backend had no `POST /v1/account/change-username` endpoint; local vault envelopes never updated `canonicalUsername` on change.
+- **Fix**: Added authenticated `POST /v1/account/change-username` route, updated `AccountService`, added `updateCanonicalUsername` to `SpaceVaultManager`, and synchronized changes across cloud and local storage during username registration.
+
+### 6. Grouped Media Persistence (Issue 13)
+- **Root Cause**: `StoredMessage` in `conversationManager.ts` lacked an `attachments` array, dropping grouped photos upon reload.
+- **Fix**: Extended `StoredMessage` with `attachments`, persisted multi-item metadata in local store, and updated CSS for adaptive 1:1 tile sizing.
+

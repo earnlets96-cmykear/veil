@@ -95,6 +95,7 @@ interface ConversationMessageRowProps {
   onDownloadAttachment: (msg: UIMessage) => void;
   onToggleVoice: (msg: UIMessage) => void;
   onSeekVoice: (msg: UIMessage, percent: number) => void;
+  onRetry?: (msg: UIMessage) => void;
 }
 
 const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
@@ -117,6 +118,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   onDownloadAttachment,
   onToggleVoice,
   onSeekVoice,
+  onRetry,
 }) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -253,6 +255,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                   text: msg.replyTo.text,
                   attachmentType: msg.replyTo.attachmentType,
                   thumbnailUrl: msg.replyTo.thumbnailUrl,
+                  isSelfReply: msg.replyTo.isSelfReply,
                 }}
                 onClick={() => onJumpToMessage(msg.replyTo!.messageId)}
               />
@@ -341,11 +344,13 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                       text: msg.replyTo.text,
                       attachmentType: msg.replyTo.attachmentType,
                       thumbnailUrl: msg.replyTo.thumbnailUrl,
+                      isSelfReply: msg.replyTo.isSelfReply,
                     }
                   : undefined
               }
               onReplyClick={onJumpToMessage}
               onReplyTrigger={() => onReplyTrigger(msg)}
+              onRetry={onRetry ? () => onRetry(msg) : undefined}
             />
           )}
         </div>
@@ -370,6 +375,7 @@ export const ConversationView: React.FC = () => {
     setReplyTarget,
     deleteMessageLocally,
     markConversationAsRead,
+    retryFailedMessage,
   } = useApp();
 
   const { showToast } = useToast();
@@ -690,7 +696,7 @@ export const ConversationView: React.FC = () => {
       width: msg.attachment?.width,
       height: msg.attachment?.height,
       timestamp: msg.timestamp,
-      senderName: msg.senderName || (msg.isOutgoing ? 'You' : 'Peer'),
+      senderName: msg.senderName || (msg.isOutgoing ? (activeSession?.name || myProfile?.displayName || 'You') : (activeContact?.name || conversationName || 'Contact')),
       status: msg.status,
       allowSave: msg.attachment?.allowSave ?? msg.voice?.allowSave ?? true,
       allowForward: msg.attachment?.allowForward ?? msg.voice?.allowForward ?? true,
@@ -823,7 +829,11 @@ export const ConversationView: React.FC = () => {
                 if (activeConversation?.type === 'group') {
                   openModal({ type: 'groupDetails', conversationId: activeChatId });
                 } else {
-                  openModal({ type: 'contactDetails', conversationId: activeChatId });
+                  openModal({
+                    type: 'profile',
+                    peerId: activeContact?.identityId || activeChatId,
+                    peerUsername: activeContact?.accountUsername || (activeContact?.name?.startsWith('@') ? activeContact.name.slice(1) : undefined),
+                  });
                 }
               }}
               role="button"
@@ -883,7 +893,11 @@ export const ConversationView: React.FC = () => {
                 if (activeConversation?.type === 'group') {
                   openModal({ type: 'groupDetails', conversationId: activeChatId });
                 } else {
-                  openModal({ type: 'contactDetails', conversationId: activeChatId });
+                  openModal({
+                    type: 'profile',
+                    peerId: activeContact?.identityId || activeChatId,
+                    peerUsername: activeContact?.accountUsername || (activeContact?.name?.startsWith('@') ? activeContact.name.slice(1) : undefined),
+                  });
                 }
               }}
               aria-label="Conversation details"
@@ -967,6 +981,7 @@ export const ConversationView: React.FC = () => {
                     [m.id]: (percent / 100) * (m.voice?.durationSeconds || 1),
                   }));
                 }}
+                onRetry={(m) => activeChatId && retryFailedMessage(activeChatId, m.id)}
               />
             );
           })

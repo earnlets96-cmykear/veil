@@ -90,12 +90,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   } = useApp();
 
   const { showToast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const isPeer = Boolean(peerId || peerUsername || searchResult);
-  const peerConv = isPeer ? (conversations || []).find((c) => c.id === peerId) : null;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const peerConv = isPeer
+    ? (conversations || []).find(
+        (c) =>
+          c.id === peerId ||
+          c.name === peerId ||
+          (peerUsername && (c.name.toLowerCase() === peerUsername.toLowerCase() || c.id.toLowerCase() === peerUsername.toLowerCase()))
+      )
+    : null;
   const peerContact = isPeer
-    ? (contacts || []).find((c) => c.identityId === peerId || (peerUsername && c.name.toLowerCase() === peerUsername.toLowerCase()))
+    ? (contacts || []).find(
+        (c) =>
+          c.identityId === peerId ||
+          c.name === peerId ||
+          (peerUsername &&
+            (c.name.toLowerCase() === peerUsername.toLowerCase() ||
+              c.accountUsername?.toLowerCase() === peerUsername.toLowerCase()))
+      )
     : null;
 
   const [peerDoc, setPeerDoc] = useState<SignedProfileDocument | null>(null);

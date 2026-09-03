@@ -12,6 +12,7 @@ export interface ReplyPreviewData {
   text?: string;
   attachmentType?: 'file' | 'voice' | 'image' | 'video' | 'grouped' | string;
   thumbnailUrl?: string;
+  isSelfReply?: boolean;
 }
 
 export interface ReplyPreviewProps {
@@ -19,6 +20,7 @@ export interface ReplyPreviewProps {
   onDismiss?: () => void;
   onClick?: () => void;
   className?: string;
+  isSelfReply?: boolean;
 }
 
 export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
@@ -26,7 +28,10 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
   onDismiss,
   onClick,
   className = '',
+  isSelfReply,
 }) => {
+  const isSelf = isSelfReply ?? replyTo.isSelfReply ?? false;
+
   const getPreviewSnippet = () => {
     if (replyTo.attachmentType === 'voice') {
       return (
@@ -66,14 +71,17 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
     return replyTo.text || '';
   };
 
+  const defaultSender = isSelf ? 'You' : 'Contact';
+  const effectiveSender = replyTo.senderName || defaultSender;
+
   return (
     <div
-      className={`veil-reply-preview ${className}`.trim()}
+      className={`veil-reply-preview ${isSelf ? 'veil-reply-self' : 'veil-reply-peer'} ${className}`.trim()}
       onClick={onClick}
       role={onClick ? 'button' : 'region'}
       tabIndex={onClick ? 0 : undefined}
       style={{ cursor: onClick ? 'pointer' : 'default' }}
-      aria-label={`Replying to ${replyTo.senderName || 'Peer'}`}
+      aria-label={`Replying to ${effectiveSender}`}
     >
       {replyTo.thumbnailUrl && (
         <img
@@ -91,7 +99,7 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
 
       <div className="veil-reply-content" style={{ flex: 1, minWidth: 0 }}>
         <div className="veil-reply-sender">
-          {replyTo.senderName || 'Peer'}
+          {effectiveSender}
         </div>
         <div className="veil-reply-snippet">
           {getPreviewSnippet()}

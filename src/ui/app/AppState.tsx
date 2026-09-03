@@ -14,7 +14,11 @@ import { NetworkManager } from '../../network/networkManager.ts';
 import { SessionController } from './sessionController.ts';
 import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyReference } from './types.ts';
 
-export function resolveReplyReference(target: UIMessage | null): ReplyReference | undefined {
+export function resolveReplyReference(
+  target: UIMessage | null,
+  selfName?: string,
+  peerName?: string
+): ReplyReference | undefined {
   if (!target) return undefined;
 
   let attachmentType: 'image' | 'video' | 'file' | 'voice' | 'grouped' | undefined;
@@ -43,13 +47,17 @@ export function resolveReplyReference(target: UIMessage | null): ReplyReference 
     }
   }
 
-  const senderName = target.senderName || (target.isOutgoing ? 'yourself' : 'Peer');
+  const isSelf = Boolean(target.isOutgoing);
+  const senderName = isSelf
+    ? (selfName || target.senderName || 'You')
+    : (peerName || target.senderName || 'Contact');
 
   return {
     messageId: target.id,
     senderName,
     text,
     attachmentType,
+    isSelfReply: isSelf,
   };
 }
 import { SpaceSession } from '../../spaces/session.ts';
@@ -227,9 +235,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
   const cloudCredentials = useRef(new Map<string, string>());
   const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
-  const syncTimeoutRef = useRef<any>(null);
+  const searchIndexTimeoutRef = useRef<any>(null);
 
-  const scheduleCloudSync = useCallback((session: SpaceSession) => {
+  const queueSearchIndexUpdate = useCallback(
+    (c: Contact[], convs: UIConversation[], msgs: Record<string, UIMessage[]>) => {
+      if (searchIndexTimeoutRef.current) {
+        clearTimeout(searchIndexTimeoutRef.current);
+      }
+      searchIndexTimeoutRef.current = setTimeout(() => {
+        searchEngine.updateIndex(c, convs, msgs);
+      }, 250);
+    },
+    [searchEngine]
+  );
+
+  const scheduleCloudSync = useCallback((session: SpaceSession, immediate = false) => {
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
@@ -242,7 +262,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (err) {
         console.warn('[VEIL-SYNC] Background cloud snapshot sync error:', err);
       }
-    }, 500);
+    }, immediate ? 100 : 15000); // 15s idle debounce during active messaging to prevent Argon2 CPU spikes
   }, []);
 
   const isConversationMuted = useCallback(
@@ -1268,7 +1288,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
+
+      // Resolve recipient contact for mailboxId and prekeyBundle
+      const freshContacts = await contactManager.listContacts(activeSession);
+      let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+
+      const activeReply = resolveReplyReference(
+        replyTargetRef.current || replyTarget,
+        myProfile?.displayName || myProfile?.username || activeSession.name,
+        targetContact?.name
+      );
 
       const newMsg: UIMessage = {
         id: msgId,
@@ -1288,7 +1317,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const list = prev[conversationId] || [];
         const updated = { ...prev, [conversationId]: [...list, newMsg] };
         store.setAsync(activeSession, 'veil:ui:messages', updated);
-        searchEngine.updateIndex(contacts, conversations, updated);
+        queueSearchIndexUpdate(contacts, conversations, updated);
         return updated;
       });
 
@@ -1299,12 +1328,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
-
-      scheduleCloudSync(activeSession);
-
-      // Resolve recipient contact for mailboxId and prekeyBundle
-      const freshContacts = await contactManager.listContacts(activeSession);
-      let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
 
       // If contact is missing mailboxId or prekeyBundle, try on-the-fly Directory lookup
       if (!targetContact?.mailboxId || !targetContact?.prekeyBundle) {
@@ -1388,12 +1411,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           return updated;
         });
 
-        scheduleCloudSync(activeSession);
+        scheduleCloudSync(activeSession, false);
 
         if (typeof console !== 'undefined' && console.debug) {
           console.debug(`[VEIL-UI] Outbound message sent: msgId=${msgId.slice(0, 8)}, convId=${conversationId.slice(0, 8)}, state=SENT_TO_RELAY`);
         }
       } catch (sendErr: any) {
+        const isOffline = networkState === 'offline';
+        const failureStatus = isOffline ? ('QUEUED' as const) : ('FAILED' as const);
+
         const keys = new Set([
           conversationId,
           targetContact?.identityId,
@@ -1402,7 +1428,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         setMessages((prev) => {
           const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-            m.id === msgId ? { ...m, status: 'QUEUED' as const } : m
+            m.id === msgId ? { ...m, status: failureStatus } : m
           );
           const updated = { ...prev };
           for (const k of keys) {
@@ -1412,14 +1438,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           return updated;
         });
 
-        scheduleCloudSync(activeSession);
+        scheduleCloudSync(activeSession, false);
 
         if (typeof console !== 'undefined' && console.warn) {
-          console.warn(`[VEIL-UI] Outbound message send failed, queued locally: msgId=${msgId.slice(0, 8)}, error=${sendErr?.message || sendErr}`);
+          console.warn(`[VEIL-UI] Outbound message send failed: msgId=${msgId.slice(0, 8)}, status=${failureStatus}, error=${sendErr?.message || sendErr}`);
         }
       }
     },
-    [activeSession, contacts, conversations, replyTarget]
+    [activeSession, contacts, conversations, replyTarget, networkState, myProfile]
   );
 
   const sendAttachments = useCallback(
@@ -1451,7 +1477,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
       const allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
 
-      const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
+      const activeReply = resolveReplyReference(
+        replyTargetRef.current || replyTarget,
+        myProfile?.displayName || myProfile?.username || activeSession.name,
+        targetContact?.name
+      );
 
       replyTargetRef.current = null;
       setReplyTargetState(null);
@@ -1850,13 +1880,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const activeReply = resolveReplyReference(replyTargetRef.current || replyTarget);
-
-      replyTargetRef.current = null;
-      setReplyTargetState(null);
 
       const freshContacts = await contactManager.listContacts(activeSession);
       const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+
+      const activeReply = resolveReplyReference(
+        replyTargetRef.current || replyTarget,
+        myProfile?.displayName || myProfile?.username || activeSession.name,
+        targetContact?.name
+      );
+
+      replyTargetRef.current = null;
+      setReplyTargetState(null);
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername =
         targetContact?.accountUsername ||
@@ -2484,6 +2519,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Network / relay unavailable -> record pending sync for automatic retry
         cloudSyncPending = true;
         await store.setAsync(activeSession, 'veil:pending:profile_sync', profile);
+      }
+
+      // 3. Propagate username change to cloud auth and local vault so login works with the new username
+      const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+      const currentCreds = activeCredentialsRef.current.get(activeSession.spaceId);
+      const currentStoredUsername = currentCreds?.username || '';
+      const isUsernameChanged = currentStoredUsername && cleanUsername !== currentStoredUsername;
+
+      if (isUsernameChanged) {
+        // 3a. Update cloud backend auth username
+        try {
+          await cloudClient.changeUsername(cleanUsername);
+        } catch (err: any) {
+          const msg = err.message || '';
+          if (msg.includes('already taken') || msg.includes('409')) {
+            throw new Error(`Username @${cleanUsername} is already taken`);
+          }
+          // Non-fatal: cloud will still accept old username for auth
+          if (typeof console !== 'undefined') {
+            console.warn('[VEIL] Cloud username change failed, will retry on next sync:', msg);
+          }
+        }
+
+        // 3b. Update local Space envelope so local login finds the correct envelope
+        try {
+          const updatedEnvelope = vault.updateCanonicalUsername(activeSession.spaceId, cleanUsername);
+          await vault.saveEnvelopeToStorage(updatedEnvelope, storageAdapter);
+        } catch (_envErr) {
+          // Non-fatal: worst case, user must use old username to login locally once
+        }
+      }
+
+      // 3c. Always update credentials ref and localStorage with current username
+      if (cleanUsername) {
+        activeCredentialsRef.current.set(activeSession.spaceId, {
+          passphrase: currentCreds?.passphrase || '',
+          username: cleanUsername,
+        });
+        cloudCredentials.current.set(activeSession.spaceId, currentCreds?.passphrase || '');
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('veil:last_username', cleanUsername);
+          } catch (_e) {}
+        }
       }
 
       return {

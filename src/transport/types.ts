@@ -7,16 +7,17 @@
  * Standard fixed size classes for traffic analysis mitigation.
  * All payloads are padded to the smallest fitting size class.
  */
-export type SizeClass = 'SMALL' | 'MEDIUM' | 'LARGE' | 'XLARGE';
+export type SizeClass = 'SMALL' | 'MEDIUM' | 'LARGE' | 'XLARGE' | 'JUMBO';
 
 export const SIZE_CLASS_BYTES: Record<SizeClass, number> = {
   SMALL: 512,       // 512 bytes
   MEDIUM: 2048,     // 2 KiB
   LARGE: 8192,      // 8 KiB
   XLARGE: 32768,    // 32 KiB
+  JUMBO: 131072,    // 128 KiB
 };
 
-export const MAX_PAYLOAD_BYTES = SIZE_CLASS_BYTES.XLARGE - 4; // Reserve 4 bytes for length prefix
+export const MAX_PAYLOAD_BYTES = SIZE_CLASS_BYTES.JUMBO - 4; // Reserve 4 bytes for length prefix
 
 /**
  * Transport Envelope: Opaque encrypted blob delivered via the untrusted server.

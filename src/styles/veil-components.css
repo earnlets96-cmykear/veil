@@ -491,15 +491,47 @@
   color: #ffffff;
 }
 
-.outgoing .veil-reply-preview .veil-reply-sender,
-.veil-message-bubble.outgoing .veil-reply-preview .veil-reply-sender {
-  color: #ffffff;
-  font-weight: 600;
+/* Distinct visual styling for Self-Replies vs Peer-Replies */
+.veil-reply-preview.veil-reply-self {
+  border-left-color: var(--veil-accent-primary, #6366f1);
+  background: var(--veil-accent-primary-subtle, rgba(99, 102, 241, 0.12));
 }
 
-.outgoing .veil-reply-preview .veil-reply-snippet,
-.veil-message-bubble.outgoing .veil-reply-preview .veil-reply-snippet {
-  color: rgba(255, 255, 255, 0.88);
+.veil-reply-preview.veil-reply-self .veil-reply-sender {
+  color: var(--veil-accent-primary, #6366f1);
+  font-weight: 700;
+}
+
+.veil-reply-preview.veil-reply-peer {
+  border-left-color: var(--veil-accent-secondary, #10b981);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.veil-reply-preview.veil-reply-peer .veil-reply-sender {
+  color: var(--veil-accent-secondary, #10b981);
+  font-weight: 700;
+}
+
+.outgoing .veil-reply-preview.veil-reply-self,
+.veil-message-bubble.outgoing .veil-reply-preview.veil-reply-self {
+  border-left-color: #67e8f9;
+  background: rgba(103, 232, 249, 0.2);
+}
+
+.outgoing .veil-reply-preview.veil-reply-self .veil-reply-sender,
+.veil-message-bubble.outgoing .veil-reply-preview.veil-reply-self .veil-reply-sender {
+  color: #67e8f9;
+}
+
+.outgoing .veil-reply-preview.veil-reply-peer,
+.veil-message-bubble.outgoing .veil-reply-preview.veil-reply-peer {
+  border-left-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.outgoing .veil-reply-preview.veil-reply-peer .veil-reply-sender,
+.veil-message-bubble.outgoing .veil-reply-preview.veil-reply-peer .veil-reply-sender {
+  color: #ffffff;
 }
 
 .veil-reply-content {
@@ -1373,6 +1405,31 @@
 
 .veil-media-thumbnail-clickable:hover .veil-media-thumbnail-img {
   transform: scale(1.02);
+}
+
+/* Adaptive Grouped Media Grid Thumbnail Resizing */
+.veil-grouped-thumb.veil-media-thumbnail-wrapper,
+.veil-grouped-media-grid .veil-media-thumbnail-wrapper {
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.veil-grouped-thumb .veil-media-thumbnail-img,
+.veil-grouped-media-grid .veil-media-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+}
+
+.veil-grouped-thumb.veil-media-thumbnail-error,
+.veil-grouped-media-grid .veil-media-thumbnail-error {
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  padding: 0.25rem;
 }
 
 .veil-media-play-badge {

@@ -92,6 +92,24 @@ export class CloudHandler {
         }
         return true;
       }
+      if (pathname === '/v1/account/change-username' && method === 'POST') {
+        const body = await this.parseJsonBody(req);
+        if (!body?.newUsername) {
+          this.sendJson(res, 400, { error: 'Missing newUsername' });
+          return true;
+        }
+        try {
+          const result = await this.accountService.changeUsername({
+            accountId: account.accountId,
+            newUsername: body.newUsername,
+          });
+          this.sendJson(res, 200, { success: true, oldUsername: result.oldUsername, newUsername: result.newUsername });
+        } catch (err: any) {
+          const status = err.message?.includes('already taken') ? 409 : 400;
+          this.sendJson(res, status, { error: err.message || 'Failed to change username' });
+        }
+        return true;
+      }
       if (pathname === '/v1/account/devices' && method === 'GET') {
         const devices = await this.db.listDevices(account.accountId);
         this.sendJson(res, 200, { devices });

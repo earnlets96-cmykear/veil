@@ -15,7 +15,7 @@ export interface PaddedResult {
   sizeClass: SizeClass;
 }
 
-const SIZE_CLASS_ORDER: SizeClass[] = ['SMALL', 'MEDIUM', 'LARGE', 'XLARGE'];
+const SIZE_CLASS_ORDER: SizeClass[] = ['SMALL', 'MEDIUM', 'LARGE', 'XLARGE', 'JUMBO'];
 
 /**
  * Pads a payload to the smallest fitting SizeClass.
@@ -33,8 +33,8 @@ export function padPayload(payload: Uint8Array): PaddedResult {
   }
 
   // Find the smallest fitting size class
-  let targetClass: SizeClass = 'XLARGE';
-  let targetBytes = SIZE_CLASS_BYTES.XLARGE;
+  let targetClass: SizeClass = 'JUMBO';
+  let targetBytes = SIZE_CLASS_BYTES.JUMBO;
 
   for (const sc of SIZE_CLASS_ORDER) {
     if (SIZE_CLASS_BYTES[sc] >= totalNeeded) {

@@ -39,6 +39,10 @@ export interface StoredMessage {
   isOutgoing: boolean;
   timestamp: number;
   status: MessageDeliveryStatus;
+  attachment?: WireAttachmentPayload;
+  attachments?: WireAttachmentPayload[];
+  replyTo?: any;
+  voice?: any;
 }
 
 const MESSAGE_HISTORY_PREFIX = 'veil:messages:conv:';
@@ -329,11 +333,17 @@ export class ConversationManager {
     const wireAttachment = attachment ? toWireAttachment(attachment) : undefined;
     const wireAttachments = toWireAttachments(attachments);
 
+    // Sanitize senderDocument: never leak large inline avatar data into wire envelopes
+    const cleanSenderDoc: IdentityDocument = {
+      ...myDoc,
+      avatar: undefined,
+    };
+
     const wireObj = {
       version: 1 as const,
       deliveryId,
-      senderIdentityId: myDoc.identityId,
-      senderDocument: myDoc,
+      senderIdentityId: cleanSenderDoc.identityId,
+      senderDocument: cleanSenderDoc,
       senderMailboxId: binding?.mailboxId,
       ratchetMessage: ratchetMsg,
       attachment: wireAttachment,
@@ -363,6 +373,10 @@ export class ConversationManager {
       isOutgoing: true,
       timestamp: Date.now(),
       status: 'sent',
+      attachment: wireAttachment,
+      attachments: wireAttachments,
+      replyTo,
+      voice,
     };
     this.appendMessage(session, peerId, storedMessage);
 
@@ -392,11 +406,15 @@ export class ConversationManager {
       : { ...receipt, conversationId: peerDocument.identityId };
     const ratchetMsg = ratchetSession.ratchetEncrypt(JSON.stringify(authenticatedReceipt));
     const binding = this.store.get<{ mailboxId: string }>(session, 'net_mailbox_binding');
+    const cleanSenderDoc: IdentityDocument = {
+      ...myDoc,
+      avatar: undefined,
+    };
     const wireObj = {
       version: 1 as const,
       deliveryId: `receipt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      senderIdentityId: myDoc.identityId,
-      senderDocument: myDoc,
+      senderIdentityId: cleanSenderDoc.identityId,
+      senderDocument: cleanSenderDoc,
       senderMailboxId: binding?.mailboxId,
       ratchetMessage: ratchetMsg,
     };
@@ -559,6 +577,10 @@ export class ConversationManager {
       isOutgoing: false,
       timestamp: Date.now(),
       status: 'delivered',
+      attachment: wireObj.attachment,
+      attachments: wireObj.attachments,
+      replyTo: wireObj.replyTo,
+      voice: wireObj.voice,
     };
     this.appendMessage(session, senderId, storedMessage);
 

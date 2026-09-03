@@ -2,6 +2,42 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase56b] - 2026-09-03
+
+### Added & Fixed (Forensic Regression Fix, Real-Time Performance & Canonical Experience)
+- **Canonical Peer Profile Routing (`src/ui/components/ConversationView.tsx`, `src/ui/components/ProfileModal.tsx`)**:
+  - Unified chat header avatar click and "More" action dropdown to route exclusively to `ProfileModal.tsx` (`openModal({ type: 'profile', ... })`), eliminating old legacy verification modal disparity.
+  - Hardened peer identity resolution in `ProfileModal.tsx` across identityId, username, and conversation ID formats.
+- **Real-Time Performance & Send Pipeline Non-Blocking Decoupling (`src/ui/app/AppState.tsx`)**:
+  - Decoupled CPU-intensive Argon2id cloud snapshot sync (`scheduleCloudSync`) from typing and messaging hot paths by increasing debounce from 500ms to 15,000ms (15s idle).
+  - Removed premature `scheduleCloudSync(activeSession)` invocation immediately prior to wire dispatch in `sendMessage`.
+  - Added `queueSearchIndexUpdate` with 250ms debounce to prevent full SQLite/IndexedDB message indexing on every keystroke/message.
+- **Wire Receipt Unblocking & Single-Tick Resolution (`src/messaging/conversationManager.ts`, `src/transport/types.ts`, `src/transport/padding.ts`, `src/messaging/readReceipts.ts`)**:
+  - Traced single-tick failure: Double Ratchet wire messages and receipts embedded `myDoc` containing 30KB base64 avatars, bloating payloads beyond 32,764 bytes (`MAX_PAYLOAD_BYTES`) and silently dropping delivery/read receipts via unhandled padding errors.
+  - Sanitized `cleanSenderDoc` in `encryptAndPackWireMessage` and `encryptAndPackReceipt` to explicitly strip inline avatars (`avatar: undefined`), achieving a >25x payload size reduction.
+  - Expanded transport size classes to include `JUMBO` (131,072 bytes / 128 KiB) to support grouped multi-media messages without overflow.
+  - Updated `processInboundReceipt` to update all conversation alias keys in `messagesMap`, preventing state desynchronization.
+- **Red Status Feature Tracing & Error Retry Wiring (`src/ui/app/AppState.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Traced nonfunctional red status: `sendMessage` marked failed network transmissions as `'QUEUED'` instead of `'FAILED'`, and `ConversationView.tsx` never destructured `retryFailedMessage` nor passed `onRetry` to message bubbles.
+  - Updated `sendMessage` to set `status: 'FAILED'` on active network errors, rendering the red `AlertCircleIcon`.
+  - Wired `retryFailedMessage` through `ConversationMessageRow` and `MessageBubble`'s red retry button.
+- **Truthful Reply Previews & Self vs Peer Differentiation (`src/ui/app/AppState.tsx`, `src/ui/components/ui/ReplyPreview.tsx`, `src/styles/veil-components.css`)**:
+  - Replaced hardcoded `'yourself'` and `'Peer'` strings in `resolveReplyReference` with actual self display name (`myProfile?.displayName || myProfile?.username || activeSession.name`) and peer contact name (`targetContact?.name`).
+  - Added `isSelfReply` boolean flag to `ReplyReference`.
+  - Added distinct visual styling for self-replies (`.veil-reply-self` with accent primary `#6366f1` border and subtle background tint) vs peer-replies (`.veil-reply-peer` with emerald secondary `#10b981` border).
+- **Username Authentication & Cloud Username Change Pipeline (`src/server/cloud/accountService.ts`, `src/server/cloud/cloudHandler.ts`, `src/network/cloudClient.ts`, `src/spaces/vault.ts`, `src/ui/app/AppState.tsx`)**:
+  - Implemented `changeUsername` on `AccountService` with uniqueness enforcement.
+  - Added authenticated `POST /v1/account/change-username` route in `cloudHandler.ts`.
+  - Added `changeUsername` method in `CloudClient`.
+  - Added `updateCanonicalUsername` in `SpaceVaultManager` to update the local `SpaceEnvelope` so that subsequent credential-selected unlocks find the new username.
+  - Fixed username map re-indexing in `MemoryCloudDatabase` and `fileCloudDatabase`.
+  - Wired username change detection in `registerUsername` in `AppState.tsx` to atomically update cloud backend auth, local envelope, credentials ref, and localStorage.
+- **Grouped Media Persistence (`src/messaging/conversationManager.ts`, `src/styles/veil-components.css`)**:
+  - Extended `StoredMessage` with `attachments` array, persisting multi-item media metadata in encrypted local history.
+  - Added adaptive 1:1 tile sizing and error thumbnail overflow rules in `veil-components.css`.
+- **Automated Verification**:
+  - Added `tests/phase56b-forensic-hardening.test.ts` with 25 exhaustive tests (100% PASS).
+
 ## [1.0.0-phase56] - 2026-09-03
 
 ### Added & Fixed (Profile Persistence, Telegram-Grade UI/UX & Video Optimization)

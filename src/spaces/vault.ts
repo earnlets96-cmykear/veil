@@ -521,6 +521,21 @@ export class SpaceVaultManager {
   }
 
   /**
+   * Updates the canonical username on a registered SpaceHeaderEnvelope.
+   * Required so that after a username change, the next login with the new username
+   * can find the correct envelope via unlockSpaceByUsernameAsync.
+   */
+  public updateCanonicalUsername(spaceId: string, newUsername: string): SpaceHeaderEnvelope {
+    const envelope = this.envelopes.get(spaceId);
+    if (!envelope) {
+      throw new Error(`Cannot update username: no envelope found for Space ${spaceId}`);
+    }
+    const cleanUsername = newUsername.trim().toLowerCase().replace(/^@/, '');
+    envelope.canonicalUsername = cleanUsername;
+    return envelope;
+  }
+
+  /**
    * Persists a SpaceHeaderEnvelope to an IStorageAdapter.
    */
   public async saveEnvelopeToStorage(envelope: SpaceHeaderEnvelope, adapter: { isInitialized(): boolean; init(): Promise<void>; saveEnvelope(env: SpaceHeaderEnvelope): Promise<void> }): Promise<void> {

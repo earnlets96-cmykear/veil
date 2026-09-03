@@ -104,63 +104,69 @@ export class ReadReceiptManager {
       }
     }
 
-    // 2. Identify the target conversation key in messagesMap.
+    // 2. Identify candidate conversation keys in messagesMap.
     const receiptMessageId = receipt.type === 'READ_RECEIPT'
       ? receipt.lastReadMessageId
       : receipt.messageId;
 
-    let targetKey: string | undefined = undefined;
-
-    // Check direct candidate keys
     const candidateKeys = [
       authenticatedPeerId,
       receipt.type === 'READ_RECEIPT' ? receipt.readerIdentityId : undefined,
       receipt.conversationId,
     ].filter(Boolean) as string[];
 
+    const keysToUpdate = new Set<string>();
     for (const k of candidateKeys) {
       if (messagesMap[k] && messagesMap[k].length > 0) {
-        targetKey = k;
-        break;
+        keysToUpdate.add(k);
+      }
+    }
+    if (receiptMessageId) {
+      for (const k of Object.keys(messagesMap)) {
+        if (messagesMap[k]?.some((m) => m.id === receiptMessageId)) {
+          keysToUpdate.add(k);
+        }
       }
     }
 
-    // Fallback: search all conversations to find which one holds this message ID
-    if (!targetKey && receiptMessageId) {
-      targetKey = Object.keys(messagesMap).find((k) =>
-        messagesMap[k]?.some((m) => m.id === receiptMessageId)
-      );
-    }
-
-    if (!targetKey) {
+    if (keysToUpdate.size === 0) {
       return { updatedMessages: messagesMap, didChange: false };
     }
 
-    const list = messagesMap[targetKey];
-    if (!list || list.length === 0) return { updatedMessages: messagesMap, didChange: false };
-
-    const receiptIndex = list.findIndex((message) => message.id === receiptMessageId);
-    if (receiptIndex < 0) return { updatedMessages: messagesMap, didChange: false };
-
     let didChange = false;
-    const nextList = list.map((message, index) => {
-      const acknowledged = receipt.type === 'READ_RECEIPT'
-        ? index <= receiptIndex
-        : index === receiptIndex;
-      if (!acknowledged || !message.isOutgoing || message.status === 'FAILED') return message;
+    const updatedMessages = { ...messagesMap };
 
-      const nextStatus: DeliveryStatus = receipt.type === 'READ_RECEIPT' ? 'READ' : 'DELIVERED_TO_RECIPIENT';
+    for (const key of keysToUpdate) {
+      const list = messagesMap[key];
+      if (!list || list.length === 0) continue;
 
-      // Strict monotonicity: A message already in 'READ' status MUST NEVER regress
-      if (message.status === nextStatus) return message;
-      if (message.status === 'READ' && nextStatus !== 'READ') return message;
+      const receiptIndex = receiptMessageId ? list.findIndex((m) => m.id === receiptMessageId) : list.length - 1;
+      if (receiptIndex < 0) continue;
 
-      didChange = true;
-      return { ...message, status: nextStatus };
-    });
+      let keyChanged = false;
+      const nextList = list.map((message, index) => {
+        const acknowledged = receipt.type === 'READ_RECEIPT'
+          ? index <= receiptIndex
+          : index === receiptIndex;
+        if (!acknowledged || !message.isOutgoing || message.status === 'FAILED') return message;
 
-    const updatedMessages = didChange ? { ...messagesMap, [targetKey]: nextList } : messagesMap;
-    return { updatedMessages, didChange };
+        const nextStatus: DeliveryStatus = receipt.type === 'READ_RECEIPT' ? 'READ' : 'DELIVERED_TO_RECIPIENT';
+
+        // Strict monotonicity: A message already in 'READ' status MUST NEVER regress
+        if (message.status === nextStatus) return message;
+        if (message.status === 'READ' && nextStatus !== 'READ') return message;
+
+        keyChanged = true;
+        didChange = true;
+        return { ...message, status: nextStatus };
+      });
+
+      if (keyChanged) {
+        updatedMessages[key] = nextList;
+      }
+    }
+
+    return { updatedMessages: didChange ? updatedMessages : messagesMap, didChange };
   }
 }
 

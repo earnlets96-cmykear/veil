@@ -88,6 +88,7 @@ export interface ReplyReference {
   text: string;
   attachmentType?: 'image' | 'video' | 'file' | 'voice' | 'grouped' | string;
   thumbnailUrl?: string;
+  isSelfReply?: boolean;
 }
 
 import { DirectorySearchResult } from '../../server/types.ts';

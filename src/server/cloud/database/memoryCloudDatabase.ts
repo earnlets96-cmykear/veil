@@ -60,8 +60,16 @@ export class MemoryCloudDatabase implements ICloudDatabase {
   }
 
   public async updateAccount(account: AccountEntity): Promise<void> {
-    if (!this.accounts.has(account.accountId)) {
+    const existing = this.accounts.get(account.accountId);
+    if (!existing) {
       throw new Error(`Account ${account.accountId} not found`);
+    }
+    // Re-index username map if username changed
+    const oldUsername = existing.username?.toLowerCase();
+    const newUsername = account.username?.toLowerCase();
+    if (oldUsername && newUsername && oldUsername !== newUsername) {
+      this.accountsByUsername.delete(oldUsername);
+      this.accountsByUsername.set(newUsername, account.accountId);
     }
     this.accounts.set(account.accountId, { ...account, updatedAt: Date.now() });
   }

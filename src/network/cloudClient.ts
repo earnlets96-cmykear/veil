@@ -220,6 +220,10 @@ export class CloudClient {
     await this.request('/v1/account/change-password', 'POST', { oldPassword, newPassword }, 60000);
   }
 
+  public async changeUsername(newUsername: string): Promise<{ oldUsername: string; newUsername: string }> {
+    return await this.request<{ oldUsername: string; newUsername: string }>('/v1/account/change-username', 'POST', { newUsername }, 15000);
+  }
+
   public async listDevices(): Promise<DeviceEntity[]> {
     const res = await this.request<{ devices: DeviceEntity[] }>('/v1/account/devices', 'GET');
     return res.devices;
