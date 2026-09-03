@@ -9,10 +9,15 @@
 - **Phase 56B Test Suite**: `tests/phase56b-acceptance.test.ts` (8/8 tests passing, 100% clean pass)
 - **Phase 56 Regression Suite**: `tests/phase56-profile-media-perf.test.ts` (7/7 tests passing, 100% clean pass)
 - **Phase 55 Regression Suite**: `tests/phase55-forensic-p0.test.ts` (7/7 tests passing, 100% clean pass)
-- **TypeScript Typecheck**: **PASS (`npx tsc --noEmit` with ZERO errors)**
-- **Web App Build**: **PASS (`npm run build` in 1.75s)**
-- **Capacitor Sync**: **PASS (`npx cap sync android` in 0.15s)**
-- **Android Hardware Status**: **`ANDROID HARDWARE RUNTIME: UNTESTED`** (honestly reported per Rule 4, no physical device or emulator connected on host)
+- **Phase 56C Final Runtime Gate**: **PASS (`scratch/verify_phase56c_runtime.ts` 13/13 gates evaluated against `https://veil-rga0.onrender.com`)**
+  - **Live Relay Timings**: `tap->visible: 0.01ms` | `visible->sent: 303.20ms` | `deliver: 623.90ms` | `read: 0.02ms`
+  - **Read Receipts Progression**: Verified strict `SENT_TO_RELAY` (1 tick) $\to$ `DELIVERED_TO_RECIPIENT` (2 gray ticks) $\to$ `READ` (2 colored ticks) without premature reads.
+  - **Grouped Media E2E**: 2, 5, 10 photos verified with `JUMBO` size-class padding; partial failures isolated without dropping successful attachments.
+  - **Voice Notes E2E**: Presigned cloud upload, authorization, and byte-for-byte decryption verified with zero 401/403 errors.
+  - **TypeScript Typecheck**: **PASS (`npx tsc --noEmit` with ZERO errors)**
+  - **Web App Build**: **PASS (`npm run build` in 1.75s)**
+  - **Capacitor Sync**: **PASS (`npx cap sync android` in 0.15s)**
+  - **Android Hardware Status**: **`ANDROID HARDWARE RUNTIME: UNTESTED`** (honestly reported per Rule 4: Pixel_8_API_35 AVD is present on disk, but no active emulator or physical device is attached to ADB)
 
 ---
 
