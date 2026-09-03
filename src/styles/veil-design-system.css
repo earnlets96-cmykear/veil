@@ -1103,7 +1103,7 @@ body {
 }
 
 .veil-waveform-bar.active {
-  animation: veilWaveBar 0.8s infinite ease-in-out;
+  animation: veilWaveBar 1.2s ease-in-out 1;
 }
 
 .veil-voice-progress-bar {

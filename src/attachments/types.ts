@@ -80,6 +80,7 @@ export interface LocalAttachmentPayload {
   encryptionKeyBase64?: string;
   previewUrl?: string; // Local preview only
   localPreviewUrl?: string; // Local preview only
+  thumbnailUrl?: string; // Local micro-thumbnail only
   state?: AttachmentState;
   error?: string;
   progressPercent?: number;
@@ -156,8 +157,8 @@ export function assertWireSafe(obj: any, path = ''): void {
   for (const [key, val] of Object.entries(obj)) {
     const currentPath = path ? `${path}.${key}` : key;
 
-    if (key === 'previewUrl' || key === 'localPreviewUrl') {
-      throw new Error(`Wire payload violation at ${currentPath}: previewUrl is local-only state and must never cross wire`);
+    if (key === 'previewUrl' || key === 'localPreviewUrl' || key === 'thumbnailUrl') {
+      throw new Error(`Wire payload violation at ${currentPath}: ${key} is local-only state and must never cross wire`);
     }
 
     if (typeof val === 'string' && val.startsWith('blob:')) {

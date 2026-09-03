@@ -39,7 +39,18 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     );
   });
 
-  const [isLoading, setIsLoading] = useState(!media && !attachment.previewUrl);
+  const durableThumbnail = (attachment.thumbnailUrl && attachment.thumbnailUrl.startsWith('data:'))
+    ? attachment.thumbnailUrl
+    : (attachment.previewUrl && attachment.previewUrl.startsWith('data:'))
+    ? attachment.previewUrl
+    : null;
+
+  // Blob URLs are only trusted if actively loaded in media state or RAM cache
+  const activeBlobUrl = media?.blobUrl || null;
+  const displayUrl = activeBlobUrl || durableThumbnail;
+  const isShowingThumbnail = !activeBlobUrl && Boolean(durableThumbnail);
+
+  const [isLoading, setIsLoading] = useState(!media && !durableThumbnail);
   const [error, setError] = useState<string | null>(null);
   const [videoThumbnailUrl, setVideoThumbnailUrl] = useState<string | null>(null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
@@ -120,11 +131,11 @@ export const MediaImage: React.FC<MediaImageProps> = ({
 
     if (attachment.objectId || attachment.attachmentId) {
       fetchAndDecrypt();
-    } else if (!attachment.previewUrl) {
+    } else if (!durableThumbnail) {
       setError('Attachment lacks objectId or attachmentId for cloud retrieval');
       setIsLoading(false);
     }
-  }, [key, attachment.objectId, attachment.attachmentId, attachment.previewUrl, fetchAndDecrypt]);
+  }, [key, attachment.objectId, attachment.attachmentId, durableThumbnail, fetchAndDecrypt]);
 
   // Handle broken/stale blob image or video load failure
   const handleMediaError = () => {
@@ -136,12 +147,11 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     }
   };
 
-  const displayBlobUrl = media?.blobUrl || attachment.previewUrl;
   const isVideoMedia = isVideo || attachment.mimeType?.startsWith('video/');
   const createdThumbUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isVideoMedia || !displayBlobUrl) return;
+    if (!isVideoMedia || !displayUrl) return;
 
     let isCancelled = false;
     (async () => {
@@ -150,7 +160,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
         if (media?.data) {
           blobSource = new Blob([media.data as any], { type: attachment.mimeType || 'video/mp4' });
         } else {
-          const res = await fetch(displayBlobUrl);
+          const res = await fetch(displayUrl);
           blobSource = await res.blob();
         }
         if (blobSource && !isCancelled) {
@@ -179,9 +189,9 @@ export const MediaImage: React.FC<MediaImageProps> = ({
         } catch (_e) {}
       }
     };
-  }, [isVideoMedia, displayBlobUrl, media, attachment.mimeType]);
+  }, [isVideoMedia, displayUrl, media, attachment.mimeType]);
 
-  if (isLoading && !displayBlobUrl) {
+  if (isLoading && !displayUrl) {
     return (
       <div
         className={`veil-media-thumbnail-loading ${className}`.trim()}
@@ -197,7 +207,7 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     );
   }
 
-  if (error && !displayBlobUrl) {
+  if (error && !displayUrl) {
     return (
       <div className={`veil-media-thumbnail-error ${className}`.trim()} role="alert">
         <AlertCircleIcon size={22} color="var(--veil-danger)" />
@@ -231,19 +241,19 @@ export const MediaImage: React.FC<MediaImageProps> = ({
         }
       }}
     >
-      {displayBlobUrl ? (
+      {displayUrl ? (
         isVideoMedia ? (
           videoThumbnailUrl ? (
             <img
               src={videoThumbnailUrl}
               alt={alt || attachment.name}
-              className="veil-media-thumbnail-img"
+              className={`veil-media-thumbnail-img ${isShowingThumbnail ? 'veil-media-thumbnail-blurred' : ''}`.trim()}
               loading="lazy"
               onError={() => setVideoThumbnailUrl(null)}
             />
           ) : (
             <video
-              src={displayBlobUrl}
+              src={displayUrl}
               className="veil-media-thumbnail-img veil-media-thumbnail-video"
               preload="metadata"
               muted
@@ -253,15 +263,24 @@ export const MediaImage: React.FC<MediaImageProps> = ({
           )
         ) : (
           <img
-            src={displayBlobUrl}
+            src={displayUrl}
             alt={alt || attachment.name}
-            className="veil-media-thumbnail-img"
+            className={`veil-media-thumbnail-img ${isShowingThumbnail ? 'veil-media-thumbnail-blurred' : ''}`.trim()}
             loading="lazy"
             onError={handleMediaError}
           />
         )
       ) : (
         <div className="veil-media-skeleton-pulse" />
+      )}
+
+      {isShowingThumbnail && (
+        <div
+          className="veil-media-loading-badge"
+          style={{ position: 'absolute', bottom: '6px', right: '6px', padding: '2px 6px', fontSize: '0.65rem' }}
+        >
+          <span className="veil-spinner veil-spinner-sm" style={{ width: '10px', height: '10px' }} />
+        </div>
       )}
 
       {isVideoMedia && (

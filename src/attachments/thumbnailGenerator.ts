@@ -130,4 +130,75 @@ export class ThumbnailGenerator {
       };
     });
   }
+
+  /**
+   * Generates a compact base64 JPEG thumbnail (data URL) from an image File or Blob.
+   * Safe for durable local-first persistence across app restarts.
+   */
+  public static async generateImageThumbnail(
+    imageSource: File | Blob,
+    maxDimension: number = 48
+  ): Promise<string> {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+    }
+
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(imageSource);
+      const img = new Image();
+      let cleaned = false;
+      const cleanup = () => {
+        if (!cleaned) {
+          cleaned = true;
+          URL.revokeObjectURL(url);
+        }
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve('');
+      }, 4000);
+
+      img.onload = () => {
+        clearTimeout(timer);
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width || 100;
+          let height = img.height || 100;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            cleanup();
+            resolve('');
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          cleanup();
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+          resolve(dataUrl);
+        } catch (_e) {
+          cleanup();
+          resolve('');
+        }
+      };
+
+      img.onerror = () => {
+        clearTimeout(timer);
+        cleanup();
+        resolve('');
+      };
+
+      img.src = url;
+    });
+  }
 }

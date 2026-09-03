@@ -56,6 +56,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!onSeek || isUploading || isError) return;
     e.preventDefault();
+    e.stopPropagation();
     setIsScrubbing(true);
 
     try {
@@ -69,12 +70,14 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isScrubbing || !onSeek) return;
     e.preventDefault();
+    e.stopPropagation();
     const percent = calculatePercentFromPointer(e.clientX);
     onSeek(percent);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isScrubbing) return;
+    e.stopPropagation();
     setIsScrubbing(false);
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);

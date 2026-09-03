@@ -37,6 +37,8 @@ export interface AttachmentPayload {
   sha256Hash?: string;
   encryptionKeyBase64?: string;
   previewUrl?: string;
+  localPreviewUrl?: string;
+  thumbnailUrl?: string;
   url?: string;
   state?: string;
   error?: string;

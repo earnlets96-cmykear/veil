@@ -428,6 +428,7 @@
   border-radius: var(--veil-radius-md);
   min-width: 220px;
   max-width: 320px;
+  touch-action: none;
 }
 
 .veil-voicenote-card.outgoing {
@@ -468,6 +469,8 @@
   align-items: center;
   justify-content: center;
   font-size: 0.9rem;
+  position: relative;
+  z-index: 2;
   transition: all var(--veil-duration-fast) var(--veil-easing-standard);
 }
 
@@ -1430,6 +1433,12 @@
 
 .veil-media-thumbnail-clickable:hover .veil-media-thumbnail-img {
   transform: scale(1.02);
+}
+
+.veil-media-thumbnail-img.veil-media-thumbnail-blurred {
+  filter: blur(8px);
+  transform: scale(1.05);
+  transition: filter 0.3s ease, transform 0.3s ease;
 }
 
 /* Adaptive Grouped Media Grid Thumbnail Resizing */

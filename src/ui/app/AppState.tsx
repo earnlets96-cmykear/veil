@@ -98,6 +98,7 @@ import {
 } from '../../attachments/types.ts';
 import { readReceiptManager } from '../../messaging/readReceipts.ts';
 import { inferMediaMime } from '../../attachments/mimeUtils.ts';
+import { ThumbnailGenerator } from '../../attachments/thumbnailGenerator.ts';
 import { presenceManager } from '../../presence/presenceManager.ts';
 import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
 import { DeletedMessageTombstone } from '../../storage/types.ts';
@@ -189,6 +190,14 @@ export interface AppContextType {
     name: string,
     description?: string,
     members?: Array<{ identityId: string; username?: string; displayName?: string; signingPublicKey?: string; mailboxId?: string }>
+  ) => Promise<void>;
+  addGroupMember: (
+    groupId: string,
+    member: { identityId: string; username?: string; displayName?: string; signingPublicKey?: string; mailboxId?: string }
+  ) => Promise<void>;
+  removeGroupMember: (
+    groupId: string,
+    targetIdentityId: string
   ) => Promise<void>;
   ensureCloudSession: (session: SpaceSession, forceReauth?: boolean, customPassword?: string) => Promise<boolean | void>;
   updateContactMediaPermissions: (identityId: string, permissions: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
@@ -1802,6 +1811,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 localPreview = AttachmentPipeline.createEphemeralBlobUrl(fileBytes, metadata.mimeType);
               }
 
+              let durableThumb: string | undefined = (currentAtt as any).thumbnailUrl;
+              if (!durableThumb && metadata.mimeType.startsWith('image/')) {
+                try {
+                  durableThumb = await ThumbnailGenerator.generateImageThumbnail(new Blob([fileBytes], { type: metadata.mimeType }), 48);
+                } catch (_tErr) {}
+              }
+
               activeAttachments[idx] = {
                 attachmentId: metadata.attachmentId,
                 objectId,
@@ -1816,6 +1832,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 encryptionKeyBase64: bytesToBase64(ephemeralKey),
                 previewUrl: localPreview,
                 localPreviewUrl: localPreview,
+                thumbnailUrl: durableThumb,
                 state: 'SENT' as const,
                 allowSave,
                 allowForward,
@@ -2535,6 +2552,70 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession]
   );
 
+  const addGroupMember = useCallback(
+    async (
+      groupId: string,
+      member: { identityId: string; username?: string; displayName?: string; signingPublicKey?: string; mailboxId?: string }
+    ) => {
+      if (!activeSession) return;
+      let enriched = { ...member };
+      if ((!enriched.signingPublicKey || !enriched.mailboxId) && enriched.username) {
+        try {
+          const profile = await directoryClient.getProfileByUsername(enriched.username);
+          if (profile) {
+            enriched.signingPublicKey = profile.prekeyBundle?.identityDocument?.signingPublicKey;
+            enriched.mailboxId = profile.mailboxId;
+            enriched.identityId = profile.identityId;
+          }
+        } catch (_e) {}
+      }
+
+      if (!enriched.identityId || !enriched.signingPublicKey) {
+        throw new Error('Could not resolve cryptographic identity or public key for member');
+      }
+
+      const { distribution } = groupManager.addMember(
+        activeSession,
+        groupId,
+        enriched.identityId,
+        enriched.signingPublicKey,
+        'MEMBER'
+      );
+
+      const updatedState = groupManager.loadGroupState(activeSession, groupId);
+
+      if (enriched.mailboxId) {
+        const invitePayload = JSON.stringify({
+          type: 'GROUP_INVITE',
+          groupId,
+          senderKeyDistribution: distribution,
+        });
+        netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
+      }
+
+      setConversations((prev) => {
+        const updated = prev.map((c) => (c.id === groupId ? { ...c, groupState: updatedState || c.groupState } : c));
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession, directoryClient, groupManager, netManager]
+  );
+
+  const removeGroupMember = useCallback(
+    async (groupId: string, targetIdentityId: string) => {
+      if (!activeSession) return;
+      groupManager.removeMember(activeSession, groupId, targetIdentityId);
+      const updatedState = groupManager.loadGroupState(activeSession, groupId);
+      setConversations((prev) => {
+        const updated = prev.map((c) => (c.id === groupId ? { ...c, groupState: updatedState || c.groupState } : c));
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession, groupManager]
+  );
+
   const openModal = useCallback((modal: ActiveModal) => {
     setActiveModal(modal);
     sessionController.recordUserActivity();
@@ -2893,6 +2974,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     exportMyInvitation,
     updateContactVerification,
     createGroup,
+    addGroupMember,
+    removeGroupMember,
     ensureCloudSession,
     updateContactMediaPermissions,
     registerUsername,

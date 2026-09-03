@@ -47,6 +47,7 @@ export interface UIMessage {
     encryptionKeyBase64?: string;
     previewUrl?: string;
     localPreviewUrl?: string;
+    thumbnailUrl?: string;
     state?: string;
     error?: string;
     allowSave?: boolean;
@@ -66,6 +67,7 @@ export interface UIMessage {
     encryptionKeyBase64?: string;
     previewUrl?: string;
     localPreviewUrl?: string;
+    thumbnailUrl?: string;
     state?: string;
     error?: string;
     allowSave?: boolean;

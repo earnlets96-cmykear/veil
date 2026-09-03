@@ -93,7 +93,7 @@ export class ReadReceiptManager {
   /**
    * Processes an inbound read/delivery receipt payload and updates matching outgoing message statuses.
    */
-  public static processInboundReceipt(
+  public processInboundReceipt(
     arg1: any,
     arg2: any,
     authenticatedPeerId?: string
@@ -186,12 +186,18 @@ export class ReadReceiptManager {
 }
 
 export const readReceiptManager = new ReadReceiptManager();
-export const processInboundReceipt = ReadReceiptManager.processInboundReceipt;
+export const processInboundReceipt = (
+  arg1: any,
+  arg2: any,
+  authenticatedPeerId?: string
+) => readReceiptManager.processInboundReceipt(arg1, arg2, authenticatedPeerId);
 export const scheduleReadReceipt = (
   conversationId: string,
   lastMessageId: string,
   sendReceipt: (receipt: ReadReceiptPayload) => Promise<void>,
   readerIdentityId?: string
 ) => readReceiptManager.scheduleReadReceipt(conversationId, lastMessageId, sendReceipt, readerIdentityId);
-export const flushPendingReceipts = (senderIdentityId?: string) => readReceiptManager.flushPendingReceipts(senderIdentityId);
+export const flushPendingReceipts = (
+  fallbackSender?: (receipt: ReadReceiptPayload) => Promise<void>
+) => readReceiptManager.flushPendingReceipts(fallbackSender);
 
