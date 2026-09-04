@@ -251,6 +251,29 @@ async function main() {
   }
   console.log('[LIVE-TEST] Bob successfully decrypted media byte-for-byte!');
 
+  // 7b. Direct raw media upload & retrieval without client encryption
+  console.log('[LIVE-TEST] Step 7b: Testing Direct Raw Media Upload and Recipient Retrieval...');
+  const rawImageBytes = new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
+  const rawHash = bytesToHex(sha256(rawImageBytes));
+  const rawAttId = `att_raw_${ts}`;
+  const { attachment: rawRecord } = await aliceCloud.createAttachment({
+    attachmentId: rawAttId,
+    spaceId: aliceSession.spaceId,
+    recipientAccountId: bobAcc.account.accountId,
+    recipientUsername: bobUser,
+    ciphertextSize: rawImageBytes.length,
+    ciphertextHash: rawHash,
+    chunkCount: 1,
+    chunkSize: rawImageBytes.length,
+  });
+  await aliceCloud.uploadAttachment(rawRecord.objectId, rawImageBytes);
+  console.log(`[LIVE-TEST] Alice direct-uploaded raw media (objectId=${rawRecord.objectId})`);
+  const bobDownloadedRaw = await bobCloud.downloadAttachment(rawRecord.objectId);
+  if (bytesToHex(bobDownloadedRaw) !== bytesToHex(rawImageBytes)) {
+    throw new Error('Bob direct downloaded media mismatch!');
+  }
+  console.log('[LIVE-TEST] Bob direct-downloaded raw media identically (0ms CPU decrypt overhead)!');
+
   // 8. Group Creation, Invite Fanout, and Sender Key Group Messaging
   console.log('[LIVE-TEST] Step 8: Testing Real Group creation, invite distribution, and group messaging...');
   const aliceGroupMgr = new GroupManager(aliceStore, aliceIdMgr);
@@ -290,6 +313,21 @@ async function main() {
     aliceSigningBytes
   );
   console.log(`[LIVE-TEST] Bob received and decrypted group message: "${bobDecryptedGroupMsg.text}"`);
+
+  // Bob replies to the group with his own SenderKey distribution
+  const bobDist = bobGroupMgr.exportSenderKeyDistribution(bobSession, groupState.groupId);
+  aliceGroupMgr.processSenderKeyDistribution(aliceSession, bobDist!, bobIdentity.signingPublicKey);
+  const { payload: bobGroupMsgPayload } = bobGroupMgr.encryptGroupMessage(
+    bobSession,
+    groupState.groupId,
+    'Live member response from Bob'
+  );
+  const aliceDecryptedGroupMsg = aliceGroupMgr.decryptGroupMessage(
+    aliceSession,
+    bobGroupMsgPayload,
+    bobIdentity.signingPublicKey
+  );
+  console.log(`[LIVE-TEST] Alice received and decrypted Bob's group reply: "${aliceDecryptedGroupMsg.text}"`);
 
   // 9. Deletion tombstone verification
   console.log('[LIVE-TEST] Step 9: Verifying Delete-For-Everyone tombstone...');

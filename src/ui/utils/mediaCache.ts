@@ -151,27 +151,27 @@ class MediaCacheManager {
       }
     }
 
-    // 2. Check durable IndexedDB cache (survives app restart without re-downloading)
-    for (const key of candidateKeys) {
-      const persisted = await this.getFromIDB(key);
-      if (persisted && persisted.blobUrl) {
-        for (const k of candidateKeys) {
-          this.cache.set(k, persisted);
-        }
-        return persisted;
-      }
-    }
-
-    // 3. Return existing in-flight promise if a fetch is already running for any matching key
+    // 2. Return existing in-flight promise if a fetch is already running for any matching key
     for (const key of candidateKeys) {
       if (this.inFlight.has(key)) {
         return this.inFlight.get(key)!;
       }
     }
 
-    // 4. Start asynchronous cloud download and AEAD decryption with a 30s timeout guard
+    // 3. Start asynchronous cloud download and AEAD decryption with timeout guard
     const fetchPromise = (async (): Promise<DecryptedMedia> => {
       try {
+        // Check durable IndexedDB cache (survives app restart without re-downloading)
+        for (const key of candidateKeys) {
+          const persisted = await this.getFromIDB(key);
+          if (persisted && persisted.blobUrl) {
+            for (const k of candidateKeys) {
+              this.cache.set(k, persisted);
+            }
+            return persisted;
+          }
+        }
+
         const objectId = attachment.objectId || attachment.attachmentId;
         if (!objectId) {
           throw new Error('Attachment lacks objectId or attachmentId for cloud retrieval');

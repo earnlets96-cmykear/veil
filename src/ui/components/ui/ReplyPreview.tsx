@@ -71,10 +71,9 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
     return replyTo.text || '';
   };
 
-  const defaultSender = isSelf ? 'You' : '';
+  const defaultSender = isSelf ? 'You' : 'Peer';
   const rawSender = replyTo.senderName;
-  const isGeneric = !rawSender || rawSender === 'Contact' || rawSender === 'Peer' || rawSender === 'Yourself';
-  const effectiveSender = isGeneric ? defaultSender : rawSender;
+  const effectiveSender = rawSender && rawSender !== 'Contact' && rawSender !== 'Yourself' ? rawSender : (rawSender || defaultSender);
 
   return (
     <div

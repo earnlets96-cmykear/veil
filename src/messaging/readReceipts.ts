@@ -112,9 +112,12 @@ export class ReadReceiptManager {
     }
 
     // 1. Authenticate peer attribution
-    // If authenticatedPeerId is provided, the sender of the encrypted payload must match the expected reader/recipient
-    if (authenticatedPeerId) {
-      if (receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId && receipt.readerIdentityId !== authenticatedPeerId) {
+    // If authenticatedPeerId is provided, the sender of the encrypted payload is guaranteed
+    if (authenticatedPeerId && receipt.type === 'READ_RECEIPT' && receipt.readerIdentityId) {
+      const cleanReader = receipt.readerIdentityId.replace(/^id_/, '').toLowerCase();
+      const cleanAuth = authenticatedPeerId.replace(/^id_/, '').toLowerCase();
+      if (cleanReader !== cleanAuth && receipt.readerIdentityId !== authenticatedPeerId) {
+        // If identity does not match authenticated peer, drop spoofed receipt
         return { updatedMessages: messagesMap, didChange: false };
       }
     }
@@ -155,21 +158,23 @@ export class ReadReceiptManager {
       const list = messagesMap[key];
       if (!list || list.length === 0) continue;
 
-      const receiptIndex = receiptMessageId ? list.findIndex((m) => m.id === receiptMessageId) : list.length - 1;
-      if (receiptIndex < 0) continue;
+      const foundIndex = receiptMessageId ? list.findIndex((m) => m.id === receiptMessageId) : -1;
+      const effectiveIndex = foundIndex >= 0 ? foundIndex : (receipt.type === 'READ_RECEIPT' ? list.length - 1 : -1);
+      if (effectiveIndex < 0) continue;
 
       let keyChanged = false;
       const nextList = list.map((message, index) => {
         const acknowledged = receipt.type === 'READ_RECEIPT'
-          ? index <= receiptIndex
-          : index === receiptIndex;
+          ? index <= effectiveIndex
+          : index === effectiveIndex;
         if (!acknowledged || !message.isOutgoing || message.status === 'FAILED') return message;
 
+        const currentNormalized = (message.status || '').toUpperCase();
         const nextStatus: DeliveryStatus = receipt.type === 'READ_RECEIPT' ? 'READ' : 'DELIVERED_TO_RECIPIENT';
 
         // Strict monotonicity: A message already in 'READ' status MUST NEVER regress
-        if (message.status === nextStatus) return message;
-        if (message.status === 'READ' && nextStatus !== 'READ') return message;
+        if (currentNormalized === 'READ' && nextStatus !== 'READ') return message;
+        if (currentNormalized === nextStatus) return message;
 
         keyChanged = true;
         didChange = true;

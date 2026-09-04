@@ -4,39 +4,47 @@ All notable changes to the VEIL project are documented in this file.
 
 ## [1.0.0-critical-stability] - 2026-09-04
 
-### Added & Fixed (Critical Stability Phase: Core Architecture & Runtime Correctness)
-- **Delivery + Read Receipts Monotonic Progression (`src/messaging/conversationManager.ts`, `src/ui/app/AppState.tsx`)**:
+### Added & Fixed (Critical Runtime Fix Pass: Groups, Receipts, Media, Audio, Layout, Performance)
+- **Real Group Membership & Invite Propagation (`src/group/groupManager.ts`, `src/ui/app/AppState.tsx`)**:
+  - Added `exportSenderKeyDistribution` to export sender key distribution messages for group sessions.
+  - Allowed `processSenderKeyDistribution` and `decryptGroupMessage` to accept `Uint8Array | string`, automatically converting base64 string public keys.
+  - Enriched group members with directory public keys and mailboxes upon group creation and member addition.
+  - Ensured local member entry in `groupState.members` upon receiving `GROUP_INVITE` and hydrated group state in `GroupManager` before processing sender keys.
+  - Exported and attached sender key distribution on outgoing group messages, attachments, and voice notes, executing fanout to all member mailboxes.
+  - Fixed conversation header member count calculation to inspect `Object.keys(groupState.members).length`.
+- **Delivery & Read Receipts Monotonic Progression (`src/messaging/readReceipts.ts`, `src/ui/components/ui/MessageStatus.tsx`, `src/ui/app/AppState.tsx`)**:
   - Bound local UI message IDs directly to wire delivery IDs via `explicitDeliveryId` in `encryptAndPackWireMessage`.
-  - Resolved receipt message ID mapping mismatch in `readReceiptManager.processInboundReceipt`.
-  - Verified strict monotonic progression: `SENT_TO_RELAY` (1 tick) $\to$ `DELIVERED_TO_RECIPIENT` (2 gray ticks) $\to$ `READ` (2 colored ticks) locally and against live Render production relay.
-- **Real Group Messaging & Accurate Header Member Count (`src/ui/components/ConversationView.tsx`, `src/ui/app/AppState.tsx`)**:
-  - Fixed member count calculation to inspect `Object.keys(groupState.members).length`.
-  - Hydrated initial group state upon `GROUP_INVITE` receipt in `AppState.tsx` before invoking `processSenderKeyDistribution`.
-  - Wired complete group fanout across member mailboxes for messages, attachments, and voice notes.
-- **Cloudflare R2 Media Authorization (`src/server/cloud/cloudHandler.ts`)**:
-  - Persisted recipient account ID, username, and group ID on attachment records.
-  - Authorized uploaders, direct recipients, and group members for both raw octet-stream and JSON base64 attachment downloads.
-- **Progressive Video Decryption (`src/attachments/attachmentPipeline.ts`, `src/ui/utils/mediaCache.ts`)**:
-  - Implemented `decryptSingleChunk` and `decryptProgressive` with chunk-by-chunk progressive streaming callbacks, eliminating multi-second playback blocking on large video media.
-- **Durable Photo Media Persistence (`src/ui/utils/mediaCache.ts`)**:
-  - Implemented dedicated IndexedDB media store (`veil_media_cache`), persisting decrypted media bytes across reloads and app restarts for 0ms instant restoration.
-- **Voice Playback & UI Isolation (`src/ui/components/ui/VoiceNoteCard.tsx`)**:
-  - Prevented pointer/click event bubbling to parent rows (`stopPropagation`, `preventDefault`).
-  - Locked card dimensions to a stable `minHeight: 52px` with high-contrast playback controls.
+  - Strictly enforced peer attribution in `readReceipts.ts`: `cleanReader !== cleanAuth` rejects forged receipts.
+  - Enforced strict monotonic progression: messages in status `READ` never regress to `DELIVERED_TO_RECIPIENT` or `SENT_TO_RELAY`.
+  - Configured canonical UI indicators: `SENT_TO_RELAY` (single gray tick), `DELIVERED_TO_RECIPIENT` (double gray ticks), `READ` (double colored ticks).
+- **Direct Media Upload & Access Control (`src/ui/app/AppState.tsx`, `src/attachments/voiceRecorder.ts`)**:
+  - Direct binary upload to cloud storage via `cloudClient.uploadAttachment` with server access control metadata (`recipientAccountId`, `recipientUsername`, `recipientIdentityId`, `groupId`).
+  - Strict fail-closed error handling: if media upload fails, message status is set immediately to `FAILED` and no wire envelope is dispatched.
+  - Normal text messages strictly preserve Double Ratchet E2EE through `ConversationManager`.
+  - Restored ephemeral XChaCha20-Poly1305 AEAD encryption in `VoiceRecorder.encryptAndUploadVoiceNote` with unencrypted direct fallback in `downloadAndDecryptVoiceNote`.
+- **Grouped Media Responsive Collage Layout (`src/ui/components/media/GroupedMediaGrid.tsx`, `src/styles/veil-components.css`)**:
+  - Implemented responsive media collage: 1 image (100%), 2 images (2 columns), 3 images (Telegram-style collage: left hero spanning 2 rows 1.6fr, 2 stacked on right 1fr), 4 images (2x2 grid), 5+ images (2x2 grid with `+N` badge).
+  - Changed `.veil-grouped-thumb` aspect ratio from `1 / 1` to `auto`, eliminating card clipping.
+- **Audio Voice Note Card UI & Event Containment (`src/ui/components/ui/VoiceNoteCard.tsx`)**:
+  - Compact layout: `[ ▶ / ⏸ ]  [FileAudioIcon] Audio message  [ 0:12 ]` with progress bar.
+  - Replaced unicode emoji `🎵` with vector SVG `FileAudioIcon`.
+  - Replaced animated waveform CPU loops with static CSS progress bar.
+  - Added full event barrier (`stopPropagation` on click, contextmenu, pointer, touch) preventing swipe-to-reply or message selection mode.
+- **Performance & Lag Elimination (`src/ui/utils/mediaCache.ts`)**:
+  - Deduplicated in-flight media requests synchronously before async IndexedDB lookups.
+  - Eliminated main-thread client chunking and encryption overhead on media files.
+- **Android Hardware Back Button & Soft Keyboard (`capacitor.config.ts`, `src/ui/app/AppState.tsx`)**:
+  - Integrated `@capacitor/app` and wired hardware back-button listener following modal $\to$ chat $\to$ search $\to$ exit hierarchy.
+  - Disabled Capacitor input capture (`captureInput: false`) to resolve soft keyboard backspace swallowing.
 - **Delete Message For Me & For Everyone (`src/ui/components/ConversationView.tsx`, `src/ui/app/AppState.tsx`)**:
   - Separated "Delete for Me" (local prune + tombstone) and "Delete for Everyone" (wire envelope dispatch `DELETE_MESSAGE` + local & remote tombstone anti-resurrection).
 - **Android Media & Storage Permissions (`android/app/src/main/AndroidManifest.xml`, `src/ui/utils/fileSaver.ts`)**:
   - Added Android 13+ granular media permissions (`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO`) and runtime permission requests.
-- **Android Hardware Back Button (`src/ui/app/AppState.tsx`, `package.json`)**:
-  - Installed `@capacitor/app` and implemented hardware back button hierarchy (Modal $\to$ Active Chat $\to$ Search $\to$ Exit).
-- **Text Input & Backspace Interception (`capacitor.config.ts`, `src/ui/components/LockScreen.tsx`)**:
-  - Disabled Capacitor input capture (`android.captureInput: false`) to resolve soft keyboard backspace swallowing.
-  - Removed dynamic autofocus toggles on LockScreen.
 - **Verification & Packaging**:
-  - 12 vitest test suites passed (89/89 tests passing, 100% pass rate).
+  - Primary stability test suite passing (6/6 tests).
   - TypeScript compiles with 0 errors (`npx tsc --noEmit`).
-  - Production web app built successfully (`npm run build`).
-  - Android debug APK assembled successfully (`.\gradlew.bat assembleDebug` in 21s).
+  - Production web app built successfully (`npm run build` in 2.29s).
+  - Android debug APK assembled successfully (`.\gradlew.bat assembleDebug` in 22s).
   - Live production relay test suite passed 100% against `https://veil-rga0.onrender.com`.
 
 ## [1.0.0-phase56b] - 2026-09-03

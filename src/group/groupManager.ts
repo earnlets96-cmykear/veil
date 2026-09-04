@@ -191,17 +191,37 @@ export class GroupManager {
   public processSenderKeyDistribution(
     session: SpaceSession,
     dist: SenderKeyDistributionMessage,
-    senderSigningPublicKey: Uint8Array
+    senderSigningPublicKey: Uint8Array | string
   ): void {
     this.assertSession(session);
 
     const state = this.loadGroupState(session, dist.groupId);
     if (!state) throw new Error(`Group ${dist.groupId} not found`);
 
+    const keyBytes = typeof senderSigningPublicKey === 'string'
+      ? base64ToBytes(senderSigningPublicKey)
+      : senderSigningPublicKey;
+
     const senderSession = this.getOrLoadSenderKeySession(session, dist.groupId, state.epoch);
-    senderSession.processDistribution(dist, senderSigningPublicKey);
+    senderSession.processDistribution(dist, keyBytes);
 
     this.saveSenderKeySession(session, senderSession);
+  }
+
+  /**
+   * Exports the current outbound SenderKeyDistributionMessage for a group.
+   */
+  public exportSenderKeyDistribution(
+    session: SpaceSession,
+    groupId: string
+  ): SenderKeyDistributionMessage | null {
+    this.assertSession(session);
+    const state = this.loadGroupState(session, groupId);
+    if (!state) return null;
+    const identity = this.idMgr.loadIdentity(session, this.store);
+    if (!identity) return null;
+    const senderSession = this.getOrLoadSenderKeySession(session, groupId, state.epoch);
+    return senderSession.exportDistribution(identity.signingPrivateKey);
   }
 
   /**
@@ -256,7 +276,7 @@ export class GroupManager {
   public decryptGroupMessage(
     session: SpaceSession,
     payload: GroupMessagePayload,
-    senderSigningPublicKey: Uint8Array
+    senderSigningPublicKey: Uint8Array | string
   ): DecryptedGroupMessage {
     this.assertSession(session);
 
@@ -270,8 +290,12 @@ export class GroupManager {
       throw new Error(`Sender ${payload.header.senderIdentityId} is not a member of group ${groupId}`);
     }
 
+    const keyBytes = typeof senderSigningPublicKey === 'string'
+      ? base64ToBytes(senderSigningPublicKey)
+      : senderSigningPublicKey;
+
     const senderSession = this.getOrLoadSenderKeySession(session, groupId, state.epoch);
-    const plaintextBytes = senderSession.decryptMessage(payload, senderSigningPublicKey);
+    const plaintextBytes = senderSession.decryptMessage(payload, keyBytes);
     this.saveSenderKeySession(session, senderSession);
 
     const parsed = JSON.parse(new TextDecoder().decode(plaintextBytes));

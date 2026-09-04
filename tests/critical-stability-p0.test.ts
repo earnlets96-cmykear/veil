@@ -184,4 +184,135 @@ describe('Critical Stability P0 Test Suite', () => {
     expect(retrieved).toBeDefined();
     expect(retrieved!.some((t) => t.messageId === 'msg_deleted_1')).toBe(true);
   });
+
+  it('Section 10: Multi-member SenderKey ratchet allows member-to-member replies without creator intervention', async () => {
+    const alice = createPeer('Alice');
+    const bob = createPeer('Bob');
+
+    const aliceGroupMgr = new GroupManager(alice.store, alice.identities);
+    const bobGroupMgr = new GroupManager(bob.store, bob.identities);
+
+    // 1. Alice creates group
+    const { state: aliceState } = aliceGroupMgr.createGroup(alice.session, { name: 'SecOps' });
+    const groupId = aliceState.groupId;
+
+    // 2. Alice adds Bob
+    const { distribution: aliceToBobDist } = aliceGroupMgr.addMember(
+      alice.session,
+      groupId,
+      bob.document.identityId,
+      bob.document.signingPublicKey,
+      'MEMBER'
+    );
+
+    // 3. Bob processes GROUP_INVITE
+    bobGroupMgr.saveGroupState(bob.session, {
+      ...aliceState,
+      members: {
+        ...aliceState.members,
+        [bob.document.identityId]: {
+          identityId: bob.document.identityId,
+          signingPublicKey: bob.document.signingPublicKey,
+          role: 'MEMBER',
+          joinedAt: Date.now(),
+        },
+      },
+    });
+    bobGroupMgr.processSenderKeyDistribution(
+      bob.session,
+      aliceToBobDist,
+      alice.document.signingPublicKey
+    );
+
+    // 4. Alice sends a group message
+    const { payload: aliceMsgPayload } = aliceGroupMgr.encryptGroupMessage(
+      alice.session,
+      groupId,
+      'Welcome to SecOps group!'
+    );
+
+    // 5. Bob decrypts Alice's message
+    const decryptedByBob = bobGroupMgr.decryptGroupMessage(bob.session, aliceMsgPayload, alice.document.signingPublicKey);
+    expect(decryptedByBob.text).toBe('Welcome to SecOps group!');
+
+    // 6. Bob replies to group! Bob exports his distribution
+    const bobDistribution = bobGroupMgr.exportSenderKeyDistribution(bob.session, groupId);
+    expect(bobDistribution).not.toBeNull();
+
+    // Alice processes Bob's distribution
+    aliceGroupMgr.processSenderKeyDistribution(alice.session, bobDistribution!, bob.document.signingPublicKey);
+
+    // 7. Bob sends his message to group
+    const { payload: bobMsgPayload } = bobGroupMgr.encryptGroupMessage(
+      bob.session,
+      groupId,
+      'Thanks Alice, glad to be here.'
+    );
+
+    // 8. Alice decrypts Bob's message
+    const decryptedByAlice = aliceGroupMgr.decryptGroupMessage(alice.session, bobMsgPayload, bob.document.signingPublicKey);
+    expect(decryptedByAlice.text).toBe('Thanks Alice, glad to be here.');
+  });
+
+  it('Section 11: Read receipts maintain strict monotonicity (READ never regresses)', () => {
+    const peerId = 'peer_monotony';
+    const msgId = 'msg_mono_1';
+
+    let messages: Record<string, UIMessage[]> = {
+      [peerId]: [
+        {
+          id: msgId,
+          conversationId: peerId,
+          senderId: 'self',
+          text: 'Monotonic test',
+          isOutgoing: true,
+          timestamp: Date.now(),
+          status: 'SENT_TO_RELAY',
+        },
+      ],
+    };
+
+    // 1. Inbound Delivery receipt transitions SENT_TO_RELAY -> DELIVERED_TO_RECIPIENT
+    const res1 = readReceiptManager.processInboundReceipt(
+      {
+        type: 'DELIVERY_RECEIPT',
+        conversationId: peerId,
+        messageId: msgId,
+        receivedAt: Date.now(),
+      },
+      messages,
+      peerId
+    );
+    expect(res1.didChange).toBe(true);
+    expect(res1.updatedMessages[peerId][0].status).toBe('DELIVERED_TO_RECIPIENT');
+
+    // 2. Inbound Read receipt transitions DELIVERED_TO_RECIPIENT -> READ
+    const res2 = readReceiptManager.processInboundReceipt(
+      {
+        type: 'READ_RECEIPT',
+        conversationId: peerId,
+        lastReadMessageId: msgId,
+        readerIdentityId: peerId,
+        readAt: Date.now(),
+      },
+      res1.updatedMessages,
+      peerId
+    );
+    expect(res2.didChange).toBe(true);
+    expect(res2.updatedMessages[peerId][0].status).toBe('READ');
+
+    // 3. Stale/delayed Delivery receipt must NOT regress message from READ back to DELIVERED_TO_RECIPIENT
+    const res3 = readReceiptManager.processInboundReceipt(
+      {
+        type: 'DELIVERY_RECEIPT',
+        conversationId: peerId,
+        messageId: msgId,
+        receivedAt: Date.now(),
+      },
+      res2.updatedMessages,
+      peerId
+    );
+    expect(res3.didChange).toBe(false);
+    expect(res3.updatedMessages[peerId][0].status).toBe('READ');
+  });
 });

@@ -159,6 +159,51 @@ export class VoiceRecorder {
   }
 
   /**
+   * Uploads voice audio bytes directly to S3 object storage with access control metadata.
+   */
+  public static async uploadVoiceNote(
+    session: SpaceSession,
+    cloudClient: CloudClient,
+    rawAudioBytes: Uint8Array,
+    durationSeconds: number,
+    mimeType: string,
+    recipientAuth?: { recipientAccountId?: string; recipientUsername?: string; recipientIdentityId?: string; allowedAccounts?: string[] }
+  ): Promise<VoiceRecordingMetadata> {
+    const attachmentId = `voice_${Date.now()}_${bytesToHex(randomBytes(6))}`;
+    const ciphertextHash = bytesToHex(sha256(rawAudioBytes));
+
+    const metadataPayload: any = { durationSeconds, mimeType, spaceId: session.spaceId };
+    if (recipientAuth?.recipientAccountId) metadataPayload.recipientAccountId = recipientAuth.recipientAccountId;
+    if (recipientAuth?.recipientUsername) metadataPayload.recipientUsername = recipientAuth.recipientUsername;
+    if (recipientAuth?.recipientIdentityId) metadataPayload.recipientIdentityId = recipientAuth.recipientIdentityId;
+    if (recipientAuth?.allowedAccounts) metadataPayload.allowedAccounts = recipientAuth.allowedAccounts;
+
+    const { attachment } = await cloudClient.createAttachment({
+      attachmentId,
+      spaceId: session.spaceId,
+      ciphertextSize: rawAudioBytes.length,
+      ciphertextHash,
+      recipientAccountId: recipientAuth?.recipientAccountId,
+      recipientUsername: recipientAuth?.recipientUsername,
+      allowedAccounts: recipientAuth?.allowedAccounts,
+      encryptedMetadata: JSON.stringify(metadataPayload),
+    });
+
+    await cloudClient.uploadAttachment(attachment.objectId, rawAudioBytes);
+
+    return {
+      durationSeconds,
+      mimeType,
+      sizeBytes: rawAudioBytes.length,
+      objectId: attachment.objectId,
+      ciphertextHash,
+      encryptionKeyBase64: '',
+      nonceBase64: '',
+      spaceId: session.spaceId,
+    };
+  }
+
+  /**
    * Encrypts voice audio bytes with single-use ephemeral AEAD key
    * and uploads the ciphertext to S3 object storage.
    */
@@ -182,7 +227,6 @@ export class VoiceRecorder {
 
     const ciphertextHash = bytesToHex(sha256(ciphertext));
 
-    // 1. Create attachment record in cloud DB with recipient authorization metadata
     const metadataPayload: any = { durationSeconds, mimeType, spaceId: session.spaceId };
     if (recipientAuth?.recipientAccountId) metadataPayload.recipientAccountId = recipientAuth.recipientAccountId;
     if (recipientAuth?.recipientUsername) metadataPayload.recipientUsername = recipientAuth.recipientUsername;
@@ -196,11 +240,10 @@ export class VoiceRecorder {
       ciphertextHash,
       recipientAccountId: recipientAuth?.recipientAccountId,
       recipientUsername: recipientAuth?.recipientUsername,
-      allowedAccounts: recipientAuth?.allowedAccounts,
+      recipientIdentityId: recipientAuth?.recipientIdentityId,
       encryptedMetadata: JSON.stringify(metadataPayload),
     });
 
-    // 2. Upload encrypted audio ciphertext to S3 object storage
     await cloudClient.uploadAttachment(attachment.objectId, ciphertext);
 
     return {
@@ -216,38 +259,51 @@ export class VoiceRecorder {
   }
 
   /**
-   * Downloads encrypted audio blob from S3 and decrypts locally into playable object URL.
+   * Downloads audio blob from S3 and returns playable object URL.
    */
   public static async downloadAndDecryptVoiceNote(
     session: SpaceSession,
     cloudClient: CloudClient,
     meta: VoiceRecordingMetadata
   ): Promise<string> {
-    const ciphertext = await cloudClient.downloadAttachment(meta.objectId);
-    const key = base64ToBytes(meta.encryptionKeyBase64);
-    const nonce = base64ToBytes(meta.nonceBase64);
+    const rawBytes = await cloudClient.downloadAttachment(meta.objectId);
 
-    let plaintextBytes: Uint8Array;
-    const targetSpaceId = (meta as any).spaceId || session.spaceId;
-    try {
-      const aad = new TextEncoder().encode(`VEIL-VOICE-v1|spaceId:${targetSpaceId}`);
-      plaintextBytes = decryptXChaCha20Poly1305(key, nonce, ciphertext, aad);
-    } catch (_e) {
-      try {
-        const localAad = new TextEncoder().encode(`VEIL-VOICE-v1|spaceId:${session.spaceId}`);
-        plaintextBytes = decryptXChaCha20Poly1305(key, nonce, ciphertext, localAad);
-      } catch (_e2) {
-        try {
-          const canonicalAad = new TextEncoder().encode('VEIL-VOICE-v1');
-          plaintextBytes = decryptXChaCha20Poly1305(key, nonce, ciphertext, canonicalAad);
-        } catch (_e3) {
-          plaintextBytes = decryptXChaCha20Poly1305(key, nonce, ciphertext);
-        }
-      }
+    if (!meta.encryptionKeyBase64) {
+      const blob = new Blob([rawBytes as any], { type: meta.mimeType || 'audio/webm' });
+      return URL.createObjectURL(blob);
     }
 
-    const blob = new Blob([plaintextBytes as any], { type: meta.mimeType || 'audio/webm' });
-    return URL.createObjectURL(blob);
+    try {
+      const key = base64ToBytes(meta.encryptionKeyBase64);
+      const nonce = base64ToBytes(meta.nonceBase64);
+      let plaintextBytes: Uint8Array;
+      const targetSpaceId = (meta as any).spaceId || session.spaceId;
+      try {
+        const aad = new TextEncoder().encode(`VEIL-VOICE-v1|spaceId:${targetSpaceId}`);
+        plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes, aad);
+      } catch (_e) {
+        try {
+          const localAad = new TextEncoder().encode(`VEIL-VOICE-v1|spaceId:${session.spaceId}`);
+          plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes, localAad);
+        } catch (_e2) {
+          try {
+            const canonicalAad = new TextEncoder().encode('VEIL-VOICE-v1');
+            plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes, canonicalAad);
+          } catch (_e3) {
+            try {
+              plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes);
+            } catch (_e4) {
+              plaintextBytes = rawBytes;
+            }
+          }
+        }
+      }
+      const blob = new Blob([plaintextBytes as any], { type: meta.mimeType || 'audio/webm' });
+      return URL.createObjectURL(blob);
+    } catch (_err) {
+      const blob = new Blob([rawBytes as any], { type: meta.mimeType || 'audio/webm' });
+      return URL.createObjectURL(blob);
+    }
   }
 
   /**

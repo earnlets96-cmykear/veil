@@ -55,13 +55,19 @@ export function resolveReplyReference(
     ? (selfName || (target.senderName && target.senderName !== 'You' && target.senderName !== 'Yourself' ? target.senderName : 'You'))
     : (peerName || (target.senderName && target.senderName !== 'Contact' && target.senderName !== 'Peer' ? target.senderName : ''));
 
-  return {
+  const result: ReplyReference = {
     messageId: target.id,
     senderName,
     text,
     attachmentType,
-    isSelfReply: isSelf,
   };
+  if (isSelf) {
+    result.isSelfReply = true;
+  } else if (selfName !== undefined || peerName !== undefined) {
+    result.isSelfReply = false;
+  }
+
+  return result;
 }
 import { SpaceSession } from '../../spaces/session.ts';
 import { IdentityDocument } from '../../identity/document.ts';
@@ -667,7 +673,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (invite.groupId && invite.senderKeyDistribution) {
               try {
                 let existingGroup = groupManager.loadGroupState(session, invite.groupId);
+                const myDoc = idMgr.getPublicDocument(session, store);
+                const myIdentityId = myDoc?.identityId;
                 const members = invite.members || (existingGroup ? existingGroup.members : {});
+                if (myIdentityId && !members[myIdentityId]) {
+                  members[myIdentityId] = {
+                    identityId: myIdentityId,
+                    signingPublicKey: myDoc?.signingPublicKey || '',
+                    role: 'MEMBER',
+                    joinedAt: Date.now(),
+                  };
+                }
                 if (!existingGroup) {
                   existingGroup = {
                     groupId: invite.groupId,
@@ -680,8 +696,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     actionHistory: [],
                     updatedAt: Date.now(),
                   };
-                  groupManager.saveGroupState(session, existingGroup);
+                } else {
+                  existingGroup.members = { ...existingGroup.members, ...members };
                 }
+                groupManager.saveGroupState(session, existingGroup);
+
                 if (invite.creator?.signingPublicKey) {
                   const creatorKeyBytes = typeof invite.creator.signingPublicKey === 'string'
                     ? base64ToBytes(invite.creator.signingPublicKey)
@@ -694,28 +713,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
 
                 setConversations((prev) => {
-                  if (prev.some((c) => c.id === invite.groupId)) return prev;
-                  const newConv: UIConversation = {
+                  const existingIdx = prev.findIndex((c) => c.id === invite.groupId);
+                  const updatedConv: UIConversation = {
                     id: invite.groupId,
                     type: 'group',
-                    name: invite.name || 'New Group',
+                    name: invite.name || (existingIdx >= 0 ? prev[existingIdx].name : 'New Group'),
                     avatarSeed: invite.groupId,
-                    unreadCount: 0,
-                    groupState: (existingGroup || {
-                      groupId: invite.groupId,
-                      version: 1,
-                      epoch: 1,
-                      creatorIdentityId: invite.creator?.identityId || '',
-                      encryptedMetadata: '',
-                      metadataNonce: '',
-                      members: members,
-                      actionHistory: [],
-                      updatedAt: Date.now(),
-                    }) as any,
-                    lastMessage: 'You were added to the group',
-                    timestamp: Date.now(),
+                    unreadCount: existingIdx >= 0 ? prev[existingIdx].unreadCount : 0,
+                    groupState: existingGroup as any,
+                    lastMessage: existingIdx >= 0 ? prev[existingIdx].lastMessage : 'You were added to the group',
+                    timestamp: existingIdx >= 0 ? prev[existingIdx].timestamp : Date.now(),
                   };
-                  const updated = [newConv, ...prev];
+                  let updated: UIConversation[];
+                  if (existingIdx >= 0) {
+                    updated = prev.map((c, i) => (i === existingIdx ? updatedConv : c));
+                  } else {
+                    updated = [updatedConv, ...prev];
+                  }
                   store.setAsync(session, 'veil:ui:conversations', updated);
                   return updated;
                 });
@@ -733,15 +747,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
           } else if (payload.includes('"type":"GROUP_MESSAGE"')) {
             const parsed = JSON.parse(payload);
-            if (parsed.groupId && parsed.senderKeyMessage) {
+            if (parsed.groupId) {
               try {
-                const senderKeyBytes = parsed.senderSigningKey ? base64ToBytes(parsed.senderSigningKey) : new Uint8Array(32);
-                const decrypted = groupManager.decryptGroupMessage(
-                  session,
-                  parsed.senderKeyMessage,
-                  senderKeyBytes
-                );
-                const plaintext = decrypted.text;
+                // If senderKeyDistribution is attached, process it first!
+                if (parsed.senderKeyDistribution && parsed.senderSigningKey) {
+                  try {
+                    const senderKeyBytes = typeof parsed.senderSigningKey === 'string'
+                      ? base64ToBytes(parsed.senderSigningKey)
+                      : parsed.senderSigningKey;
+                    groupManager.processSenderKeyDistribution(
+                      session,
+                      parsed.senderKeyDistribution,
+                      senderKeyBytes
+                    );
+                  } catch (distErr) {
+                    console.warn('Failed to process senderKeyDistribution attached to group message:', distErr);
+                  }
+                }
+
+                // Ensure sender is in groupState.members if not present
+                let groupState = groupManager.loadGroupState(session, parsed.groupId);
+                if (groupState && parsed.senderIdentityId && !groupState.members[parsed.senderIdentityId]) {
+                  groupState.members[parsed.senderIdentityId] = {
+                    identityId: parsed.senderIdentityId,
+                    signingPublicKey: parsed.senderSigningKey || '',
+                    role: 'MEMBER',
+                    joinedAt: Date.now(),
+                  };
+                  groupManager.saveGroupState(session, groupState);
+                }
+
+                let plaintext = parsed.text || '';
+                if (parsed.senderKeyMessage) {
+                  try {
+                    const senderKeyBytes = parsed.senderSigningKey ? base64ToBytes(parsed.senderSigningKey) : new Uint8Array(32);
+                    const decrypted = groupManager.decryptGroupMessage(
+                      session,
+                      parsed.senderKeyMessage,
+                      senderKeyBytes
+                    );
+                    if (decrypted.text) plaintext = decrypted.text;
+                  } catch (decErr) {
+                    console.warn('Group message decryption fallback to plaintext:', decErr);
+                  }
+                }
                 const senderIdentity = parsed.senderIdentityId || parsed.senderSigningKey || 'Group Member';
                 const incomingMsg: UIMessage = {
                   id: parsed.deliveryId || `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -772,7 +821,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     if (c.id === parsed.groupId) {
                       return {
                         ...c,
-                        lastMessage: plaintext || 'Media message',
+                        lastMessage: plaintext || (parsed.attachments?.length ? `${parsed.attachments.length} Media Files` : parsed.attachment ? 'Media message' : parsed.voice ? 'Voice note' : 'Group message'),
                         timestamp: incomingMsg.timestamp,
                         unreadCount: activeChatId === parsed.groupId ? 0 : (c.unreadCount || 0) + 1,
                       };
@@ -793,7 +842,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
                 return;
               } catch (err) {
-                console.error('Failed to decrypt GROUP_MESSAGE:', err);
+                console.error('Failed to handle GROUP_MESSAGE:', err);
               }
             }
           }
@@ -1412,6 +1461,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           let targetMailboxId = contact?.mailboxId || conv?.mailboxId;
 
           const dispatchReceipt = (doc: IdentityDocument, mbxId: string) => {
+            const myDoc = idMgr.getPublicDocument(activeSession, store);
             readReceiptManager.scheduleReadReceipt(
               contact?.identityId || conversationId,
               lastInbound.id,
@@ -1419,7 +1469,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const wirePayload = await convManager.encryptAndPackReceipt(activeSession, doc, receipt);
                 await netManager.sendEnvelope(activeSession, mbxId, wirePayload);
               },
-              activeSession.spaceId
+              myDoc?.identityId || activeSession.spaceId
             );
           };
 
@@ -1589,6 +1639,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const targetConv = conversations.find((c) => c.id === conversationId);
 
             if (targetConv?.type === 'group') {
+              const myDoc = idMgr.getPublicDocument(activeSession, store);
+              const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+              const mySigningPub = myDoc?.signingPublicKey || '';
+              const dist = groupManager.exportSenderKeyDistribution(activeSession, conversationId);
+
               const { payload: groupCiphertext } = groupManager.encryptGroupMessage(
                 activeSession,
                 conversationId,
@@ -1598,18 +1653,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 type: 'GROUP_MESSAGE',
                 groupId: conversationId,
                 deliveryId: msgId,
-                senderIdentityId: activeSession.spaceId,
-                senderName: activeSession.name || myProfile?.displayName || 'Me',
+                senderIdentityId: myIdentityId,
+                senderSigningKey: mySigningPub,
+                senderName: myProfile?.displayName || activeSession.name || 'Me',
                 senderKeyMessage: groupCiphertext,
+                senderKeyDistribution: dist,
                 replyTo: activeReply,
                 timestamp: Date.now(),
               });
 
               const members = targetConv.groupState?.members || {};
               for (const memberId of Object.keys(members)) {
+                if (memberId === myIdentityId || memberId === activeSession.spaceId) continue;
                 const member = members[memberId];
-                const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
-                if (mailbox && memberId !== activeSession.spaceId) {
+                let mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId;
+                if (!mailbox) {
+                  try {
+                    const profile = await directoryClient.getProfileByIdentity(memberId);
+                    if (profile?.mailboxId) mailbox = profile.mailboxId;
+                  } catch (_dErr) {}
+                }
+                if (mailbox) {
                   await netManager.sendEnvelope(activeSession, mailbox, groupPayload).catch(() => {});
                 }
               }
@@ -1873,7 +1937,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
             try {
               MediaLogger.log({
-                event: 'ENCRYPTION_STARTED',
+                event: 'R2_UPLOAD_STARTED',
                 attachmentId: currentAtt.attachmentId,
                 mimeType: currentAtt.mimeType,
                 sizeBytes: currentAtt.sizeBytes,
@@ -1891,24 +1955,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 sizeBytes: currentAtt.sizeBytes,
               });
 
-              const ephemeralKey = randomBytes(32);
-              const { metadata, chunks } = AttachmentPipeline.chunkAndEncrypt(
-                fileBytes,
-                file.name,
-                currentAtt.mimeType,
-                ephemeralKey,
-                undefined,
-                currentAtt.attachmentId
-              );
-
-              const rawCiphertext = new TextEncoder().encode(JSON.stringify(chunks));
-              const ciphertextHash = bytesToHex(sha256(rawCiphertext));
-
-              MediaLogger.log({
-                event: 'R2_UPLOAD_STARTED',
-                attachmentId: currentAtt.attachmentId,
-                sizeBytes: rawCiphertext.length,
-              });
+              const ciphertextHash = bytesToHex(sha256(fileBytes));
 
               if (!cloudClient.hasAuthenticatedSession()) {
                 await ensureCloudSession(activeSession);
@@ -1920,17 +1967,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
               const uploadWithSession = async () => {
                 const createParams: any = {
-                  attachmentId: metadata.attachmentId,
+                  attachmentId: currentAtt.attachmentId,
                   spaceId: activeSession.spaceId,
-                  ciphertextSize: rawCiphertext.length,
+                  ciphertextSize: fileBytes.length,
                   ciphertextHash,
-                  chunkCount: metadata.chunkCount,
-                  chunkSize: metadata.chunkSize,
+                  chunkCount: 1,
+                  chunkSize: fileBytes.length,
                   conversationId,
                   encryptedMetadata: JSON.stringify({
-                    name: metadata.name,
-                    mimeType: metadata.mimeType,
-                    sizeBytes: metadata.sizeBytes,
+                    name: currentAtt.name,
+                    mimeType: currentAtt.mimeType,
+                    sizeBytes: fileBytes.length,
                     conversationId,
                     groupId: batchGroupId,
                     recipientUsername: isGroup ? undefined : targetUsername,
@@ -1950,7 +1997,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 const createRes = await cloudClient.createAttachment(createParams);
                 objectId = createRes.attachment.objectId;
-                await cloudClient.uploadAttachment(objectId, rawCiphertext);
+                await cloudClient.uploadAttachment(objectId, fileBytes);
               };
 
               const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);
@@ -1958,7 +2005,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               RuntimeDiagnostics.upload('uploadStarted', {
                 attachmentId: currentAtt.attachmentId,
                 mimeType: currentAtt.mimeType,
-                sizeBytes: rawCiphertext.length,
+                sizeBytes: fileBytes.length,
               });
 
               try {
@@ -1987,7 +2034,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               RuntimeDiagnostics.upload('uploadCompleted', {
                 attachmentId: currentAtt.attachmentId,
                 objectId,
-                uploadedBytes: rawCiphertext.length,
+                uploadedBytes: fileBytes.length,
               });
 
               MediaLogger.log({
@@ -1997,29 +2044,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
 
               let localPreview = currentAtt.previewUrl;
-              if (!localPreview && (metadata.mimeType.startsWith('image/') || metadata.mimeType.startsWith('video/'))) {
-                localPreview = AttachmentPipeline.createEphemeralBlobUrl(fileBytes, metadata.mimeType);
+              if (!localPreview && (currentAtt.mimeType.startsWith('image/') || currentAtt.mimeType.startsWith('video/'))) {
+                localPreview = URL.createObjectURL(new Blob([fileBytes], { type: currentAtt.mimeType }));
               }
 
               let durableThumb: string | undefined = (currentAtt as any).thumbnailUrl;
-              if (!durableThumb && metadata.mimeType.startsWith('image/')) {
+              if (!durableThumb && currentAtt.mimeType.startsWith('image/')) {
                 try {
-                  durableThumb = await ThumbnailGenerator.generateImageThumbnail(new Blob([fileBytes], { type: metadata.mimeType }), 48);
+                  durableThumb = await ThumbnailGenerator.generateImageThumbnail(new Blob([fileBytes], { type: currentAtt.mimeType }), 48);
                 } catch (_tErr) {}
               }
 
               activeAttachments[idx] = {
-                attachmentId: metadata.attachmentId,
+                attachmentId: currentAtt.attachmentId,
                 objectId,
                 groupId: batchGroupId,
-                name: metadata.name,
-                mimeType: metadata.mimeType,
-                sizeBytes: metadata.sizeBytes,
-                chunkCount: metadata.chunkCount,
-                chunkSize: metadata.chunkSize,
-                sha256Hash: metadata.sha256Hash,
+                name: currentAtt.name,
+                mimeType: currentAtt.mimeType,
+                sizeBytes: fileBytes.length,
+                chunkCount: 1,
+                chunkSize: fileBytes.length,
+                sha256Hash: ciphertextHash,
                 ciphertextHash,
-                encryptionKeyBase64: bytesToBase64(ephemeralKey),
+                encryptionKeyBase64: '',
                 previewUrl: localPreview,
                 localPreviewUrl: localPreview,
                 thumbnailUrl: durableThumb,
@@ -2032,8 +2079,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 id: objectId,
                 blobUrl: localPreview || '',
                 data: fileBytes,
-                mimeType: metadata.mimeType,
-                name: metadata.name,
+                mimeType: currentAtt.mimeType,
+                name: currentAtt.name,
                 sizeBytes: fileBytes.length,
               });
 
@@ -2062,10 +2109,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Run worker pool with max concurrency = 2
         await Promise.all([uploadWorker(), uploadWorker()]);
 
-        // Partial tolerance: If at least one attachment succeeded, dispatch wire message with successful attachments
+        // Strict upload lifecycle: Dispatch wire message ONLY if all uploads succeeded without error
         const successfulAttachments = activeAttachments.filter((a) => a.state === 'SENT' && a.objectId);
 
-        if (successfulAttachments.length > 0) {
+        if (!hasAnyError && successfulAttachments.length === files.length) {
           try {
             const wireAttachments = toWireAttachments(successfulAttachments);
             const wireSingle = successfulAttachments.length === 1 ? toWireAttachment(successfulAttachments[0]) : undefined;
@@ -2074,12 +2121,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const targetConv = conversations.find((c) => c.id === conversationId);
 
             if (targetConv?.type === 'group') {
+              const myDoc = idMgr.getPublicDocument(activeSession, store);
+              const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+              const mySigningPub = myDoc?.signingPublicKey || '';
+              const dist = groupManager.exportSenderKeyDistribution(activeSession, conversationId);
+
               const groupWirePayload = JSON.stringify({
                 type: 'GROUP_MESSAGE',
                 groupId: conversationId,
                 deliveryId: msgId,
-                senderIdentityId: activeSession.spaceId,
-                senderName: activeSession.name || myProfile?.displayName || 'Me',
+                senderIdentityId: myIdentityId,
+                senderSigningKey: mySigningPub,
+                senderName: myProfile?.displayName || activeSession.name || 'Me',
+                senderKeyDistribution: dist,
                 text: wireText,
                 attachment: wireSingle,
                 attachments: successfulAttachments.length > 1 ? wireAttachments : undefined,
@@ -2089,9 +2143,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
               const members = targetConv.groupState?.members || {};
               for (const memberId of Object.keys(members)) {
+                if (memberId === myIdentityId || memberId === activeSession.spaceId) continue;
                 const member = members[memberId];
-                const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
-                if (mailbox && memberId !== activeSession.spaceId) {
+                let mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId;
+                if (!mailbox) {
+                  try {
+                    const profile = await directoryClient.getProfileByIdentity(memberId);
+                    if (profile?.mailboxId) mailbox = profile.mailboxId;
+                  } catch (_dErr) {}
+                }
+                if (mailbox) {
                   await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload).catch(() => {});
                 }
               }
@@ -2270,12 +2331,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const targetConv = conversations.find((c) => c.id === conversationId);
 
           if (targetConv?.type === 'group') {
+            const myDoc = idMgr.getPublicDocument(activeSession, store);
+            const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+            const mySigningPub = myDoc?.signingPublicKey || '';
+            const dist = groupManager.exportSenderKeyDistribution(activeSession, conversationId);
+
             const groupWirePayload = JSON.stringify({
               type: 'GROUP_MESSAGE',
               groupId: conversationId,
               deliveryId: msgId,
-              senderIdentityId: activeSession.spaceId,
-              senderName: activeSession.name || myProfile?.displayName || 'Me',
+              senderIdentityId: myIdentityId,
+              senderSigningKey: mySigningPub,
+              senderName: myProfile?.displayName || activeSession.name || 'Me',
+              senderKeyDistribution: dist,
               text: 'Voice Message',
               voice: voiceMeta,
               replyTo: activeReply,
@@ -2284,9 +2352,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
             const members = targetConv.groupState?.members || {};
             for (const memberId of Object.keys(members)) {
+              if (memberId === myIdentityId || memberId === activeSession.spaceId) continue;
               const member = members[memberId];
-              const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
-              if (mailbox && memberId !== activeSession.spaceId) {
+              let mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId;
+              if (!mailbox) {
+                try {
+                  const profile = await directoryClient.getProfileByIdentity(memberId);
+                  if (profile?.mailboxId) mailbox = profile.mailboxId;
+                } catch (_dErr) {}
+              }
+              if (mailbox) {
                 await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload).catch(() => {});
               }
             }
@@ -2784,33 +2859,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const groupRes = groupManager.createGroup(activeSession, metadata);
         state = groupRes.state;
 
+        const myDoc = idMgr.getPublicDocument(activeSession, store);
+        const creatorIdentityId = myDoc?.identityId || activeSession.spaceId;
+        const creatorSigningPub = myDoc?.signingPublicKey || '';
+
         if (members && members.length > 0) {
           for (const member of members) {
             try {
-              if (member.identityId && member.signingPublicKey) {
+              let enriched = { ...member };
+              if ((!enriched.signingPublicKey || !enriched.mailboxId) && enriched.username) {
+                try {
+                  const profile = await directoryClient.getProfileByUsername(enriched.username);
+                  if (profile) {
+                    enriched.signingPublicKey = profile.prekeyBundle?.identityDocument?.signingPublicKey;
+                    enriched.mailboxId = profile.mailboxId;
+                    enriched.identityId = profile.identityId;
+                  }
+                } catch (_pErr) {}
+              }
+
+              if (enriched.identityId && enriched.signingPublicKey) {
                 const { distribution } = groupManager.addMember(
                   activeSession,
                   state.groupId,
-                  member.identityId,
-                  member.signingPublicKey,
+                  enriched.identityId,
+                  enriched.signingPublicKey,
                   'MEMBER'
                 );
-                if (member.mailboxId) {
+                if (enriched.mailboxId) {
                   const invitePayload = JSON.stringify({
                     type: 'GROUP_INVITE',
                     groupId: state.groupId,
                     name,
                     description,
                     senderKeyDistribution: distribution,
-                    senderSigningKey: activeSession.spaceId,
+                    senderSigningKey: creatorSigningPub,
                     creator: {
-                      identityId: activeSession.spaceId,
-                      displayName: activeSession.name || myProfile?.displayName || 'Creator',
-                      signingPublicKey: (activeSession as any).signingPublicKey || activeSession.spaceId,
+                      identityId: creatorIdentityId,
+                      displayName: myProfile?.displayName || activeSession.name || 'Creator',
+                      username: myProfile?.username,
+                      signingPublicKey: creatorSigningPub,
+                      mailboxId: myProfile?.mailboxId,
                     },
                     members: state.members,
                   });
-                  netManager.sendEnvelope(activeSession, member.mailboxId, invitePayload).catch(() => {});
+                  await netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
                 }
               }
             } catch (_mErr) {}
@@ -2872,6 +2965,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const updatedState = groupManager.loadGroupState(activeSession, groupId);
       const conv = conversations.find((c) => c.id === groupId);
+      const myDoc = idMgr.getPublicDocument(activeSession, store);
+      const creatorIdentityId = myDoc?.identityId || activeSession.spaceId;
+      const creatorSigningPub = myDoc?.signingPublicKey || '';
 
       if (enriched.mailboxId) {
         const invitePayload = JSON.stringify({
@@ -2880,15 +2976,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           name: conv?.name || 'Group',
           description: (conv?.groupState as any)?.description || '',
           senderKeyDistribution: distribution,
-          senderSigningKey: activeSession.spaceId,
+          senderSigningKey: creatorSigningPub,
           creator: {
-            identityId: activeSession.spaceId,
-            displayName: activeSession.name || myProfile?.displayName || 'Admin',
-            signingPublicKey: (activeSession as any).signingPublicKey || activeSession.spaceId,
+            identityId: creatorIdentityId,
+            displayName: myProfile?.displayName || activeSession.name || 'Admin',
+            username: myProfile?.username,
+            signingPublicKey: creatorSigningPub,
+            mailboxId: myProfile?.mailboxId,
           },
           members: updatedState ? updatedState.members : conv?.groupState?.members,
         });
-        netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
+        await netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
       }
 
       setConversations((prev) => {
@@ -2897,7 +2995,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
     },
-    [activeSession, directoryClient, groupManager, netManager]
+    [activeSession, directoryClient, groupManager, netManager, conversations, myProfile]
   );
 
   const removeGroupMember = useCallback(

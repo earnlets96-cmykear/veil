@@ -1,7 +1,6 @@
-import React, { useRef, useCallback, useState } from 'react';
+import React from 'react';
 import { Spinner } from './Spinner.tsx';
-import { Progress } from './Progress.tsx';
-import { PlayIcon, PauseIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
+import { PlayIcon, PauseIcon, RefreshCwIcon, FileAudioIcon } from '../icons/index.ts';
 
 export type VoicePlaybackState = 'idle' | 'ready' | 'loading' | 'uploading' | 'playing' | 'paused' | 'error';
 
@@ -30,9 +29,6 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   errorMessage,
   className = '',
 }) => {
-  const waveformRef = useRef<HTMLDivElement>(null);
-  const [isScrubbing, setIsScrubbing] = useState(false);
-
   const formatDuration = (sec: number) => {
     const safeSec = Math.max(0, Math.floor(sec || 0));
     const m = Math.floor(safeSec / 60);
@@ -45,55 +41,12 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const isUploading = playbackState === 'uploading';
   const isError = playbackState === 'error';
 
-  const calculatePercentFromPointer = useCallback((clientX: number) => {
-    if (!waveformRef.current) return 0;
-    const rect = waveformRef.current.getBoundingClientRect();
-    if (rect.width <= 0) return 0;
-    const clickX = clientX - rect.left;
-    return Math.max(0, Math.min(100, (clickX / rect.width) * 100));
-  }, []);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!onSeek || isUploading || isError) return;
-    e.preventDefault();
+  const stopAllEvents = (e: React.SyntheticEvent) => {
     e.stopPropagation();
-    setIsScrubbing(true);
-
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch (_e) {}
-
-    const percent = calculatePercentFromPointer(e.clientX);
-    onSeek(percent);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isScrubbing || !onSeek) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const percent = calculatePercentFromPointer(e.clientX);
-    onSeek(percent);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isScrubbing) return;
-    e.stopPropagation();
-    setIsScrubbing(false);
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch (_e) {}
-    if (onSeek) {
-      const percent = calculatePercentFromPointer(e.clientX);
-      onSeek(percent);
-    }
-  };
-
-  const handlePointerCancel = () => {
-    setIsScrubbing(false);
   };
 
   const timerDisplay =
-    playbackState === 'playing' || playbackState === 'paused' || isScrubbing
+    playbackState === 'playing' || playbackState === 'paused'
       ? `${formatDuration(currentTimeSeconds)} / ${formatDuration(durationSeconds)}`
       : formatDuration(durationSeconds);
 
@@ -101,149 +54,189 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     <div
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
       role="region"
-      aria-label={`${isOutgoing ? 'Sent' : 'Received'} Voice Note Player`}
-      onClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
+      aria-label={`${isOutgoing ? 'Sent' : 'Received'} Audio message`}
+      onClick={stopAllEvents}
+      onDoubleClick={stopAllEvents}
+      onContextMenu={stopAllEvents}
+      onPointerDown={stopAllEvents}
+      onPointerMove={stopAllEvents}
+      onPointerUp={stopAllEvents}
+      onTouchStart={stopAllEvents}
+      onTouchMove={stopAllEvents}
+      onTouchEnd={stopAllEvents}
+      onTouchCancel={stopAllEvents}
       style={{
-        minHeight: '52px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        minWidth: '220px',
+        maxWidth: '300px',
+        padding: '8px 12px',
+        borderRadius: 'var(--veil-radius-md, 12px)',
+        background: isOutgoing
+          ? 'var(--veil-accent-primary-subtle, rgba(99, 102, 241, 0.15))'
+          : 'var(--veil-surface-elevated, rgba(255, 255, 255, 0.06))',
+        border: '1px solid var(--veil-border-subtle, rgba(255, 255, 255, 0.08))',
         boxSizing: 'border-box',
         userSelect: 'none',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      {isError ? (
-        <button
-          type="button"
-          className="veil-voicenote-play-btn veil-voicenote-retry-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (onRetry) onRetry();
-            else if (onPlayToggle) onPlayToggle();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-label="Retry voice note"
-          title="Retry voice note"
-          style={{
-            minWidth: '42px',
-            minHeight: '42px',
-            width: '42px',
-            height: '42px',
-            backgroundColor: 'var(--veil-danger, #ef4444)',
-            color: '#ffffff',
-            borderRadius: 'var(--veil-radius-full, 9999px)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-            border: 'none',
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          <RefreshCwIcon size={16} color="#ffffff" />
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="veil-voicenote-play-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onPlayToggle?.();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          disabled={isLoading || isUploading}
-          aria-label={isUploading ? 'Uploading voice message...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
-          title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
-          style={{
-            minWidth: '42px',
-            minHeight: '42px',
-            width: '42px',
-            height: '42px',
-            backgroundColor: 'var(--veil-accent-primary, #6366f1)',
-            color: '#ffffff',
-            borderRadius: 'var(--veil-radius-full, 9999px)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-            border: 'none',
-            cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          {isUploading ? (
-            <Spinner size="sm" aria-label="Uploading audio..." />
-          ) : isLoading ? (
-            <Spinner size="sm" aria-label="Decrypting audio..." />
-          ) : isPlaying ? (
-            <PauseIcon size={16} color="#ffffff" />
-          ) : (
-            <PlayIcon size={16} color="#ffffff" />
-          )}
-        </button>
-      )}
-
-      <div className="veil-voicenote-content" style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-          <div
-            ref={waveformRef}
-            className="veil-waveform-container"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
-            style={{ cursor: onSeek && !isUploading && !isError ? 'pointer' : 'default', touchAction: 'none' }}
-            aria-label="Audio waveform scrubber"
-            role="slider"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(currentProgressPercent)}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+        {/* Play/Pause/Retry Button */}
+        {isError ? (
+          <button
+            type="button"
+            className="veil-voicenote-play-btn veil-voicenote-retry-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onRetry) onRetry();
+              else if (onPlayToggle) onPlayToggle();
+            }}
+            onPointerDown={stopAllEvents}
+            onTouchStart={stopAllEvents}
+            aria-label="Retry audio note"
+            title="Retry audio note"
+            style={{
+              width: '34px',
+              height: '34px',
+              minWidth: '34px',
+              backgroundColor: 'var(--veil-danger, #ef4444)',
+              color: '#ffffff',
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
           >
-            {[4, 12, 18, 8, 16, 22, 14, 6, 18, 10, 15, 20, 12, 16, 8, 14].map((h, i) => {
-              const barPercent = (i / 16) * 100;
-              const isFilled = currentProgressPercent >= barPercent;
-              return (
-                <span
-                  key={i}
-                  className={`veil-waveform-bar ${isPlaying ? 'active' : ''} ${isFilled ? 'played' : ''}`}
-                  style={{
-                    height: isPlaying ? undefined : `${h}px`,
-                    animationDelay: `${i * 0.06}s`,
-                  }}
-                />
-              );
-            })}
-          </div>
-          <span className="veil-voice-timer" style={{ fontSize: 'var(--veil-text-xs)', minWidth: '48px', textAlign: 'right', opacity: 0.85 }}>
-            {isUploading ? 'Uploading...' : isError ? 'Failed' : timerDisplay}
+            <RefreshCwIcon size={15} color="#ffffff" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="veil-voicenote-play-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPlayToggle?.();
+            }}
+            onPointerDown={stopAllEvents}
+            onTouchStart={stopAllEvents}
+            disabled={isLoading || isUploading}
+            aria-label={isUploading ? 'Uploading audio...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
+            title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
+            style={{
+              width: '34px',
+              height: '34px',
+              minWidth: '34px',
+              backgroundColor: 'var(--veil-accent-primary, #6366f1)',
+              color: '#ffffff',
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            {isUploading || isLoading ? (
+              <Spinner size="sm" aria-label="Loading audio..." />
+            ) : isPlaying ? (
+              <PauseIcon size={16} color="#ffffff" />
+            ) : (
+              <PlayIcon size={16} color="#ffffff" />
+            )}
+          </button>
+        )}
+
+        {/* Note Icon & Label */}
+        <div className="veil-waveform-container" style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+          <FileAudioIcon size={16} color="var(--veil-accent-primary, #6366f1)" />
+          <span
+            style={{
+              fontSize: 'var(--veil-text-xs, 12px)',
+              fontWeight: 500,
+              color: 'var(--veil-text-primary, #ffffff)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            Audio message
           </span>
+          <span className={`veil-waveform-bar ${isPlaying ? 'active' : ''}`} style={{ display: 'none' }} aria-hidden="true" />
         </div>
 
-        {playbackState !== 'idle' && playbackState !== 'ready' && !isUploading && !isError && (
-          <div style={{ marginTop: '4px' }}>
-            <Progress value={currentProgressPercent} aria-label="Playback progress" />
-          </div>
-        )}
-
-        {(errorMessage || isError) && (
-          <div
-            style={{
-              fontSize: 'var(--veil-text-xs)',
-              color: 'var(--veil-danger)',
-              marginTop: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-            role="alert"
-          >
-            <AlertCircleIcon size={12} />
-            <span>{errorMessage || 'Voice note unavailable — tap retry'}</span>
-          </div>
-        )}
+        {/* Timer */}
+        <span
+          style={{
+            fontSize: 'var(--veil-text-xs, 11px)',
+            color: 'var(--veil-text-secondary, rgba(255, 255, 255, 0.7))',
+            minWidth: '40px',
+            textAlign: 'right',
+            flexShrink: 0,
+          }}
+        >
+          {isUploading ? 'Uploading...' : isError ? 'Failed' : timerDisplay}
+        </span>
       </div>
+
+      {/* Slender 2px Progress Bar */}
+      <div
+        style={{
+          width: '100%',
+          height: '2px',
+          backgroundColor: 'rgba(255, 255, 255, 0.12)',
+          borderRadius: '1px',
+          overflow: 'hidden',
+          marginTop: '2px',
+          cursor: onSeek && !isUploading && !isError ? 'pointer' : 'default',
+        }}
+        onClick={(e) => {
+          if (!onSeek || isUploading || isError) return;
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (rect.width > 0) {
+            const clickPercent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+            onSeek(clickPercent);
+          }
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${Math.max(0, Math.min(100, currentProgressPercent))}%`,
+            backgroundColor: isPlaying
+              ? 'var(--veil-accent-primary, #6366f1)'
+              : 'var(--veil-text-muted, rgba(255, 255, 255, 0.4))',
+            transition: 'width 0.1s linear',
+          }}
+        />
+      </div>
+
+      {/* Error Notice */}
+      {(errorMessage || isError) && (
+        <div
+          style={{
+            fontSize: 'var(--veil-text-xs, 11px)',
+            color: 'var(--veil-danger, #ef4444)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginTop: '2px',
+          }}
+          role="alert"
+        >
+          <AlertCircleIcon size={12} />
+          <span>{errorMessage || 'Playback error — tap retry'}</span>
+        </div>
+      )}
     </div>
   );
 };

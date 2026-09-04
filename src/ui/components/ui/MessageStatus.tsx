@@ -25,6 +25,18 @@ export type DeliveryStatus =
   | 'FAILED'
   | string;
 
+export function normalizeDeliveryStatus(raw: string | undefined | null): DeliveryStatus {
+  if (!raw) return 'QUEUED';
+  const u = raw.toUpperCase();
+  if (u === 'READ' || u === 'SEEN') return 'READ';
+  if (u === 'DELIVERED_TO_RECIPIENT' || u === 'DELIVERED' || u === 'RECEIVED' || u === 'PROCESSED') return 'DELIVERED_TO_RECIPIENT';
+  if (u === 'SENT_TO_RELAY' || u === 'SENT' || u === 'ACKNOWLEDGED') return 'SENT_TO_RELAY';
+  if (u === 'SENDING') return 'SENDING';
+  if (u === 'UPLOADING') return 'UPLOADING';
+  if (u === 'FAILED') return 'FAILED';
+  return 'QUEUED';
+}
+
 export interface MessageStatusProps {
   status: DeliveryStatus;
   className?: string;
@@ -38,7 +50,8 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
   size = 15,
   uploadProgress,
 }) => {
-  switch (status) {
+  const canonicalStatus = normalizeDeliveryStatus(status);
+  switch (canonicalStatus) {
     case 'QUEUED':
       return (
         <span className={`veil-msg-status ${className}`.trim()} title="Queued locally (Offline)" aria-label="Queued locally">
@@ -140,7 +153,7 @@ export const MessageStatus: React.FC<MessageStatusProps> = ({
     case 'DELIVERED_TO_RECIPIENT':
     case 'PROCESSED':
       return (
-        <span className={`veil-msg-status ${className}`.trim()} title="Delivered" aria-label="Delivered to recipient">
+        <span className={`veil-msg-status ${className}`.trim()} title="Delivered & Read" aria-label="Delivered to recipient">
           <CheckCheckIcon size={size} color="var(--veil-text-secondary)" />
         </span>
       );

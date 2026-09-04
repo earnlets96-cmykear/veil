@@ -48,28 +48,91 @@ export const GroupedMediaGrid: React.FC<GroupedMediaGridProps> = ({
   const displayItems = attachments.slice(0, 4);
   const remainingCount = count - 4;
 
-  const getGridStyle = () => {
+  const getGridStyle = (): React.CSSProperties => {
     if (count === 2) {
       return {
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        gridTemplateColumns: '1fr 1fr',
         gap: '3px',
-        maxWidth: '320px',
+        width: '100%',
+        maxWidth: '380px',
+        height: '180px',
+        borderRadius: 'var(--veil-radius-md, 12px)',
+        overflow: 'hidden',
       };
     }
     if (count === 3) {
       return {
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        gridTemplateColumns: '1.6fr 1fr',
+        gridTemplateRows: '1fr 1fr',
         gap: '3px',
-        maxWidth: '320px',
+        width: '100%',
+        maxWidth: '380px',
+        height: '240px',
+        borderRadius: 'var(--veil-radius-md, 12px)',
+        overflow: 'hidden',
       };
     }
     return {
       display: 'grid',
-      gridTemplateColumns: 'repeat(2, 1fr)',
+      gridTemplateColumns: '1fr 1fr',
+      gridTemplateRows: '1fr 1fr',
       gap: '3px',
-      maxWidth: '320px',
+      width: '100%',
+      maxWidth: '380px',
+      height: '240px',
+      borderRadius: 'var(--veil-radius-md, 12px)',
+      overflow: 'hidden',
+    };
+  };
+
+  const getItemStyle = (idx: number): React.CSSProperties => {
+    if (count === 3) {
+      if (idx === 0) {
+        return {
+          position: 'relative',
+          gridRow: '1 / span 2',
+          gridColumn: '1',
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          background: 'var(--veil-surface-elevated)',
+        };
+      }
+      if (idx === 1) {
+        return {
+          position: 'relative',
+          gridRow: '1',
+          gridColumn: '2',
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          background: 'var(--veil-surface-elevated)',
+        };
+      }
+      if (idx === 2) {
+        return {
+          position: 'relative',
+          gridRow: '2',
+          gridColumn: '2',
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          background: 'var(--veil-surface-elevated)',
+        };
+      }
+    }
+    return {
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      overflow: 'hidden',
+      cursor: 'pointer',
+      background: 'var(--veil-surface-elevated)',
     };
   };
 
@@ -87,14 +150,7 @@ export const GroupedMediaGrid: React.FC<GroupedMediaGridProps> = ({
         return (
           <div
             key={att.objectId || att.attachmentId || idx}
-            style={{
-              position: 'relative',
-              borderRadius: 'var(--veil-radius-sm)',
-              overflow: 'hidden',
-              aspectRatio: '1 / 1',
-              cursor: 'pointer',
-              background: 'var(--veil-surface-elevated)',
-            }}
+            style={getItemStyle(idx)}
             onClick={() => onOpenItem(idx)}
             role="button"
             tabIndex={0}
