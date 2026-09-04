@@ -195,10 +195,10 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
           if (isSelectionMode) onToggleSelect(msg.id);
         }}
         onContextMenu={(e) => onContextMenu(e, msg)}
-        onTouchStart={!hasVisibleTextBubble ? handleTouchStart : undefined}
-        onTouchMove={!hasVisibleTextBubble ? handleTouchMove : undefined}
-        onTouchEnd={!hasVisibleTextBubble ? handleTouchEnd : undefined}
-        onTouchCancel={!hasVisibleTextBubble ? handleTouchEnd : undefined}
+        onTouchStart={!hasVisibleTextBubble && !msg.voice ? handleTouchStart : undefined}
+        onTouchMove={!hasVisibleTextBubble && !msg.voice ? handleTouchMove : undefined}
+        onTouchEnd={!hasVisibleTextBubble && !msg.voice ? handleTouchEnd : undefined}
+        onTouchCancel={!hasVisibleTextBubble && !msg.voice ? handleTouchEnd : undefined}
         style={{ position: 'relative' }}
       >
         {isSelectionMode && (
@@ -212,7 +212,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         )}
 
         {/* Visual Swipe-to-reply icon indicator for non-text bubbles */}
-        {!hasVisibleTextBubble && swipeOffset < -15 && (
+        {!hasVisibleTextBubble && !msg.voice && swipeOffset < -15 && (
           <div
             style={{
               position: 'absolute',
@@ -241,8 +241,8 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         <div
           className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}
           style={{
-            transform: !hasVisibleTextBubble ? `translateX(${swipeOffset}px)` : undefined,
-            transition: !hasVisibleTextBubble && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
+            transform: !hasVisibleTextBubble && !msg.voice ? `translateX(${swipeOffset}px)` : undefined,
+            transition: !hasVisibleTextBubble && !msg.voice && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
           }}
         >
           {/* Quoted Reply Reference for Non-Text Bubbles */}
@@ -318,6 +318,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
           {/* Voice Note Card */}
           {msg.voice && (
             <VoiceNoteCard
+              messageId={msg.id}
               durationSeconds={msg.voice.durationSeconds}
               currentTimeSeconds={playbackCurrentTime[msg.id] || 0}
               isOutgoing={msg.isOutgoing}
@@ -513,13 +514,21 @@ export const ConversationView: React.FC = () => {
   const handleToggleVoice = async (msg: UIMessage) => {
     if (!msg.voice || !activeSession) return;
 
-    if (playingAudioId === msg.id) {
-      VoicePlayer.stop();
+    // 1. If currently playing this message, PAUSE immediately
+    if (VoicePlayer.isPlaying(msg.id)) {
+      VoicePlayer.pause();
       setPlayingAudioId(null);
-      setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
       return;
     }
 
+    // 2. If this message is paused, RESUME immediately
+    if (VoicePlayer.getPlayingId() === msg.id && VoicePlayer.isPaused(msg.id)) {
+      setPlayingAudioId(msg.id);
+      await VoicePlayer.resume();
+      return;
+    }
+
+    // 3. Otherwise start playback
     try {
       if (!cloudClient.hasAuthenticatedSession()) {
         await ensureCloudSession(activeSession);
@@ -527,10 +536,6 @@ export const ConversationView: React.FC = () => {
 
       setPlayingAudioId(msg.id);
       await VoicePlayer.playVoiceNote(activeSession, cloudClient, msg.voice, msg.id, {
-        onProgress: (percent, currentTime) => {
-          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: percent }));
-          setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: currentTime }));
-        },
         onEnded: () => {
           setPlayingAudioId(null);
           setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
@@ -538,15 +543,11 @@ export const ConversationView: React.FC = () => {
         },
         onError: (err) => {
           setPlayingAudioId(null);
-          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
-          setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
           showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
         },
       });
     } catch (err: any) {
       setPlayingAudioId(null);
-      setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
-      setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
       showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
     }
   };

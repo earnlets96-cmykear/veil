@@ -2389,7 +2389,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const targetConv = conversations.find((c) => c.id === conversationId);
           const isGroup = conversationId.startsWith('grp_') || targetConv?.type === 'group';
 
-          const voiceMeta = await VoiceRecorder.encryptAndUploadVoiceNote(
+          const voiceMeta = await VoiceRecorder.uploadVoiceNote(
             activeSession,
             cloudClient,
             rawBytes,

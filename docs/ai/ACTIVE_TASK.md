@@ -1,9 +1,32 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: RUNTIME FORENSIC FIX PASS (Group State, Reconnect Oscillation, Attachments & Chat Overview)
+## Active Phase: RUNTIME FORENSIC FIX PASS (Audio Playback, Seeking, Range Streaming & UI Overhaul)
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Completed Tasks (Audio Playback, Seeking & UI Pass)
+- [x] **Audio Range Streaming & Authentication (`cloudHandler.ts`)**:
+  - Implemented HTTP Range header parser returning `206 Partial Content`, `Content-Range: bytes start-end/total`, `Accept-Ranges: bytes`, and accurate `Content-Type: audio/webm`.
+  - Added query token authentication fallback (`?token=...`) allowing native `<audio>` element requests to stream authenticated bytes.
+- [x] **Stable Audio Playback Lifecycle (`voicePlayer.ts`)**:
+  - Reused persistent HTMLAudioElement instance across renders with zero element destruction.
+  - Implemented instantaneous synchronous `pause()` (retaining state and blob URL) and instant `resume()`.
+  - Implemented accurate `seek(percent, messageId)` with pre-play staging and [0, 100] clamping.
+  - Implemented WebM duration normalization: safely falls back to `meta.durationSeconds` when Chrome reports `duration: Infinity`.
+  - Implemented localized subscription mechanism (`VoicePlayer.subscribe(messageId, listener)`) eliminating `ConversationView` timeline re-render overhead.
+- [x] **Voice Note Card Redesign & Event Shielding (`VoiceNoteCard.tsx`, `ConversationView.tsx`)**:
+  - Compact 260px container with Play/Pause button (32x32px), `FileAudioIcon`, "Audio message" title, and tabular timer.
+  - Exactly ONE subtle integrated scrub bar (3px height) with drag-to-seek and click-to-seek.
+  - Stopped event propagation (`stopPropagation` & `preventDefault`) on all pointer/touch/mouse events.
+  - Disabled touch listeners on audio message rows (`!hasVisibleTextBubble && !msg.voice`), permanently eliminating swipe-to-reply triggering during scrubbing.
+- [x] **Durable Audio Caching (`voiceRecorder.ts`, `mediaCache.ts`)**:
+  - Integrated `MediaCache.getOrFetch` in `downloadAndDecryptVoiceNote`, caching raw audio bytes in RAM and IndexedDB.
+  - Verified zero network refetches on repeated playback or re-opening spaces.
+- [x] **Comprehensive Automated Verification (Tests A-F)**:
+  - Created `tests/phase45e-audio-forensic-e2e.test.ts` passing all 6 tests (Tests A-F).
+  - Extended `tests/phase45e-audio-runtime.test.ts` passing all 6 lifecycle tests.
+  - Full test suite passing 100% with 0 regressions.
 
 ### Completed Tasks (Runtime Forensic Pass)
 - [x] **Dual-Account Group Invariant & Synchronization**:

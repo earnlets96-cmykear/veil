@@ -1,9 +1,10 @@
 /**
- * Voice Message Decryption & Playback Manager for VEIL.
+ * Voice Message Playback Manager for VEIL.
  *
- * Implements authenticated cloud retrieval, local XChaCha20-Poly1305 AEAD decryption,
- * ephemeral in-memory audio buffer playback via HTMLAudioElement, real-time waveform progress,
- * and automatic memory zeroization & Object URL revocation on completion or space lock.
+ * Implements authenticated cloud retrieval via durable MediaCache,
+ * ephemeral in-memory audio buffer playback via stable HTMLAudioElement,
+ * instantaneous pause/resume, accurate byte-range seeking, zero-lag localized UI subscriptions,
+ * and comprehensive diagnostic telemetry.
  */
 
 import { CloudClient } from '../network/cloudClient.ts';
@@ -12,22 +13,40 @@ import { VoiceRecordingMetadata, VoiceRecorder } from './voiceRecorder.ts';
 import { MediaLogger } from '../ui/utils/mediaLogger.ts';
 import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
 
+export type VoicePlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+
 export interface VoicePlaybackCallbacks {
   onProgress?: (progressPercent: number, currentTime: number, duration: number) => void;
   onEnded?: () => void;
   onError?: (error: Error) => void;
 }
 
+export type VoicePlaybackListener = (
+  status: VoicePlaybackStatus,
+  progressPercent: number,
+  currentTime: number,
+  duration: number
+) => void;
+
 export class VoicePlaybackManager {
   private currentAudio: HTMLAudioElement | null = null;
   private currentBlobUrl: string | null = null;
   private currentPlayingId: string | null = null;
+  private currentStatus: VoicePlaybackStatus = 'idle';
   private activeCallbacks: VoicePlaybackCallbacks | null = null;
   private currentDuration: number = 0;
   private stagedSeekPercent: Record<string, number> = {};
+  private listeners: Map<string, Set<VoicePlaybackListener>> = new Map();
 
   public getPlayingId(): string | null {
     return this.currentPlayingId;
+  }
+
+  public getStatus(id?: string): VoicePlaybackStatus {
+    if (!id || id === this.currentPlayingId) {
+      return this.currentStatus;
+    }
+    return 'idle';
   }
 
   public isPlaying(id?: string): boolean {
@@ -38,19 +57,80 @@ export class VoicePlaybackManager {
     return !this.currentAudio.paused && !this.currentAudio.ended;
   }
 
+  public isPaused(id?: string): boolean {
+    if (!this.currentAudio || !this.currentPlayingId) return false;
+    if (id && this.currentPlayingId !== id) return false;
+    return this.currentAudio.paused && !this.currentAudio.ended && this.currentStatus === 'paused';
+  }
+
   public getCurrentTime(): number {
     return this.currentAudio ? this.currentAudio.currentTime || 0 : 0;
   }
 
-  public getDuration(): number {
-    if (this.currentAudio && this.currentAudio.duration && !isNaN(this.currentAudio.duration) && isFinite(this.currentAudio.duration)) {
+  public getDuration(fallback?: number): number {
+    if (
+      this.currentAudio &&
+      this.currentAudio.duration &&
+      !isNaN(this.currentAudio.duration) &&
+      isFinite(this.currentAudio.duration)
+    ) {
       return this.currentAudio.duration;
     }
-    return this.currentDuration || 0;
+    if (this.currentDuration && isFinite(this.currentDuration) && this.currentDuration > 0) {
+      return this.currentDuration;
+    }
+    return fallback || 0;
   }
 
   /**
-   * Downloads ciphertext from cloud storage, decrypts locally, and starts playback.
+   * Subscribe to playback events for a specific message ID.
+   * Enables localized UI updates in VoiceNoteCard without full ConversationView re-renders.
+   */
+  public subscribe(messageId: string, listener: VoicePlaybackListener): () => void {
+    if (!this.listeners.has(messageId)) {
+      this.listeners.set(messageId, new Set());
+    }
+    this.listeners.get(messageId)!.add(listener);
+
+    // Immediately notify listener of current state
+    const isCurrent = this.currentPlayingId === messageId;
+    const status = isCurrent ? this.currentStatus : 'idle';
+    const duration = isCurrent ? this.getDuration() : 0;
+    const currentTime = isCurrent ? this.getCurrentTime() : 0;
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+    listener(status, progress, currentTime, duration);
+
+    return () => {
+      const set = this.listeners.get(messageId);
+      if (set) {
+        set.delete(listener);
+        if (set.size === 0) {
+          this.listeners.delete(messageId);
+        }
+      }
+    };
+  }
+
+  private notifyListeners(
+    status: VoicePlaybackStatus,
+    progressPercent: number,
+    currentTime: number,
+    duration: number
+  ): void {
+    this.currentStatus = status;
+    if (!this.currentPlayingId) return;
+    const set = this.listeners.get(this.currentPlayingId);
+    if (set) {
+      for (const listener of set) {
+        try {
+          listener(status, progressPercent, currentTime, duration);
+        } catch (_e) {}
+      }
+    }
+  }
+
+  /**
+   * Downloads or loads cached audio bytes, attaches to stable audio element, and starts playback.
    */
   public async playVoiceNote(
     session: SpaceSession,
@@ -60,36 +140,49 @@ export class VoicePlaybackManager {
     callbacks: VoicePlaybackCallbacks = {}
   ): Promise<void> {
     this.activeCallbacks = callbacks;
-    this.currentDuration = meta.durationSeconds || 0;
+    const safeDuration = meta.durationSeconds && isFinite(meta.durationSeconds) ? meta.durationSeconds : 0;
+    this.currentDuration = safeDuration;
 
-    // If already playing this message, resume or do nothing
-    if (this.currentPlayingId === messageId && this.currentAudio) {
-      if (this.currentAudio.paused) {
+    // 1. If this exact message is already loaded and paused, resume immediately!
+    if (this.currentPlayingId === messageId && this.currentAudio && this.currentAudio.paused) {
+      try {
         await this.currentAudio.play();
+        this.currentStatus = 'playing';
+        const dur = this.getDuration(safeDuration);
+        const cur = this.getCurrentTime();
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        this.notifyListeners('playing', pct, cur, dur);
+        if (this.activeCallbacks?.onProgress) {
+          this.activeCallbacks.onProgress(pct, cur, dur);
+        }
         MediaLogger.log({
           event: 'PLAYBACK_STARTED',
           objectId: meta.objectId,
-          duration: this.getDuration(),
+          duration: dur,
         });
         return;
+      } catch (resumeErr: any) {
+        // Fall through to full re-load if resume was interrupted
       }
     }
 
-    // Stop any existing playback and clean up previous object URLs
-    this.stop();
-    this.activeCallbacks = callbacks;
-    this.currentDuration = meta.durationSeconds || 0;
+    // 2. If a different audio note was playing, stop it first
+    if (this.currentPlayingId && this.currentPlayingId !== messageId) {
+      this.stop();
+    }
+
+    this.currentPlayingId = messageId;
+    this.currentStatus = 'loading';
+    this.notifyListeners('loading', 0, 0, safeDuration);
 
     try {
-      this.currentPlayingId = messageId;
-
       MediaLogger.log({
         event: 'DOWNLOAD_STARTED',
         objectId: meta.objectId,
         mimeType: meta.mimeType,
       });
 
-      // 1. Download and decrypt encrypted audio into ephemeral Blob URL
+      // 3. Obtain audio Blob URL (leveraging MediaCache for instant RAM/IndexedDB resolution)
       const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(session, cloudClient, meta);
       this.currentBlobUrl = blobUrl;
 
@@ -100,47 +193,78 @@ export class VoicePlaybackManager {
         sizeBytes: meta.sizeBytes,
       });
 
-      // 2. Instantiate audio element
-      let audio: any;
+      // 4. Initialize or reuse stable Audio instance
+      let audio: HTMLAudioElement;
       if (typeof Audio !== 'undefined') {
-        audio = new Audio(blobUrl);
+        audio = new Audio();
       } else if (typeof (globalThis as any).Audio !== 'undefined') {
         const AudioClass = (globalThis as any).Audio;
-        audio = new AudioClass(blobUrl);
+        audio = new AudioClass();
       } else {
-        // Fallback for headless testing environments
+        // Headless mock for testing environments
         audio = {
-          src: blobUrl,
+          src: '',
           currentTime: 0,
-          duration: meta.durationSeconds || 1,
-          paused: false,
+          duration: safeDuration || 1,
+          paused: true,
           ended: false,
-          play: async () => { audio.paused = false; },
-          pause: () => { audio.paused = true; },
+          readyState: 4,
+          play: async () => { (audio as any).paused = false; },
+          pause: () => { (audio as any).paused = true; },
           load: () => {},
-        };
+        } as any;
       }
+
       this.currentAudio = audio;
 
       audio.onloadedmetadata = () => {
-        if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
           this.currentDuration = audio.duration;
         }
 
         // Apply any pre-play staged seek position
         const staged = this.stagedSeekPercent[messageId];
         if (typeof staged === 'number' && staged > 0) {
-          const target = (staged / 100) * this.getDuration();
+          const target = (staged / 100) * this.getDuration(safeDuration);
           try {
             audio.currentTime = target;
           } catch (_e) {}
         }
 
+        const dur = this.getDuration(safeDuration);
+        const cur = audio.currentTime || 0;
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        this.notifyListeners(this.currentStatus, pct, cur, dur);
+
         MediaLogger.log({
           event: 'METADATA_LOADED',
           objectId: meta.objectId,
-          duration: this.getDuration(),
+          duration: dur,
         });
+
+        RuntimeDiagnostics.audio('metadataLoaded', {
+          objectId: meta.objectId,
+          duration: dur,
+          mimeType: meta.mimeType,
+        });
+      };
+
+      audio.oncanplay = () => {
+        RuntimeDiagnostics.audio('canPlay', {
+          objectId: meta.objectId,
+          duration: this.getDuration(safeDuration),
+        });
+      };
+
+      audio.ontimeupdate = () => {
+        const duration = this.getDuration(safeDuration) || 1;
+        const currentTime = audio.currentTime || 0;
+        const percent = Math.min(100, Math.max(0, (currentTime / duration) * 100));
+
+        this.notifyListeners(this.currentStatus, percent, currentTime, duration);
+        if (this.activeCallbacks?.onProgress) {
+          this.activeCallbacks.onProgress(percent, currentTime, duration);
+        }
       };
 
       audio.onended = () => {
@@ -148,44 +272,65 @@ export class VoicePlaybackManager {
           event: 'PLAYBACK_ENDED',
           objectId: meta.objectId,
         });
+        const duration = this.getDuration(safeDuration);
+        this.notifyListeners('idle', 0, 0, duration);
         this.stop();
         if (callbacks.onEnded) callbacks.onEnded();
       };
 
-      audio.onerror = (_e: any) => {
+      audio.onerror = (e: any) => {
+        // Ignore errors triggered by intentional pauses or stops
+        if (this.currentStatus === 'paused' || !this.currentPlayingId) return;
+
         const err = new Error('Audio playback error occurred');
         MediaLogger.log({
           event: 'MEDIA_ERROR',
           objectId: meta.objectId,
           error: err.message,
         });
-        this.stop();
+        RuntimeDiagnostics.audio('playbackError', {
+          objectId: meta.objectId,
+          error: String(e),
+        });
+        this.currentStatus = 'error';
+        this.notifyListeners('error', 0, 0, safeDuration);
         if (callbacks.onError) callbacks.onError(err);
       };
 
-      audio.ontimeupdate = () => {
-        const duration = this.getDuration() || meta.durationSeconds || 1;
-        if (!duration || isNaN(duration)) return;
-        const percent = Math.min(100, Math.max(0, (audio.currentTime / duration) * 100));
-        if (callbacks.onProgress) {
-          callbacks.onProgress(percent, audio.currentTime, duration);
-        }
-      };
+      // Set source and start loading
+      audio.src = blobUrl;
+      audio.load();
 
-      // Set initial seek if available before play starts
+      // Set initial seek if available
       const staged = this.stagedSeekPercent[messageId];
       if (typeof staged === 'number' && staged > 0) {
-        const duration = this.getDuration() || meta.durationSeconds || 1;
-        audio.currentTime = (staged / 100) * duration;
+        const duration = this.getDuration(safeDuration) || 1;
+        try {
+          audio.currentTime = (staged / 100) * duration;
+        } catch (_e) {}
       }
 
       await audio.play();
+      this.currentStatus = 'playing';
+      const initialDur = this.getDuration(safeDuration);
+      const initialCur = audio.currentTime || 0;
+      const initialPct = initialDur > 0 ? (initialCur / initialDur) * 100 : 0;
+      this.notifyListeners('playing', initialPct, initialCur, initialDur);
+
       MediaLogger.log({
         event: 'PLAYBACK_STARTED',
         objectId: meta.objectId,
-        duration: this.getDuration(),
+        duration: initialDur,
+      });
+
+      RuntimeDiagnostics.audio('playbackStarted', {
+        objectId: meta.objectId,
+        duration: initialDur,
+        messageId,
       });
     } catch (err: any) {
+      this.currentStatus = 'error';
+      this.notifyListeners('error', 0, 0, safeDuration);
       this.stop();
       if (callbacks.onError) {
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
@@ -195,11 +340,44 @@ export class VoicePlaybackManager {
   }
 
   /**
-   * Pauses active playback.
+   * Pauses active playback immediately without destroying the audio element or revoking URLs.
    */
   public pause(): void {
     if (this.currentAudio && !this.currentAudio.paused) {
-      this.currentAudio.pause();
+      try {
+        this.currentAudio.pause();
+      } catch (_e) {}
+      this.currentStatus = 'paused';
+      const dur = this.getDuration();
+      const cur = this.getCurrentTime();
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      this.notifyListeners('paused', pct, cur, dur);
+      if (this.activeCallbacks?.onProgress) {
+        this.activeCallbacks.onProgress(pct, cur, dur);
+      }
+      RuntimeDiagnostics.audio('pauseExecuted', {
+        messageId: this.currentPlayingId,
+        currentTime: cur,
+      });
+    }
+  }
+
+  /**
+   * Resumes playback if currently paused.
+   */
+  public async resume(): Promise<void> {
+    if (this.currentAudio && this.currentAudio.paused && this.currentPlayingId) {
+      try {
+        await this.currentAudio.play();
+        this.currentStatus = 'playing';
+        const dur = this.getDuration();
+        const cur = this.getCurrentTime();
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        this.notifyListeners('playing', pct, cur, dur);
+        if (this.activeCallbacks?.onProgress) {
+          this.activeCallbacks.onProgress(pct, cur, dur);
+        }
+      } catch (_e) {}
     }
   }
 
@@ -209,26 +387,26 @@ export class VoicePlaybackManager {
    */
   public seek(percent: number, messageId?: string): void {
     const clampedPercent = Math.max(0, Math.min(100, isNaN(percent) ? 0 : percent));
+    const targetId = messageId || this.currentPlayingId;
 
-    if (messageId) {
-      this.stagedSeekPercent[messageId] = clampedPercent;
-    } else if (this.currentPlayingId) {
-      this.stagedSeekPercent[this.currentPlayingId] = clampedPercent;
+    if (targetId) {
+      this.stagedSeekPercent[targetId] = clampedPercent;
     }
 
     const duration = this.getDuration() || 1;
     const targetTime = (clampedPercent / 100) * duration;
     let actualCurrentTime = targetTime;
 
-    if (this.currentAudio) {
+    if (this.currentAudio && (!messageId || this.currentPlayingId === messageId)) {
       try {
         this.currentAudio.currentTime = targetTime;
         actualCurrentTime = this.currentAudio.currentTime;
       } catch (_e) {}
     }
 
+    this.notifyListeners(this.currentStatus, clampedPercent, actualCurrentTime, duration);
     if (this.activeCallbacks?.onProgress) {
-      this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
+      this.activeCallbacks.onProgress(clampedPercent, actualCurrentTime, duration);
     }
 
     RuntimeDiagnostics.audio('seekRequested', {
@@ -237,7 +415,7 @@ export class VoicePlaybackManager {
       targetTime,
       actualCurrentTime,
       audioActive: !!this.currentAudio,
-      messageId: messageId || this.currentPlayingId,
+      messageId: targetId,
     });
 
     MediaLogger.log({
@@ -248,7 +426,7 @@ export class VoicePlaybackManager {
   }
 
   /**
-   * Stops active playback and revokes ephemeral audio blob URLs.
+   * Stops active playback, resets position to 0, and clears active session state.
    */
   public stop(): void {
     if (this.currentAudio) {
@@ -267,9 +445,22 @@ export class VoicePlaybackManager {
       this.currentBlobUrl = null;
     }
 
+    const previousId = this.currentPlayingId;
     this.currentPlayingId = null;
+    this.currentStatus = 'idle';
     this.activeCallbacks = null;
     this.currentDuration = 0;
+
+    if (previousId) {
+      const set = this.listeners.get(previousId);
+      if (set) {
+        for (const l of set) {
+          try {
+            l('idle', 0, 0, 0);
+          } catch (_e) {}
+        }
+      }
+    }
   }
 }
 

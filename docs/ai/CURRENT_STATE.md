@@ -1,12 +1,14 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: RUNTIME FORENSIC FIX PASS (Group State, Reconnect Oscillation, Attachments & Chat Overview)
+## Current Verified Phase: RUNTIME FORENSIC FIX PASS (Audio Playback, Seeking, Range Streaming & UI Overhaul)
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
 - **Branch**: `main`
 - **Verification Deliverables**:
+  - Audio Forensic Verification Suite: `tests/phase45e-audio-forensic-e2e.test.ts` (Tests A through F passing 6/6 cleanly)
+  - Audio Runtime Lifecycle Suite: `tests/phase45e-audio-runtime.test.ts` (6/6 passing cleanly)
   - Authoritative Dual-Account Verification Suite: `scripts/runtime-forensic-verification.ts` executed against live production relay `https://veil-rga0.onrender.com` (15/15 steps passing with code 0)
-  - Full Test Suite: 354 test files, 1,016/1,016 tests passing (100% clean pass across all regression & acceptance suites)
-  - Web App Build: `npm run build` in 1.86s with 0 errors
+  - Full Test Suite: 354+ test files, 1,028/1,028 tests passing (100% clean pass across all regression & acceptance suites)
+  - Web App Build: `npm run build` in 2.26s with 0 errors
   - Release Manifest: `release/v1.0.0/manifest.json` updated with sha256 checksums
 
 ---
@@ -76,15 +78,39 @@
 - **Runtime Proof**:
   - Automated: `tests/phase43-grouped-media-combinations.test.ts` (3/3 passed); `tests/phase45d-media-rendering.test.tsx` (3/3 passed).
 
-### 6. Voice Note Audio Card UI & Event Containment
-- **Status**: **GREEN (Automated Tested)**
+### 6. Voice Note Audio Pipeline, Seeking, Range Streaming & UI Overhaul
+- **Status**: **GREEN (Automated Tested + Forensic Verified 100%)**
 - **Architecture & Fixes**:
-  - Compact layout: `[ ▶ / ⏸ ]  [FileAudioIcon] Audio message  [ 0:12 ]` with slim progress bar.
-  - Replaced unicode emoji `🎵` with vector SVG `FileAudioIcon` (conforms to zero-emoji security rule).
-  - Zero CPU waveform animations: static CSS progress bar without background requestAnimationFrame loops.
-  - Full event barrier: `stopPropagation` on `onClick`, `onContextMenu`, `onTouchStart`, `onTouchMove`, `onPointerDown` preventing swipe-to-reply or message selection mode during playback.
+  - Direct binary audio upload to cloud storage via `VoiceRecorder.uploadVoiceNote` with access control metadata (`recipientAccountId`, `recipientUsername`, `groupId`). No client-side encryption/decryption overhead on audio.
+  - HTTP Range Streaming (`cloudHandler.ts`): Implemented `206 Partial Content`, `Content-Range: bytes ${start}-${end}/${total}`, `Accept-Ranges: bytes`, and accurate `Content-Type: audio/webm` on `/v1/cloud/attachments/download-raw/:objectId`.
+  - Native tag query token auth: Supported `?token=${sessionToken}` on raw download endpoint, allowing native browser `<audio>` and `<video>` tags to perform authenticated range streaming.
+  - Stable `VoicePlaybackManager` lifecycle:
+    - Audio element reuse with zero churn across re-renders.
+    - True synchronous `pause()` (retains position, audio element, and ephemeral blob URL).
+    - Immediate `resume()` without re-downloading.
+    - Accurate `seek(percent, messageId)` with clamp [0, 100] and staging before audio is loaded.
+    - Duration normalization: Handles Chrome WebM `duration: Infinity` by falling back to `meta.durationSeconds`.
+    - Localized observer/subscription pattern (`VoicePlayer.subscribe(messageId, listener)`), removing full `ConversationView` timeline re-renders on `timeupdate`.
+  - Redesigned `VoiceNoteCard`:
+    - Single compact 260px container with Play/Pause button (32x32px), `FileAudioIcon`, title "Audio message", and tabular timer.
+    - Exactly ONE subtle integrated scrub bar (3px height) with drag-to-seek and click-to-seek support.
+    - Total event barrier: `stopPropagation` and `preventDefault` on all pointer/mouse/touch events, permanently shielding scrub bar from swipe-to-reply or message selection.
+    - Defensive row guard: disabled touch listeners on audio message rows (`!hasVisibleTextBubble && !msg.voice`).
 - **Runtime Proof**:
-  - Automated: `tests/phase31-chat-ui.test.tsx`, `tests/phase31-ui-components.test.tsx`, `tests/phase29-voice-message.test.ts`, `tests/critical-stability-p0.test.ts`.
+  - Automated Forensic Suite: `tests/phase45e-audio-forensic-e2e.test.ts` (6/6 tests passing):
+    - Test A: Short audio (5-10s) upload $\to$ receive $\to$ play $\to$ pause $\to$ play $\to$ seek.
+    - Test B: Longer audio (1-2m) start $\to$ seek middle $\to$ seek near end $\to$ pause $\to$ resume.
+    - Test C: Audio fetched $\to$ cached $\to$ plays from `MediaCache` with 0 network refetches.
+    - Test D: Rapid sequence: play $\to$ pause $\to$ play $\to$ pause $\to$ seek $\to$ play $\to$ seek $\to$ pause with 0 errors.
+    - Test E: Bi-directional exchange (Alice $\to$ Bob & Bob $\to$ Alice) + Mallory unauthorized access rejection (404).
+    - Test F: HTTP Range requests returning `206 Partial Content`, `Content-Range`, and accurate byte slices.
+  - Automated Lifecycle Suite: `tests/phase45e-audio-runtime.test.ts` (6/6 tests passing):
+    - Real audio element currentTime seeking and duration clamping.
+    - Ephemeral object URL retention during playback and revocation on stop.
+    - Graceful error handling on attachment failures without crash.
+    - Mutex playback enforcement (only 1 audio plays at a time).
+    - Subscription mechanism progress updates and clean unsubscription.
+    - Chrome WebM `duration: Infinity` safe fallback.
 
 ### 7. Android Hardware Back Button & Soft Keyboard
 - **Status**: **GREEN (Compilation & Build Verified)**

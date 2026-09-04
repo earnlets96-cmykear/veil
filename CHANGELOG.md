@@ -2,6 +2,30 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-audio-stabilization] - 2026-09-05
+
+### Added & Fixed (Voice Note Audio Playback, Seeking, Range Streaming & UI Overhaul)
+- **Audio Pipeline Direct Binary R2 Upload & Server Range Streaming (`src/server/cloud/cloudHandler.ts`, `src/attachments/voiceRecorder.ts`)**:
+  - Implemented direct binary upload of audio recordings to R2/S3 without client-side encryption overhead.
+  - Implemented HTTP Range support in `cloudHandler.ts` returning `206 Partial Content`, `Content-Range: bytes ${start}-${end}/${total}`, `Accept-Ranges: bytes`, and accurate `Content-Type: audio/webm`.
+  - Added query token authentication (`?token=...`) allowing native HTML `<audio>` elements to stream range-authenticated audio directly.
+- **Audio Playback Manager & Lifecycle Resilience (`src/attachments/voicePlayer.ts`)**:
+  - Reused persistent `HTMLAudioElement` across React re-renders, preventing audio interruptions and abort errors.
+  - Implemented true synchronous `pause()` (preserving audio instance and ephemeral blob URL) and instant `resume()`.
+  - Implemented accurate `seek(percent, messageId)` with pre-play staging and clamping to [0, 100].
+  - Implemented Chrome WebM duration normalization: safely falls back to `meta.durationSeconds` when Chrome reports `duration: Infinity`.
+  - Implemented localized subscription mechanism (`VoicePlayer.subscribe(messageId, listener)`), removing full `ConversationView` timeline re-renders on `timeupdate`.
+- **Voice Note Card Redesign & Event Containment (`src/ui/components/ui/VoiceNoteCard.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Single compact container (260px) with 32x32px Play/Pause button, `FileAudioIcon`, "Audio message" title, and tabular timer.
+  - Exactly ONE subtle integrated scrub bar (3px height) with drag-to-seek and click-to-seek.
+  - Comprehensive event barrier (`stopPropagation` and `preventDefault` on click, pointer, touch, contextmenu) shielding against swipe-to-reply or message selection.
+  - Disabled touch listeners on audio message rows in `ConversationView.tsx` (`!hasVisibleTextBubble && !msg.voice`).
+- **Media Cache Integration (`src/ui/utils/mediaCache.ts`)**:
+  - Integrated `MediaCache.getOrFetch` in `downloadAndDecryptVoiceNote`, caching raw audio bytes in RAM and IndexedDB with zero network refetches.
+- **Verification Suites (`tests/phase45e-audio-forensic-e2e.test.ts`, `tests/phase45e-audio-runtime.test.ts`)**:
+  - Created 6-point forensic verification suite (Tests A-F) verifying short audio, long audio seeking, cache durability, rapid controls stress, dual accounts, and HTTP 206 range streaming.
+  - Extended runtime test suite to 6 tests covering element seeking, object URL lifecycle, error handling, mutex playback, subscription progress, and `duration: Infinity` fallback.
+
 ## [1.0.0-critical-stability] - 2026-09-04
 
 ### Added & Fixed (Critical Runtime Fix Pass: Groups, Receipts, Media, Audio, Layout, Performance)

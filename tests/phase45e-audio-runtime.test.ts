@@ -128,4 +128,77 @@ describe('Phase 45E: Audio Playback, Seeking & Runtime Lifecycle', () => {
 
     createSpy.mockRestore();
   });
+
+  it('5. subscription mechanism receives updates on play, pause, seek, and unregisters cleanly', async () => {
+    vi.spyOn(VoiceRecorder, 'downloadAndDecryptVoiceNote').mockResolvedValue('blob:mock-audio-url');
+
+    const meta = {
+      durationSeconds: 40,
+      mimeType: 'audio/webm',
+      sizeBytes: 15000,
+      objectId: 'obj_sub_01',
+      ciphertextHash: 'hash_sub',
+      encryptionKeyBase64: '',
+      nonceBase64: '',
+    };
+
+    const statusLog: string[] = [];
+    const unsubscribe = player.subscribe('msg_sub_01', (status, pct, cur, dur) => {
+      statusLog.push(`${status}:${Math.round(pct)}%`);
+    });
+
+    // Initial subscription should emit initial state
+    expect(statusLog[0]).toBe('idle:0%');
+
+    await player.playVoiceNote(mockSession, mockCloud, meta, 'msg_sub_01');
+    expect(statusLog).toContain('loading:0%');
+    expect(statusLog).toContain('playing:0%');
+
+    // Seek to 50%
+    player.seek(50, 'msg_sub_01');
+    expect(statusLog).toContain('playing:50%');
+
+    // Pause
+    player.pause();
+    expect(statusLog).toContain('paused:50%');
+
+    // Stop
+    player.stop();
+    expect(statusLog[statusLog.length - 1]).toBe('idle:0%');
+
+    // Unsubscribe and verify no further callbacks
+    unsubscribe();
+    const countAfterUnsub = statusLog.length;
+    player.seek(70, 'msg_sub_01');
+    expect(statusLog.length).toBe(countAfterUnsub);
+  });
+
+  it('6. safely handles Chrome WebM duration: Infinity by falling back to metadata duration', async () => {
+    vi.spyOn(VoiceRecorder, 'downloadAndDecryptVoiceNote').mockResolvedValue('blob:mock-audio-url');
+
+    const meta = {
+      durationSeconds: 24, // authoritatively 24s
+      mimeType: 'audio/webm',
+      sizeBytes: 9000,
+      objectId: 'obj_inf_01',
+      ciphertextHash: 'hash_inf',
+      encryptionKeyBase64: '',
+      nonceBase64: '',
+    };
+
+    await player.playVoiceNote(mockSession, mockCloud, meta, 'msg_inf_01');
+
+    // Simulate browser reporting Infinity duration for WebM stream
+    (player as any).currentAudio.duration = Infinity;
+
+    // getDuration must NOT return Infinity
+    expect(player.getDuration()).toBe(24);
+    expect(isFinite(player.getDuration())).toBe(true);
+
+    // Seeking works accurately with finite metadata fallback
+    player.seek(50, 'msg_inf_01');
+    expect(player.getCurrentTime()).toBe(12);
+
+    player.stop();
+  });
 });

@@ -195,8 +195,24 @@ export class CloudHandler {
         await this.handleAttachmentUpload(req, res, account.accountId);
         return true;
       }
-      if (pathname.startsWith('/v1/cloud/attachments/download-raw/') && method === 'GET') {
-        const objectId = pathname.substring('/v1/cloud/attachments/download-raw/'.length);
+      if (
+        (pathname.startsWith('/v1/cloud/attachments/download-raw/') ||
+          pathname.startsWith('/v1/cloud/attachments/raw/') ||
+          pathname.startsWith('/api/cloud/attachments/download-raw/')) &&
+        method === 'GET'
+      ) {
+        const prefix = pathname.startsWith('/v1/cloud/attachments/download-raw/')
+          ? '/v1/cloud/attachments/download-raw/'
+          : pathname.startsWith('/v1/cloud/attachments/raw/')
+          ? '/v1/cloud/attachments/raw/'
+          : '/api/cloud/attachments/download-raw/';
+        const objectId = pathname.substring(prefix.length);
+        await this.handleAttachmentDownloadRaw(req, res, account.accountId, objectId);
+        return true;
+      }
+      const rawMatch = pathname.match(/^\/(?:v1|api)\/cloud\/attachments\/([^/]+)\/raw$/);
+      if (rawMatch && method === 'GET') {
+        const objectId = rawMatch[1];
         await this.handleAttachmentDownloadRaw(req, res, account.accountId, objectId);
         return true;
       }
@@ -219,12 +235,24 @@ export class CloudHandler {
   // ===========================================================================
 
   private async authenticate(req: IncomingMessage, res: ServerResponse) {
+    let token = '';
     const authHeader = req.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring('Bearer '.length).trim();
+    } else {
+      try {
+        const parsedUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+        const queryToken = parsedUrl.searchParams.get('token');
+        if (queryToken) {
+          token = queryToken.trim();
+        }
+      } catch (_e) {}
+    }
+
+    if (!token) {
       this.sendJson(res, 401, { error: 'Unauthorized: missing or invalid Authorization header' });
       return null;
     }
-    const token = authHeader.substring('Bearer '.length).trim();
     try {
       return await this.accountService.validateSession(token);
     } catch (err: any) {
@@ -768,9 +796,47 @@ export class CloudHandler {
         return this.sendJson(res, 404, { error: 'Attachment not found or missing from storage' });
       }
 
+      let mimeType = 'application/octet-stream';
+      if (attRecord.encryptedMetadata) {
+        try {
+          const meta = JSON.parse(attRecord.encryptedMetadata);
+          if (meta.mimeType) mimeType = meta.mimeType;
+        } catch (_e) {}
+      }
+
+      const rangeHeader = req.headers.range;
+      if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+        const total = data.length;
+        const parts = rangeHeader.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10) || 0;
+        const end = parts[1] && !isNaN(parseInt(parts[1], 10)) ? Math.min(parseInt(parts[1], 10), total - 1) : total - 1;
+
+        if (start >= total || start > end) {
+          res.writeHead(416, {
+            'Content-Range': `bytes */${total}`,
+            'Content-Type': mimeType,
+          });
+          res.end();
+          return;
+        }
+
+        const chunk = data.slice(start, end + 1);
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${total}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(chunk.length),
+          'Content-Type': mimeType,
+          'X-Ciphertext-Hash': attRecord.ciphertextHash,
+          'X-Attachment-Id': attRecord.attachmentId,
+        });
+        res.end(Buffer.from(chunk));
+        return;
+      }
+
       res.writeHead(200, {
-        'Content-Type': 'application/octet-stream',
+        'Content-Type': mimeType,
         'Content-Length': String(data.length),
+        'Accept-Ranges': 'bytes',
         'X-Ciphertext-Hash': attRecord.ciphertextHash,
         'X-Attachment-Id': attRecord.attachmentId,
       });
