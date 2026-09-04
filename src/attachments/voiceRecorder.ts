@@ -213,7 +213,7 @@ export class VoiceRecorder {
     rawAudioBytes: Uint8Array,
     durationSeconds: number,
     mimeType: string,
-    recipientAuth?: { recipientAccountId?: string; recipientUsername?: string; recipientIdentityId?: string; allowedAccounts?: string[] }
+    recipientAuth?: { recipientAccountId?: string; recipientUsername?: string; recipientIdentityId?: string; allowedAccounts?: string[]; groupId?: string; conversationId?: string }
   ): Promise<VoiceRecordingMetadata> {
     const attachmentId = `voice_${Date.now()}_${bytesToHex(randomBytes(6))}`;
     const ephemeralKey = randomBytes(32);
@@ -232,6 +232,8 @@ export class VoiceRecorder {
     if (recipientAuth?.recipientUsername) metadataPayload.recipientUsername = recipientAuth.recipientUsername;
     if (recipientAuth?.recipientIdentityId) metadataPayload.recipientIdentityId = recipientAuth.recipientIdentityId;
     if (recipientAuth?.allowedAccounts) metadataPayload.allowedAccounts = recipientAuth.allowedAccounts;
+    if (recipientAuth?.groupId) metadataPayload.groupId = recipientAuth.groupId;
+    if (recipientAuth?.conversationId) metadataPayload.conversationId = recipientAuth.conversationId;
 
     const { attachment } = await cloudClient.createAttachment({
       attachmentId,
@@ -241,6 +243,8 @@ export class VoiceRecorder {
       recipientAccountId: recipientAuth?.recipientAccountId,
       recipientUsername: recipientAuth?.recipientUsername,
       recipientIdentityId: recipientAuth?.recipientIdentityId,
+      groupId: recipientAuth?.groupId,
+      conversationId: recipientAuth?.conversationId,
       encryptedMetadata: JSON.stringify(metadataPayload),
     });
 

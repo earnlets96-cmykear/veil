@@ -32,7 +32,8 @@ export class GroupStateManager {
     creatorSigningKeyPub: string,
     creatorSigningKeyPriv: Uint8Array,
     metadata: GroupMetadata,
-    groupMasterSecret?: Uint8Array
+    groupMasterSecret?: Uint8Array,
+    creatorInfo?: { username?: string; displayName?: string; mailboxId?: string }
   ): { state: GroupState; groupMasterSecret: Uint8Array } {
     const rawSecret = groupMasterSecret ? new Uint8Array(groupMasterSecret) : getRandomBytes(32);
     const groupId = `grp_${bytesToBase64(getRandomBytes(16)).replace(/[+/=]/g, '').slice(0, 24)}`;
@@ -55,6 +56,10 @@ export class GroupStateManager {
         role: 'CREATOR',
         joinedAtEpoch: epoch,
         addedBy: creatorIdentityId,
+        username: creatorInfo?.username,
+        displayName: creatorInfo?.displayName,
+        mailboxId: creatorInfo?.mailboxId,
+        joinedAt: Date.now(),
       },
     };
 
@@ -100,7 +105,8 @@ export class GroupStateManager {
     adminSigningPriv: Uint8Array,
     newMemberIdentityId: string,
     newMemberSigningPub: string,
-    role: GroupRole = 'MEMBER'
+    role: GroupRole = 'MEMBER',
+    memberInfo?: { username?: string; displayName?: string; mailboxId?: string }
   ): GroupAction {
     const admin = state.members[adminIdentityId];
     if (!admin || (admin.role !== 'CREATOR' && admin.role !== 'ADMIN')) {
@@ -137,6 +143,10 @@ export class GroupStateManager {
       role,
       joinedAtEpoch: state.epoch,
       addedBy: adminIdentityId,
+      username: memberInfo?.username,
+      displayName: memberInfo?.displayName,
+      mailboxId: memberInfo?.mailboxId,
+      joinedAt: Date.now(),
     };
 
     state.actionHistory.push(action);

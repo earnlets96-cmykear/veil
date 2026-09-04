@@ -1,14 +1,14 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-04T20:23:14.612Z",
+  "generatedAt": "2026-09-04T21:21:29.100Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-4BDgPg1S.js",
-      "sizeBytes": 703523,
-      "sha256": "472c106eeebfab065cfedbb8abfab84318dda1a7cf77d32f85ac1cd88f63e7b5"
+      "path": "dist/assets/index-B-iDNIFI.js",
+      "sizeBytes": 707707,
+      "sha256": "5f6e7393625b6e0b23b982b4d5b19d5d4d2365e628a2eff772cfd83ef7e6a8a6"
     },
     {
       "path": "dist/assets/index-CQOKbT_3.css",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-CJsUQH5U.js",
-      "sizeBytes": 361,
-      "sha256": "a8c8aa339c9d8cc6e781eae6a5140b1594bfa0c1938277ebab16b811d00d9cb4"
-    },
-    {
-      "path": "dist/assets/web-CobqKTUJ.js",
+      "path": "dist/assets/web-DDrlW1uk.js",
       "sizeBytes": 842,
-      "sha256": "8adf58fc2067b88ac723d45df777d348a519316e4cb63d7f932a87459fe6d021"
+      "sha256": "abab58659822baf33fa2a7fda230bb30238346e03c2aa1764bbe783e2d9243b0"
     },
     {
-      "path": "dist/assets/web-CXc-px6T.js",
+      "path": "dist/assets/web-DKGr_auk.js",
       "sizeBytes": 8728,
-      "sha256": "e87fa31822bb2c225ab4efc8955c0f1719f140204686419c89f1ba9ebb871702"
+      "sha256": "b30010a92fbef3b7266132ee12536ea5e23f2893126d69407c3146f88ca7b7e7"
+    },
+    {
+      "path": "dist/assets/web-DydRvwP5.js",
+      "sizeBytes": 361,
+      "sha256": "7628943820479990fd3e241da370c35f1c1a2e14ca2a6d73d980392aa5894437"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "c4dc8557eb43ea1492c9172b5ac27781ace900f17c138170e0f36770fe0206c6"
+      "sha256": "6dcf1b462386689d5ddeb50379175a8f0f2d85291eb9c5d1bfbb74923ba4254c"
     }
   ]
 }

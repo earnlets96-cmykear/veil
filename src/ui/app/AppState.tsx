@@ -441,13 +441,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const storedContacts = await contactManager.listContacts(session);
     setContacts(storedContacts);
 
-    // 2. Load active conversations & hydrate contact avatars
+    // 2. Load active conversations & hydrate contact avatars and canonical group state
     const storedConvs = (await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations')) || [];
     const hydratedConvs = storedConvs.map((conv) => {
       if (conv.type === 'direct') {
         const contact = storedContacts.find((c) => c.identityId === conv.id);
         if (contact?.avatar && conv.avatar !== contact.avatar) {
           return { ...conv, avatar: contact.avatar };
+        }
+      } else if (conv.type === 'group') {
+        const canonicalGroup = groupManager.loadGroupState(session, conv.id);
+        if (canonicalGroup) {
+          return {
+            ...conv,
+            groupState: canonicalGroup,
+          };
         }
       }
       return conv;
@@ -485,7 +493,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (cloudClient.getSessionToken()) {
         await syncEngine.sync(session);
         const postSyncConvs = await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations');
-        if (postSyncConvs) setConversations(postSyncConvs);
+        if (postSyncConvs) {
+          const rehydrated = postSyncConvs.map((conv) => {
+            if (conv.type === 'group') {
+              const canonicalGroup = groupManager.loadGroupState(session, conv.id);
+              if (canonicalGroup) {
+                return { ...conv, groupState: canonicalGroup };
+              }
+            }
+            return conv;
+          });
+          setConversations(rehydrated);
+        }
         const postSyncMsgs = await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages');
         if (postSyncMsgs) setMessages(postSyncMsgs);
       }
@@ -673,17 +692,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (invite.groupId && invite.senderKeyDistribution) {
               try {
                 let existingGroup = groupManager.loadGroupState(session, invite.groupId);
-                const myDoc = idMgr.getPublicDocument(session, store);
-                const myIdentityId = myDoc?.identityId;
-                const members = invite.members || (existingGroup ? existingGroup.members : {});
-                if (myIdentityId && !members[myIdentityId]) {
-                  members[myIdentityId] = {
-                    identityId: myIdentityId,
-                    signingPublicKey: myDoc?.signingPublicKey || '',
-                    role: 'MEMBER',
-                    joinedAt: Date.now(),
-                  };
+                const myDoc = idMgr.getPublicDocument(session, store) || await store.getAsync(session, 'veil:identity:doc');
+                const myIdentityId = (myDoc as any)?.identityId;
+                const members: Record<string, any> = {
+                  ...(existingGroup ? existingGroup.members : {}),
+                  ...(invite.members || {}),
+                };
+
+                // Guarantee creator is present with metadata
+                if (invite.creator?.identityId) {
+                  if (!members[invite.creator.identityId]) {
+                    members[invite.creator.identityId] = {
+                      identityId: invite.creator.identityId,
+                      signingPublicKey: invite.creator.signingPublicKey || '',
+                      role: 'CREATOR',
+                      joinedAtEpoch: 1,
+                      addedBy: invite.creator.identityId,
+                      displayName: invite.creator.displayName,
+                      username: invite.creator.username,
+                      mailboxId: invite.creator.mailboxId,
+                      joinedAt: Date.now(),
+                    };
+                  } else {
+                    members[invite.creator.identityId] = {
+                      ...members[invite.creator.identityId],
+                      displayName: invite.creator.displayName || members[invite.creator.identityId].displayName,
+                      username: invite.creator.username || members[invite.creator.identityId].username,
+                      mailboxId: invite.creator.mailboxId || members[invite.creator.identityId].mailboxId,
+                    };
+                  }
                 }
+
+                // Guarantee self (invitee) is present with metadata
+                if (myIdentityId) {
+                  if (!members[myIdentityId]) {
+                    members[myIdentityId] = {
+                      identityId: myIdentityId,
+                      signingPublicKey: (myDoc as any)?.signingPublicKey || '',
+                      role: 'MEMBER',
+                      joinedAtEpoch: 1,
+                      addedBy: invite.creator?.identityId || myIdentityId,
+                      displayName: myProfile?.displayName || session.name,
+                      username: myProfile?.username,
+                      mailboxId: myProfile?.mailboxId,
+                      joinedAt: Date.now(),
+                    };
+                  } else {
+                    members[myIdentityId] = {
+                      ...members[myIdentityId],
+                      displayName: myProfile?.displayName || members[myIdentityId].displayName,
+                      username: myProfile?.username || members[myIdentityId].username,
+                      mailboxId: myProfile?.mailboxId || members[myIdentityId].mailboxId,
+                    };
+                  }
+                }
+
                 if (!existingGroup) {
                   existingGroup = {
                     groupId: invite.groupId,
@@ -697,7 +760,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     updatedAt: Date.now(),
                   };
                 } else {
-                  existingGroup.members = { ...existingGroup.members, ...members };
+                  existingGroup.members = members;
                 }
                 groupManager.saveGroupState(session, existingGroup);
 
@@ -1195,24 +1258,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const handleResume = () => {
       performSync();
-      netManager.reconnect(activeSession);
+      if (netManager.getState() !== 'connected') {
+        netManager.reconnect(activeSession);
+      }
+    };
+
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        handleResume();
+      }
     };
 
     if (typeof window !== 'undefined') {
       window.addEventListener('focus', handleResume);
     }
     if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          handleResume();
-        }
-      });
+      document.addEventListener('visibilitychange', handleVisibility);
     }
 
     return () => {
       clearInterval(interval);
       if (typeof window !== 'undefined') {
         window.removeEventListener('focus', handleResume);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibility);
       }
     };
   }, [activeSession]);
@@ -1974,12 +2044,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   chunkCount: 1,
                   chunkSize: fileBytes.length,
                   conversationId,
+                  groupId: isGroup ? conversationId : undefined,
                   encryptedMetadata: JSON.stringify({
                     name: currentAtt.name,
                     mimeType: currentAtt.mimeType,
                     sizeBytes: fileBytes.length,
                     conversationId,
-                    groupId: batchGroupId,
+                    groupId: isGroup ? conversationId : undefined,
+                    batchGroupId,
                     recipientUsername: isGroup ? undefined : targetUsername,
                     recipientAccountId: isGroup ? undefined : recipientAccountId,
                     recipientIdentityId: isGroup ? undefined : recipientIdentityId,
@@ -2314,6 +2386,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             await ensureCloudSession(activeSession, true);
           }
 
+          const targetConv = conversations.find((c) => c.id === conversationId);
+          const isGroup = conversationId.startsWith('grp_') || targetConv?.type === 'group';
+
           const voiceMeta = await VoiceRecorder.encryptAndUploadVoiceNote(
             activeSession,
             cloudClient,
@@ -2321,14 +2396,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             durationSeconds,
             mimeType,
             {
-              recipientUsername: targetUsername,
-              recipientAccountId,
-              recipientIdentityId,
+              recipientUsername: isGroup ? undefined : targetUsername,
+              recipientAccountId: isGroup ? undefined : recipientAccountId,
+              recipientIdentityId: isGroup ? undefined : recipientIdentityId,
               allowedAccounts: recipientAccountId ? [recipientAccountId] : undefined,
+              groupId: isGroup ? conversationId : undefined,
+              conversationId,
             }
           );
-
-          const targetConv = conversations.find((c) => c.id === conversationId);
 
           if (targetConv?.type === 'group') {
             const myDoc = idMgr.getPublicDocument(activeSession, store);
@@ -2856,14 +2931,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           name,
           description,
         };
-        const groupRes = groupManager.createGroup(activeSession, metadata);
+        const groupRes = groupManager.createGroup(activeSession, metadata, {
+          username: myProfile?.username,
+          displayName: myProfile?.displayName || activeSession.name || 'Creator',
+          mailboxId: myProfile?.mailboxId,
+        });
         state = groupRes.state;
 
-        const myDoc = idMgr.getPublicDocument(activeSession, store);
-        const creatorIdentityId = myDoc?.identityId || activeSession.spaceId;
-        const creatorSigningPub = myDoc?.signingPublicKey || '';
+        const myDoc = idMgr.getPublicDocument(activeSession, store) || await store.getAsync(activeSession, 'veil:identity:doc');
+        const creatorIdentityId = (myDoc as any)?.identityId || activeSession.spaceId;
+        const creatorSigningPub = (myDoc as any)?.signingPublicKey || '';
 
         if (members && members.length > 0) {
+          const pendingInvites: Array<{ mailboxId: string; distribution: any }> = [];
+
           for (const member of members) {
             try {
               let enriched = { ...member };
@@ -2874,6 +2955,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     enriched.signingPublicKey = profile.prekeyBundle?.identityDocument?.signingPublicKey;
                     enriched.mailboxId = profile.mailboxId;
                     enriched.identityId = profile.identityId;
+                    if (!enriched.displayName && profile.displayName) enriched.displayName = profile.displayName;
                   }
                 } catch (_pErr) {}
               }
@@ -2884,29 +2966,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   state.groupId,
                   enriched.identityId,
                   enriched.signingPublicKey,
-                  'MEMBER'
+                  'MEMBER',
+                  {
+                    username: enriched.username,
+                    displayName: enriched.displayName,
+                    mailboxId: enriched.mailboxId,
+                  }
                 );
                 if (enriched.mailboxId) {
-                  const invitePayload = JSON.stringify({
-                    type: 'GROUP_INVITE',
-                    groupId: state.groupId,
-                    name,
-                    description,
-                    senderKeyDistribution: distribution,
-                    senderSigningKey: creatorSigningPub,
-                    creator: {
-                      identityId: creatorIdentityId,
-                      displayName: myProfile?.displayName || activeSession.name || 'Creator',
-                      username: myProfile?.username,
-                      signingPublicKey: creatorSigningPub,
-                      mailboxId: myProfile?.mailboxId,
-                    },
-                    members: state.members,
-                  });
-                  await netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
+                  pendingInvites.push({ mailboxId: enriched.mailboxId, distribution });
                 }
               }
             } catch (_mErr) {}
+          }
+
+          // Authoritative refresh of group state containing creator and all added members
+          const freshState = groupManager.loadGroupState(activeSession, state.groupId);
+          if (freshState) {
+            state = freshState;
+          }
+
+          // Dispatch GROUP_INVITE to all members with the complete authoritative members roster
+          for (const inv of pendingInvites) {
+            const invitePayload = JSON.stringify({
+              type: 'GROUP_INVITE',
+              groupId: state.groupId,
+              name,
+              description,
+              senderKeyDistribution: inv.distribution,
+              senderSigningKey: creatorSigningPub,
+              creator: {
+                identityId: creatorIdentityId,
+                displayName: myProfile?.displayName || activeSession.name || 'Creator',
+                username: myProfile?.username,
+                signingPublicKey: creatorSigningPub,
+                mailboxId: myProfile?.mailboxId,
+              },
+              members: state.members,
+            });
+            await netManager.sendEnvelope(activeSession, inv.mailboxId, invitePayload).catch(() => {});
           }
         }
       } catch (_gErr) {}
@@ -2947,6 +3045,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             enriched.signingPublicKey = profile.prekeyBundle?.identityDocument?.signingPublicKey;
             enriched.mailboxId = profile.mailboxId;
             enriched.identityId = profile.identityId;
+            if (!enriched.displayName && profile.displayName) enriched.displayName = profile.displayName;
           }
         } catch (_e) {}
       }
@@ -2960,14 +3059,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         groupId,
         enriched.identityId,
         enriched.signingPublicKey,
-        'MEMBER'
+        'MEMBER',
+        {
+          username: enriched.username,
+          displayName: enriched.displayName,
+          mailboxId: enriched.mailboxId,
+        }
       );
 
       const updatedState = groupManager.loadGroupState(activeSession, groupId);
       const conv = conversations.find((c) => c.id === groupId);
-      const myDoc = idMgr.getPublicDocument(activeSession, store);
-      const creatorIdentityId = myDoc?.identityId || activeSession.spaceId;
-      const creatorSigningPub = myDoc?.signingPublicKey || '';
+      const myDoc = idMgr.getPublicDocument(activeSession, store) || await store.getAsync(activeSession, 'veil:identity:doc');
+      const creatorIdentityId = (myDoc as any)?.identityId || activeSession.spaceId;
+      const creatorSigningPub = (myDoc as any)?.signingPublicKey || '';
 
       if (enriched.mailboxId) {
         const invitePayload = JSON.stringify({

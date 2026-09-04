@@ -619,11 +619,18 @@ export class CloudHandler {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+      const resolvedConversationId = conversationId || metaObj.conversationId;
+
       if (resolvedRecipientAccountId) {
         (record as any).recipientAccountId = resolvedRecipientAccountId;
       }
       if (resolvedGroupId) {
         (record as any).groupId = resolvedGroupId;
+      } else if (resolvedConversationId && resolvedConversationId.startsWith('grp_')) {
+        (record as any).groupId = resolvedConversationId;
+      }
+      if (resolvedConversationId) {
+        (record as any).conversationId = resolvedConversationId;
       }
 
       await this.db.saveAttachment(record);
@@ -706,14 +713,14 @@ export class CloudHandler {
           isRecipient = true;
         }
 
-        if ((attRecord as any).groupId) {
+        if ((attRecord as any).groupId || (attRecord as any).conversationId?.startsWith('grp_')) {
           isRecipient = true;
         }
 
         if (attRecord.encryptedMetadata) {
           try {
             const metaObj = JSON.parse(attRecord.encryptedMetadata);
-            if (metaObj.groupId) {
+            if (metaObj.groupId || metaObj.conversationId?.startsWith('grp_')) {
               isRecipient = true;
             } else if (
               metaObj.recipientAccountId === accountId ||
@@ -799,14 +806,14 @@ export class CloudHandler {
           isRecipient = true;
         }
 
-        if ((attRecord as any).groupId) {
+        if ((attRecord as any).groupId || (attRecord as any).conversationId?.startsWith('grp_')) {
           isRecipient = true;
         }
 
         if (attRecord.encryptedMetadata) {
           try {
             const metaObj = JSON.parse(attRecord.encryptedMetadata);
-            if (metaObj.groupId) {
+            if (metaObj.groupId || metaObj.conversationId?.startsWith('grp_')) {
               isRecipient = true;
             } else if (
               metaObj.recipientAccountId === accountId ||

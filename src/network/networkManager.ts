@@ -295,7 +295,9 @@ export class NetworkManager {
     if (session && session.isActive()) {
       const wsTransport = this.activeWsTransports.get(session.spaceId);
       if (wsTransport) {
-        wsTransport.reconnectNow();
+        if (wsTransport.getState() !== 'connected') {
+          wsTransport.reconnectNow();
+        }
       } else {
         const handler = this.messageHandlers.get(session.spaceId);
         await this.startListening(session, handler);
@@ -303,7 +305,9 @@ export class NetworkManager {
       await this.syncMailbox(session);
     } else {
       for (const [spaceId, wsTransport] of this.activeWsTransports.entries()) {
-        wsTransport.reconnectNow();
+        if (wsTransport.getState() !== 'connected') {
+          wsTransport.reconnectNow();
+        }
       }
     }
   }

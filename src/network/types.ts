@@ -81,7 +81,7 @@ export const DEFAULT_NETWORK_CONFIG: NetworkConfig = {
   wsUrl: 'ws://127.0.0.1:8080/v1/ws',
   requestTimeoutMs: 10000,
   connectTimeoutMs: 10000,
-  heartbeatIntervalMs: 30000,
+  heartbeatIntervalMs: 15000,
   maxRetries: 5,
   initialRetryDelayMs: 1000,
   maxRetryDelayMs: 30000,

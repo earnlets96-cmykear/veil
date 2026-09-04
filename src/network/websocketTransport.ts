@@ -103,6 +103,20 @@ export class WebSocketTransport {
 
   private async establishConnection(): Promise<void> {
     this.clearTimers();
+    if (this.ws) {
+      try {
+        if (typeof this.ws.removeAllListeners === 'function') {
+          this.ws.removeAllListeners();
+        } else {
+          this.ws.onopen = null;
+          this.ws.onmessage = null;
+          this.ws.onclose = null;
+          this.ws.onerror = null;
+        }
+        this.ws.close();
+      } catch (_e) {}
+      this.ws = null;
+    }
     this.setState(this.retryCount > 0 ? 'reconnecting' : 'connecting');
 
     return new Promise<void>((resolve, reject) => {
@@ -200,6 +214,9 @@ export class WebSocketTransport {
    * Immediately resets retry count and attempts reconnection without waiting for backoff.
    */
   public reconnectNow(): void {
+    if (this.ws && (this.ws.readyState === 1 || this.ws.readyState === 0) && this.state === 'connected') {
+      return;
+    }
     this.clearTimers();
     this.retryCount = 0;
     this.isExplicitlyClosed = false;

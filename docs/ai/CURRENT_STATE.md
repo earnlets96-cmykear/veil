@@ -1,15 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: CRITICAL RUNTIME FIX PASS (Groups • Receipts • Media • Audio • Layout • Performance)
+## Current Verified Phase: RUNTIME FORENSIC FIX PASS (Group State, Reconnect Oscillation, Attachments & Chat Overview)
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
 - **Branch**: `main`
 - **Verification Deliverables**:
+  - Authoritative Dual-Account Verification Suite: `scripts/runtime-forensic-verification.ts` executed against live production relay `https://veil-rga0.onrender.com` (15/15 steps passing with code 0)
   - Full Test Suite: 354 test files, 1,016/1,016 tests passing (100% clean pass across all regression & acceptance suites)
-  - Primary Stability Suite: `tests/critical-stability-p0.test.ts` passing (6/6 tests)
-  - Live Production Relay Test: `scripts/live-production-test.ts` verified 100% against `https://veil-rga0.onrender.com`
-  - Android APK Build: `android/app/build/outputs/apk/debug/app-debug.apk` built successfully via Gradle in 22s (4.59 MB)
-  - Web App Build: `npm run build` in 2.29s with 0 errors
-  - Capacitor Android Sync: `npx cap sync android` with `@capacitor/app@8.1.1`, `@capacitor/filesystem@8.1.3`, `@capacitor/share@8.0.1`
+  - Web App Build: `npm run build` in 1.86s with 0 errors
+  - Release Manifest: `release/v1.0.0/manifest.json` updated with sha256 checksums
 
 ---
 
@@ -105,12 +103,17 @@
 | Step | Target | Result | Evidence |
 |---|---|---|---|
 | Step 1: Crypto Init | Local Space & Prekeys | **PASS** | Sealed under Argon2id |
-| Step 2: Account Reg | Live Render Cloud | **PASS** | Registered `@alice_live_...` & `@bob_live_...` |
-| Step 3: Mailboxes | Render Relay Transport | **PASS** | Ephemeral mailboxes allocated |
-| Step 4: E2EE Message | Double Ratchet Wire | **PASS** | Explicit `deliveryId` bound to message |
-| Step 5: Decryption | Recipient Bob | **PASS** | Plaintext decrypted byte-for-byte |
-| Step 6: Delivery Receipt | Sender Alice | **PASS** | Monotonic transition to `DELIVERED_TO_RECIPIENT` (2 gray ticks) |
-| Step 7: Read Receipt | Sender Alice | **PASS** | Monotonic transition to `READ` (2 colored ticks) |
-| Step 7b: Raw Media Upload | Direct Cloud Upload | **PASS** | Alice direct-uploaded raw media, Bob retrieved byte-for-byte |
-| Step 8: Group Lifecycle | Sender Keys & Relay | **PASS** | Group creation, member add, sender key broadcast & Bob group reply |
-| Step 9: Delete For Everyone | Anti-Resurrection | **PASS** | Tombstones saved across spaces |
+| Step 2: Account Reg | Live Render Cloud | **PASS** | Registered disposable accounts `@alice_fn_...` & `@bob_fn_...` |
+| Step 3: Network & WS | WebSocket Transport | **PASS** | 5 rapid `reconnectNow()` calls, 0 oscillation, stayed `connected` |
+| Step 4: Group Creation | Group Manager | **PASS** | Group "team" created, Alice+Bob added, Alice state = 2 members |
+| Step 5: Invite Transport | Relay & Bob Hydration | **PASS** | Bob received `GROUP_INVITE`, hydrated state = 2 members |
+| Step 6: Bob Reload | Bob Client Storage | **PASS** | Reloaded Bob retains 2 members |
+| Step 7: Bob Re-login | Bob Vault & Space | **PASS** | Bob locked space, fresh unlock retains 2 members |
+| Step 8: Alice Reload | Alice Client Storage | **PASS** | Reloaded Alice retains 2 members |
+| Step 9: Group Msg (A->B) | Group Sender Key Wire | **PASS** | Alice group message decrypted by Bob: "Hey team! This is Alice." |
+| Step 10: Group Msg (B->A) | Group Sender Key Wire | **PASS** | Bob group reply decrypted by Alice: "Hey Alice! Bob received it..." |
+| Step 11: Photo Attachments | Cloudflare R2 Cloud | **PASS** | Alice uploaded 3 photos, Bob downloaded all 3 (NO 404 access denied!) |
+| Step 12: Dual Restart | Client State Persistence | **PASS** | Both sessions restarted, group = 2 members on both devices |
+| Step 13: DM Receipts (A->B) | Direct Message & Read | **PASS** | Progression: 1 tick -> 2 gray ticks -> 2 colored ticks (READ) |
+| Step 14: DM Receipts (B->A) | Direct Message & Read | **PASS** | Reverse DM read receipt processed -> 2 colored ticks (READ) |
+| Step 15: Clean Disconnect | WebSocket Transport | **PASS** | Clean teardown without error or lingering sockets |

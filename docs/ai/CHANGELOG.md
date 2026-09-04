@@ -4,6 +4,34 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Runtime Forensic Fix Pass] - 2026-09-04
+
+### Fixed & Production-Verified
+- **Authoritative Dual-Account Group State Synchronization (`src/group/`, `src/ui/app/AppState.tsx`, `src/account/accountManager.ts`)**:
+  - Enriched `GroupMember` model with `username`, `displayName`, `joinedAt`, and `mailboxId`.
+  - Reloaded authoritative `groupState` in `AppState.createGroup` after adding initial members; passed full roster in `GROUP_INVITE` payload.
+  - Hydrated `conv.groupState` from `groupManager.loadGroupState(session, conv.id)` during startup/space switch in `loadSpaceData`.
+  - Implemented non-destructive member set union in `accountManager.ts` for both `veil:ui:conversations` and `veil:group:state:`, preventing multi-device sync from overwriting or losing members.
+  - Verified member count = 2 on both Alice and Bob through reloads, logouts, and restarts.
+- **Attachment Authorization & Group Sharing ("Attachment not found or access denied" Fix) (`src/ui/app/AppState.tsx`, `src/attachments/voiceRecorder.ts`, `src/server/cloud/cloudHandler.ts`)**:
+  - Attached `groupId: conversationId` on all group media and voice note uploads (`sendAttachments`, `sendVoiceMessage`).
+  - Stored `groupId` directly on cloud attachment records and in `encryptedMetadata`.
+  - Updated server-side authorization in `cloudHandler.ts` (`handleAttachmentDownloadRaw` and `handleAttachmentDownload`) to authorize group member downloads matching `attRecord.groupId` or `conversationId?.startsWith('grp_')`.
+  - Verified Alice sending 3 photos in group "team" and Bob downloading all 3 without 404 access denied errors.
+- **WebSocket Reconnect Oscillation & Connection Stability (`src/network/websocketTransport.ts`, `src/network/networkManager.ts`, `src/ui/app/AppState.tsx`)**:
+  - Guarded `reconnectNow()` and `networkManager.reconnect()` against tearing down already connected sockets (`readyState === 1` and `state === 'connected'`).
+  - Unhooked event listeners from previous socket instances upon reconnect to prevent leak loops.
+  - Reduced default heartbeat interval to 15s to keep connections alive through mobile proxy gateways.
+  - Cleaned up `visibilitychange` window event listeners on component unmount.
+  - Verified zero state oscillation across rapid window focus/blur events.
+- **Chat Overview Outgoing Message Status Indicators (`src/ui/components/Sidebar.tsx`)**:
+  - Rendered `<MessageStatus status={latestMsg.status} size={14} />` directly beside conversation snippets for outgoing messages.
+  - Strictly suppressed ticks on incoming messages to match privacy invariants.
+- **Human-Readable Member Roster in Group Details (`src/ui/components/GroupDetailsModal.tsx`)**:
+  - Displayed `displayName` and `@username` directly from member metadata; eliminated raw internal UUID display.
+- **Live Verification**:
+  - `scripts/runtime-forensic-verification.ts` executed with 15/15 steps passing against `https://veil-rga0.onrender.com`.
+
 ## [Phase 54] - 2026-09-02
 
 ### Audited & Documented (Zero-Code Forensic Inventory)

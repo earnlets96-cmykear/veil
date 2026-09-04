@@ -20,6 +20,7 @@ import {
   EmptyState,
   Spinner,
   UserSearchResult,
+  MessageStatus,
 } from './ui/index.ts';
 import {
   LockIcon,
@@ -61,6 +62,7 @@ export const Sidebar: React.FC = () => {
     exportMyInvitation,
     myProfile,
     isConversationMuted,
+    messages,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
@@ -548,6 +550,10 @@ export const Sidebar: React.FC = () => {
             filteredConversations.map((conv) => {
               const isSelected = activeChatId === conv.id;
               const isMuted = typeof isConversationMuted === 'function' && isConversationMuted(conv.id);
+              const convMsgs = (messages && messages[conv.id]) || [];
+              const latestMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
+              const isOutgoing = !!latestMsg?.isOutgoing;
+
               return (
                 <div
                   key={conv.id}
@@ -581,8 +587,15 @@ export const Sidebar: React.FC = () => {
                         )}
                       </div>
                     </div>
-                    <div className="veil-conversation-preview">
-                      {renderMessageSnippet(conv.lastMessage)}
+                    <div className="veil-conversation-preview" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {isOutgoing && latestMsg && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                          <MessageStatus status={latestMsg.status} size={14} />
+                        </span>
+                      )}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {renderMessageSnippet(conv.lastMessage || latestMsg?.text)}
+                      </span>
                     </div>
                   </div>
                   {conv.unreadCount > 0 && (

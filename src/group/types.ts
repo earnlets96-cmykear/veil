@@ -24,6 +24,10 @@ export interface GroupMember {
   role: GroupRole;
   joinedAtEpoch: number;
   addedBy: string;
+  username?: string;
+  displayName?: string;
+  joinedAt?: number;
+  mailboxId?: string;
 }
 
 export interface GroupAction {

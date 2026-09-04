@@ -1,17 +1,36 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: CRITICAL RUNTIME FIX PASS (Groups • Receipts • Media • Audio • Layout • Performance)
+## Active Phase: RUNTIME FORENSIC FIX PASS (Group State, Reconnect Oscillation, Attachments & Chat Overview)
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 
-### Completed Tasks
-- [x] **Real Group Membership & Invite Propagation**:
-  - Implemented `exportSenderKeyDistribution` and made group sender key processing accept `Uint8Array | string`.
-  - Added full member enrichment, directory mailbox resolution, and local member entry in `AppState.tsx`.
-  - Wired group fanout for messages, attachments, and voice notes.
-  - Calculated conversation header member count from `groupState.members`.
-  - Verified multi-member sender key distribution, member addition, and member replies.
+### Completed Tasks (Runtime Forensic Pass)
+- [x] **Dual-Account Group Invariant & Synchronization**:
+  - Enriched `GroupMember` with user/mailbox metadata.
+  - Reloaded canonical state post-member addition; passed full roster in `GROUP_INVITE`.
+  - Implemented non-destructive member unioning in cloud sync.
+  - Hydrated `conv.groupState` from canonical storage during startup.
+  - Verified 2 members on both devices across reload, logout, and restart.
+- [x] **Attachment Authorization & Group Sharing ("Access Denied" Fix)**:
+  - Passed `groupId: conversationId` on group attachments and voice notes.
+  - Updated server-side authorization in `cloudHandler.ts` to authorize group members.
+  - Verified upload and download of 3 photos in group "team" without 404 access denied.
+- [x] **WebSocket Reconnect Oscillation Elimination**:
+  - Guarded against tearing down already open and connected sockets.
+  - Removed stale listeners and shortened heartbeat interval to 15s.
+  - Cleaned up window visibility listeners.
+  - Verified zero state oscillation across rapid focus events.
+- [x] **Chat Overview Outgoing Message Status Indicators**:
+  - Displayed `<MessageStatus>` ticks beside snippet in sidebar for outgoing messages.
+  - Suppressed ticks on incoming messages.
+- [x] **Human-Readable Member Roster in Group Details**:
+  - Rendered human display names and `@username` instead of raw UUIDs.
+- [x] **Authoritative 15-Step Dual-Account Runtime Verification**:
+  - `scripts/runtime-forensic-verification.ts` executed against `https://veil-rga0.onrender.com` (15/15 passed with code 0).
+- [x] **Regression Suite & Production Build**:
+  - 354/354 test suites passing (1,016/1,016 unit/integration tests).
+  - `npm run build` passing with 0 errors.
 - [x] **Delivery & Read Receipts Monotonic Progression**:
   - Bound local UI message IDs directly to wire delivery IDs via `explicitDeliveryId`.
   - Enforced peer attribution in `readReceipts.ts` (`cleanReader !== cleanAuth` rejects forged receipts).

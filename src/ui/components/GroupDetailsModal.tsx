@@ -334,9 +334,14 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
             >
               {membersList.map((m: any) => {
                 const contactMatch = contacts.find((c) => c.identityId === m.identityId);
-                const memberName = contactMatch?.name || (m.identityId === activeSession?.spaceId ? 'You' : m.identityId.slice(0, 10));
-                const memberUsername = contactMatch?.accountUsername;
-                const canRemove = isCreator && m.identityId !== activeSession?.spaceId;
+                const isMe = m.identityId === myProfile?.identityId || m.identityId === activeSession?.spaceId;
+                const memberName = isMe
+                  ? (myProfile?.displayName || 'You')
+                  : (m.displayName || contactMatch?.name || (m.username ? m.username : 'Member'));
+                const memberUsername = isMe
+                  ? myProfile?.username
+                  : (m.username || contactMatch?.accountUsername);
+                const canRemove = isCreator && !isMe;
 
                 return (
                   <div
@@ -354,12 +359,14 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
                       <div>
                         <div style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 500 }}>
                           {memberName}
-                          {m.identityId === activeSession?.spaceId && (
+                          {isMe && (
                             <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginLeft: '4px' }}>(You)</span>
                           )}
                         </div>
                         {memberUsername && (
-                          <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>@{memberUsername}</div>
+                          <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>
+                            @{memberUsername.replace(/^@/, '')}
+                          </div>
                         )}
                       </div>
                     </div>

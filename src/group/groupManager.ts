@@ -52,7 +52,8 @@ export class GroupManager {
    */
   public createGroup(
     session: SpaceSession,
-    metadata: GroupMetadata
+    metadata: GroupMetadata,
+    creatorInfo?: { username?: string; displayName?: string; mailboxId?: string }
   ): { state: GroupState; senderSession: SenderKeySession; groupMasterSecret: Uint8Array } {
     this.assertSession(session);
 
@@ -65,7 +66,9 @@ export class GroupManager {
       myIdentityDoc.identityId,
       myIdentityDoc.signingPublicKey,
       identity.signingPrivateKey,
-      metadata
+      metadata,
+      undefined,
+      creatorInfo
     );
 
     // Initialize Creator's SenderKeySession
@@ -91,7 +94,8 @@ export class GroupManager {
     groupId: string,
     newMemberIdentityId: string,
     newMemberSigningPub: string,
-    role: GroupRole = 'MEMBER'
+    role: GroupRole = 'MEMBER',
+    memberInfo?: { username?: string; displayName?: string; mailboxId?: string }
   ): { action: GroupAction; distribution: SenderKeyDistributionMessage } {
     this.assertSession(session);
 
@@ -109,7 +113,8 @@ export class GroupManager {
       identity.signingPrivateKey,
       newMemberIdentityId,
       newMemberSigningPub,
-      role
+      role,
+      memberInfo
     );
 
     const senderSession = this.getOrLoadSenderKeySession(session, groupId, state.epoch);

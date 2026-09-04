@@ -806,6 +806,17 @@ export class AccountManager {
               convMap.set(c.id, c);
             } else {
               const keepNew = (Number(c.timestamp) || 0) >= (Number(existing.timestamp) || 0);
+              const mergedGroupState = (existing.groupState || c.groupState)
+                ? {
+                    ...(existing.groupState || {}),
+                    ...(c.groupState || {}),
+                    members: {
+                      ...(existing.groupState?.members || {}),
+                      ...(c.groupState?.members || {}),
+                    },
+                  }
+                : undefined;
+
               convMap.set(c.id, {
                 ...existing,
                 ...c,
@@ -814,6 +825,7 @@ export class AccountManager {
                 unreadCount: keepNew ? (c.unreadCount ?? existing.unreadCount) : (existing.unreadCount ?? c.unreadCount),
                 avatar: c.avatar || existing.avatar,
                 name: c.name || existing.name,
+                groupState: mergedGroupState || existing.groupState || c.groupState,
               });
             }
           }
@@ -893,6 +905,22 @@ export class AccountManager {
           };
           mergedRecords.push(
             encryptRec(key, mergedPriv, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
+          );
+        } else if (key.startsWith('veil:group:state:')) {
+          const localGroup = decryptRec<any>(localRec);
+          const remoteGroup = decryptRec<any>(remoteRec);
+          const mergedMembers = {
+            ...(localGroup?.members || {}),
+            ...(remoteGroup?.members || {}),
+          };
+          const baseGroup = (Number(localGroup?.epoch) || 0) >= (Number(remoteGroup?.epoch) || 0) ? localGroup : remoteGroup;
+          const mergedGroup = {
+            ...baseGroup,
+            members: mergedMembers,
+            updatedAt: Math.max(localGroup?.updatedAt || 0, remoteGroup?.updatedAt || 0, Date.now()),
+          };
+          mergedRecords.push(
+            encryptRec(key, mergedGroup, Math.max(localRec.updatedAt, remoteRec.updatedAt, Date.now()))
           );
         } else {
           const winnerRec = localRec.updatedAt >= remoteRec.updatedAt ? localRec : remoteRec;
