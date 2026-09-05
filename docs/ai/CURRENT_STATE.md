@@ -124,7 +124,7 @@
   - Text Input / Backspace: Disabled Capacitor input interceptor (`android: { captureInput: false }` in `capacitor.config.ts`) ensuring smooth textarea typing and backspace handling.
 - **Runtime Proof**:
   - Capacitor Android Sync: `npx cap sync android` with `@capacitor/app@8.1.1`.
-  - Android APK Build: `cd android; .\gradlew.bat assembleDebug` built successfully in 22s (`android/app/build/outputs/apk/debug/app-debug.apk`, 4.59 MB).
+  - Android APK Build: `cd android; .\gradlew.bat assembleDebug` built successfully in 20s (`android/app/build/outputs/apk/debug/app-debug.apk`, 7.38 MB / 7,380,829 bytes, assembled Sun Sep 6 00:50:12 2026).
 
 ---
 
