@@ -338,6 +338,11 @@ export class ConversationManager {
         x3dhRes.sharedMasterKey,
         peerRatchetPub
       );
+      ratchetSession.initialX3DHHeader = x3dhHeader;
+    } else if (ratchetSession.getNr() === 0 && ratchetSession.initialX3DHHeader) {
+      // Alice has not yet received an inbound reply from Bob.
+      // Attach initial X3DH header so Bob can decrypt and self-heal even if he missed previous messages.
+      x3dhHeader = ratchetSession.initialX3DHHeader;
     }
 
     // 1. Encrypt plaintext through Double Ratchet

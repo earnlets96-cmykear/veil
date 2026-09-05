@@ -219,8 +219,18 @@ export class NetworkManager {
           console.debug(`[VEIL-NET] Outbound flush: queueId=${item.queueId.slice(0, 8)}, mailbox=${maskMailbox(item.mailboxId)}, state=SENT_TO_RELAY`);
         }
       } catch (err: any) {
+        const isMailboxDead =
+          err?.name === 'MailboxRevokedError' ||
+          err?.message?.includes('404') ||
+          err?.message?.includes('not found') ||
+          err?.message?.includes('expired');
+        if (isMailboxDead) {
+          // Target mailbox is invalid or expired; mark this item as FAILED and continue draining remaining queue
+          await this.queue.updateOutboundStatus(session, item.queueId, 'FAILED', err.message);
+          continue;
+        }
         await this.queue.updateOutboundStatus(session, item.queueId, 'QUEUED', err.message);
-        break; // Stop draining on connection failure
+        break; // Stop draining on genuine network/transport failure
       }
     }
 

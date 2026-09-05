@@ -93,6 +93,8 @@ export interface PersistedRatchetState {
   // Skipped message keys: key is "dhRatchetPub:sequenceNum", value is Base64 32-byte message key
   skippedMessageKeys: Record<string, string>;
   
+  initialX3DHHeader?: X3DHInitiationHeader;
+
   createdAt: number;
   lastActiveAt: number;
 }

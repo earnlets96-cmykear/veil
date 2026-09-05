@@ -1,6 +1,6 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-05T10:22:55.235Z",
+  "generatedAt": "2026-09-05T11:12:53.687Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
@@ -11,9 +11,9 @@
       "sha256": "8b612ee6248b8abca40976895ff68d0f8623f460f6f8498595720503430392f8"
     },
     {
-      "path": "dist/assets/index-VuAMugRp.js",
-      "sizeBytes": 717392,
-      "sha256": "234e39fc034ea7cb9d7849205c7d3397b1dc854a3280c96cc42d229a33d76255"
+      "path": "dist/assets/index-xTh9KKAf.js",
+      "sizeBytes": 721261,
+      "sha256": "a35abba76f65ce3b5ab54a1ff1910a66472a9208772e699e57c7728cec33cc56"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-CqmIu7j5.js",
-      "sizeBytes": 8728,
-      "sha256": "5a66840efbd092822bcf21989836b63fe82c7fa34198475b4fe38fc648d1beaa"
-    },
-    {
-      "path": "dist/assets/web-DFpOFiLz.js",
-      "sizeBytes": 361,
-      "sha256": "6a0d55269fd0c04bd9970600aa2125295704b3d52f992a74084bd1087814604b"
-    },
-    {
-      "path": "dist/assets/web-VzUlisdx.js",
+      "path": "dist/assets/web-7m424UMO.js",
       "sizeBytes": 842,
-      "sha256": "717370808a7ec82da923387704d8c4df7e1163944b40d93647e273b05e3ef7d6"
+      "sha256": "20277981860c767d36904efbe1dcf7e04088ac1316be58d8e1fa30268735ba83"
+    },
+    {
+      "path": "dist/assets/web-BGNctJQf.js",
+      "sizeBytes": 8728,
+      "sha256": "85a67399420e9faa36a264fd47147145b4542b6e3b0c071efe3038d30db07bba"
+    },
+    {
+      "path": "dist/assets/web-CvctPsMT.js",
+      "sizeBytes": 361,
+      "sha256": "4bf76dcc6f7211fb765a328097362196bd1dd1e797f3635d298092218c972e32"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "aa3a407842760774e2fe158532bea041fd76abbbef62e9d190cea6bdaeefe1f4"
+      "sha256": "2507add564c13940d01a51b76bb463c424009b6917ffb06efe0316b95bfed872"
     }
   ]
 }

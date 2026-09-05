@@ -1,17 +1,17 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: FINAL REAL-WORLD ACCEPTANCE PASS & MASTER STABILIZATION
+## Current Verified Phase: MASTER RELIABILITY, SELF-HEALING RATCHET & AUDIO SCRUBBING STABILIZATION
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
-- **Commit**: `84a35d6`
-- **Branch**: `main`
 - **Verification Deliverables**:
-  - Full Test Suite: **358/358 test suites passed, 1,035 tests passed (0 failures)** across entire repository.
-  - Phase 29 Main Test Suite Fix: `tests/phase29-voice-message.test.ts` updated to canonical Phase 30/31 authorized media pipeline (2/2 passed).
+  - Full Test Suite: **361/361 test suites passed, 1,043 tests passed (0 failures)** across entire repository.
+  - Phase 59 Group Seen Feature Suite: `tests/phase59-group-seen-receipts.test.ts` (3/3 passed).
+  - Phase 60 Double Ratchet Self-Healing & Outbound Queue Suite: `tests/phase60-mailbox-refresh-recovery.test.ts` (2/2 passed).
+  - Phase 61 Audio Seek Throttling & Playback Resilience Suite: `tests/phase61-audio-seek-throttling.test.ts` (3/3 passed).
   - Real Voice Audio Forensic Suite: `tests/phase57-real-voice-forensic.test.ts` (3/3 passed using real 441,044-byte 5.0s PCM WAV recording).
-  - Real Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed; bidirectional messaging, 5-message rapid burst, offline queue drain, group lifecycle, GroupDetailsModal render, and network stability).
-  - Master Reliability Acceptance Suite: `tests/master-reliability-p0.test.tsx` (4/4 passed; local + live Render relay `https://veil-rga0.onrender.com`).
-  - Native Kotlin Media3 Plugin: `android/app/src/main/java/chat/veil/app/VeilNativeMediaPlugin.kt` (single ExoPlayer instance, Audio Focus, `becomingNoisy` handling, registered in `MainActivity.java`).
-  - Android APK Assembly: `android/app/build/outputs/apk/debug/app-debug.apk` (7.12 MB, built 05/09/2026 12:30:51).
+  - Two-Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed).
+  - Master Reliability Acceptance Suite: `tests/master-reliability-p0.test.tsx` (4/4 passed).
+  - Native Kotlin Media3 Plugin: `android/app/src/main/java/chat/veil/app/VeilNativeMediaPlugin.kt` with seek coalescing runnable and single ExoPlayer instance.
+  - Android APK Assembly: `android/app/build/outputs/apk/debug/app-debug.apk` (7.36 MB, fresh build).
   - Android Hardware Runtime: Explicitly classified as **UNKNOWN** (no physical Android hardware device currently attached to ADB).
   - Web App Production Build: `npm run build` succeeds cleanly with 0 TypeScript or bundling errors.
 

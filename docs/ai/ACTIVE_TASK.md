@@ -1,9 +1,32 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: FINAL REAL-WORLD ACCEPTANCE PASS & MASTER STABILIZATION
-- **Status**: **COMPLETE & PRODUCTION-VERIFIED (Commit `84a35d6`)**
+## Active Phase: MASTER RELIABILITY, SELF-HEALING RATCHET & AUDIO SCRUBBING STABILIZATION
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Master Reliability Phase 59-61 Completed Tasks:
+- [x] **Phase 59: Group Seen Feature & Group Read Receipts**:
+  - Automatically transitions preceding outgoing messages to `READ` upon inbound peer messages in group chats.
+  - Handles `GROUP_READ_RECEIPT` payloads across all members.
+  - Broadcasts group read receipts upon opening unread group conversations.
+  - Validated by `tests/phase59-group-seen-receipts.test.ts` (3/3 passing).
+- [x] **Phase 60: Double Ratchet Self-Healing & Outbound Queue Head-of-Line Unblocking**:
+  - Added `initialX3DHHeader` retention in `DoubleRatchetSession` until recipient acknowledges with reciprocal message (`nr > 0`).
+  - Allows recipient to decrypt subsequent messages even if first message was missed or space was reset.
+  - In `NetworkManager.flushOutboundQueue`, detects 404/revoked mailboxes and marks them `FAILED` without breaking out of the queue drain loop.
+  - In `AppState.tsx`, refreshes peer mailbox from Directory upon 404/expired mailbox and retries envelope delivery.
+  - Validated by `tests/phase60-mailbox-refresh-recovery.test.ts` (2/2 passing).
+- [x] **Phase 61: Audio Seek Throttling & Playback Resilience**:
+  - In `VoiceNoteCard.tsx`, decoupled instant 60fps UI scrub bar tracking from throttled 120ms audio seek calls.
+  - In `voicePlayer.ts`, guarded against `readyState === 0` throwing `InvalidStateError`, safely staging the target seek time.
+  - In `VeilNativeMediaPlugin.kt`, added `pendingSeekRunnable` on `mainHandler` to coalesce rapid ExoPlayer seek operations.
+  - Validated by `tests/phase61-audio-seek-throttling.test.ts` (3/3 passing).
+- [x] **100% Repository-Wide Automated Verification**:
+  - **361/361 test suites passed, 1,043/1,043 tests passed (0 failures)**.
+  - Production Web build passing (`npm run build`).
+  - Capacitor Android assets synced (`npx cap sync android`).
+  - Android debug APK assembled successfully (`app-debug.apk`, 7.36 MB).
 
 ### Real-World Acceptance Pass Completed Tasks:
 - [x] **Fix Main Test Suite Failure (`phase29-voice-message.test.ts`)**:

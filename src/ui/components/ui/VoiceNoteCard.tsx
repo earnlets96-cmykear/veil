@@ -92,8 +92,22 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     e.stopPropagation();
   };
 
+  const seekThrottleTimerRef = useRef<any>(null);
+  const pendingSeekPercentRef = useRef<number | null>(null);
+
+  const executeSeek = useCallback(
+    (percent: number) => {
+      if (onSeek) {
+        onSeek(percent);
+      } else if (messageId) {
+        VoicePlayer.seek(percent, messageId);
+      }
+    },
+    [onSeek, messageId]
+  );
+
   const handleSeekFromClientX = useCallback(
-    (clientX: number) => {
+    (clientX: number, commitImmediately = false) => {
       if (!trackRef.current) return;
       const rect = trackRef.current.getBoundingClientRect();
       if (rect.width <= 0) return;
@@ -102,13 +116,26 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       const targetTime = (percent / 100) * effectiveDuration;
       setLocalCurrentTime(targetTime);
 
-      if (onSeek) {
-        onSeek(percent);
-      } else if (messageId) {
-        VoicePlayer.seek(percent, messageId);
+      pendingSeekPercentRef.current = percent;
+
+      if (commitImmediately) {
+        if (seekThrottleTimerRef.current) {
+          clearTimeout(seekThrottleTimerRef.current);
+          seekThrottleTimerRef.current = null;
+        }
+        executeSeek(percent);
+      } else {
+        if (!seekThrottleTimerRef.current) {
+          seekThrottleTimerRef.current = setTimeout(() => {
+            seekThrottleTimerRef.current = null;
+            if (pendingSeekPercentRef.current !== null) {
+              executeSeek(pendingSeekPercentRef.current);
+            }
+          }, 120);
+        }
       }
     },
-    [effectiveDuration, onSeek, messageId]
+    [effectiveDuration, executeSeek]
   );
 
   // Mouse / Touch scrubbing handlers
@@ -117,18 +144,19 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     e.preventDefault();
     if (isUploading || isError) return;
     setIsScrubbing(true);
-    handleSeekFromClientX(e.clientX);
+    handleSeekFromClientX(e.clientX, false);
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       moveEvent.stopPropagation();
       moveEvent.preventDefault();
-      handleSeekFromClientX(moveEvent.clientX);
+      handleSeekFromClientX(moveEvent.clientX, false);
     };
 
     const handlePointerUp = (upEvent: PointerEvent) => {
       upEvent.stopPropagation();
       upEvent.preventDefault();
       setIsScrubbing(false);
+      handleSeekFromClientX(upEvent.clientX, true);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);

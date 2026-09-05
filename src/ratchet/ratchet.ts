@@ -53,6 +53,12 @@ export class DoubleRatchetSession {
   // Skipped message keys: "ratchetPubB64:sequenceNum" -> 32-byte MessageKey
   private skippedMessageKeys = new Map<string, Uint8Array>();
 
+  public initialX3DHHeader?: X3DHInitiationHeader;
+
+  public getNr(): number {
+    return this.nr;
+  }
+
   private createdAt: number;
   private lastActiveAt: number;
 
@@ -338,6 +344,7 @@ export class DoubleRatchetSession {
       nr: this.nr,
       pn: this.pn,
       skippedMessageKeys: skippedObj,
+      initialX3DHHeader: this.initialX3DHHeader,
       createdAt: this.createdAt,
       lastActiveAt: this.lastActiveAt,
     };
@@ -367,6 +374,7 @@ export class DoubleRatchetSession {
     session.ns = state.ns;
     session.nr = state.nr;
     session.pn = state.pn;
+    session.initialX3DHHeader = state.initialX3DHHeader;
     session.createdAt = state.createdAt;
     session.lastActiveAt = state.lastActiveAt;
 

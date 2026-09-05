@@ -25,6 +25,7 @@ class VeilNativeMediaPlugin : Plugin() {
     private var currentMessageId: String? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var progressRunnable: Runnable? = null
+    private var pendingSeekRunnable: Runnable? = null
     private var isReleased = false
 
     private fun getOrCreatePlayer(): ExoPlayer {
@@ -216,7 +217,8 @@ class VeilNativeMediaPlugin : Plugin() {
             return
         }
 
-        mainHandler.post {
+        pendingSeekRunnable?.let { mainHandler.removeCallbacks(it) }
+        pendingSeekRunnable = Runnable {
             exoPlayer?.let { player ->
                 player.seekTo(positionMs)
                 val ret = JSObject().apply {
@@ -227,6 +229,7 @@ class VeilNativeMediaPlugin : Plugin() {
                 call.resolve(ret)
             } ?: call.reject("Player not initialized")
         }
+        mainHandler.post(pendingSeekRunnable!!)
     }
 
     @PluginMethod

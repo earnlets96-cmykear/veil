@@ -531,9 +531,16 @@ export class VoicePlaybackManager {
 
     if (this.currentAudio && (!messageId || this.currentPlayingId === messageId)) {
       try {
-        this.currentAudio.currentTime = targetTime;
-        actualCurrentTime = this.currentAudio.currentTime;
-      } catch (_e) {}
+        if (typeof this.currentAudio.readyState === 'undefined' || this.currentAudio.readyState !== 0) {
+          this.currentAudio.currentTime = targetTime;
+          actualCurrentTime = this.currentAudio.currentTime;
+        } else {
+          // If element explicitly has readyState === 0 (HAVE_NOTHING), keep staged
+          actualCurrentTime = targetTime;
+        }
+      } catch (_e) {
+        actualCurrentTime = targetTime;
+      }
     }
 
     this.notifyListeners(this.currentStatus, clampedPercent, actualCurrentTime, duration);

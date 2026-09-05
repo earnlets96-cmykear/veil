@@ -876,7 +876,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 setMessages((prev) => {
                   const list = prev[parsed.groupId] || [];
                   if (list.some((m) => m.id === incomingMsg.id)) return prev;
-                  const updated = { ...prev, [parsed.groupId]: [...list, incomingMsg] };
+
+                  // Advance all preceding outgoing messages in this group to 'READ' since a peer replied
+                  const updatedList = list.map((m) => {
+                    if (m.isOutgoing && m.status !== 'FAILED' && m.status !== 'READ' && (!m.timestamp || m.timestamp <= incomingMsg.timestamp)) {
+                      return { ...m, status: 'READ' as const };
+                    }
+                    return m;
+                  });
+
+                  const updated = { ...prev, [parsed.groupId]: [...updatedList, incomingMsg] };
                   store.setAsync(session, 'veil:ui:messages', updated);
                   return updated;
                 });
@@ -910,6 +919,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 console.error('Failed to handle GROUP_MESSAGE:', err);
               }
             }
+          } else if (payload.includes('"type":"GROUP_READ_RECEIPT"')) {
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.groupId) {
+                setMessages((prev) => {
+                  const list = prev[parsed.groupId];
+                  if (!list || list.length === 0) return prev;
+                  let didMutate = false;
+                  const updatedList = list.map((m) => {
+                    if (m.isOutgoing && m.status !== 'FAILED' && m.status !== 'READ') {
+                      if (!parsed.lastReadMessageId || m.id === parsed.lastReadMessageId || (m.timestamp && parsed.readAt && m.timestamp <= parsed.readAt)) {
+                        didMutate = true;
+                        return { ...m, status: 'READ' as const };
+                      }
+                    }
+                    return m;
+                  });
+                  if (!didMutate) return prev;
+                  const updated = { ...prev, [parsed.groupId]: updatedList };
+                  store.setAsync(session, 'veil:ui:messages', updated);
+                  return updated;
+                });
+                return;
+              }
+            } catch (_grrErr) {}
           }
         } catch (_reqErr) {}
 
@@ -1265,9 +1299,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const performSync = async () => {
       try {
         if (activeSession && activeSession.isActive()) {
-          if (netManager.getState() !== 'connected') {
-            await netManager.syncMailbox(activeSession);
-          }
+          await netManager.syncMailbox(activeSession);
           const pending = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:pending:profile_sync');
           if (pending) {
             try {
@@ -1548,8 +1580,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         const lastInbound = [...convMsgs].reverse().find((m) => !m.isOutgoing);
+        const conv = conversations.find((c) => c.id === conversationId || c.name === conversationId);
+
+        if (conv?.type === 'group' || conversationId.startsWith('grp_')) {
+          const myDoc = idMgr.getPublicDocument(activeSession, store);
+          const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+          const groupState = conv?.groupState || groupManager.loadGroupState(activeSession, conversationId);
+          if (groupState && groupState.members) {
+            const receiptPayload = JSON.stringify({
+              type: 'GROUP_READ_RECEIPT',
+              groupId: conversationId,
+              readerIdentityId: myIdentityId,
+              lastReadMessageId: lastInbound?.id,
+              readAt: Date.now(),
+            });
+            for (const memberId of Object.keys(groupState.members)) {
+              if (memberId === myIdentityId || memberId === activeSession.spaceId) continue;
+              const member = groupState.members[memberId];
+              let mailbox = (member as any)?.mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId;
+              if (mailbox) {
+                netManager.sendEnvelope(activeSession, mailbox, receiptPayload).catch(() => {});
+              } else {
+                directoryClient.getProfileByIdentity(memberId).then((p) => {
+                  if (p?.mailboxId) {
+                    netManager.sendEnvelope(activeSession, p.mailboxId, receiptPayload).catch(() => {});
+                  }
+                }).catch(() => {});
+              }
+            }
+          }
+          return;
+        }
+
         if (lastInbound) {
-          const conv = conversations.find((c) => c.id === conversationId || c.name === conversationId);
           let peerDocument =
             contact?.prekeyBundle?.identityDocument ||
             conv?.peerDoc;
@@ -1730,6 +1793,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
 
           const targetMailboxId = targetContact?.mailboxId || conversationId;
+          let deliveryStatus: DeliveryStatus = 'SENT_TO_RELAY';
 
           try {
             const targetConv = conversations.find((c) => c.id === conversationId);
@@ -1795,10 +1859,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 msgId
               );
 
-              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayloadBase64, undefined, {
+              let effectiveMailboxId = targetMailboxId;
+              let sendRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                 messageId: msgId,
                 conversationId,
               });
+
+              if (sendRes.status === 'QUEUED' && (sendRes.errorMessage?.includes('404') || sendRes.errorMessage?.includes('expired') || sendRes.errorMessage?.includes('not found') || !targetContact?.mailboxId)) {
+                try {
+                  const freshProfile = (await directoryClient.getProfileByIdentity(peerId)) || (await directoryClient.getProfileByUsername(peerId));
+                  if (freshProfile?.mailboxId && freshProfile.mailboxId !== effectiveMailboxId) {
+                    effectiveMailboxId = freshProfile.mailboxId;
+                    const retryRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
+                      messageId: msgId,
+                      conversationId,
+                    });
+                    if (retryRes.status === 'SENT_TO_RELAY') {
+                      sendRes = retryRes;
+                    }
+                  }
+                } catch (_retryErr) {}
+              }
+
+              if (sendRes.status !== 'SENT_TO_RELAY') {
+                deliveryStatus = 'SENDING';
+              }
             }
 
             const keys = new Set([
@@ -1809,7 +1894,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
             setMessages((prev) => {
               const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-                m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const } : m
+                m.id === msgId ? { ...m, status: deliveryStatus } : m
               );
               const updated = { ...prev };
               for (const k of keys) {
@@ -2273,10 +2358,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 msgId
               );
 
-              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayloadBase64, undefined, {
+              let effectiveMailboxId = targetMailboxId;
+              let sendRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                 messageId: msgId,
                 conversationId,
               });
+
+              if (sendRes.status === 'QUEUED' && (sendRes.errorMessage?.includes('404') || sendRes.errorMessage?.includes('expired') || sendRes.errorMessage?.includes('not found') || !targetContact?.mailboxId)) {
+                try {
+                  const freshProfile = (await directoryClient.getProfileByIdentity(peerId)) || (await directoryClient.getProfileByUsername(peerId));
+                  if (freshProfile?.mailboxId && freshProfile.mailboxId !== effectiveMailboxId) {
+                    effectiveMailboxId = freshProfile.mailboxId;
+                    const retryRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
+                      messageId: msgId,
+                      conversationId,
+                    });
+                    if (retryRes.status === 'SENT_TO_RELAY') {
+                      sendRes = retryRes;
+                    }
+                  }
+                } catch (_retryErr) {}
+              }
             }
 
             RuntimeDiagnostics.wire('wireDispatched', {
@@ -2422,6 +2524,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
           );
 
+          let voiceDeliveryStatus: DeliveryStatus = 'SENT_TO_RELAY';
+
           if (targetConv?.type === 'group') {
             const myDoc = idMgr.getPublicDocument(activeSession, store);
             const myIdentityId = myDoc?.identityId || activeSession.spaceId;
@@ -2479,15 +2583,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               msgId
             );
 
-            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayloadBase64, undefined, {
+            let effectiveMailboxId = targetMailboxId;
+            let sendRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
               messageId: msgId,
               conversationId,
             });
+
+            if (sendRes.status === 'QUEUED' && (sendRes.errorMessage?.includes('404') || sendRes.errorMessage?.includes('expired') || sendRes.errorMessage?.includes('not found') || !targetContact?.mailboxId)) {
+              try {
+                const freshProfile = (await directoryClient.getProfileByIdentity(peerId)) || (await directoryClient.getProfileByUsername(peerId));
+                if (freshProfile?.mailboxId && freshProfile.mailboxId !== effectiveMailboxId) {
+                  effectiveMailboxId = freshProfile.mailboxId;
+                  const retryRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
+                    messageId: msgId,
+                    conversationId,
+                  });
+                  if (retryRes.status === 'SENT_TO_RELAY') {
+                    sendRes = retryRes;
+                  }
+                }
+              } catch (_retryErr) {}
+            }
+
+            if (sendRes.status !== 'SENT_TO_RELAY') {
+              voiceDeliveryStatus = 'SENDING';
+            }
           }
 
           setMessages((prev) => {
             const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
-              m.id === msgId ? { ...m, status: 'SENT_TO_RELAY' as const, voice: voiceMeta } : m
+              m.id === msgId ? { ...m, status: voiceDeliveryStatus, voice: voiceMeta } : m
             );
             const updated = { ...prev };
             for (const k of keys) {

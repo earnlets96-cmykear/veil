@@ -2,6 +2,27 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-master-reliability] - 2026-09-05
+
+### Added & Fixed (Master Reliability: Double Ratchet Self-Healing, Group Seen Receipts, Audio Seek Throttling)
+- **Double Ratchet Protocol Self-Healing (`src/ratchet/ratchet.ts`, `src/ratchet/types.ts`, `src/messaging/conversationManager.ts`)**:
+  - Persisted and attached `initialX3DHHeader` on all Alice-initiated outbound messages until a reciprocal reply from Bob is processed (`nr > 0`).
+  - Enables Bob to self-heal and decrypt subsequent messages even if Bob desynced, missed the initial initiation message, or restored an earlier session.
+- **Relay Outbound Queue Head-of-Line Unblocking (`src/network/networkManager.ts`, `src/ui/app/AppState.tsx`)**:
+  - Prevented 404/revoked mailboxes from freezing the outbound queue loop in `flushOutboundQueue` by marking dead items `FAILED` and draining subsequent items.
+  - Implemented dynamic Directory mailbox lookup and delivery retry in `AppState.tsx` when a target mailbox returns 404/expired.
+- **Group Seen Feature & Group Read Receipts (`src/ui/app/AppState.tsx`)**:
+  - Automatically advances all preceding outgoing messages in a group to `READ` when any group member posts an inbound reply.
+  - Broadcasts `GROUP_READ_RECEIPT` across all member mailboxes upon opening an unread group.
+  - Processes incoming `GROUP_READ_RECEIPT` envelopes and updates matching group messages up to `lastReadMessageId`.
+- **Voice Seeking Scrubbing & Playback Resilience (`src/ui/components/ui/VoiceNoteCard.tsx`, `src/attachments/voicePlayer.ts`, `android/app/src/main/java/chat/veil/app/VeilNativeMediaPlugin.kt`)**:
+  - Decoupled visual scrubbing bar progress updates (instant 60fps) from audio engine seeks (throttled to 120ms during drag, committed on pointer up).
+  - Protected web `voicePlayer.ts` against `readyState === 0` (HAVE_NOTHING) throwing `InvalidStateError`.
+  - Added `pendingSeekRunnable` in Kotlin `VeilNativeMediaPlugin.kt` on `mainHandler` to coalesce rapid native ExoPlayer seek commands.
+- **Verification Suites (`tests/phase59-group-seen-receipts.test.ts`, `tests/phase60-mailbox-refresh-recovery.test.ts`, `tests/phase61-audio-seek-throttling.test.ts`)**:
+  - 361/361 test suites passing (1,043/1,043 tests passing, 0 failures).
+  - Web production bundle built, Capacitor Android synced, and native Android APK assembled (`app-debug.apk`, 7.36 MB).
+
 ## [1.0.0-acceptance-pass] - 2026-09-05
 
 ### Added & Verified (Final Real-World Acceptance Pass & Zero Failure Test Suite)
