@@ -12,6 +12,7 @@ import { SpaceSession } from '../spaces/session.ts';
 import { VoiceRecordingMetadata, VoiceRecorder } from './voiceRecorder.ts';
 import { MediaLogger } from '../ui/utils/mediaLogger.ts';
 import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
+import { NativeMediaBridge } from '../media/NativeMediaBridge.ts';
 
 export type VoicePlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
@@ -37,6 +38,58 @@ export class VoicePlaybackManager {
   private currentDuration: number = 0;
   private stagedSeekPercent: Record<string, number> = {};
   private listeners: Map<string, Set<VoicePlaybackListener>> = new Map();
+  private isNative: boolean = false;
+  private nativeCurrentTime: number = 0;
+  private nativeDuration: number = 0;
+  private nativeIsPlaying: boolean = false;
+
+  constructor() {
+    this.isNative = NativeMediaBridge.getInstance().isSupported();
+    if (this.isNative) {
+      const bridge = NativeMediaBridge.getInstance();
+      bridge.onStateChange((e) => {
+        this.nativeIsPlaying = e.isPlaying;
+        this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
+        if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
+        const status: VoicePlaybackStatus =
+          e.state === 'playing' ? 'playing' : e.state === 'paused' ? 'paused' : e.state === 'buffering' ? 'loading' : e.state === 'error' ? 'error' : 'idle';
+        const dur = this.getDuration();
+        const cur = this.getCurrentTime();
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        this.notifyListeners(status, pct, cur, dur);
+      });
+
+      bridge.onProgress((e) => {
+        this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
+        if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
+        const dur = this.getDuration();
+        const cur = this.getCurrentTime();
+        const pct = dur > 0 ? (cur / dur) * 100 : 0;
+        this.notifyListeners(this.currentStatus, pct, cur, dur);
+        if (this.activeCallbacks?.onProgress) {
+          this.activeCallbacks.onProgress(pct, cur, dur);
+        }
+      });
+
+      bridge.onEnded((e) => {
+        this.nativeIsPlaying = false;
+        this.nativeCurrentTime = 0;
+        const dur = this.getDuration();
+        this.notifyListeners('idle', 0, 0, dur);
+        this.stop();
+        if (this.activeCallbacks?.onEnded) this.activeCallbacks.onEnded();
+      });
+
+      bridge.onError((e) => {
+        this.nativeIsPlaying = false;
+        this.currentStatus = 'error';
+        this.notifyListeners('error', 0, 0, this.getDuration());
+        if (this.activeCallbacks?.onError) {
+          this.activeCallbacks.onError(new Error(e.message || 'Playback error'));
+        }
+      });
+    }
+  }
 
   public getPlayingId(): string | null {
     return this.currentPlayingId;
@@ -50,6 +103,12 @@ export class VoicePlaybackManager {
   }
 
   public isPlaying(id?: string): boolean {
+    if (this.isNative) {
+      if (id) {
+        return this.currentPlayingId === id && this.nativeIsPlaying;
+      }
+      return this.nativeIsPlaying;
+    }
     if (!this.currentAudio) return false;
     if (id) {
       return this.currentPlayingId === id && !this.currentAudio.paused && !this.currentAudio.ended;
@@ -58,16 +117,29 @@ export class VoicePlaybackManager {
   }
 
   public isPaused(id?: string): boolean {
+    if (this.isNative) {
+      if (!this.currentPlayingId) return false;
+      if (id && this.currentPlayingId !== id) return false;
+      return !this.nativeIsPlaying && this.currentStatus === 'paused';
+    }
     if (!this.currentAudio || !this.currentPlayingId) return false;
     if (id && this.currentPlayingId !== id) return false;
     return this.currentAudio.paused && !this.currentAudio.ended && this.currentStatus === 'paused';
   }
 
   public getCurrentTime(): number {
+    if (this.isNative) {
+      return this.nativeCurrentTime;
+    }
     return this.currentAudio ? this.currentAudio.currentTime || 0 : 0;
   }
 
   public getDuration(fallback?: number): number {
+    if (this.isNative) {
+      if (this.nativeDuration > 0) return this.nativeDuration;
+      if (this.currentDuration > 0) return this.currentDuration;
+      return fallback || 0;
+    }
     if (
       this.currentAudio &&
       this.currentAudio.duration &&
@@ -144,25 +216,31 @@ export class VoicePlaybackManager {
     this.currentDuration = safeDuration;
 
     // 1. If this exact message is already loaded and paused, resume immediately!
-    if (this.currentPlayingId === messageId && this.currentAudio && this.currentAudio.paused) {
-      try {
-        await this.currentAudio.play();
-        this.currentStatus = 'playing';
-        const dur = this.getDuration(safeDuration);
-        const cur = this.getCurrentTime();
-        const pct = dur > 0 ? (cur / dur) * 100 : 0;
-        this.notifyListeners('playing', pct, cur, dur);
-        if (this.activeCallbacks?.onProgress) {
-          this.activeCallbacks.onProgress(pct, cur, dur);
-        }
-        MediaLogger.log({
-          event: 'PLAYBACK_STARTED',
-          objectId: meta.objectId,
-          duration: dur,
-        });
+    if (this.currentPlayingId === messageId && this.currentStatus === 'paused') {
+      if (this.isNative) {
+        await NativeMediaBridge.getInstance().resumeAudio();
         return;
-      } catch (resumeErr: any) {
-        // Fall through to full re-load if resume was interrupted
+      }
+      if (this.currentAudio && this.currentAudio.paused) {
+        try {
+          await this.currentAudio.play();
+          this.currentStatus = 'playing';
+          const dur = this.getDuration(safeDuration);
+          const cur = this.getCurrentTime();
+          const pct = dur > 0 ? (cur / dur) * 100 : 0;
+          this.notifyListeners('playing', pct, cur, dur);
+          if (this.activeCallbacks?.onProgress) {
+            this.activeCallbacks.onProgress(pct, cur, dur);
+          }
+          MediaLogger.log({
+            event: 'PLAYBACK_STARTED',
+            objectId: meta.objectId,
+            duration: dur,
+          });
+          return;
+        } catch (resumeErr: any) {
+          // Fall through to full re-load if resume was interrupted
+        }
       }
     }
 
@@ -174,6 +252,29 @@ export class VoicePlaybackManager {
     this.currentPlayingId = messageId;
     this.currentStatus = 'loading';
     this.notifyListeners('loading', 0, 0, safeDuration);
+
+    if (this.isNative) {
+      try {
+        const streamUrl = `${cloudClient.getBaseUrl()}/v1/cloud/attachments/download-raw/${encodeURIComponent(meta.objectId)}`;
+        const token = cloudClient.getSessionToken() || undefined;
+        const staged = this.stagedSeekPercent[messageId];
+        const startMs = staged ? (staged / 100) * (safeDuration * 1000) : 0;
+
+        const success = await NativeMediaBridge.getInstance().playAudio({
+          url: streamUrl,
+          authToken: token,
+          messageId,
+          startPositionMs: startMs,
+        });
+        if (success) {
+          this.currentStatus = 'playing';
+          this.nativeIsPlaying = true;
+          return;
+        }
+      } catch (_nativeErr) {
+        // Fall back to web audio element below
+      }
+    }
 
     try {
       MediaLogger.log({
@@ -343,6 +444,19 @@ export class VoicePlaybackManager {
    * Pauses active playback immediately without destroying the audio element or revoking URLs.
    */
   public pause(): void {
+    if (this.isNative) {
+      NativeMediaBridge.getInstance().pauseAudio();
+      this.currentStatus = 'paused';
+      this.nativeIsPlaying = false;
+      const dur = this.getDuration();
+      const cur = this.getCurrentTime();
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      this.notifyListeners('paused', pct, cur, dur);
+      if (this.activeCallbacks?.onProgress) {
+        this.activeCallbacks.onProgress(pct, cur, dur);
+      }
+      return;
+    }
     if (this.currentAudio && !this.currentAudio.paused) {
       try {
         this.currentAudio.pause();
@@ -366,6 +480,14 @@ export class VoicePlaybackManager {
    * Resumes playback if currently paused.
    */
   public async resume(): Promise<void> {
+    if (this.isNative) {
+      if (this.currentPlayingId && this.currentStatus === 'paused') {
+        await NativeMediaBridge.getInstance().resumeAudio();
+        this.currentStatus = 'playing';
+        this.nativeIsPlaying = true;
+      }
+      return;
+    }
     if (this.currentAudio && this.currentAudio.paused && this.currentPlayingId) {
       try {
         await this.currentAudio.play();
@@ -396,6 +518,16 @@ export class VoicePlaybackManager {
     const duration = this.getDuration() || 1;
     const targetTime = (clampedPercent / 100) * duration;
     let actualCurrentTime = targetTime;
+
+    if (this.isNative) {
+      this.nativeCurrentTime = targetTime;
+      NativeMediaBridge.getInstance().seekAudio(targetTime * 1000);
+      this.notifyListeners(this.currentStatus, clampedPercent, targetTime, duration);
+      if (this.activeCallbacks?.onProgress) {
+        this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
+      }
+      return;
+    }
 
     if (this.currentAudio && (!messageId || this.currentPlayingId === messageId)) {
       try {
@@ -429,6 +561,11 @@ export class VoicePlaybackManager {
    * Stops active playback, resets position to 0, and clears active session state.
    */
   public stop(): void {
+    if (this.isNative) {
+      NativeMediaBridge.getInstance().stopAudio();
+      this.nativeIsPlaying = false;
+      this.nativeCurrentTime = 0;
+    }
     if (this.currentAudio) {
       try {
         this.currentAudio.pause();

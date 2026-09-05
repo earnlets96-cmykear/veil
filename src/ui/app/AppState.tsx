@@ -835,6 +835,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     identityId: parsed.senderIdentityId,
                     signingPublicKey: parsed.senderSigningKey || '',
                     role: 'MEMBER',
+                    joinedAtEpoch: groupState.epoch || 1,
+                    addedBy: parsed.senderIdentityId || 'system',
                     joinedAt: Date.now(),
                   };
                   groupManager.saveGroupState(session, groupState);
@@ -914,7 +916,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Standard E2EE wire payload processing
         try {
           const result = await convManager.processInboundWirePayload(session, payload);
-          const { storedMessage, senderDoc, senderMailboxId, attachment, attachments, replyTo, voice, receipt } = result;
+          const { storedMessage, senderDoc, senderMailboxId, senderUsername, senderDisplayName, attachment, attachments, replyTo, voice, receipt } = result;
 
           // Phase 55 P0-2: Check blocking immediately
           const isSenderBlocked = await contactRequestManager.isBlocked(session, senderDoc.identityId);
@@ -950,6 +952,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           const incomingSenderName =
             matchingContact?.name ||
+            senderDisplayName ||
+            (senderUsername ? `@${senderUsername}` : undefined) ||
             (senderDoc as any).displayName ||
             ((senderDoc as any).username ? `@${(senderDoc as any).username}` : undefined) ||
             senderDoc.identityId.slice(0, 10);
@@ -986,16 +990,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             );
           }
 
-          if (senderMailboxId && (!matchingContact || !matchingContact.mailboxId)) {
+          if (senderMailboxId && (!matchingContact || !matchingContact.mailboxId || !matchingContact.prekeyBundle)) {
             try {
+              let resolvedName = matchingContact?.name || senderDisplayName || (senderUsername ? `@${senderUsername}` : senderDoc.identityId.slice(0, 10));
+              let resolvedUsername = matchingContact?.accountUsername || senderUsername;
+              let resolvedPrekey = matchingContact?.prekeyBundle;
+
+              if (!resolvedPrekey || !resolvedUsername) {
+                try {
+                  const p = await directoryClient.getProfileByIdentity(senderDoc.identityId);
+                  if (p) {
+                    if (!resolvedPrekey && p.prekeyBundle) resolvedPrekey = p.prekeyBundle;
+                    if (!resolvedUsername && p.username) resolvedUsername = p.username;
+                    if ((!resolvedName || resolvedName === senderDoc.identityId.slice(0, 10)) && (p.displayName || p.username)) {
+                      resolvedName = p.displayName || p.username;
+                    }
+                  }
+                } catch (_dirErr) {}
+              }
+
               const updatedContact = await contactManager.addContactFromInvitation(session, {
                 version: 1,
                 identityId: senderDoc.identityId,
-                name: matchingContact?.name || senderDoc.identityId.slice(0, 10),
+                name: resolvedName,
+                accountUsername: resolvedUsername,
                 signingPublicKey: senderDoc.signingPublicKey,
                 keyAgreementPublicKey: senderDoc.keyAgreementPublicKey,
                 fingerprint: senderDoc.fingerprint,
                 mailboxId: senderMailboxId,
+                prekeyBundle: resolvedPrekey,
                 createdAt: Date.now(),
                 expiresAt: 0,
                 signature: senderDoc.signature,
@@ -1242,7 +1265,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const performSync = async () => {
       try {
         if (activeSession && activeSession.isActive()) {
-          await netManager.syncMailbox(activeSession);
+          if (netManager.getState() !== 'connected') {
+            await netManager.syncMailbox(activeSession);
+          }
           const pending = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:pending:profile_sync');
           if (pending) {
             try {
@@ -1670,25 +1695,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           // If contact is missing mailboxId or prekeyBundle, try on-the-fly Directory lookup
           if (!targetContact?.mailboxId || !targetContact?.prekeyBundle) {
             try {
-              const lookupName = (targetContact?.name || conversationId).replace(/^@/, '').trim();
-              let profile = await directoryClient.getProfileByUsername(lookupName);
-              if (!profile && targetContact?.identityId) {
+              let profile: SignedProfileDocument | null = null;
+              if (targetContact?.identityId) {
                 profile = await directoryClient.getProfileByIdentity(targetContact.identityId);
               }
               if (!profile && conversationId) {
                 profile = await directoryClient.getProfileByIdentity(conversationId);
               }
-              if (!profile) {
-                const results = await directoryClient.searchProfiles(lookupName);
-                if (results.length > 0) {
-                  profile = await directoryClient.getProfileByUsername(results[0].username);
-                }
+              if (!profile && targetContact?.accountUsername) {
+                profile = await directoryClient.getProfileByUsername(targetContact.accountUsername);
+              }
+              if (!profile && targetContact?.name) {
+                const lookupName = targetContact.name.replace(/^@/, '').trim();
+                profile = await directoryClient.getProfileByUsername(lookupName);
               }
               if (profile) {
                 targetContact = await contactManager.addContactFromInvitation(activeSession, {
                   version: 1,
                   identityId: profile.identityId,
                   name: profile.displayName || profile.username,
+                  accountUsername: profile.username,
                   signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
                   keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
                   fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
@@ -1748,31 +1774,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
               }
             } else {
-              let wirePayload: string;
-              if (targetContact?.prekeyBundle) {
-                const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-                  activeSession,
-                  targetContact.prekeyBundle,
-                  text.trim(),
-                  undefined,
-                  activeReply,
-                  undefined,
-                  undefined,
-                  msgId
-                );
-                wirePayload = wirePayloadBase64;
-              } else {
-                wirePayload = JSON.stringify({
-                  id: msgId,
-                  deliveryId: msgId,
-                  conversationId,
-                  senderId: activeSession.spaceId,
-                  text: text.trim(),
-                  replyTo: activeReply,
-                });
+              const peerId = targetContact?.identityId || conversationId;
+              const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+              const peerTarget = hasActiveRatchet
+                ? { identityId: peerId, prekeyBundle: targetContact?.prekeyBundle }
+                : targetContact?.prekeyBundle;
+
+              if (!peerTarget) {
+                throw new Error(`Cannot send message: no Double Ratchet session or PrekeyBundle available for peer ${peerId}`);
               }
 
-              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                activeSession,
+                peerTarget,
+                text.trim(),
+                undefined,
+                activeReply,
+                undefined,
+                undefined,
+                msgId
+              );
+
+              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayloadBase64, undefined, {
                 messageId: msgId,
                 conversationId,
               });
@@ -2229,34 +2252,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
               }
             } else {
-              let wirePayload: string;
-              if (targetContact?.prekeyBundle) {
-                const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-                  activeSession,
-                  targetContact.prekeyBundle,
-                  wireText,
-                  wireSingle,
-                  activeReply,
-                  undefined,
-                  successfulAttachments.length > 1 ? wireAttachments : undefined,
-                  msgId
-                );
-                wirePayload = wirePayloadBase64;
-              } else {
-                wirePayload = JSON.stringify({
-                  id: msgId,
-                  deliveryId: msgId,
-                  conversationId,
-                  senderId: activeSession.spaceId,
-                  text: wireText,
-                  attachment: wireSingle,
-                  attachments: successfulAttachments.length > 1 ? wireAttachments : undefined,
-                  groupId: batchGroupId,
-                  replyTo: activeReply,
-                });
+              const peerId = targetContact?.identityId || conversationId;
+              const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+              const peerTarget = hasActiveRatchet
+                ? { identityId: peerId, prekeyBundle: targetContact?.prekeyBundle }
+                : targetContact?.prekeyBundle;
+
+              if (!peerTarget) {
+                throw new Error(`Cannot send media: no Double Ratchet session or PrekeyBundle available for peer ${peerId}`);
               }
 
-              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+                activeSession,
+                peerTarget,
+                wireText,
+                wireSingle,
+                activeReply,
+                undefined,
+                successfulAttachments.length > 1 ? wireAttachments : undefined,
+                msgId
+              );
+
+              await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayloadBase64, undefined, {
                 messageId: msgId,
                 conversationId,
               });
@@ -2441,32 +2458,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               }
             }
           } else {
-            let wirePayload: string;
-            if (targetContact?.prekeyBundle) {
-              const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
-                activeSession,
-                targetContact.prekeyBundle,
-                'Voice Message',
-                undefined,
-                activeReply,
-                voiceMeta,
-                undefined,
-                msgId
-              );
-              wirePayload = wirePayloadBase64;
-            } else {
-              wirePayload = JSON.stringify({
-                id: msgId,
-                deliveryId: msgId,
-                conversationId,
-                senderId: activeSession.spaceId,
-                text: 'Voice Message',
-                voice: voiceMeta,
-                replyTo: activeReply,
-              });
+            const peerId = targetContact?.identityId || conversationId;
+            const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+            const peerTarget = hasActiveRatchet
+              ? { identityId: peerId, prekeyBundle: targetContact?.prekeyBundle }
+              : targetContact?.prekeyBundle;
+
+            if (!peerTarget) {
+              throw new Error(`Cannot send voice note: no Double Ratchet session or PrekeyBundle available for peer ${peerId}`);
             }
 
-            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayload, undefined, {
+            const { wirePayloadBase64 } = await convManager.encryptAndPackWireMessage(
+              activeSession,
+              peerTarget,
+              'Voice Message',
+              undefined,
+              activeReply,
+              voiceMeta,
+              undefined,
+              msgId
+            );
+
+            await netManager.sendEnvelope(activeSession, targetMailboxId, wirePayloadBase64, undefined, {
               messageId: msgId,
               conversationId,
             });
@@ -3073,24 +3086,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const creatorIdentityId = (myDoc as any)?.identityId || activeSession.spaceId;
       const creatorSigningPub = (myDoc as any)?.signingPublicKey || '';
 
-      if (enriched.mailboxId) {
-        const invitePayload = JSON.stringify({
-          type: 'GROUP_INVITE',
-          groupId,
-          name: conv?.name || 'Group',
-          description: (conv?.groupState as any)?.description || '',
-          senderKeyDistribution: distribution,
-          senderSigningKey: creatorSigningPub,
-          creator: {
-            identityId: creatorIdentityId,
-            displayName: myProfile?.displayName || activeSession.name || 'Admin',
-            username: myProfile?.username,
-            signingPublicKey: creatorSigningPub,
-            mailboxId: myProfile?.mailboxId,
-          },
-          members: updatedState ? updatedState.members : conv?.groupState?.members,
-        });
-        await netManager.sendEnvelope(activeSession, enriched.mailboxId, invitePayload).catch(() => {});
+      const members = updatedState ? updatedState.members : conv?.groupState?.members || {};
+      for (const memberId of Object.keys(members)) {
+        if (memberId === creatorIdentityId || memberId === activeSession.spaceId) continue;
+        const memberObj = members[memberId];
+        let targetMailbox = (memberObj as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId;
+        if (!targetMailbox) {
+          try {
+            const p = await directoryClient.getProfileByIdentity(memberId);
+            if (p?.mailboxId) targetMailbox = p.mailboxId;
+          } catch (_err) {}
+        }
+        if (targetMailbox) {
+          const invitePayload = JSON.stringify({
+            type: 'GROUP_INVITE',
+            groupId,
+            name: conv?.name || 'Group',
+            description: (conv?.groupState as any)?.description || '',
+            senderKeyDistribution: memberId === enriched.identityId ? distribution : undefined,
+            senderSigningKey: creatorSigningPub,
+            creator: {
+              identityId: creatorIdentityId,
+              displayName: myProfile?.displayName || activeSession.name || 'Admin',
+              username: myProfile?.username,
+              signingPublicKey: creatorSigningPub,
+              mailboxId: myProfile?.mailboxId,
+            },
+            members,
+          });
+          await netManager.sendEnvelope(activeSession, targetMailbox, invitePayload).catch(() => {});
+        }
       }
 
       setConversations((prev) => {
@@ -3446,7 +3471,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setSearchQuery('');
             return;
           }
-          CapacitorApp.exitApp();
+          if ((CapacitorApp as any).minimizeApp) {
+            (CapacitorApp as any).minimizeApp();
+          } else {
+            CapacitorApp.exitApp();
+          }
         });
       } catch (_e) {}
     };

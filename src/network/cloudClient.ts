@@ -299,6 +299,8 @@ export class CloudClient {
     chunkSize?: number;
     recipientAccountId?: string;
     recipientUsername?: string;
+    recipientIdentityId?: string;
+    groupId?: string;
     conversationId?: string;
     allowedAccounts?: string[];
   }): Promise<{ attachment: CloudAttachmentEntity }> {

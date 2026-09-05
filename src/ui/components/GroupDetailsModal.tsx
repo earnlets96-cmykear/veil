@@ -33,6 +33,7 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
     addGroupMember,
     removeGroupMember,
     activeSession,
+    myProfile,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');

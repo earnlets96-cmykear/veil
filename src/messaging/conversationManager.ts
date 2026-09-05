@@ -288,11 +288,21 @@ export class ConversationManager {
   }
 
   /**
+   * Checks if an active Double Ratchet session exists for a peer.
+   */
+  public hasSession(session: SpaceSession, peerIdentityId: string): boolean {
+    this.assertSession(session);
+    return !!this.sessionStore.loadSession(session, peerIdentityId);
+  }
+
+  /**
    * Encrypts a message using Double Ratchet and packages it into a size-padded wire payload.
+   * If an active session exists, encrypts directly using that session.
+   * If not, establishes a new session via X3DH using the provided PrekeyBundle.
    */
   public async encryptAndPackWireMessage(
     session: SpaceSession,
-    peerBundle: PrekeyBundle,
+    peerTarget: PrekeyBundle | { identityId: string; prekeyBundle?: PrekeyBundle },
     text: string,
     attachment?: any,
     replyTo?: { messageId: string; senderName?: string; text: string; attachmentType?: string },
@@ -302,7 +312,7 @@ export class ConversationManager {
   ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {
     this.assertSession(session);
 
-    const peerId = peerBundle.identityDocument.identityId;
+    const peerId = 'identityDocument' in peerTarget ? peerTarget.identityDocument.identityId : peerTarget.identityId;
     let ratchetSession = this.sessionStore.loadSession(session, peerId);
     let x3dhHeader = undefined;
 
@@ -312,6 +322,10 @@ export class ConversationManager {
 
     // If no existing session, establish new session via X3DH
     if (!ratchetSession) {
+      const peerBundle = 'identityDocument' in peerTarget ? peerTarget : peerTarget.prekeyBundle;
+      if (!peerBundle) {
+        throw new Error(`Cannot initiate Double Ratchet session with peer ${peerId}: missing PrekeyBundle`);
+      }
       const x3dhRes = initiateX3DH(myIdentity.keyAgreementPrivateKey, peerBundle);
       x3dhHeader = x3dhRes.header;
 
@@ -348,6 +362,8 @@ export class ConversationManager {
       senderIdentityId: cleanSenderDoc.identityId,
       senderDocument: cleanSenderDoc,
       senderMailboxId: binding?.mailboxId,
+      senderUsername: (myDoc as any).username,
+      senderDisplayName: (myDoc as any).displayName,
       ratchetMessage: ratchetMsg,
       attachment: wireAttachment,
       attachments: wireAttachments,
@@ -438,6 +454,8 @@ export class ConversationManager {
     storedMessage: StoredMessage;
     senderDoc: IdentityDocument;
     senderMailboxId?: string;
+    senderUsername?: string;
+    senderDisplayName?: string;
     attachment?: any;
     attachments?: any[];
     replyTo?: any;
@@ -595,6 +613,8 @@ export class ConversationManager {
       storedMessage,
       senderDoc,
       senderMailboxId: wireObj.senderMailboxId,
+      senderUsername: wireObj.senderUsername,
+      senderDisplayName: wireObj.senderDisplayName,
       attachment: wireObj.attachment,
       attachments: wireObj.attachments,
       replyTo: wireObj.replyTo,

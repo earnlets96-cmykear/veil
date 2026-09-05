@@ -214,8 +214,10 @@ export class WebSocketTransport {
    * Immediately resets retry count and attempts reconnection without waiting for backoff.
    */
   public reconnectNow(): void {
-    if (this.ws && (this.ws.readyState === 1 || this.ws.readyState === 0) && this.state === 'connected') {
-      return;
+    if (this.ws && (this.ws.readyState === 1 || this.ws.readyState === 0)) {
+      if (this.state === 'connected' || this.state === 'connecting') {
+        return;
+      }
     }
     this.clearTimers();
     this.retryCount = 0;

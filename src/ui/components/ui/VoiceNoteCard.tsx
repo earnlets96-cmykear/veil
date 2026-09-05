@@ -295,6 +295,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       {/* Single Subtle Integrated Scrubbing Bar */}
       <div
         ref={trackRef}
+        className="veil-waveform-container"
         onPointerDown={handlePointerDown}
         onTouchStart={stopAllEvents}
         onTouchMove={stopAllEvents}
@@ -320,6 +321,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
         >
           {/* Active Fill */}
           <div
+            className={isPlaying ? 'veil-waveform-bar active' : 'veil-waveform-bar'}
             style={{
               height: '100%',
               width: `${effectiveProgress}%`,
