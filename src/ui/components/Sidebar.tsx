@@ -63,6 +63,8 @@ export const Sidebar: React.FC = () => {
     myProfile,
     isConversationMuted,
     messages,
+    pinConversation,
+    unpinConversation,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
@@ -199,13 +201,19 @@ export const Sidebar: React.FC = () => {
     return msg;
   };
 
-  // Filter conversations
-  const filteredConversations = conversations.filter((c) => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'direct') return c.type === 'direct';
-    if (activeTab === 'group') return c.type === 'group';
-    return true;
-  });
+  // Filter and sort conversations (pinned conversations first, then newest message)
+  const filteredConversations = conversations
+    .filter((c) => {
+      if (activeTab === 'all') return true;
+      if (activeTab === 'direct') return c.type === 'direct';
+      if (activeTab === 'group') return c.type === 'group';
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.timestamp || 0) - (a.timestamp || 0);
+    });
 
   const pendingIncoming = contactRequests.filter((r) => r.isIncoming && r.status === 'INCOMING_PENDING');
 
@@ -271,6 +279,13 @@ export const Sidebar: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.35rem' }}>
+          <IconButton
+            icon={<UsersIcon size={18} />}
+            variant="ghost"
+            onClick={() => openModal({ type: 'accountsAndSpaces' })}
+            aria-label="Accounts & Spaces"
+            title="Manage Accounts & Spaces"
+          />
           <IconButton
             icon={<SettingsIcon size={18} />}
             variant="ghost"
@@ -561,6 +576,14 @@ export const Sidebar: React.FC = () => {
                   role="button"
                   tabIndex={0}
                   onClick={() => selectConversation(conv.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (conv.isPinned) {
+                      unpinConversation(conv.id);
+                    } else {
+                      pinConversation(conv.id);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
@@ -579,6 +602,18 @@ export const Sidebar: React.FC = () => {
                     <div className="veil-conversation-top">
                       <span className="veil-conversation-name">{conv.name}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {conv.isPinned && (
+                          <span
+                            title="Pinned Conversation"
+                            aria-label="Pinned"
+                            style={{ color: 'var(--accent-color, #14b8a6)', display: 'inline-flex', alignItems: 'center' }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="17" x2="12" y2="22" />
+                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                            </svg>
+                          </span>
+                        )}
                         {isMuted && <BellOffIcon size={12} color="var(--veil-text-muted)" aria-label="Muted" />}
                         {conv.timestamp && (
                           <span className="veil-conversation-time">

@@ -1,31 +1,37 @@
 /**
- * VEIL Restrained Production Lock & Authentication Screen.
+ * VEIL Clean Authentication Screen (First Login & Account Sign In).
  *
- * Implements credential-selected Space unlocking without revealing existing
- * Space names or counts before authentication.
- *
- * Features:
- * - 100% SVG vector iconography and accessible form controls.
- * - Sub-100ms instant loading feedback with progressive state updates.
- * - Zero decorative clutter, glows, or AI-style radial gradients.
- * - Local-first encryption reassurance with zero secret leakage.
+ * Designed as a modern, privacy-first authentication interface:
+ * - Tabbed switcher between "Sign In" and "Create Account".
+ * - Username & Password credentials with show/hide password visibility.
+ * - Zero disclosure: no account counts, no space enumerations, no leaks.
+ * - Local-first reassurance with Argon2id + XChaCha20 cryptography under the hood.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { PasswordInput } from './ui/PasswordInput.tsx';
 import { Button } from './ui/Button.tsx';
-import { Spinner } from './ui/Spinner.tsx';
-import {
-  LockIcon,
-  ShieldIcon,
-  PlusIcon,
-  RefreshCwIcon,
-  AlertCircleIcon,
-} from './icons/index.ts';
+import { ShieldIcon, AlertCircleIcon, UserIcon, LockIcon } from './icons/index.ts';
 
-export const LockScreen: React.FC = () => {
-  const { unlockSpace, openModal, panicLock, storageReady, storageError } = useApp();
+interface LockScreenProps {
+  onSuccessAuth?: (params: {
+    spaceId: string;
+    username: string;
+    spaceName: string;
+    password?: string;
+  }) => void;
+  onCancelPasswordFallback?: () => void;
+  showCancel?: boolean;
+}
+
+export const LockScreen: React.FC<LockScreenProps> = ({
+  onSuccessAuth,
+  onCancelPasswordFallback,
+  showCancel,
+}) => {
+  const { unlockSpace, createSpace, storageReady, storageError } = useApp();
+  const [mode, setMode] = useState<'signin' | 'create'>('signin');
   const [username, setUsername] = useState(() => {
     try {
       return (typeof localStorage !== 'undefined' ? localStorage.getItem('veil:last_username') : null) || '';
@@ -33,40 +39,48 @@ export const LockScreen: React.FC = () => {
       return '';
     }
   });
-  const [passphrase, setPassphrase] = useState('');
+  const [password, setPassword] = useState('');
+  const [spaceName, setSpaceName] = useState('Main Space');
   const [error, setError] = useState<string | null>(null);
-  const [loadingPhase, setLoadingPhase] = useState<'idle' | 'deriving' | 'loading_data'>('idle');
-
-  // Progressive status message transitions while unlocking
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (loadingPhase === 'deriving') {
-      timer = setTimeout(() => {
-        setLoadingPhase('loading_data');
-      }, 400);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [loadingPhase]);
+  const [loadingPhase, setLoadingPhase] = useState<'idle' | 'deriving' | 'authenticating'>('idle');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
     if (!cleanUsername) {
-      setError('Please enter your account username.');
+      setError('Please enter your username.');
       return;
     }
-    if (!passphrase.trim() || loadingPhase !== 'idle') return;
+    if (!password.trim() || loadingPhase !== 'idle') return;
 
     setError(null);
     setLoadingPhase('deriving');
 
     try {
-      await unlockSpace(passphrase, cleanUsername);
+      if (mode === 'signin') {
+        await unlockSpace(password, cleanUsername);
+        if (onSuccessAuth) {
+          onSuccessAuth({
+            spaceId: '',
+            username: cleanUsername,
+            spaceName: 'Main Space',
+            password,
+          });
+        }
+      } else {
+        await createSpace(spaceName.trim() || 'Main Space', password, cleanUsername);
+        if (onSuccessAuth) {
+          onSuccessAuth({
+            spaceId: '',
+            username: cleanUsername,
+            spaceName: spaceName.trim() || 'Main Space',
+            password,
+          });
+        }
+      }
     } catch (err: any) {
-      setError(err?.message || 'Invalid username or passphrase.');
-      setPassphrase('');
+      setError(err?.message || (mode === 'signin' ? 'Invalid username or password.' : 'Failed to create account.'));
+      setPassword('');
       setLoadingPhase('idle');
     }
   };
@@ -74,8 +88,19 @@ export const LockScreen: React.FC = () => {
   if (!storageReady) {
     if (storageError) {
       return (
-        <div className="veil-modal-overlay" style={{ background: 'var(--veil-bg-base)' }}>
-          <div className="veil-card" style={{ maxWidth: '400px', width: '90%', textAlign: 'center' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            width: '100vw',
+            backgroundColor: 'var(--veil-bg-base)',
+            color: 'var(--veil-text-primary)',
+            padding: '1rem',
+          }}
+        >
+          <div className="veil-card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
               <AlertCircleIcon size={36} color="var(--veil-danger)" />
             </div>
@@ -99,16 +124,13 @@ export const LockScreen: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          height: '100vh',
+          minHeight: '100vh',
           width: '100vw',
           backgroundColor: 'var(--veil-bg-base)',
           color: 'var(--veil-text-primary)',
         }}
       >
-        <div className="veil-card" style={{ width: '90%', maxWidth: '380px', padding: '2rem', textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-            <Spinner size="md" />
-          </div>
+        <div className="veil-card" style={{ width: '90%', maxWidth: '360px', padding: '2rem', textAlign: 'center' }}>
           <h2 style={{ fontSize: 'var(--veil-text-base)', fontWeight: 600, marginBottom: '0.25rem' }}>
             Initializing VEIL
           </h2>
@@ -131,44 +153,47 @@ export const LockScreen: React.FC = () => {
         minHeight: '100vh',
         width: '100vw',
         backgroundColor: 'var(--veil-bg-base)',
-        padding: 'var(--veil-space-4)',
+        padding: '1rem',
+        userSelect: 'none',
       }}
     >
       <div
         className="veil-card"
         style={{
           width: '100%',
-          maxWidth: '390px',
-          padding: '2rem',
-          boxShadow: 'var(--veil-elevation-2)',
+          maxWidth: '380px',
+          padding: '2.25rem 1.75rem',
+          backgroundColor: 'var(--veil-bg-surface)',
           borderColor: 'var(--veil-border)',
+          borderRadius: 'var(--veil-radius-xl)',
+          boxShadow: 'var(--veil-elevation-3)',
         }}
       >
         {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div
             style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: 'var(--veil-radius-md)',
+              width: '48px',
+              height: '48px',
+              borderRadius: 'var(--veil-radius-lg)',
               backgroundColor: 'var(--veil-accent-primary-subtle)',
               border: '1px solid var(--veil-accent-primary-alpha)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--veil-accent-primary)',
-              marginBottom: '0.85rem',
+              marginBottom: '0.75rem',
             }}
           >
-            <ShieldIcon size={22} />
+            <ShieldIcon size={24} />
           </div>
           <h1
             style={{
-              fontSize: '1.5rem',
+              fontSize: '1.45rem',
               fontWeight: 700,
               letterSpacing: '-0.02em',
               color: 'var(--veil-text-primary)',
-              lineHeight: 1.2,
+              margin: '0 0 0.35rem 0',
             }}
           >
             VEIL
@@ -177,11 +202,66 @@ export const LockScreen: React.FC = () => {
             style={{
               color: 'var(--veil-text-secondary)',
               fontSize: 'var(--veil-text-xs)',
-              marginTop: '0.35rem',
+              margin: 0,
             }}
           >
-            Unlock your encrypted Space
+            {mode === 'signin' ? 'Sign in to your account' : 'Create a new encrypted account'}
           </p>
+        </div>
+
+        {/* Tab Switcher */}
+        <div
+          style={{
+            display: 'flex',
+            backgroundColor: 'var(--veil-bg-surface-elevated)',
+            borderRadius: 'var(--veil-radius-md)',
+            padding: '4px',
+            marginBottom: '1.25rem',
+            border: '1px solid var(--veil-border-subtle)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setMode('signin');
+              setError(null);
+            }}
+            style={{
+              flex: 1,
+              padding: '6px 0',
+              border: 'none',
+              borderRadius: 'var(--veil-radius-sm)',
+              fontSize: 'var(--veil-text-xs)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              backgroundColor: mode === 'signin' ? 'var(--veil-accent-primary)' : 'transparent',
+              color: mode === 'signin' ? '#ffffff' : 'var(--veil-text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('create');
+              setError(null);
+            }}
+            style={{
+              flex: 1,
+              padding: '6px 0',
+              border: 'none',
+              borderRadius: 'var(--veil-radius-sm)',
+              fontSize: 'var(--veil-text-xs)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              backgroundColor: mode === 'create' ? 'var(--veil-accent-primary)' : 'transparent',
+              color: mode === 'create' ? '#ffffff' : 'var(--veil-text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Create Account
+          </button>
         </div>
 
         {/* Form */}
@@ -194,48 +274,72 @@ export const LockScreen: React.FC = () => {
                 fontSize: 'var(--veil-text-xs)',
                 fontWeight: 600,
                 color: 'var(--veil-text-secondary)',
-                marginBottom: '0.5rem',
-                letterSpacing: '0.03em',
+                marginBottom: '0.4rem',
               }}
             >
-              Account Username
+              Username
             </label>
             <input
               id="username-input"
               type="text"
               className="veil-input"
-              placeholder="e.g. dagmawi"
+              placeholder="e.g. alice"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
               autoFocus
               required
-              aria-label="Account username"
               style={{ width: '100%' }}
             />
           </div>
 
+          {mode === 'create' && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label
+                htmlFor="space-name-input"
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--veil-text-xs)',
+                  fontWeight: 600,
+                  color: 'var(--veil-text-secondary)',
+                  marginBottom: '0.4rem',
+                }}
+              >
+                Space Name
+              </label>
+              <input
+                id="space-name-input"
+                type="text"
+                className="veil-input"
+                placeholder="e.g. Main Space, Work, Private"
+                value={spaceName}
+                onChange={(e) => setSpaceName(e.target.value)}
+                disabled={isLoading}
+                style={{ width: '100%' }}
+              />
+            </div>
+          )}
+
           <div style={{ marginBottom: '1.25rem' }}>
             <label
-              htmlFor="passphrase-input"
+              htmlFor="password-input"
               style={{
                 display: 'block',
                 fontSize: 'var(--veil-text-xs)',
                 fontWeight: 600,
                 color: 'var(--veil-text-secondary)',
-                marginBottom: '0.5rem',
-                letterSpacing: '0.03em',
+                marginBottom: '0.4rem',
               }}
             >
-              Enter Space Passphrase / PIN
+              Password
             </label>
             <PasswordInput
-              id="passphrase-input"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
+              id="password-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter Space Passphrase"
               disabled={isLoading}
               required
-              aria-label="Space passphrase"
             />
           </div>
 
@@ -248,7 +352,6 @@ export const LockScreen: React.FC = () => {
                 borderRadius: 'var(--veil-radius-sm)',
                 color: 'var(--veil-danger)',
                 fontSize: 'var(--veil-text-xs)',
-                textAlign: 'left',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
@@ -267,69 +370,30 @@ export const LockScreen: React.FC = () => {
             size="lg"
             fullWidth
             loading={isLoading}
-            disabled={isLoading || !passphrase.trim()}
+            disabled={isLoading || !password.trim()}
           >
             {isLoading ? (
-              <span>
-                {loadingPhase === 'deriving'
-                  ? 'Deriving Keys...'
-                  : 'Preparing Secure Space...'}
-              </span>
+              <span>Authenticating...</span>
+            ) : mode === 'signin' ? (
+              <span>Unlock Space</span>
             ) : (
-              <>
-                <LockIcon size={17} />
-                <span>Unlock Space</span>
-              </>
+              <span>Create Account</span>
             )}
           </Button>
+
+          {showCancel && onCancelPasswordFallback && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              fullWidth
+              onClick={onCancelPasswordFallback}
+              style={{ marginTop: '0.75rem', fontSize: 'var(--veil-text-xs)' }}
+            >
+              Back to PIN Lock
+            </Button>
+          )}
         </form>
-
-        {/* Secondary Actions */}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            paddingTop: '1.25rem',
-            borderTop: '1px solid var(--veil-divider)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '0.5rem',
-          }}
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => openModal({ type: 'createSpace' })}
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
-          >
-            <PlusIcon size={14} />
-            <span>New Space</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => openModal({ type: 'restoreAccount' })}
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
-            title="Restore Account on Fresh Device"
-          >
-            <RefreshCwIcon size={14} />
-            <span>Restore</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="danger"
-            size="sm"
-            onClick={panicLock}
-            style={{ fontSize: 'var(--veil-text-xs)', padding: '0.4rem 0.6rem' }}
-            title="Instant Memory Wipe"
-          >
-            <span>Panic</span>
-          </Button>
-        </div>
 
         {/* Local Security Assurance */}
         <div

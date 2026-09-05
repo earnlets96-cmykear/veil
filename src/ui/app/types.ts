@@ -21,6 +21,8 @@ export interface UIConversation {
   peerDoc?: IdentityDocument;
   mailboxId?: string;
   groupState?: GroupState;
+  isPinned?: boolean;
+  pinnedMessageId?: string;
 }
 
 export interface UIMessage {
@@ -114,6 +116,9 @@ export type ActiveModal =
   | { type: 'createSpace' }
   | { type: 'restoreAccount' }
   | { type: 'accountSettings' }
+  | { type: 'accountsAndSpaces' }
+  | { type: 'appLockSetup'; spaceId?: string; username?: string; spaceName?: string; password?: string; accountId?: string }
+  | { type: 'switchSpace' }
   | { type: 'newChat' }
   | { type: 'newGroup' }
   | { type: 'groupDetails'; conversationId: string }
@@ -126,7 +131,9 @@ export type ActiveModal =
         | 'overview'
         | 'profile'
         | 'account'
+        | 'accountsAndSpaces'
         | 'privacy'
+        | 'appLock'
         | 'notifications'
         | 'appearance'
         | 'storage'

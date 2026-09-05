@@ -2,6 +2,31 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-ui-applock-overhaul] - 2026-09-05
+
+### Added & Overhauled (Complete UI/UX Redesign, Multi-Space App Lock & Centralized Theme Engine)
+- **Multi-Space App Lock & Silent Space Resolution (`src/privacy/pinManager.ts`, `src/ui/components/PinLockScreen.tsx`, `src/ui/components/AppLockSetupModal.tsx`, `src/ui/components/AppLockSettingsView.tsx`, `src/ui/components/AccountsAndSpacesModal.tsx`)**:
+  - Argon2id KDF derivation with device-unique salt (`veil_pin_salt_v1`).
+  - Single-pass silent space resolution (`verifyAndResolvePin`): entering any registered Space PIN decrypts and switches directly into that specific Space with zero UI disclosure of other existing spaces or space counts.
+  - Strict duplicate PIN collision prevention (`isPinAvailable`, `isPinAvailableSync`): prevents assigning an identical PIN to different spaces while returning generic non-enumerating error responses.
+  - XChaCha20-Poly1305 AEAD PIN key wrapping for credentials.
+  - Exponential rate limiting and lockout backoff (30s after 5 failed attempts, doubling up to 10m).
+  - Configurable auto-lock timeouts (Immediately, 30s, 1m, 5m, 10m, Never) and background state detection.
+- **Centralized Theme & Appearance Engine (`src/ui/utils/themeManager.ts`, `src/styles/themes.css`, `src/styles/veil-design-system.css`, `src/styles/veil-components.css`, `src/ui/components/AppearanceSettingsView.tsx`)**:
+  - Replaced all generic AI styling and purple/blue gradients with restrained, deep charcoal neutral surfaces (`#0c0d10`, `#15171c`, `#1e2029`).
+  - 11 globally selectable accent colors (Teal default, Emerald, Cobalt, Indigo, Violet, Rose, Amber, Olive, Slate, Crimson, Coral) applied dynamically via CSS custom properties.
+  - 4 complete theme modes: Dark (default), AMOLED (pure black #000000), Dim (muted charcoal), and Light.
+  - Message bubble customization (Modern Rounded, Compact, Sharp) and typography scaling (13px–17px).
+- **Comprehensive UI/UX Refactor & 100% SVG Vector Iconography**:
+  - Complete elimination of all Unicode symbol/emoji characters from the UI layer; full replacement with SVG vector icons (`Icons.tsx`, `DeleteIcon`, `ArrowLeftIcon`, etc.).
+  - Sidebar enhancements: conversation pin-to-top ordering, SVG pin badges, active accent unread counters, and quick Accounts & Spaces access.
+  - Conversation view enhancements: persistent pinned message banner with 1-click jump-to-message, context menu Pin/Unpin, smooth audio player integration.
+  - Modernized lock/login screen with zero metadata leakage and space passphrase unlocking.
+- **Verification Suites & Mobile Builds (`tests/applock-multi-space-pin.test.ts`, `tests/theme-accent-system.test.ts`)**:
+  - 363/363 test files passed, 1,056/1,056 tests passed (100% pass rate).
+  - Web production bundle built cleanly with Vite.
+  - Capacitor Android synchronized and native Android APK assembled cleanly (`app-debug.apk`, 7.38 MB).
+
 ## [1.0.0-master-reliability] - 2026-09-05
 
 ### Added & Fixed (Master Reliability: Double Ratchet Self-Healing, Group Seen Receipts, Audio Seek Throttling)

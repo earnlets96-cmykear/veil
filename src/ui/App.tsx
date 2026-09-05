@@ -2,9 +2,10 @@
  * Root React Application Component for VEIL.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from './app/AppState.tsx';
 import { LockScreen } from './components/LockScreen.tsx';
+import { PinLockScreen } from './components/PinLockScreen.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { ConversationView } from './components/ConversationView.tsx';
 import { CreateSpaceModal } from './components/CreateSpaceModal.tsx';
@@ -15,11 +16,31 @@ import { ContactDetailsModal } from './components/ContactDetailsModal.tsx';
 import { SettingsModal } from './components/SettingsModal.tsx';
 import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
+import { AppLockSetupModal } from './components/AppLockSetupModal.tsx';
+import { AccountsAndSpacesModal } from './components/AccountsAndSpacesModal.tsx';
 import { ShieldIcon, CloseIcon } from './components/icons/index.ts';
+import { spacePinManager } from '../privacy/pinManager.ts';
+import { themeManager } from './utils/themeManager.ts';
 
 export const App: React.FC = () => {
-  const { activeSession, activeChatId, activeModal, recoveryPasswordChangeRequired, openModal } = useApp();
-  const [isBannerDismissed, setIsBannerDismissed] = React.useState(() => {
+  const {
+    activeSession,
+    activeChatId,
+    activeModal,
+    recoveryPasswordChangeRequired,
+    openModal,
+    isAppLocked,
+  } = useApp();
+
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
+  const [pendingPinSetup, setPendingPinSetup] = useState<{
+    spaceId: string;
+    username: string;
+    spaceName: string;
+    password?: string;
+  } | null>(null);
+
+  const [isBannerDismissed, setIsBannerDismissed] = useState(() => {
     try {
       return typeof localStorage !== 'undefined' && localStorage.getItem('veil:recovery_banner_dismissed') === 'true';
     } catch {
@@ -36,19 +57,34 @@ export const App: React.FC = () => {
     } catch {}
   };
 
-  React.useEffect(() => {
-    try {
-      const savedTheme = localStorage.getItem('veil:theme') || 'obsidian';
-      const savedDensity = localStorage.getItem('veil:density') || 'comfortable';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-      document.documentElement.setAttribute('data-density', savedDensity);
-    } catch (_e) {}
+  useEffect(() => {
+    themeManager.applyTheme();
   }, []);
 
-  if (!activeSession || !activeSession.isActive()) {
+  const hasRegisteredPins = spacePinManager.hasRegisteredPins() && spacePinManager.isAppLockEnabled();
+
+  if (!activeSession || !activeSession.isActive() || isAppLocked) {
+    if (hasRegisteredPins && !showPasswordLogin) {
+      return (
+        <>
+          <PinLockScreen onFallbackPassword={() => setShowPasswordLogin(true)} />
+          {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
+          {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
+        </>
+      );
+    }
+
     return (
       <>
-        <LockScreen />
+        <LockScreen
+          showCancel={hasRegisteredPins}
+          onCancelPasswordFallback={hasRegisteredPins ? () => setShowPasswordLogin(false) : undefined}
+          onSuccessAuth={(params) => {
+            if (!spacePinManager.hasPinForSpace(params.spaceId || params.username)) {
+              setPendingPinSetup(params);
+            }
+          }}
+        />
         {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
         {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
       </>
@@ -144,6 +180,16 @@ export const App: React.FC = () => {
           peerId={activeModal.peerId}
           peerUsername={activeModal.peerUsername}
           searchResult={activeModal.searchResult}
+        />
+      )}
+      {activeModal?.type === 'accountsAndSpaces' && <AccountsAndSpacesModal />}
+      {(activeModal?.type === 'appLockSetup' || pendingPinSetup) && (
+        <AppLockSetupModal
+          spaceId={pendingPinSetup?.spaceId || activeSession?.spaceId || ''}
+          username={pendingPinSetup?.username || ''}
+          spaceName={pendingPinSetup?.spaceName || activeSession?.name || ''}
+          password={pendingPinSetup?.password}
+          onComplete={() => setPendingPinSetup(null)}
         />
       )}
     </div>

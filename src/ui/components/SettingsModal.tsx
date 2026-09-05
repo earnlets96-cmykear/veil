@@ -17,6 +17,8 @@ import { NotificationPrivacyMode } from '../../notifications/types.ts';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
 import { getErrorMessage } from '../../utils/errors.ts';
+import { AppLockSettingsView } from './AppLockSettingsView.tsx';
+import { AppearanceSettingsView } from './AppearanceSettingsView.tsx';
 import {
   Avatar,
   Badge,
@@ -58,6 +60,7 @@ export type SettingsCategory =
   | 'account'
   | 'devices'
   | 'privacy'
+  | 'appLock'
   | 'notifications'
   | 'appearance'
   | 'storage'
@@ -71,6 +74,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   const {
     activeSession,
     closeModal,
+    openModal,
     sessionController,
     panicLock,
     idMgr,
@@ -286,6 +290,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               {activeCategory === 'profile' && 'My Profile'}
               {activeCategory === 'account' && 'Account & Identity'}
               {activeCategory === 'privacy' && 'Privacy & Security'}
+              {activeCategory === 'appLock' && 'App Lock & PIN'}
               {activeCategory === 'appearance' && 'Appearance'}
               {activeCategory === 'notifications' && 'Notifications'}
               {activeCategory === 'storage' && 'Storage & Data'}
@@ -358,6 +363,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
 
                 <div
                   className="veil-settings-row"
+                  onClick={() => openModal({ type: 'accountsAndSpaces' })}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-cyan">
+                    <UserIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Accounts & Spaces</div>
+                    <div className="veil-settings-row-sub">Switch spaces, add accounts, manage PINs</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+
+                <div
+                  className="veil-settings-row"
                   onClick={() => setActiveCategory('account')}
                   role="button"
                   tabIndex={0}
@@ -376,6 +397,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               {/* Group 2: PRIVACY & SECURITY */}
               <div className="veil-settings-group">
                 <div className="veil-settings-group-header">PRIVACY & SECURITY</div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('appLock')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-indigo">
+                    <LockIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">App Lock & PIN Access</div>
+                    <div className="veil-settings-row-sub">Require PIN, auto-lock, multi-space gates</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
 
                 <div
                   className="veil-settings-row"
@@ -762,55 +799,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
           {/* 6. APPEARANCE SUB-PAGE */}
           {activeCategory === 'appearance' && (
             <div className="veil-settings-subpage">
-              <div className="veil-card">
-                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
-                  Theme
-                </h3>
-                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '1rem' }}>
-                  Choose your visual interface style. Applies instantly across all Spaces.
-                </p>
-                <div className="veil-theme-grid">
-                  {[
-                    { id: 'obsidian', name: 'Obsidian', color: '#0c0c0e', desc: 'Warm dark neutral' },
-                    { id: 'slate', name: 'Slate', color: '#0f1219', desc: 'Cool dark blue-gray' },
-                    { id: 'light', name: 'Light', color: '#f5f5f7', desc: 'Clean minimal light' },
-                    { id: 'midnight', name: 'Midnight', color: '#0a0e18', desc: 'Deep blue-black' },
-                    { id: 'graphite', name: 'Graphite', color: '#121212', desc: 'Neutral charcoal' },
-                  ].map((t) => (
-                    <div
-                      key={t.id}
-                      className={`veil-theme-card ${themeVal === t.id ? 'active' : ''}`}
-                      onClick={() => handleSelectTheme(t.id)}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Select ${t.name} theme`}
-                    >
-                      <div className="veil-theme-swatch" style={{ background: t.color, border: '1px solid var(--veil-border)' }} />
-                      <div className="veil-theme-name" style={{ fontWeight: 600 }}>{t.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--veil-text-muted)', marginTop: '2px' }}>{t.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <AppearanceSettingsView onBack={() => setActiveCategory('overview')} />
+            </div>
+          )}
 
-              <div className="veil-card" style={{ marginTop: '1rem' }}>
-                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
-                  Message Density
-                </h3>
-                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
-                  Adjust padding and bubble sizing in conversation timelines.
-                </p>
-                <select
-                  value={densityVal}
-                  onChange={(e) => handleSelectDensity(e.target.value)}
-                  className="veil-select"
-                  aria-label="Message density selector"
-                >
-                  <option value="compact">Compact (High Information Density)</option>
-                  <option value="comfortable">Comfortable (Default)</option>
-                  <option value="spacious">Spacious (Relaxed Touch Target Layout)</option>
-                </select>
-              </div>
+          {/* APP LOCK SUB-PAGE */}
+          {activeCategory === 'appLock' && (
+            <div className="veil-settings-subpage">
+              <AppLockSettingsView
+                onBack={() => setActiveCategory('overview')}
+                onOpenPinSetup={() => openModal({ type: 'appLockSetup' })}
+                onOpenAccountsAndSpaces={() => openModal({ type: 'accountsAndSpaces' })}
+              />
             </div>
           )}
 

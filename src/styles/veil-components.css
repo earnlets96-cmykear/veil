@@ -230,10 +230,9 @@
   border-radius: var(--veil-radius-full);
   font-weight: var(--veil-weight-bold);
   color: #ffffff;
-  background: var(--veil-gradient-primary);
+  background: var(--veil-accent-primary, #14b8a6);
   user-select: none;
   flex-shrink: 0;
-  box-shadow: var(--veil-shadow-sm);
 }
 
 .veil-avatar-square {

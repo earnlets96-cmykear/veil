@@ -16,6 +16,8 @@ import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyRefer
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { base64ToBytes } from '../../crypto/utils.ts';
+import { spacePinManager } from '../../privacy/pinManager.ts';
+import { themeManager } from '../utils/themeManager.ts';
 
 export function resolveReplyReference(
   target: UIMessage | null,
@@ -170,6 +172,18 @@ export interface AppContextType {
   isConversationMuted: (conversationId: string) => boolean;
   toggleMuteConversation: (conversationId: string) => Promise<boolean>;
 
+  // App Lock & Multi-Space PIN Gate
+  isAppLocked: boolean;
+  setAppLocked: (locked: boolean) => void;
+  unlockWithPin: (pin: string) => Promise<void>;
+  setupSpacePin: (params: { spaceId: string; username: string; spaceName: string; password?: string; pin: string; accountId?: string }) => Promise<void>;
+  switchSpaceWithPin: (pin: string) => Promise<void>;
+  pinConversation: (conversationId: string) => Promise<void>;
+  unpinConversation: (conversationId: string) => Promise<void>;
+  pinMessage: (conversationId: string, messageId: string) => Promise<void>;
+  unpinMessage: (conversationId: string) => Promise<void>;
+  forwardMessage: (targetConversationId: string, message: UIMessage) => Promise<void>;
+
   // Actions
   unlockSpace: (passphrase: string, username?: string) => Promise<void>;
   createSpace: (name: string, passphrase: string, explicitUsername?: string) => Promise<void>;
@@ -258,6 +272,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [recoveryPasswordChangeRequired, setRecoveryPasswordChangeRequired] = useState(false);
   const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => spacePinManager.isAppLockEnabled());
+  const lastBackgroundTimeRef = useRef<number | null>(null);
   const cloudCredentials = useRef(new Map<string, string>());
   const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
   const syncTimeoutRef = useRef<any>(null);
@@ -1288,6 +1304,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       AttachmentPipeline.revokeAllEphemeralBlobUrls();
       MediaCache.clear();
       notificationDispatcher.setLocked(true);
+      if (spacePinManager.isAppLockEnabled()) {
+        setIsAppLocked(true);
+      }
     });
     return unsub;
   }, []);
@@ -1343,6 +1362,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     };
   }, [activeSession]);
+
+  // Background auto-lock tracking
+  useEffect(() => {
+    const handleBackground = () => {
+      if (!spacePinManager.isAppLockEnabled()) return;
+      lastBackgroundTimeRef.current = Date.now();
+      if (spacePinManager.isLockOnBackgroundEnabled() || spacePinManager.getAutoLockInterval() === 'immediately') {
+        sessionController.lock();
+        setIsAppLocked(true);
+      }
+    };
+
+    const handleForeground = () => {
+      if (!spacePinManager.isAppLockEnabled()) return;
+      if (lastBackgroundTimeRef.current !== null) {
+        const elapsed = Date.now() - lastBackgroundTimeRef.current;
+        const intervalStr = spacePinManager.getAutoLockInterval();
+        let thresholdMs = 0;
+        if (intervalStr === 'immediately') thresholdMs = 0;
+        else if (intervalStr === '30s') thresholdMs = 30 * 1000;
+        else if (intervalStr === '1m') thresholdMs = 60 * 1000;
+        else if (intervalStr === '5m') thresholdMs = 5 * 60 * 1000;
+        else if (intervalStr === '10m') thresholdMs = 10 * 60 * 1000;
+        else if (intervalStr === 'never') thresholdMs = Infinity;
+
+        if (elapsed >= thresholdMs) {
+          sessionController.lock();
+          setIsAppLocked(true);
+        }
+        lastBackgroundTimeRef.current = null;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'hidden') {
+        handleBackground();
+      } else if (document.visibilityState === 'visible') {
+        handleForeground();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    let capListenerHandle: any = null;
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.addListener('appStateChange', (state) => {
+        if (!state.isActive) {
+          handleBackground();
+        } else {
+          handleForeground();
+        }
+      }).then((handle) => {
+        capListenerHandle = handle;
+      }).catch(() => {});
+    }
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+      if (capListenerHandle && typeof capListenerHandle.remove === 'function') {
+        capListenerHandle.remove();
+      }
+    };
+  }, []);
 
   const unlockSpace = useCallback(
     async (passphrase: string, username?: string) => {
@@ -1537,11 +1624,128 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const lockSpace = useCallback(() => {
     sessionController.lock();
+    if (spacePinManager.isAppLockEnabled()) {
+      setIsAppLocked(true);
+    }
   }, []);
 
   const panicLock = useCallback(() => {
     sessionController.panicLock();
+    if (spacePinManager.isAppLockEnabled()) {
+      setIsAppLocked(true);
+    }
   }, []);
+
+  const unlockWithPin = useCallback(
+    async (pin: string) => {
+      const result = await spacePinManager.verifyAndResolvePin(pin);
+      if (!result.success || !result.spaceId) {
+        if (result.isLockedOut) {
+          throw new Error(`Too many incorrect attempts. Please wait ${result.remainingLockoutSeconds || 30} seconds.`);
+        }
+        throw new Error('Incorrect PIN');
+      }
+
+      if (activeSession && activeSession.spaceId === result.spaceId && activeSession.isActive()) {
+        setIsAppLocked(false);
+        return;
+      }
+
+      if (activeSession) {
+        sessionController.lock();
+      }
+
+      if (result.wrappedCredentials) {
+        await unlockSpace(result.wrappedCredentials, result.username);
+      } else {
+        const creds = activeCredentialsRef.current.get(result.spaceId);
+        if (creds?.passphrase) {
+          await unlockSpace(creds.passphrase, creds.username || result.username);
+        } else {
+          throw new Error('Password required to unlock this space.');
+        }
+      }
+
+      setIsAppLocked(false);
+    },
+    [activeSession, unlockSpace]
+  );
+
+  const setupSpacePin = useCallback(
+    async (params: { spaceId: string; username: string; spaceName: string; password?: string; pin: string; accountId?: string }) => {
+      const creds = activeCredentialsRef.current.get(params.spaceId);
+      const passwordToStore = params.password || creds?.passphrase || cloudCredentials.current.get(params.spaceId);
+      if (!passwordToStore) {
+        throw new Error('Space password required to configure PIN lock');
+      }
+      await spacePinManager.assignPinToSpace({
+        spaceId: params.spaceId,
+        username: params.username,
+        spaceName: params.spaceName,
+        password: passwordToStore,
+        pin: params.pin,
+        accountId: params.accountId,
+      });
+      setIsAppLocked(false);
+    },
+    []
+  );
+
+  const switchSpaceWithPin = useCallback(
+    async (pin: string) => {
+      await unlockWithPin(pin);
+    },
+    [unlockWithPin]
+  );
+
+  const pinConversation = useCallback(
+    async (conversationId: string) => {
+      if (!activeSession) return;
+      setConversations((prev) => {
+        const updated = prev.map((c) => (c.id === conversationId ? { ...c, isPinned: true } : c));
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession]
+  );
+
+  const unpinConversation = useCallback(
+    async (conversationId: string) => {
+      if (!activeSession) return;
+      setConversations((prev) => {
+        const updated = prev.map((c) => (c.id === conversationId ? { ...c, isPinned: false } : c));
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession]
+  );
+
+  const pinMessage = useCallback(
+    async (conversationId: string, messageId: string) => {
+      if (!activeSession) return;
+      setConversations((prev) => {
+        const updated = prev.map((c) => (c.id === conversationId ? { ...c, pinnedMessageId: messageId } : c));
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession]
+  );
+
+  const unpinMessage = useCallback(
+    async (conversationId: string) => {
+      if (!activeSession) return;
+      setConversations((prev) => {
+        const updated = prev.map((c) => (c.id === conversationId ? { ...c, pinnedMessageId: undefined } : c));
+        store.setAsync(activeSession, 'veil:ui:conversations', updated);
+        return updated;
+      });
+    },
+    [activeSession]
+  );
+
 
   const markConversationAsRead = useCallback(
     (conversationId: string) => {
@@ -1941,6 +2145,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       })();
     },
     [activeSession, contacts, conversations, replyTarget, networkState, myProfile]
+  );
+
+  const forwardMessage = useCallback(
+    async (targetConversationId: string, message: UIMessage) => {
+      if (!activeSession) return;
+      if (message.text) {
+        await sendMessage(targetConversationId, message.text);
+      }
+    },
+    [activeSession, sendMessage]
   );
 
   const sendAttachments = useCallback(
@@ -3637,6 +3851,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     config: appConfig,
     replyTarget,
     recoveryPasswordChangeRequired,
+    isAppLocked,
+    setAppLocked: setIsAppLocked,
+    unlockWithPin,
+    setupSpacePin,
+    switchSpaceWithPin,
+    pinConversation,
+    unpinConversation,
+    pinMessage,
+    unpinMessage,
+    forwardMessage,
     unlockSpace,
     createSpace,
     changeAccountPassword,

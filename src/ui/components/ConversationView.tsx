@@ -389,6 +389,9 @@ export const ConversationView: React.FC = () => {
     deleteMessageForEveryone,
     markConversationAsRead,
     retryFailedMessage,
+    pinMessage,
+    unpinMessage,
+    forwardMessage,
   } = useApp();
 
   const { showToast } = useToast();
@@ -462,6 +465,11 @@ export const ConversationView: React.FC = () => {
     }
     return list;
   }, [activeChatId, activeContact, messages, localSearchQuery]);
+
+  const pinnedMessage = useMemo(() => {
+    if (!activeConversation?.pinnedMessageId) return null;
+    return activeMessages.find((m) => m.id === activeConversation.pinnedMessageId) || null;
+  }, [activeConversation?.pinnedMessageId, activeMessages]);
 
   // First unread message index for divider
   const firstUnreadIndex = useMemo(() => {
@@ -741,6 +749,18 @@ export const ConversationView: React.FC = () => {
     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
   };
 
+  const handleTogglePinMessage = async (msg: UIMessage) => {
+    if (!activeChatId) return;
+    if (activeConversation?.pinnedMessageId === msg.id) {
+      await unpinMessage(activeChatId);
+      showToast({ type: 'info', message: 'Message unpinned' });
+    } else {
+      await pinMessage(activeChatId, msg.id);
+      showToast({ type: 'success', message: 'Message pinned to top' });
+    }
+    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+  };
+
   // Selection Mode Actions
   const handleToggleSelectMessage = (msgId: string) => {
     setSelectedMessageIds((prev) => {
@@ -936,6 +956,60 @@ export const ConversationView: React.FC = () => {
         </div>
       )}
 
+      {/* Pinned Message Strip */}
+      {pinnedMessage && (
+        <div
+          className="veil-pinned-bar"
+          onClick={() => handleJumpToMessage(pinnedMessage.id)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 16px',
+            backgroundColor: 'var(--bg-secondary, #15171c)',
+            borderBottom: '1px solid var(--border-color, #272a34)',
+            cursor: 'pointer',
+            fontSize: '13px',
+            transition: 'background-color 0.15s ease',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <div style={{ color: 'var(--accent-color, #14b8a6)', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="17" x2="12" y2="22" />
+                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+              </svg>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-color, #14b8a6)' }}>Pinned Message</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {pinnedMessage.text || (pinnedMessage.attachment ? 'Photo / Attachment' : 'Voice Message')}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (activeChatId) unpinMessage(activeChatId);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-secondary, #94a3b8)',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Unpin Message"
+            aria-label="Unpin Message"
+          >
+            <CloseIcon size={14} />
+          </button>
+        </div>
+      )}
+
       {/* In-Chat Search Bar */}
       {isSearchingInChat && (
         <div className="veil-chat-search-bar" role="search">
@@ -1026,6 +1100,20 @@ export const ConversationView: React.FC = () => {
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
+          <button
+            type="button"
+            className="veil-context-item"
+            onClick={() => handleTogglePinMessage(contextMenu.message!)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="17" x2="12" y2="22" />
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+            </svg>
+            <span>
+              {activeConversation?.pinnedMessageId === contextMenu.message.id ? 'Unpin Message' : 'Pin Message'}
+            </span>
+          </button>
+
           <button
             type="button"
             className="veil-context-item"
