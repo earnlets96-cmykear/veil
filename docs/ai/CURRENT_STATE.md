@@ -1,15 +1,16 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: RUNTIME FORENSIC FIX PASS (Audio Playback, Seeking, Range Streaming & UI Overhaul)
+## Current Verified Phase: MASTER RELIABILITY & HYBRID KOTLIN MEDIA3 MIGRATION
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
+- **Commit**: `cb08ccdf765c808f139ca28e22b94639248cef9b`
 - **Branch**: `main`
 - **Verification Deliverables**:
-  - Audio Forensic Verification Suite: `tests/phase45e-audio-forensic-e2e.test.ts` (Tests A through F passing 6/6 cleanly)
-  - Audio Runtime Lifecycle Suite: `tests/phase45e-audio-runtime.test.ts` (6/6 passing cleanly)
-  - Authoritative Dual-Account Verification Suite: `scripts/runtime-forensic-verification.ts` executed against live production relay `https://veil-rga0.onrender.com` (15/15 steps passing with code 0)
-  - Full Test Suite: 354+ test files, 1,028/1,028 tests passing (100% clean pass across all regression & acceptance suites)
-  - Web App Build: `npm run build` in 2.26s with 0 errors
-  - Release Manifest: `release/v1.0.0/manifest.json` updated with sha256 checksums
+  - Master Reliability Acceptance Suite: `tests/master-reliability-p0.test.tsx` (4/4 passed; local + live Render relay bidirectional E2EE exchange)
+  - Native Kotlin Media3 Plugin: `android/app/src/main/java/chat/veil/app/VeilNativeMediaPlugin.kt` with authoritative single ExoPlayer and automatic Audio Focus
+  - Android APK Compilation: `.\gradlew.bat assembleDebug` succeeds (`android/app/build/outputs/apk/debug/app-debug.apk`, 7.12 MB)
+  - Audio Forensic Verification Suite: `tests/phase45e-audio-forensic-e2e.test.ts` (6/6 passed)
+  - Full Test Suite: 355/356 test suites passed, 1,027 tests passed
+  - Web App Build: `npm run build` and TypeScript `npx tsc --noEmit` pass with 0 errors
 
 ---
 

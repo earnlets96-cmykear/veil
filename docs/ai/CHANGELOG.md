@@ -3,6 +3,29 @@
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+## [Master Reliability & Hybrid Kotlin Media3 Migration] - 2026-09-05
+
+### Added & Verified
+- **Native AndroidX Media3 ExoPlayer Plugin (`VeilNativeMediaPlugin.kt`)**:
+  - Implemented authoritative single `ExoPlayer` instance in Kotlin (`chat.veil.app.VeilNativeMediaPlugin`).
+  - Added automatic Android `AudioAttributes` (usage: `USAGE_MEDIA`, content: `CONTENT_TYPE_SPEECH`) handling system Audio Focus.
+  - Implemented automatic pause on headphone/bluetooth disconnect via `setHandleAudioBecomingNoisy(true)`.
+  - Registered plugin in `MainActivity.java` and bridged to TypeScript via `NativeMediaBridge.ts`.
+  - Integrated into `VoicePlayer` (`voicePlayer.ts`) with zero React timers and seamless web/desktop fallback.
+
+### Fixed
+- **1-to-1 Bidirectional Message Delivery (`conversationManager.ts`, `AppState.tsx`)**:
+  - Added `convManager.hasSession(session, peerIdentityId)`.
+  - Double Ratchet now encrypts directly on existing sessions without requiring a PrekeyBundle.
+  - Removed unencrypted JSON fallbacks (`{ id, text, replyTo }`), resolving recipient inbound validation drops.
+- **Group Details Modal "profile is not defined" Crash (`GroupDetailsModal.tsx`)**:
+  - Destructured `myProfile` from `useApp()` with full null safety.
+- **Group Membership Roster Convergence (`AppState.tsx`)**:
+  - Broadcast authoritative roster updates to all existing members upon member addition.
+- **Network Reconnect Flapping (`websocketTransport.ts`, `AppState.tsx`)**:
+  - Prevented socket teardown during connecting/open states; suppressed HTTP mailbox polling while WebSocket is active.
+- **Android Root Hardware Back Navigation (`AppState.tsx`)**:
+  - Minimized application rather than killing process on root back navigation.
 
 ## [Runtime Forensic Fix Pass] - 2026-09-04
 

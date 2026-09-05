@@ -1,9 +1,32 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: RUNTIME FORENSIC FIX PASS (Audio Playback, Seeking, Range Streaming & UI Overhaul)
-- **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
+## Active Phase: MASTER RELIABILITY & HYBRID KOTLIN MEDIA3 MIGRATION
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED 100% (Commit `cb08ccd`)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Master Reliability & Hybrid Kotlin Migration Completed Tasks:
+- [x] **P0-1: 1-to-1 Return Reply & Double Ratchet Fix**:
+  - Implemented `convManager.hasSession(session, peerIdentityId)`.
+  - Allowed direct encryption on active sessions in `encryptAndPackWireMessage` without requiring a prekey bundle.
+  - Eliminated raw unencrypted JSON fallback in `AppState.tsx`.
+  - Verified bidirectional message delivery locally and against live Render production.
+- [x] **P0-2: "profile is not defined" Crash Eliminated**:
+  - Destructured `myProfile` from `useApp()` in `GroupDetailsModal.tsx` with full null-safety.
+- [x] **P0-3: Group Membership Roster Convergence**:
+  - Broadcast authoritative roster updates to all existing group members in `addGroupMember`.
+  - Fixed missing `joinedAtEpoch` and `addedBy` fields on `GroupMember`.
+- [x] **P0-4: Network Reconnect Stability**:
+  - Guarded `reconnectNow()` against closing connecting/open sockets.
+  - Suppressed HTTP mailbox polling while WebSocket is connected.
+- [x] **P1-5: Native Kotlin Media3 Audio Implementation**:
+  - Created `VeilNativeMediaPlugin.kt` with authoritative single ExoPlayer instance.
+  - Audio focus management via `AudioAttributes` and automatic pause on headphone disconnect (`becomingNoisy`).
+  - Native playback events bridged to TypeScript without React timers.
+  - Created `NativeMediaBridge.ts` with web fallback in `voicePlayer.ts`.
+  - Android debug APK assembled successfully (`app-debug.apk`, 7.12 MB).
+- [x] **P2-7: Android Root Back Navigation**:
+  - Minimized app on root hardware back button instead of abrupt process termination.
 
 ### Completed Tasks (Audio Playback, Seeking & UI Pass)
 - [x] **Audio Range Streaming & Authentication (`cloudHandler.ts`)**:
