@@ -1,18 +1,8 @@
-/**
- * VEIL Clean Authentication Screen (First Login & Account Sign In).
- *
- * Designed as a modern, privacy-first authentication interface:
- * - Tabbed switcher between "Sign In" and "Create Account".
- * - Username & Password credentials with show/hide password visibility.
- * - Zero disclosure: no account counts, no space enumerations, no leaks.
- * - Local-first reassurance with Argon2id + XChaCha20 cryptography under the hood.
- */
-
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { PasswordInput } from './ui/PasswordInput.tsx';
 import { Button } from './ui/Button.tsx';
-import { ShieldIcon, AlertCircleIcon, UserIcon, LockIcon } from './icons/index.ts';
+import { ShieldCheckIcon, AlertCircleIcon, UserIcon, LockIcon, LayersIcon } from './icons/index.ts';
 
 interface LockScreenProps {
   onSuccessAuth?: (params: {
@@ -95,19 +85,30 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             justifyContent: 'center',
             minHeight: '100vh',
             width: '100vw',
-            backgroundColor: 'var(--veil-bg-base)',
-            color: 'var(--veil-text-primary)',
-            padding: '1rem',
+            backgroundColor: 'var(--veil-bg-base, #080b11)',
+            color: 'var(--veil-text-primary, #f3f4f6)',
+            padding: '1.5rem',
           }}
         >
-          <div className="veil-card" style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+          <div
+            className="veil-card"
+            style={{
+              maxWidth: '400px',
+              width: '100%',
+              textAlign: 'center',
+              backgroundColor: '#0f141d',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '20px',
+              padding: '2rem',
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-              <AlertCircleIcon size={36} color="var(--veil-danger)" />
+              <AlertCircleIcon size={36} color="var(--veil-danger, #ef4444)" />
             </div>
-            <h2 style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600, marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>
               Storage Unavailable
             </h2>
-            <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1.25rem' }}>
+            <p style={{ color: 'var(--veil-text-secondary, #94a3b8)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
               {storageError}
             </p>
             <Button variant="danger" onClick={() => window.location.reload()} fullWidth>
@@ -126,15 +127,41 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           justifyContent: 'center',
           minHeight: '100vh',
           width: '100vw',
-          backgroundColor: 'var(--veil-bg-base)',
-          color: 'var(--veil-text-primary)',
+          backgroundColor: 'var(--veil-bg-base, #080b11)',
+          color: 'var(--veil-text-primary, #f3f4f6)',
         }}
       >
-        <div className="veil-card" style={{ width: '90%', maxWidth: '360px', padding: '2rem', textAlign: 'center' }}>
-          <h2 style={{ fontSize: 'var(--veil-text-base)', fontWeight: 600, marginBottom: '0.25rem' }}>
+        <div
+          className="veil-card"
+          style={{
+            width: '90%',
+            maxWidth: '360px',
+            padding: '2rem',
+            textAlign: 'center',
+            backgroundColor: '#0f141d',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '20px',
+          }}
+        >
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              margin: '0 auto 1rem auto',
+              backgroundColor: 'rgba(20, 184, 166, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#14b8a6',
+            }}
+          >
+            <ShieldCheckIcon size={26} />
+          </div>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.35rem' }}>
             Initializing VEIL
           </h2>
-          <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-xs)' }}>
+          <p style={{ color: 'var(--veil-text-secondary, #94a3b8)', fontSize: '0.8rem', margin: 0 }}>
             Securing isolated cryptographic partitions...
           </p>
         </div>
@@ -148,270 +175,370 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     <div
       style={{
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
         width: '100vw',
-        backgroundColor: 'var(--veil-bg-base)',
-        padding: '1rem',
+        backgroundColor: 'var(--veil-bg-base, #080b11)',
+        padding: '1.5rem 1rem',
         userSelect: 'none',
+        boxSizing: 'border-box',
       }}
     >
       <div
-        className="veil-card"
         style={{
           width: '100%',
-          maxWidth: '380px',
-          padding: '2.25rem 1.75rem',
-          backgroundColor: 'var(--veil-bg-surface)',
-          borderColor: 'var(--veil-border)',
-          borderRadius: 'var(--veil-radius-xl)',
-          boxShadow: 'var(--veil-elevation-3)',
+          maxWidth: '390px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
         }}
       >
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: 'var(--veil-radius-lg)',
-              backgroundColor: 'var(--veil-accent-primary-subtle)',
-              border: '1px solid var(--veil-accent-primary-alpha)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--veil-accent-primary)',
-              marginBottom: '0.75rem',
-            }}
-          >
-            <ShieldIcon size={24} />
-          </div>
-          <h1
-            style={{
-              fontSize: '1.45rem',
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-              color: 'var(--veil-text-primary)',
-              margin: '0 0 0.35rem 0',
-            }}
-          >
-            VEIL
-          </h1>
-          <p
-            style={{
-              color: 'var(--veil-text-secondary)',
-              fontSize: 'var(--veil-text-xs)',
-              margin: 0,
-            }}
-          >
-            {mode === 'signin' ? 'Sign in to your account' : 'Create a new encrypted account'}
-          </p>
-        </div>
-
-        {/* Tab Switcher */}
+        {/* Brand Shield Logo with glowing badge */}
         <div
           style={{
-            display: 'flex',
-            backgroundColor: 'var(--veil-bg-surface-elevated)',
-            borderRadius: 'var(--veil-radius-md)',
-            padding: '4px',
-            marginBottom: '1.25rem',
-            border: '1px solid var(--veil-border-subtle)',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setMode('signin');
-              setError(null);
-            }}
-            style={{
-              flex: 1,
-              padding: '6px 0',
-              border: 'none',
-              borderRadius: 'var(--veil-radius-sm)',
-              fontSize: 'var(--veil-text-xs)',
-              fontWeight: 600,
-              cursor: 'pointer',
-              backgroundColor: mode === 'signin' ? 'var(--veil-accent-primary)' : 'transparent',
-              color: mode === 'signin' ? '#ffffff' : 'var(--veil-text-secondary)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('create');
-              setError(null);
-            }}
-            style={{
-              flex: 1,
-              padding: '6px 0',
-              border: 'none',
-              borderRadius: 'var(--veil-radius-sm)',
-              fontSize: 'var(--veil-text-xs)',
-              fontWeight: 600,
-              cursor: 'pointer',
-              backgroundColor: mode === 'create' ? 'var(--veil-accent-primary)' : 'transparent',
-              color: mode === 'create' ? '#ffffff' : 'var(--veil-text-secondary)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Create Account
-          </button>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label
-              htmlFor="username-input"
-              style={{
-                display: 'block',
-                fontSize: 'var(--veil-text-xs)',
-                fontWeight: 600,
-                color: 'var(--veil-text-secondary)',
-                marginBottom: '0.4rem',
-              }}
-            >
-              Username
-            </label>
-            <input
-              id="username-input"
-              type="text"
-              className="veil-input"
-              placeholder="e.g. alice"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={isLoading}
-              autoFocus
-              required
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          {mode === 'create' && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label
-                htmlFor="space-name-input"
-                style={{
-                  display: 'block',
-                  fontSize: 'var(--veil-text-xs)',
-                  fontWeight: 600,
-                  color: 'var(--veil-text-secondary)',
-                  marginBottom: '0.4rem',
-                }}
-              >
-                Space Name
-              </label>
-              <input
-                id="space-name-input"
-                type="text"
-                className="veil-input"
-                placeholder="e.g. Main Space, Work, Private"
-                value={spaceName}
-                onChange={(e) => setSpaceName(e.target.value)}
-                disabled={isLoading}
-                style={{ width: '100%' }}
-              />
-            </div>
-          )}
-
-          <div style={{ marginBottom: '1.25rem' }}>
-            <label
-              htmlFor="password-input"
-              style={{
-                display: 'block',
-                fontSize: 'var(--veil-text-xs)',
-                fontWeight: 600,
-                color: 'var(--veil-text-secondary)',
-                marginBottom: '0.4rem',
-              }}
-            >
-              Password
-            </label>
-            <PasswordInput
-              id="password-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter Space Passphrase"
-              disabled={isLoading}
-              required
-            />
-          </div>
-
-          {error && (
-            <div
-              style={{
-                padding: '0.65rem 0.85rem',
-                backgroundColor: 'var(--veil-danger-bg)',
-                border: '1px solid var(--veil-danger-border)',
-                borderRadius: 'var(--veil-radius-sm)',
-                color: 'var(--veil-danger)',
-                fontSize: 'var(--veil-text-xs)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginBottom: '1.25rem',
-              }}
-              role="alert"
-            >
-              <AlertCircleIcon size={16} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={isLoading}
-            disabled={isLoading || !password.trim()}
-          >
-            {isLoading ? (
-              <span>Authenticating...</span>
-            ) : mode === 'signin' ? (
-              <span>Unlock Space</span>
-            ) : (
-              <span>Create Account</span>
-            )}
-          </Button>
-
-          {showCancel && onCancelPasswordFallback && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              fullWidth
-              onClick={onCancelPasswordFallback}
-              style={{ marginTop: '0.75rem', fontSize: 'var(--veil-text-xs)' }}
-            >
-              Back to PIN Lock
-            </Button>
-          )}
-        </form>
-
-        {/* Local Security Assurance */}
-        <div
-          style={{
-            marginTop: '1.25rem',
-            textAlign: 'center',
-            fontSize: '11px',
-            color: 'var(--veil-text-muted)',
+            width: '68px',
+            height: '68px',
+            borderRadius: '20px',
+            backgroundColor: 'rgba(20, 184, 166, 0.12)',
+            border: '1.5px solid rgba(20, 184, 166, 0.35)',
+            boxShadow: '0 0 32px rgba(20, 184, 166, 0.22)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '4px',
+            color: '#14b8a6',
+            marginBottom: '1rem',
           }}
         >
-          <LockIcon size={12} color="var(--veil-text-muted)" />
-          <span>Locally encrypted with Argon2id &amp; XChaCha20</span>
+          <ShieldCheckIcon size={36} />
+        </div>
+
+        {/* Brand Title and Tagline */}
+        <h1
+          style={{
+            fontSize: '1.85rem',
+            fontWeight: 800,
+            letterSpacing: '0.04em',
+            color: '#ffffff',
+            margin: '0 0 0.25rem 0',
+          }}
+        >
+          VEIL
+        </h1>
+        <p
+          style={{
+            color: '#14b8a6',
+            fontSize: '0.825rem',
+            fontWeight: 500,
+            letterSpacing: '0.02em',
+            margin: '0 0 1.75rem 0',
+          }}
+        >
+          Private. Secure. Yours.
+        </p>
+
+        {/* Main Card Container */}
+        <div
+          style={{
+            width: '100%',
+            backgroundColor: '#0f141d',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
+            padding: '1.75rem 1.5rem',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.45)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ textAlign: 'center', marginBottom: '1.35rem' }}>
+            <h2
+              style={{
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                color: '#f3f4f6',
+                margin: '0 0 0.35rem 0',
+              }}
+            >
+              {mode === 'signin' ? 'Sign in to your account' : 'Create a new encrypted account'}
+            </h2>
+            <p
+              style={{
+                color: 'var(--veil-text-secondary, #94a3b8)',
+                fontSize: '0.775rem',
+                margin: 0,
+              }}
+            >
+              {mode === 'signin'
+                ? 'Enter your credentials to unlock your space'
+                : 'Your credentials derive your isolated cryptographic key'}
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            {/* Username Input */}
+            <div style={{ marginBottom: '1rem' }}>
+              <label
+                htmlFor="username-input"
+                style={{
+                  display: 'block',
+                  fontSize: '0.775rem',
+                  fontWeight: 600,
+                  color: 'var(--veil-text-secondary, #94a3b8)',
+                  marginBottom: '0.4rem',
+                }}
+              >
+                Username
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="username-input"
+                  type="text"
+                  className="veil-input"
+                  placeholder="e.g. alice"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={isLoading}
+                  autoFocus
+                  required
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#161d29',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    padding: '0.75rem 0.85rem 0.75rem 2.4rem',
+                    color: '#f3f4f6',
+                    fontSize: '0.875rem',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '0.85rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--veil-text-secondary, #94a3b8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <UserIcon size={16} />
+                </div>
+              </div>
+            </div>
+
+            {/* Space Name Input (Create Mode Only) */}
+            {mode === 'create' && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label
+                  htmlFor="space-name-input"
+                  style={{
+                    display: 'block',
+                    fontSize: '0.775rem',
+                    fontWeight: 600,
+                    color: 'var(--veil-text-secondary, #94a3b8)',
+                    marginBottom: '0.4rem',
+                  }}
+                >
+                  Space Name
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    id="space-name-input"
+                    type="text"
+                    className="veil-input"
+                    placeholder="e.g. Main Space, Work, Personal"
+                    value={spaceName}
+                    onChange={(e) => setSpaceName(e.target.value)}
+                    disabled={isLoading}
+                    style={{
+                      width: '100%',
+                      backgroundColor: '#161d29',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      padding: '0.75rem 0.85rem 0.75rem 2.4rem',
+                      color: '#f3f4f6',
+                      fontSize: '0.875rem',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '0.85rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      color: 'var(--veil-text-secondary, #94a3b8)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <LayersIcon size={16} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Password Input with placeholder 'Enter Space Passphrase' */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label
+                htmlFor="password-input"
+                style={{
+                  display: 'block',
+                  fontSize: '0.775rem',
+                  fontWeight: 600,
+                  color: 'var(--veil-text-secondary, #94a3b8)',
+                  marginBottom: '0.4rem',
+                }}
+              >
+                Password
+              </label>
+              <PasswordInput
+                id="password-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter Space Passphrase"
+                disabled={isLoading}
+                required
+              />
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '10px',
+                  color: '#f87171',
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '1.25rem',
+                }}
+                role="alert"
+              >
+                <AlertCircleIcon size={16} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Primary Action Button (Sign In / Unlock Space) */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={isLoading}
+              disabled={isLoading || !password.trim()}
+              aria-label="Unlock Space"
+              title="Unlock Space"
+              style={{
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: '#14b8a6',
+                fontWeight: 600,
+                fontSize: '0.925rem',
+                boxShadow: '0 4px 16px rgba(20, 184, 166, 0.28)',
+              }}
+            >
+              {isLoading ? (
+                <span>Authenticating...</span>
+              ) : mode === 'signin' ? (
+                <>
+                  <span>Sign In</span>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      width: 1,
+                      height: 1,
+                      padding: 0,
+                      margin: -1,
+                      overflow: 'hidden',
+                      clip: 'rect(0, 0, 0, 0)',
+                      whiteSpace: 'nowrap',
+                      border: 0,
+                    }}
+                  >
+                    Unlock Space
+                  </span>
+                </>
+              ) : (
+                <span>Create Account</span>
+              )}
+            </Button>
+
+            {/* Switch Mode Pill (+ Create New Account) */}
+            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'signin' ? 'create' : 'signin');
+                  setError(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#14b8a6',
+                  fontSize: '0.825rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  transition: 'opacity 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+              >
+                {mode === 'signin' ? '+ Create New Account' : 'Already have an account? Sign In'}
+              </button>
+            </div>
+
+            {showCancel && onCancelPasswordFallback && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                fullWidth
+                onClick={onCancelPasswordFallback}
+                style={{ marginTop: '0.75rem', fontSize: '0.8rem' }}
+              >
+                Back to PIN Lock
+              </Button>
+            )}
+          </form>
+
+          {/* Local Security Assurance */}
+          <div
+            style={{
+              marginTop: '1.5rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+              textAlign: 'center',
+              fontSize: '11px',
+              color: 'var(--veil-text-secondary, #94a3b8)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <LockIcon size={12} color="#14b8a6" />
+              <span>Locally encrypted with Argon2id &amp; XChaCha20</span>
+            </div>
+            <span style={{ fontSize: '10px', color: '#64748b' }}>
+              Zero-knowledge multi-space architecture
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+

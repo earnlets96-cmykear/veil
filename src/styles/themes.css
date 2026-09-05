@@ -11,50 +11,51 @@
  */
 
 /* =========================================================================
-   1. DARK (Default) — Deep charcoal neutral
+   1. DARK / MIDNIGHT (Default) — Deep dark navy/black surfaces
    ========================================================================= */
 :root,
 [data-theme="dark"],
+[data-theme="midnight"],
 [data-theme="obsidian"] {
-  --veil-bg-base: #0c0d10;
-  --veil-bg-surface: #15171c;
-  --veil-bg-surface-elevated: #1c1e24;
-  --veil-bg-surface-active: #242730;
-  --veil-bg-surface-hover: rgba(255, 255, 255, 0.04);
-  --veil-bg-surface-subtle: rgba(21, 23, 28, 0.7);
-  --veil-bg-glass: rgba(21, 23, 28, 0.92);
-  --veil-overlay-backdrop: rgba(0, 0, 0, 0.75);
+  --veil-bg-base: #080b11;
+  --veil-bg-surface: #0f141d;
+  --veil-bg-surface-elevated: #131926;
+  --veil-bg-surface-active: #1b2335;
+  --veil-bg-surface-hover: rgba(255, 255, 255, 0.05);
+  --veil-bg-surface-subtle: rgba(15, 20, 29, 0.75);
+  --veil-bg-glass: rgba(15, 20, 29, 0.92);
+  --veil-overlay-backdrop: rgba(0, 0, 0, 0.8);
 
   --veil-border: rgba(255, 255, 255, 0.08);
   --veil-border-subtle: rgba(255, 255, 255, 0.04);
-  --veil-border-strong: rgba(255, 255, 255, 0.15);
+  --veil-border-strong: rgba(255, 255, 255, 0.16);
   --veil-border-focus: var(--veil-accent-primary, #14b8a6);
-  --veil-divider: rgba(255, 255, 255, 0.06);
+  --veil-divider: rgba(255, 255, 255, 0.07);
 
   --veil-text-primary: #f1f3f7;
   --veil-text-secondary: #9aa0ac;
   --veil-text-muted: #5e6573;
   --veil-text-disabled: #3d424d;
-  --veil-text-inverse: #0c0d10;
+  --veil-text-inverse: #080b11;
 
-  /* Default Accent (Teal) — Overridden dynamically by data-accent */
+  /* Default Cyan/Teal VEIL Accent */
   --veil-accent-primary: #14b8a6;
   --veil-accent-primary-hover: #0d9488;
-  --veil-accent-primary-subtle: rgba(20, 184, 166, 0.12);
-  --veil-accent-primary-alpha: rgba(20, 184, 166, 0.25);
+  --veil-accent-primary-subtle: rgba(20, 184, 166, 0.15);
+  --veil-accent-primary-alpha: rgba(20, 184, 166, 0.28);
   --veil-accent-secondary: #06b6d4;
-  --veil-accent-glow: rgba(20, 184, 166, 0.18);
-  --veil-accent-glow-subtle: rgba(20, 184, 166, 0.08);
+  --veil-accent-glow: rgba(20, 184, 166, 0.25);
+  --veil-accent-glow-subtle: rgba(20, 184, 166, 0.1);
 
-  /* Restrained Message Bubbles */
-  --veil-bubble-outgoing: #1b262a;
-  --veil-bubble-outgoing-border: rgba(20, 184, 166, 0.25);
-  --veil-bubble-incoming: #171920;
-  --veil-bubble-incoming-border: rgba(255, 255, 255, 0.06);
-  --veil-bubble-outgoing-text: #f1f3f7;
+  /* Reference Chat Message Bubbles */
+  --veil-bubble-outgoing: #0d9488;
+  --veil-bubble-outgoing-border: transparent;
+  --veil-bubble-incoming: #161a24;
+  --veil-bubble-incoming-border: rgba(255, 255, 255, 0.07);
+  --veil-bubble-outgoing-text: #ffffff;
   --veil-bubble-incoming-text: #f1f3f7;
 
-  --veil-input-bg: #14161b;
+  --veil-input-bg: #111622;
 
   --veil-success: #22c55e;
   --veil-success-bg: rgba(34, 197, 94, 0.12);
@@ -70,16 +71,75 @@
   --veil-info-border: rgba(59, 130, 246, 0.25);
 
   --veil-gradient-primary: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
-  --veil-gradient-dark: linear-gradient(180deg, #15171c 0%, #0c0d10 100%);
+  --veil-gradient-dark: linear-gradient(180deg, #0f141d 0%, #080b11 100%);
 
   --veil-scheme: dark;
+}
+
+/* Ocean Theme */
+[data-theme="ocean"] {
+  --veil-bg-base: #08101a;
+  --veil-bg-surface: #0c1827;
+  --veil-bg-surface-elevated: #102136;
+  --veil-bg-surface-active: #162b47;
+  --veil-bg-glass: rgba(12, 24, 39, 0.92);
+  --veil-border: rgba(59, 130, 246, 0.14);
+  --veil-bubble-incoming: #0e1d30;
+  --veil-input-bg: #0c1827;
+}
+
+/* Forest Theme */
+[data-theme="forest"] {
+  --veil-bg-base: #07130e;
+  --veil-bg-surface: #0a1c15;
+  --veil-bg-surface-elevated: #0f261d;
+  --veil-bg-surface-active: #153529;
+  --veil-bg-glass: rgba(10, 28, 21, 0.92);
+  --veil-border: rgba(34, 197, 94, 0.14);
+  --veil-bubble-incoming: #0d221a;
+  --veil-input-bg: #0a1c15;
+}
+
+/* Amber Theme */
+[data-theme="amber"] {
+  --veil-bg-base: #120e0a;
+  --veil-bg-surface: #1a140e;
+  --veil-bg-surface-elevated: #241c14;
+  --veil-bg-surface-active: #31261b;
+  --veil-bg-glass: rgba(26, 20, 14, 0.92);
+  --veil-border: rgba(245, 158, 11, 0.14);
+  --veil-bubble-incoming: #201811;
+  --veil-input-bg: #1a140e;
+}
+
+/* Rose Theme */
+[data-theme="rose"] {
+  --veil-bg-base: #13090e;
+  --veil-bg-surface: #1b0d14;
+  --veil-bg-surface-elevated: #26131d;
+  --veil-bg-surface-active: #341a27;
+  --veil-bg-glass: rgba(27, 13, 20, 0.92);
+  --veil-border: rgba(244, 63, 94, 0.14);
+  --veil-bubble-incoming: #221019;
+  --veil-input-bg: #1b0d14;
+}
+
+/* Slate Theme */
+[data-theme="slate"] {
+  --veil-bg-base: #0c0d10;
+  --veil-bg-surface: #14161c;
+  --veil-bg-surface-elevated: #1c1e26;
+  --veil-bg-surface-active: #242732;
+  --veil-bg-glass: rgba(20, 22, 28, 0.92);
+  --veil-border: rgba(255, 255, 255, 0.08);
+  --veil-bubble-incoming: #181a22;
+  --veil-input-bg: #14161c;
 }
 
 /* =========================================================================
    2. AMOLED — Pure Black (#000000)
    ========================================================================= */
-[data-theme="amoled"],
-[data-theme="midnight"] {
+[data-theme="amoled"] {
   --veil-bg-base: #000000;
   --veil-bg-surface: #0a0a0c;
   --veil-bg-surface-elevated: #131316;

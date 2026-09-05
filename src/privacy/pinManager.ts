@@ -48,9 +48,19 @@ export interface DevicePinRegistry {
   autoLockInterval: AutoLockIntervalSetting;
   lockOnBackground: boolean;
   lockOnScreenOff: boolean;
+  afterExitingApp?: string;
+  afterBackground?: string;
+  afterScreenOff?: string;
+  afterInactivity?: string;
   biometricsEnabled: boolean;
   failedAttempts: number;
   lockedUntilEpoch: number;
+  onboardingCompletedSpaces?: Record<string, boolean>;
+  securityOptions?: {
+    hideContentInRecents?: boolean;
+    screenCaptureProtection?: boolean;
+    disableAppSwitcherPreview?: boolean;
+  };
   entries: Record<string, SpacePinEntry>; // Keyed by pinHash
 }
 
@@ -93,9 +103,19 @@ export class SpacePinManager {
       autoLockInterval: '5m',
       lockOnBackground: true,
       lockOnScreenOff: true,
+      afterExitingApp: '1m',
+      afterBackground: '5m',
+      afterScreenOff: 'immediately',
+      afterInactivity: '10m',
       biometricsEnabled: false,
       failedAttempts: 0,
       lockedUntilEpoch: 0,
+      onboardingCompletedSpaces: {},
+      securityOptions: {
+        hideContentInRecents: true,
+        screenCaptureProtection: true,
+        disableAppSwitcherPreview: true,
+      },
       entries: {},
     };
     this.saveRegistry(fresh);
@@ -185,7 +205,121 @@ export class SpacePinManager {
   }
 
   public isLockOnBackground(): boolean {
-    return this.registry.lockOnBackground;
+    return this.registry.lockOnBackground ?? true;
+  }
+
+  public setLockOnBackgroundEnabled(enabled: boolean): void {
+    this.setLockOnBackground(enabled);
+  }
+
+  public isLockOnBackgroundEnabled(): boolean {
+    return this.isLockOnBackground();
+  }
+
+  public setLockOnScreenOff(enabled: boolean): void {
+    this.registry.lockOnScreenOff = enabled;
+    this.saveRegistry();
+  }
+
+  public isLockOnScreenOff(): boolean {
+    return this.registry.lockOnScreenOff ?? true;
+  }
+
+  public setLockOnScreenOffEnabled(enabled: boolean): void {
+    this.setLockOnScreenOff(enabled);
+  }
+
+  public isLockOnScreenOffEnabled(): boolean {
+    return this.isLockOnScreenOff();
+  }
+
+  public getAfterExitingApp(): string {
+    return this.registry.afterExitingApp || '1m';
+  }
+
+  public setAfterExitingApp(val: string): void {
+    this.registry.afterExitingApp = val;
+    this.saveRegistry();
+  }
+
+  public getAfterBackground(): string {
+    return this.registry.afterBackground || '5m';
+  }
+
+  public setAfterBackground(val: string): void {
+    this.registry.afterBackground = val;
+    this.saveRegistry();
+  }
+
+  public getAfterScreenOff(): string {
+    return this.registry.afterScreenOff || 'immediately';
+  }
+
+  public setAfterScreenOff(val: string): void {
+    this.registry.afterScreenOff = val;
+    this.saveRegistry();
+  }
+
+  public getAfterInactivity(): string {
+    return this.registry.afterInactivity || '10m';
+  }
+
+  public setAfterInactivity(val: string): void {
+    this.registry.afterInactivity = val;
+    this.saveRegistry();
+  }
+
+  public getPinType(spaceId?: string): '4-digit' | '6-digit' {
+    if (spaceId) {
+      const meta = this.getSpaceMetadata(spaceId);
+      if (meta) {
+        return meta.pinLength === 4 ? '4-digit' : '6-digit';
+      }
+    }
+    const all = this.listRegisteredSpaces();
+    if (all.length > 0) {
+      return all[0].pinLength === 4 ? '4-digit' : '6-digit';
+    }
+    return '6-digit';
+  }
+
+  public isOnboardingCompleted(spaceId: string): boolean {
+    if (!this.registry.onboardingCompletedSpaces) {
+      this.registry.onboardingCompletedSpaces = {};
+    }
+    return Boolean(this.registry.onboardingCompletedSpaces[spaceId]);
+  }
+
+  public setOnboardingCompleted(spaceId: string, completed: boolean): void {
+    if (!this.registry.onboardingCompletedSpaces) {
+      this.registry.onboardingCompletedSpaces = {};
+    }
+    this.registry.onboardingCompletedSpaces[spaceId] = completed;
+    this.saveRegistry();
+  }
+
+  public getSecurityOptions(): {
+    hideContentInRecents: boolean;
+    screenCaptureProtection: boolean;
+    disableAppSwitcherPreview: boolean;
+  } {
+    return {
+      hideContentInRecents: this.registry.securityOptions?.hideContentInRecents ?? true,
+      screenCaptureProtection: this.registry.securityOptions?.screenCaptureProtection ?? true,
+      disableAppSwitcherPreview: this.registry.securityOptions?.disableAppSwitcherPreview ?? true,
+    };
+  }
+
+  public setSecurityOption(key: 'hideContentInRecents' | 'screenCaptureProtection' | 'disableAppSwitcherPreview', enabled: boolean): void {
+    if (!this.registry.securityOptions) {
+      this.registry.securityOptions = {
+        hideContentInRecents: true,
+        screenCaptureProtection: true,
+        disableAppSwitcherPreview: true,
+      };
+    }
+    this.registry.securityOptions[key] = enabled;
+    this.saveRegistry();
   }
 
   public setBiometricsEnabled(enabled: boolean): void {

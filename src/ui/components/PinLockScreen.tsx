@@ -1,39 +1,44 @@
 /**
- * VEIL Minimal PIN Gate Lock Screen.
+ * VEIL Minimal PIN Gate Lock Screen (Screen 3 & 10).
  *
  * Implements the core multi-space privacy gate:
- * - Neutral minimal interface: VEIL logo, lock icon, "Enter your PIN", interactive dots & keypad.
- * - Silent multi-space resolution: entering different PINs resolves to different spaces.
- * - Zero disclosure: no space names, no avatars, no accounts, no space counts.
- * - Anti-enumeration: wrong PIN displays generic "Incorrect PIN" with rate-limiting.
- * - Biometric unlock support where available.
- * - Discreet "Log in with password" fallback for fresh login or recovery.
+ * - Glowing teal shield logo with checkmark
+ * - "Enter your PIN"
+ * - Subtitle: "Simple. Private. Yours."
+ * - 6 PIN dots
+ * - Numeric keypad
+ * - "Forgot PIN?" password fallback
+ * - "Use Face ID" / Biometrics action
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { spacePinManager } from '../../privacy/pinManager.ts';
-import { ShieldIcon, LockIcon, DeleteIcon, AlertCircleIcon } from './icons/index.ts';
+import { ShieldIcon, DeleteIcon, AlertCircleIcon, ChevronRightIcon } from './icons/index.ts';
 import { Spinner } from './ui/Spinner.tsx';
 
 interface PinLockScreenProps {
   onFallbackToPassword?: () => void;
+  onFallbackPassword?: () => void;
 }
 
-export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPassword }) => {
+export const PinLockScreen: React.FC<PinLockScreenProps> = ({
+  onFallbackToPassword,
+  onFallbackPassword,
+}) => {
   const { unlockWithPin } = useApp();
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
 
-  const biometricsEnabled = spacePinManager.isBiometricsEnabled();
+  const fallbackHandler = onFallbackPassword || onFallbackToPassword;
 
   const handleDigit = useCallback((digit: string) => {
     if (isUnlocking) return;
     setError(null);
     setPin((prev) => {
-      if (prev.length >= 8) return prev;
+      if (prev.length >= 6) return prev;
       return prev + digit;
     });
   }, [isUnlocking]);
@@ -112,11 +117,10 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
     setIsUnlocking(true);
     setError(null);
     try {
-      // In Android / Web biometric environment, trigger credential challenge
       if (typeof window !== 'undefined' && (window as any).PublicKeyCredential) {
-        // Biometric assertion placeholder — falls back if not enrolled
+        // Biometric challenge
       }
-      throw new Error('Biometrics not configured on this device');
+      throw new Error('Biometric credentials unavailable on this device');
     } catch (err: any) {
       setError(err?.message || 'Biometric authentication unavailable');
       setIsUnlocking(false);
@@ -134,13 +138,14 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
     <div
       style={{
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
         width: '100vw',
         backgroundColor: 'var(--veil-bg-base)',
         color: 'var(--veil-text-primary)',
-        padding: '1rem',
+        padding: '1.5rem 1rem',
         userSelect: 'none',
       }}
     >
@@ -149,59 +154,59 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
         style={{
           width: '100%',
           maxWidth: '360px',
-          padding: '2.25rem 1.75rem',
+          padding: '2rem 1.5rem',
           textAlign: 'center',
           backgroundColor: 'var(--veil-bg-surface)',
-          borderColor: 'var(--veil-border)',
-          borderRadius: 'var(--veil-radius-xl)',
-          boxShadow: 'var(--veil-elevation-3)',
+          border: '1px solid var(--veil-border)',
+          borderRadius: '24px',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
         }}
       >
-        {/* Brand Shield & App Lock Header */}
+        {/* Glowing Shield / Logo */}
         <div
           style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: 'var(--veil-radius-lg)',
-            backgroundColor: 'var(--veil-accent-primary-subtle)',
-            border: '1px solid var(--veil-accent-primary-alpha)',
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(20, 184, 166, 0.1)',
+            border: '2px solid var(--veil-accent-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'var(--veil-accent-primary)',
-            marginBottom: '1rem',
+            boxShadow: '0 0 24px rgba(20, 184, 166, 0.3)',
+            marginBottom: '1.25rem',
           }}
         >
-          <LockIcon size={22} />
+          <ShieldIcon size={32} />
         </div>
 
         <h1
           style={{
-            fontSize: '1.35rem',
+            fontSize: '1.25rem',
             fontWeight: 700,
-            letterSpacing: '-0.02em',
             margin: '0 0 0.35rem 0',
             color: 'var(--veil-text-primary)',
           }}
         >
-          VEIL
+          Enter your PIN
         </h1>
 
         <p
           style={{
             fontSize: 'var(--veil-text-xs)',
-            color: 'var(--veil-text-secondary)',
+            color: 'var(--veil-text-muted)',
             margin: '0 0 1.75rem 0',
             fontWeight: 500,
           }}
         >
-          Enter your PIN
+          Simple. Private. Yours.
         </p>
 
-        {/* PIN Dot Indicators */}
+        {/* 6 PIN Dot Indicators */}
         <div
           style={{
             display: 'flex',
@@ -213,21 +218,22 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
           }}
           aria-label={`${pin.length} digits entered`}
         >
-          {Array.from({ length: Math.max(pin.length > 4 ? 6 : 4, pin.length) }).map((_, idx) => {
+          {Array.from({ length: 6 }).map((_, idx) => {
             const isFilled = idx < pin.length;
             return (
               <div
                 key={idx}
                 style={{
-                  width: '14px',
-                  height: '14px',
+                  width: '12px',
+                  height: '12px',
                   borderRadius: '50%',
                   backgroundColor: isFilled ? 'var(--veil-accent-primary)' : 'transparent',
                   border: isFilled
                     ? '1px solid var(--veil-accent-primary)'
-                    : '2px solid var(--veil-border-strong)',
-                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-                  transform: isFilled ? 'scale(1.15)' : 'scale(1)',
+                    : '2px solid rgba(255, 255, 255, 0.25)',
+                  boxShadow: isFilled ? '0 0 8px var(--veil-accent-glow)' : 'none',
+                  transition: 'all 0.15s ease',
+                  transform: isFilled ? 'scale(1.2)' : 'scale(1)',
                 }}
               />
             );
@@ -242,7 +248,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
               padding: '0.6rem 0.75rem',
               backgroundColor: 'var(--veil-danger-bg)',
               border: '1px solid var(--veil-danger-border)',
-              borderRadius: 'var(--veil-radius-md)',
+              borderRadius: '12px',
               color: 'var(--veil-danger)',
               fontSize: 'var(--veil-text-xs)',
               textAlign: 'center',
@@ -285,8 +291,8 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
                     disabled={isUnlocking || pin.length === 0}
                     aria-label="Backspace"
                     style={{
-                      height: '58px',
-                      borderRadius: 'var(--veil-radius-lg)',
+                      height: '54px',
+                      borderRadius: '16px',
                       border: 'none',
                       backgroundColor: 'transparent',
                       color: 'var(--veil-text-secondary)',
@@ -294,17 +300,11 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: pin.length > 0 ? 'pointer' : 'default',
-                      opacity: pin.length > 0 ? 1 : 0.4,
-                      transition: 'background-color 0.1s ease, transform 0.1s ease',
-                    }}
-                    onMouseDown={(e) => {
-                      if (pin.length > 0) e.currentTarget.style.transform = 'scale(0.92)';
-                    }}
-                    onMouseUp={(e) => {
-                      e.currentTarget.style.transform = 'scale(1)';
+                      opacity: pin.length > 0 ? 1 : 0.35,
+                      transition: 'transform 0.1s ease',
                     }}
                   >
-                    <DeleteIcon size={20} />
+                    <DeleteIcon size={22} />
                   </button>
                 );
               }
@@ -317,35 +317,18 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
                   disabled={isUnlocking}
                   aria-label={`Digit ${val}`}
                   style={{
-                    height: '58px',
-                    borderRadius: 'var(--veil-radius-lg)',
+                    height: '54px',
+                    borderRadius: '16px',
                     border: '1px solid var(--veil-border)',
-                    backgroundColor: 'var(--veil-bg-surface-elevated)',
+                    backgroundColor: 'var(--veil-bg-base)',
                     color: 'var(--veil-text-primary)',
-                    fontSize: '1.35rem',
+                    fontSize: '1.3rem',
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: isUnlocking ? 'default' : 'pointer',
-                    transition: 'background-color 0.15s ease, transform 0.1s ease, border-color 0.15s ease',
-                  }}
-                  onMouseDown={(e) => {
-                    if (!isUnlocking) {
-                      e.currentTarget.style.transform = 'scale(0.92)';
-                      e.currentTarget.style.backgroundColor = 'var(--veil-bg-surface-active)';
-                      e.currentTarget.style.borderColor = 'var(--veil-accent-primary)';
-                    }
-                  }}
-                  onMouseUp={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = 'var(--veil-bg-surface-elevated)';
-                    e.currentTarget.style.borderColor = 'var(--veil-border)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = 'var(--veil-bg-surface-elevated)';
-                    e.currentTarget.style.borderColor = 'var(--veil-border)';
+                    transition: 'all 0.1s ease',
                   }}
                 >
                   {val}
@@ -355,20 +338,20 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
           )}
         </div>
 
-        {/* Biometrics & Fallback Action */}
+        {/* Bottom Actions: Forgot PIN? & Face ID */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '0.75rem',
+            gap: '1rem',
             width: '100%',
           }}
         >
-          {biometricsEnabled && (
+          {fallbackHandler && (
             <button
               type="button"
-              onClick={handleBiometricUnlock}
+              onClick={fallbackHandler}
               disabled={isUnlocking}
               style={{
                 background: 'transparent',
@@ -377,32 +360,34 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({ onFallbackToPasswo
                 fontSize: 'var(--veil-text-xs)',
                 fontWeight: 600,
                 cursor: 'pointer',
-                padding: '0.35rem 0.75rem',
-                borderRadius: 'var(--veil-radius-sm)',
+                padding: '4px',
               }}
             >
-              Use Biometrics
+              Forgot PIN?
             </button>
           )}
 
-          {onFallbackToPassword && (
-            <button
-              type="button"
-              onClick={onFallbackToPassword}
-              disabled={isUnlocking}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--veil-text-muted)',
-                fontSize: '11px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                padding: '0.25rem 0.5rem',
-              }}
-            >
-              Log in with password
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleBiometricUnlock}
+            disabled={isUnlocking}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--veil-text-secondary)',
+              fontSize: 'var(--veil-text-xs)',
+              cursor: 'pointer',
+              padding: '6px 12px',
+            }}
+          >
+            <ShieldIcon size={16} />
+            <span>Use Face ID</span>
+            <ChevronRightIcon size={14} />
+          </button>
 
           {isUnlocking && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>

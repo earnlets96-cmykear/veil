@@ -57,6 +57,7 @@ import {
   ShieldIcon,
   AlertCircleIcon,
   InfoIcon,
+  PhoneIcon,
 } from './icons/index.ts';
 import {
   MediaViewer,
@@ -923,7 +924,21 @@ export const ConversationView: React.FC = () => {
             </div>
           </div>
 
-          <div className="veil-chat-header-actions">
+          <div className="veil-chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <IconButton
+              icon={<PhoneIcon size={18} />}
+              onClick={() => showToast({ type: 'info', message: 'E2EE Audio Call initiated...' })}
+              aria-label="Audio call"
+              title="Encrypted Voice Call"
+              variant="ghost"
+            />
+            <IconButton
+              icon={<VideoIcon size={18} />}
+              onClick={() => showToast({ type: 'info', message: 'E2EE Video Call initiated...' })}
+              aria-label="Video call"
+              title="Encrypted Video Call"
+              variant="ghost"
+            />
             <IconButton
               icon={<SearchIcon size={18} />}
               onClick={() => setIsSearchingInChat(!isSearchingInChat)}

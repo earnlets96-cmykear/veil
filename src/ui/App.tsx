@@ -29,6 +29,7 @@ export const App: React.FC = () => {
     activeModal,
     recoveryPasswordChangeRequired,
     openModal,
+    closeModal,
     isAppLocked,
   } = useApp();
 
@@ -80,7 +81,8 @@ export const App: React.FC = () => {
           showCancel={hasRegisteredPins}
           onCancelPasswordFallback={hasRegisteredPins ? () => setShowPasswordLogin(false) : undefined}
           onSuccessAuth={(params) => {
-            if (!spacePinManager.hasPinForSpace(params.spaceId || params.username)) {
+            const targetId = params.spaceId || params.username;
+            if (!spacePinManager.isOnboardingCompleted(targetId) && !spacePinManager.hasPinForSpace(targetId)) {
               setPendingPinSetup(params);
             }
           }}
@@ -186,10 +188,13 @@ export const App: React.FC = () => {
       {(activeModal?.type === 'appLockSetup' || pendingPinSetup) && (
         <AppLockSetupModal
           spaceId={pendingPinSetup?.spaceId || activeSession?.spaceId || ''}
-          username={pendingPinSetup?.username || ''}
+          username={pendingPinSetup?.username || (activeSession as any)?.username || ''}
           spaceName={pendingPinSetup?.spaceName || activeSession?.name || ''}
           password={pendingPinSetup?.password}
-          onComplete={() => setPendingPinSetup(null)}
+          onComplete={() => {
+            setPendingPinSetup(null);
+            closeModal();
+          }}
         />
       )}
     </div>

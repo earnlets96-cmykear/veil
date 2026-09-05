@@ -9,7 +9,17 @@
  * - Persistent storage surviving app restart, app lock, and account switching
  */
 
-export type ThemeMode = 'dark' | 'amoled' | 'dim' | 'light';
+export type ThemeMode =
+  | 'midnight'
+  | 'ocean'
+  | 'forest'
+  | 'amber'
+  | 'rose'
+  | 'slate'
+  | 'dark'
+  | 'amoled'
+  | 'dim'
+  | 'light';
 
 export type AccentColor =
   | 'teal'
@@ -35,12 +45,17 @@ export interface ThemeOption {
   name: string;
   description: string;
   bgHex: string;
+  accentHex?: string;
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { id: 'dark', name: 'Dark (Default)', description: 'Deep neutral charcoal panels (#0c0d10, #15171c)', bgHex: '#0c0d10' },
+  { id: 'midnight', name: 'Midnight', description: 'Deep navy & black VEIL dark mode', bgHex: '#080b11', accentHex: '#14b8a6' },
+  { id: 'ocean', name: 'Ocean', description: 'Deep marine blue encrypted tones', bgHex: '#08101a', accentHex: '#3b82f6' },
+  { id: 'forest', name: 'Forest', description: 'Deep emerald pine dark surfaces', bgHex: '#07130e', accentHex: '#22c55e' },
+  { id: 'amber', name: 'Amber', description: 'Warm obsidian dark charcoal', bgHex: '#120e0a', accentHex: '#f59e0b' },
+  { id: 'rose', name: 'Rose', description: 'Deep velvet burgundy dark surfaces', bgHex: '#13090e', accentHex: '#f43f5e' },
+  { id: 'slate', name: 'Slate', description: 'Neutral graphite slate dark finish', bgHex: '#0c0d10', accentHex: '#94a3b8' },
   { id: 'amoled', name: 'AMOLED', description: 'Pure black background (#000000) for OLED battery savings', bgHex: '#000000' },
-  { id: 'dim', name: 'Dim', description: 'Soft slate dark tones with lowered contrast', bgHex: '#181b22' },
   { id: 'light', name: 'Light', description: 'High-contrast clean light mode', bgHex: '#f8fafc' },
 ];
 
@@ -142,8 +157,9 @@ export class ThemeManager {
     let bubbleStyle: BubbleStyle = 'modern';
     let fontSize: FontSizeSetting = 'default';
 
-    const savedTheme = getStorageItem(STORAGE_KEYS.theme);
-    if (savedTheme === 'dark' || savedTheme === 'amoled' || savedTheme === 'dim' || savedTheme === 'light') {
+    const savedTheme = getStorageItem(STORAGE_KEYS.theme) as ThemeMode;
+    const validThemes: ThemeMode[] = ['midnight', 'ocean', 'forest', 'amber', 'rose', 'slate', 'dark', 'amoled', 'dim', 'light'];
+    if (savedTheme && validThemes.includes(savedTheme)) {
       theme = savedTheme;
     }
 

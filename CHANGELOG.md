@@ -2,6 +2,38 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-showcase-ui-redesign] - 2026-09-06
+
+### Completed Full UI/UX Redesign (10 Showcase Screens & App Lock Overhaul)
+- **App Lock Runtime Fix & Advanced Controls (`src/privacy/pinManager.ts`, `src/ui/components/AppLockSettingsView.tsx`, `src/ui/components/SecurityOptionsView.tsx`)**:
+  - Resolved `Tt.isLockOnBackgroundEnabled is not a function` minification issue by providing explicit typed getters/setters (`isLockOnBackgroundEnabled`, `setLockOnBackgroundEnabled`, `isLockOnScreenOffEnabled`, `setLockOnScreenOffEnabled`).
+  - Added granular auto-lock timer controls (`afterExitingApp`, `afterBackground`, `afterScreenOff`, `afterInactivity`) and instant Red "Lock Now" action.
+  - Implemented Screen 9: Security Options with toggleable native protections (Hide app content in recents, Screen capture protection, Disable app switcher preview, Biometric authentication) and palette theme swatch picker.
+- **Screen 1: First Login Redesign (`src/ui/components/LockScreen.tsx`)**:
+  - Rebuilt with deep midnight palette (`#080b11`), glowing circular shield checkmark badge (`#14b8a6`), clean username input with user icon, password passphrase input, full-width teal "Sign In" button with accessible `Unlock Space` test contract, "+ Create New Account" pill, and zero-knowledge local encryption notice.
+- **Screen 2: Set App Lock Modal (`src/ui/components/AppLockSetupModal.tsx`)**:
+  - Glowing circular lock badge, 4-digit / 6-digit PIN length toggle, interactive on-screen numeric keypad, collision prevention, confirmation flow, and persistent onboarding flag.
+- **Screen 3 & 10: PIN Entry Unlock Screen (`src/ui/components/PinLockScreen.tsx`)**:
+  - Centered glowing teal shield icon, interactive PIN dots with shake animation on error, responsive numeric keypad, "Forgot PIN?" fallback to password, and "Use Face ID" biometric button.
+- **Screen 4: Conversations Sidebar Redesign (`src/ui/components/Sidebar.tsx`)**:
+  - Top header with hamburger Menu icon (opens Accounts & Spaces), centered bold "VEIL" title, and expandable search toggle.
+  - Filter chips bar: `All`, `Unread`, `Groups`, and `Spaces` (direct shortcut to Accounts & Spaces).
+  - Clean list items with avatars, timestamps, SVG media snippet icons, outgoing message statuses, and teal unread pills.
+  - Floating Action Button (+) on bottom-right with glowing teal shadow for starting new chats.
+  - Bottom navigation bar with 4 tabs: `Chats`, `Calls`, `Groups`, and `Settings`.
+- **Screen 5: Chat Screen Redesign (`src/ui/components/ConversationView.tsx`, `src/ui/components/ui/MessageBubble.tsx`)**:
+  - Top header with mobile back button, avatar, verified identity badge, status text, and action buttons: Audio Call, Video Call, In-Chat Search, Shared Media Gallery, and Details.
+  - Persistent pinned message banner with 1-click jump-to-message and unpin button.
+  - Incoming dark bubbles (`#161a24`), outgoing teal bubbles (`#0d9488`), colored sender tags for group members, and reaction pill support.
+- **Screen 6: Accounts & Spaces Redesign (`src/ui/components/AccountsAndSpacesModal.tsx`)**:
+  - Active space card with teal badge, "Your Spaces" list with cryptographic padlock indicators, "+ Add Account" & "+ Create Space" buttons, and informative "How it works?" explanation card.
+- **Screen 7: Customize Your VEIL (`src/ui/components/AppearanceSettingsView.tsx`, `src/styles/themes.css`, `src/ui/utils/themeManager.ts`)**:
+  - 6 showcase themes (`midnight`, `ocean`, `forest`, `amber`, `rose`, `slate`), 11 accent color swatches, and 6 feature callout badges.
+- **Verification & Builds**:
+  - All test suites passing with 100% pass rate.
+  - Production build cleanly compiled via Vite (`npm run build`).
+  - Android assets synchronized via Capacitor (`npx cap sync android`).
+
 ## [1.0.0-ui-applock-overhaul] - 2026-09-05
 
 ### Added & Overhauled (Complete UI/UX Redesign, Multi-Space App Lock & Centralized Theme Engine)

@@ -1,18 +1,18 @@
 /**
- * VEIL "Protect VEIL" App Lock PIN Setup Modal.
+ * VEIL "Set App Lock" PIN Setup Modal (Screen 2).
  *
- * Guides user immediately following account authentication / creation:
- * - Allows choosing 4-digit or 6-digit PIN.
- * - Stage 1: Choose PIN.
- * - Stage 2: Confirm PIN.
- * - Real-time validation, PIN collision check, and secure wrapping via spacePinManager.
+ * Implements real App Lock onboarding & PIN configuration:
+ * - Glowing circular lock badge in teal
+ * - 4 or 6 digit PIN option with toggle button
+ * - Stage 1: Choose PIN
+ * - Stage 2: Confirm PIN
+ * - Real collision prevention and persistent onboarding completion
  */
 
 import React, { useState } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { spacePinManager } from '../../privacy/pinManager.ts';
-import { LockIcon, ShieldIcon, AlertCircleIcon, DeleteIcon } from './icons/index.ts';
-import { Button } from './ui/Button.tsx';
+import { LockIcon, ShieldIcon, AlertCircleIcon, DeleteIcon, ArrowLeftIcon } from './icons/index.ts';
 
 interface AppLockSetupModalProps {
   onComplete?: () => void;
@@ -36,7 +36,7 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
   const targetUsername = username || myProfile?.username || '';
   const targetSpaceName = spaceName || activeSession?.name || targetUsername || 'Primary Space';
 
-  const [pinLength, setPinLength] = useState<4 | 6>(4);
+  const [pinLength, setPinLength] = useState<4 | 6>(6);
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [firstPin, setFirstPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -44,6 +44,17 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const activePin = step === 'create' ? firstPin : confirmPin;
+
+  const handleDismiss = () => {
+    if (targetSpaceId) {
+      spacePinManager.setOnboardingCompleted(targetSpaceId, true);
+    }
+    if (onComplete) {
+      onComplete();
+    } else {
+      closeModal();
+    }
+  };
 
   const handleDigit = (d: string) => {
     if (isSubmitting) return;
@@ -53,7 +64,6 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
         const next = firstPin + d;
         setFirstPin(next);
         if (next.length === pinLength) {
-          // Check PIN availability before moving to confirm
           const avail = spacePinManager.isPinAvailableSync(next, targetSpaceId);
           if (!avail) {
             setError('This PIN is unavailable. Please choose a different PIN.');
@@ -75,7 +85,6 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
             setFirstPin('');
             return;
           }
-          // Matching PIN: submit and save
           submitPin(next);
         }
       }
@@ -104,6 +113,8 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
         pin: finalPin,
         accountId,
       });
+      spacePinManager.setOnboardingCompleted(targetSpaceId, true);
+      spacePinManager.setAppLockEnabled(true);
       if (onComplete) {
         onComplete();
       } else {
@@ -132,7 +143,7 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
         inset: 0,
         zIndex: 9999,
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(10px)',
+        backdropFilter: 'blur(12px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -144,43 +155,82 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
         style={{
           width: '100%',
           maxWidth: '380px',
-          padding: '2.25rem 1.75rem',
-          backgroundColor: 'var(--veil-bg-surface)',
-          borderColor: 'var(--veil-border)',
-          borderRadius: 'var(--veil-radius-xl)',
-          textAlign: 'center',
-          boxShadow: 'var(--veil-elevation-3)',
+          padding: '1.75rem 1.5rem',
+          backgroundColor: 'var(--veil-bg-base)',
+          border: '1px solid var(--veil-border)',
+          borderRadius: '24px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
+          position: 'relative',
         }}
       >
+        {/* Top Header Row with Back Button */}
         <div
           style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: 'var(--veil-radius-lg)',
-            backgroundColor: 'var(--veil-accent-primary-subtle)',
-            border: '1px solid var(--veil-accent-primary-alpha)',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '1rem',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleDismiss}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--veil-text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '4px',
+            }}
+          >
+            <ArrowLeftIcon size={18} />
+          </button>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--veil-text-primary)' }}>
+              Set App Lock
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--veil-text-muted)' }}>
+              Secure your VEIL
+            </div>
+          </div>
+          <div style={{ width: '24px' }} />
+        </div>
+
+        {/* Glowing Lock Badge */}
+        <div
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(20, 184, 166, 0.1)',
+            border: '2px solid var(--veil-accent-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'var(--veil-accent-primary)',
+            boxShadow: '0 0 20px rgba(20, 184, 166, 0.25)',
             marginBottom: '1rem',
           }}
         >
-          <ShieldIcon size={24} />
+          <LockIcon size={28} />
         </div>
 
+        {/* Title & Subtitle */}
         <h2
           style={{
-            fontSize: '1.4rem',
+            fontSize: '1.25rem',
             fontWeight: 700,
             margin: '0 0 0.4rem 0',
             color: 'var(--veil-text-primary)',
           }}
         >
-          Protect VEIL
+          {step === 'create' ? 'Set App Lock' : 'Confirm your PIN'}
         </h2>
 
         <p
@@ -189,70 +239,14 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
             color: 'var(--veil-text-secondary)',
             margin: '0 0 1.5rem 0',
             lineHeight: 1.4,
+            textAlign: 'center',
+            whiteSpace: 'pre-line',
           }}
         >
           {step === 'create'
-            ? 'Create an app PIN to protect VEIL on this device.'
-            : 'Confirm your app PIN to finish setup.'}
+            ? 'Choose a 4 or 6 digit PIN\nYou\'ll use this to unlock VEIL'
+            : 'Re-enter your PIN to verify and complete setup.'}
         </p>
-
-        {/* PIN Length Switcher (only shown on create step) */}
-        {step === 'create' && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '6px',
-              backgroundColor: 'var(--veil-bg-surface-elevated)',
-              padding: '4px',
-              borderRadius: 'var(--veil-radius-md)',
-              marginBottom: '1.5rem',
-              border: '1px solid var(--veil-border-subtle)',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setPinLength(4);
-                setFirstPin('');
-                setError(null);
-              }}
-              style={{
-                border: 'none',
-                padding: '4px 14px',
-                borderRadius: 'var(--veil-radius-sm)',
-                fontSize: 'var(--veil-text-xs)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                backgroundColor: pinLength === 4 ? 'var(--veil-accent-primary)' : 'transparent',
-                color: pinLength === 4 ? '#ffffff' : 'var(--veil-text-secondary)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              4-digit PIN
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPinLength(6);
-                setFirstPin('');
-                setError(null);
-              }}
-              style={{
-                border: 'none',
-                padding: '4px 14px',
-                borderRadius: 'var(--veil-radius-sm)',
-                fontSize: 'var(--veil-text-xs)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                backgroundColor: pinLength === 6 ? 'var(--veil-accent-primary)' : 'transparent',
-                color: pinLength === 6 ? '#ffffff' : 'var(--veil-text-secondary)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              6-digit PIN
-            </button>
-          </div>
-        )}
 
         {/* PIN Dot Indicators */}
         <div
@@ -261,7 +255,7 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             gap: '12px',
-            marginBottom: '1.75rem',
+            marginBottom: '1.5rem',
           }}
         >
           {Array.from({ length: pinLength }).map((_, idx) => {
@@ -270,15 +264,16 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
               <div
                 key={idx}
                 style={{
-                  width: '14px',
-                  height: '14px',
+                  width: '12px',
+                  height: '12px',
                   borderRadius: '50%',
                   backgroundColor: isFilled ? 'var(--veil-accent-primary)' : 'transparent',
                   border: isFilled
                     ? '1px solid var(--veil-accent-primary)'
-                    : '2px solid var(--veil-border-strong)',
+                    : '2px solid rgba(255, 255, 255, 0.25)',
+                  boxShadow: isFilled ? '0 0 8px var(--veil-accent-glow)' : 'none',
                   transition: 'all 0.15s ease',
-                  transform: isFilled ? 'scale(1.15)' : 'scale(1)',
+                  transform: isFilled ? 'scale(1.2)' : 'scale(1)',
                 }}
               />
             );
@@ -293,7 +288,7 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
               padding: '0.6rem 0.75rem',
               backgroundColor: 'var(--veil-danger-bg)',
               border: '1px solid var(--veil-danger-border)',
-              borderRadius: 'var(--veil-radius-md)',
+              borderRadius: '12px',
               color: 'var(--veil-danger)',
               fontSize: 'var(--veil-text-xs)',
               textAlign: 'center',
@@ -301,7 +296,7 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.4rem',
-              marginBottom: '1.25rem',
+              marginBottom: '1rem',
             }}
           >
             <AlertCircleIcon size={14} />
@@ -317,6 +312,7 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
             gap: '12px',
             width: '100%',
             maxWidth: '280px',
+            marginBottom: '1rem',
           }}
         >
           {keypadDigits.map((row, rowIdx) =>
@@ -333,8 +329,8 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
                     onClick={handleBackspace}
                     disabled={isSubmitting || activePin.length === 0}
                     style={{
-                      height: '54px',
-                      borderRadius: 'var(--veil-radius-lg)',
+                      height: '52px',
+                      borderRadius: '16px',
                       border: 'none',
                       backgroundColor: 'transparent',
                       color: 'var(--veil-text-secondary)',
@@ -342,10 +338,10 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: activePin.length > 0 ? 'pointer' : 'default',
-                      opacity: activePin.length > 0 ? 1 : 0.4,
+                      opacity: activePin.length > 0 ? 1 : 0.35,
                     }}
                   >
-                    <DeleteIcon size={20} />
+                    <DeleteIcon size={22} />
                   </button>
                 );
               }
@@ -357,12 +353,12 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
                   onClick={() => handleDigit(val)}
                   disabled={isSubmitting}
                   style={{
-                    height: '54px',
-                    borderRadius: 'var(--veil-radius-lg)',
+                    height: '52px',
+                    borderRadius: '16px',
                     border: '1px solid var(--veil-border)',
-                    backgroundColor: 'var(--veil-bg-surface-elevated)',
+                    backgroundColor: 'var(--veil-bg-surface)',
                     color: 'var(--veil-text-primary)',
-                    fontSize: '1.3rem',
+                    fontSize: '1.25rem',
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.1s ease',
@@ -373,6 +369,49 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
               );
             })
           )}
+        </div>
+
+        {/* 4 or 6-digit PIN Toggle Button */}
+        {step === 'create' && (
+          <button
+            type="button"
+            onClick={() => {
+              const nextLen = pinLength === 6 ? 4 : 6;
+              setPinLength(nextLen);
+              setFirstPin('');
+              setError(null);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--veil-accent-primary)',
+              fontSize: 'var(--veil-text-xs)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: '1.25rem',
+              padding: '6px 12px',
+            }}
+          >
+            {pinLength === 6 ? 'Use 4-digit PIN' : 'Use 6-digit PIN'}
+          </button>
+        )}
+
+        {/* Footer Notice */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid var(--veil-border-subtle)',
+            width: '100%',
+            justifyContent: 'center',
+          }}
+        >
+          <ShieldIcon size={16} color="var(--veil-text-muted)" />
+          <span style={{ fontSize: '11px', color: 'var(--veil-text-muted)' }}>
+            This PIN locks and unlocks all your spaces on this device.
+          </span>
         </div>
       </div>
     </div>

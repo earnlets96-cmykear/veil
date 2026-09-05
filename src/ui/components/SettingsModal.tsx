@@ -19,6 +19,7 @@ import { MediaCache } from '../utils/mediaCache.ts';
 import { getErrorMessage } from '../../utils/errors.ts';
 import { AppLockSettingsView } from './AppLockSettingsView.tsx';
 import { AppearanceSettingsView } from './AppearanceSettingsView.tsx';
+import { SecurityOptionsView } from './SecurityOptionsView.tsx';
 import {
   Avatar,
   Badge,
@@ -52,6 +53,7 @@ import {
   MoonIcon,
   BellIcon,
   ChevronRightIcon,
+  ShieldCheckIcon,
 } from './icons/index.ts';
 
 export type SettingsCategory =
@@ -60,6 +62,7 @@ export type SettingsCategory =
   | 'account'
   | 'devices'
   | 'privacy'
+  | 'securityOptions'
   | 'appLock'
   | 'notifications'
   | 'appearance'
@@ -410,6 +413,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                   <div className="veil-settings-row-text">
                     <div className="veil-settings-row-title">App Lock & PIN Access</div>
                     <div className="veil-settings-row-sub">Require PIN, auto-lock, multi-space gates</div>
+                  </div>
+                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
+                </div>
+
+                <div
+                  className="veil-settings-row"
+                  onClick={() => setActiveCategory('securityOptions')}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="veil-settings-icon-badge badge-teal" style={{ backgroundColor: '#0d9488' }}>
+                    <ShieldCheckIcon size={18} color="#ffffff" />
+                  </div>
+                  <div className="veil-settings-row-text">
+                    <div className="veil-settings-row-title">Security Options</div>
+                    <div className="veil-settings-row-sub">Hide in recents, screen protection, biometrics</div>
                   </div>
                   <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
                 </div>
@@ -811,6 +830,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                 onOpenPinSetup={() => openModal({ type: 'appLockSetup' })}
                 onOpenAccountsAndSpaces={() => openModal({ type: 'accountsAndSpaces' })}
               />
+            </div>
+          )}
+
+          {/* SECURITY OPTIONS SUB-PAGE */}
+          {activeCategory === 'securityOptions' && (
+            <div className="veil-settings-subpage">
+              <SecurityOptionsView onBack={() => setActiveCategory('overview')} />
             </div>
           )}
 

@@ -191,6 +191,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           transition: swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
         }}
       >
+        {!isOutgoing && senderName && (
+          <div
+            className="veil-message-sender-tag"
+            style={{
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              color: 'var(--veil-accent-primary, #14b8a6)',
+              marginBottom: '3px',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {senderName}
+          </div>
+        )}
+
         {replyTo && (
           <ReplyPreview
             replyTo={replyTo}

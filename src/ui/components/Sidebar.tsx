@@ -1,9 +1,14 @@
 /**
- * Modernized Conversation Sidebar Component for VEIL Phase 33.
+ * Modernized Conversation Sidebar Component for VEIL Phase 33 & Showcase Redesign.
  *
- * Implements Telegram-inspired conversation list, active Space identity header,
- * tabbed filtering (All, Chats, Groups, Contacts), SVG snippet indicators (Photo,
- * Video, File, Voice), and unread badge counters with zero emojis.
+ * Implements Screen 4 (Conversations) with:
+ * - Hamburger menu icon (opens Accounts & Spaces)
+ * - Centered bold VEIL title
+ * - Search toggle button
+ * - Filter chips: All, Unread, Groups, Spaces
+ * - Rich conversation list with avatar, timestamp, message preview, unread count
+ * - Teal Floating Action Button (+) for starting new chats
+ * - Bottom navigation bar: Chats, Calls, Groups, Settings
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -27,8 +32,6 @@ import {
   AlertCircleIcon,
   PlusIcon,
   UsersIcon,
-  ShareIcon,
-  CheckIcon,
   SettingsIcon,
   UserIcon,
   ImageIcon,
@@ -36,6 +39,11 @@ import {
   FileIcon,
   MicIcon,
   BellOffIcon,
+  MenuIcon,
+  SearchIcon,
+  PhoneIcon,
+  MessageSquareIcon,
+  CloseIcon,
 } from './icons/index.ts';
 
 export const Sidebar: React.FC = () => {
@@ -46,8 +54,6 @@ export const Sidebar: React.FC = () => {
     contactRequests,
     acceptContactRequest,
     declineContactRequest,
-    cancelContactRequest,
-    blockUser,
     activeChatId,
     selectConversation,
     openModal,
@@ -59,7 +65,6 @@ export const Sidebar: React.FC = () => {
     setSearchQuery,
     searchDirectory,
     sendContactRequest,
-    exportMyInvitation,
     myProfile,
     isConversationMuted,
     messages,
@@ -67,11 +72,13 @@ export const Sidebar: React.FC = () => {
     unpinConversation,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'all' | 'direct' | 'group' | 'contacts'>('all');
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [activeChip, setActiveChip] = useState<'all' | 'unread' | 'group'>('all');
+  const [activeNavTab, setActiveNavTab] = useState<'chats' | 'calls' | 'groups' | 'settings'>('chats');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalResults, setGlobalResults] = useState<DirectorySearchResult[]>([]);
   const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
+  const [showQuickMenu, setShowQuickMenu] = useState(false);
 
   const debounceTimerRef = useRef<any>(null);
 
@@ -111,15 +118,6 @@ export const Sidebar: React.FC = () => {
     };
   }, [searchQuery, searchDirectory]);
 
-  const handleCopyInvitation = () => {
-    const link = exportMyInvitation();
-    if (link) {
-      navigator.clipboard.writeText(link);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2500);
-    }
-  };
-
   const formatConversationTime = (timestamp?: number) => {
     if (!timestamp) return '';
     const now = new Date();
@@ -154,8 +152,8 @@ export const Sidebar: React.FC = () => {
 
     if (msg === 'Photo' || msg.includes('Photo') || msg.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
       return (
-        <span className="veil-snippet-with-icon">
-          <ImageIcon size={14} color="var(--veil-accent-primary)" />
+        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <ImageIcon size={14} color="#14b8a6" />
           <span>Photo</span>
         </span>
       );
@@ -163,8 +161,8 @@ export const Sidebar: React.FC = () => {
 
     if (msg === 'Video' || msg.includes('Video') || msg.match(/\.(mp4|webm|mov|mkv)$/i)) {
       return (
-        <span className="veil-snippet-with-icon">
-          <VideoIcon size={14} color="var(--veil-accent-primary)" />
+        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <VideoIcon size={14} color="#14b8a6" />
           <span>Video</span>
         </span>
       );
@@ -172,8 +170,8 @@ export const Sidebar: React.FC = () => {
 
     if (msg.includes('Media Files')) {
       return (
-        <span className="veil-snippet-with-icon">
-          <ImageIcon size={14} color="var(--veil-accent-primary)" />
+        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <ImageIcon size={14} color="#14b8a6" />
           <span>{msg}</span>
         </span>
       );
@@ -181,8 +179,8 @@ export const Sidebar: React.FC = () => {
 
     if (msg.toLowerCase().includes('voice note') || msg.toLowerCase().includes('voice message')) {
       return (
-        <span className="veil-snippet-with-icon">
-          <MicIcon size={14} color="var(--veil-accent-primary)" />
+        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <MicIcon size={14} color="#14b8a6" />
           <span>Voice message</span>
         </span>
       );
@@ -191,8 +189,8 @@ export const Sidebar: React.FC = () => {
     if (msg.includes('Attachment:')) {
       const cleanName = msg.replace(/^Attachment:\s*/i, '');
       return (
-        <span className="veil-snippet-with-icon">
-          <FileIcon size={14} color="var(--veil-accent-primary)" />
+        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <FileIcon size={14} color="#14b8a6" />
           <span>{cleanName}</span>
         </span>
       );
@@ -204,9 +202,8 @@ export const Sidebar: React.FC = () => {
   // Filter and sort conversations (pinned conversations first, then newest message)
   const filteredConversations = conversations
     .filter((c) => {
-      if (activeTab === 'all') return true;
-      if (activeTab === 'direct') return c.type === 'direct';
-      if (activeTab === 'group') return c.type === 'group';
+      if (activeChip === 'unread') return (c.unreadCount || 0) > 0;
+      if (activeChip === 'group') return c.type === 'group';
       return true;
     })
     .sort((a, b) => {
@@ -227,147 +224,296 @@ export const Sidebar: React.FC = () => {
   const hasAnySearchResults = localConvResults.length > 0 || localMatchingContacts.length > 0 || globalResults.length > 0;
 
   return (
-    <div className="veil-sidebar" role="region" aria-label="Conversation List">
-      {/* Space Header */}
-      <div className="veil-sidebar-header">
-        <div
-          className="veil-space-status-box"
-          onClick={() => openModal({ type: 'profile' })}
-          style={{ cursor: 'pointer' }}
-          title="View & Edit My Profile"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              openModal({ type: 'profile' });
-            }
+    <div
+      className="veil-sidebar"
+      role="region"
+      aria-label="Conversation List"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        position: 'relative',
+        backgroundColor: '#080b11',
+        borderRight: '1px solid rgba(255, 255, 255, 0.06)',
+        userSelect: 'none',
+      }}
+    >
+      {/* Top Header */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.85rem 1rem 0.5rem 1rem',
+          position: 'relative',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => openModal({ type: 'accountsAndSpaces' })}
+          aria-label="Open Accounts & Spaces"
+          title="Accounts & Spaces"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#f3f4f6',
+            cursor: 'pointer',
+            padding: '6px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          <Avatar
-            name={myProfile?.displayName || activeSession?.name || 'Active Space'}
-            imageUrl={myProfile?.avatar}
-            size="md"
-            aria-label="Current Space Profile"
-          />
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-              {myProfile?.displayName || activeSession?.name || 'Active Space'}
-            </div>
-            <StatusIndicator
-              status={
-                networkState === 'connected'
-                  ? 'online'
-                  : networkState === 'connecting' || networkState === 'reconnecting'
-                  ? 'connecting'
-                  : networkState === 'degraded'
-                  ? 'warning'
-                  : 'offline'
-              }
-              label={
-                networkState === 'connected'
-                  ? 'Encrypted & Online'
-                  : networkState === 'connecting'
-                  ? 'Connecting...'
-                  : networkState === 'reconnecting'
-                  ? 'Reconnecting...'
-                  : networkState === 'degraded'
-                  ? 'Degraded (Polling)'
-                  : 'Offline / Queued'
-              }
-            />
-          </div>
+          <MenuIcon size={22} />
+        </button>
+
+        <div style={{ textAlign: 'center' }}>
+          <h1
+            style={{
+              fontSize: '1.25rem',
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              color: '#ffffff',
+              margin: 0,
+            }}
+          >
+            VEIL
+          </h1>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.35rem' }}>
-          <IconButton
-            icon={<UsersIcon size={18} />}
-            variant="ghost"
-            onClick={() => openModal({ type: 'accountsAndSpaces' })}
-            aria-label="Accounts & Spaces"
-            title="Manage Accounts & Spaces"
-          />
-          <IconButton
-            icon={<SettingsIcon size={18} />}
-            variant="ghost"
-            onClick={() => openModal({ type: 'settings' as any })}
-            aria-label="Settings"
-          />
-          <IconButton
-            icon={<LockIcon size={18} />}
-            variant="secondary"
-            onClick={lockSpace}
-            aria-label="Lock Space"
-          />
-          <IconButton
-            icon={<AlertCircleIcon size={18} />}
-            variant="danger"
-            onClick={panicLock}
-            aria-label="Panic Lock: Instant Memory Wipe"
-          />
-        </div>
-      </div>
-
-      {/* Instant Search Bar */}
-      <div className="veil-sidebar-search" role="search">
-        <SearchInput
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onClear={() => setSearchQuery('')}
-          placeholder="Search chats, messages, @username..."
-          aria-label="Search conversation history and directory"
-        />
-      </div>
-
-      {/* Filter Tabs (Hidden during search) */}
-      {!searchQuery.trim() && (
-        <div className="veil-sidebar-tabs" role="tablist">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'all'}
-            className={`veil-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
+            onClick={() => {
+              setIsSearchOpen((prev) => !prev);
+              if (isSearchOpen) setSearchQuery('');
+            }}
+            aria-label="Search"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: isSearchOpen ? '#14b8a6' : '#f3f4f6',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {isSearchOpen ? <CloseIcon size={20} /> : <SearchIcon size={20} />}
+          </button>
+
+          {/* Quick Lock Dropdown Trigger */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowQuickMenu((prev) => !prev)}
+              aria-label="Security Menu"
+              title="Security & Lock Options"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <LockIcon size={18} />
+            </button>
+
+            {showQuickMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '110%',
+                  backgroundColor: '#0f141d',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)',
+                  padding: '6px',
+                  zIndex: 100,
+                  minWidth: '150px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQuickMenu(false);
+                    lockSpace();
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#f3f4f6',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <LockIcon size={15} color="#14b8a6" />
+                  <span>Lock Space</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQuickMenu(false);
+                    panicLock();
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 10px',
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <AlertCircleIcon size={15} color="#ef4444" />
+                  <span>Panic Lock</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expandable Search Input */}
+      {(isSearchOpen || searchQuery.trim().length > 0) && (
+        <div style={{ padding: '0 1rem 0.65rem 1rem' }} role="search">
+          <SearchInput
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onClear={() => setSearchQuery('')}
+            placeholder="Search chats, messages, @username..."
+            aria-label="Search conversation history and directory"
+          />
+        </div>
+      )}
+
+      {/* Category Chips Bar (Screen 4: All, Unread, Groups, Spaces) */}
+      {!searchQuery.trim() && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '0.25rem 1rem 0.75rem 1rem',
+            overflowX: 'auto',
+          }}
+          role="tablist"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveChip('all')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: activeChip === 'all' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: activeChip === 'all' ? '#14b8a6' : '#121824',
+              color: activeChip === 'all' ? '#ffffff' : '#94a3b8',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
           >
             All
           </button>
+
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'direct'}
-            className={`veil-tab-btn ${activeTab === 'direct' ? 'active' : ''}`}
-            onClick={() => setActiveTab('direct')}
+            onClick={() => setActiveChip('unread')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: activeChip === 'unread' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: activeChip === 'unread' ? '#14b8a6' : '#121824',
+              color: activeChip === 'unread' ? '#ffffff' : '#94a3b8',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
           >
-            Chats
+            Unread
           </button>
+
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'group'}
-            className={`veil-tab-btn ${activeTab === 'group' ? 'active' : ''}`}
-            onClick={() => setActiveTab('group')}
+            onClick={() => setActiveChip('group')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: activeChip === 'group' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: activeChip === 'group' ? '#14b8a6' : '#121824',
+              color: activeChip === 'group' ? '#ffffff' : '#94a3b8',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
           >
             Groups
           </button>
+
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'contacts'}
-            className={`veil-tab-btn ${activeTab === 'contacts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('contacts')}
+            onClick={() => openModal({ type: 'accountsAndSpaces' })}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: '#121824',
+              color: '#94a3b8',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
           >
-            Contacts {pendingIncoming.length > 0 && <Badge variant="warning">{pendingIncoming.length}</Badge>}
+            Spaces
           </button>
         </div>
       )}
 
       {/* Conversation / Contacts / Unified Search List */}
-      <div className="veil-conversation-list">
+      <div
+        className="veil-conversation-list"
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '0 0.5rem',
+        }}
+      >
         {searchQuery.trim() ? (
           <div>
             {/* 1. Local Conversations */}
             {localConvResults.length > 0 && (
               <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
+                <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                   Chats & Groups
                 </div>
                 {localConvResults.map((res) => (
@@ -379,12 +525,14 @@ export const Sidebar: React.FC = () => {
                     onClick={() => {
                       if (res.conversationId) selectConversation(res.conversationId);
                       setSearchQuery('');
+                      setIsSearchOpen(false);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         if (res.conversationId) selectConversation(res.conversationId);
                         setSearchQuery('');
+                        setIsSearchOpen(false);
                       }
                     }}
                   >
@@ -403,7 +551,7 @@ export const Sidebar: React.FC = () => {
             {/* 2. Local Contacts */}
             {localMatchingContacts.length > 0 && (
               <div style={{ marginBottom: '0.75rem' }}>
-                <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600 }}>
+                <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                   My Contacts
                 </div>
                 {localMatchingContacts.map((contact) => (
@@ -415,6 +563,7 @@ export const Sidebar: React.FC = () => {
                     onClick={() => {
                       selectConversation(contact.identityId);
                       setSearchQuery('');
+                      setIsSearchOpen(false);
                     }}
                   >
                     <Avatar name={contact.name} imageUrl={contact.avatar} size="sm" />
@@ -429,13 +578,13 @@ export const Sidebar: React.FC = () => {
 
             {/* 3. Global Directory Results */}
             <div style={{ marginBottom: '0.75rem' }}>
-              <div style={{ padding: '0.4rem 0.5rem', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ padding: '0.4rem 0.5rem', fontSize: '0.75rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>Global Directory Discovery</span>
                 {isSearchingDirectory && <Spinner size="sm" />}
               </div>
 
               {directoryError && (
-                <div style={{ padding: '0.5rem', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
+                <div style={{ padding: '0.5rem', color: '#ef4444', fontSize: '0.75rem' }}>
                   {directoryError}
                 </div>
               )}
@@ -461,6 +610,7 @@ export const Sidebar: React.FC = () => {
                     onMessageUser={(peerId) => {
                       selectConversation(peerId);
                       setSearchQuery('');
+                      setIsSearchOpen(false);
                     }}
                   />
                 );
@@ -476,197 +626,330 @@ export const Sidebar: React.FC = () => {
               />
             )}
           </div>
-        ) : activeTab === 'contacts' ? (
-          /* Contacts View Tab */
-          <div>
+        ) : (
+          /* Normal Conversations List */
+          <>
             {/* Pending Requests Banner */}
             {pendingIncoming.length > 0 && (
-              <div style={{ padding: '0.5rem', background: 'var(--veil-bg-surface-elevated)', borderRadius: 'var(--veil-radius-md)', marginBottom: '0.5rem' }}>
-                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-warning)', marginBottom: '0.25rem' }}>
+              <div style={{ padding: '0.65rem 0.85rem', background: '#131924', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: '12px', marginBottom: '0.65rem' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e0b', marginBottom: '0.35rem' }}>
                   Incoming Contact Requests ({pendingIncoming.length})
                 </div>
                 {pendingIncoming.map((req) => (
-                  <div key={req.requestId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0' }}>
-                    <div style={{ fontSize: 'var(--veil-text-xs)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div key={req.requestId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.25rem 0' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#f3f4f6' }}>
                       @{req.peerUsername || req.peerIdentityId.slice(0, 10)}
                     </div>
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                      <Button variant="primary" size="sm" onClick={() => acceptContactRequest(req.requestId)}>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => acceptContactRequest(req.requestId)}
+                        style={{
+                          backgroundColor: '#14b8a6',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
                         Accept
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => declineContactRequest(req.requestId)}>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => declineContactRequest(req.requestId)}
+                        style={{
+                          backgroundColor: 'transparent',
+                          color: '#94a3b8',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          padding: '4px 10px',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                        }}
+                      >
                         Decline
-                      </Button>
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {contacts.length === 0 ? (
+            {filteredConversations.length === 0 ? (
               <EmptyState
                 icon={<UsersIcon size={40} color="var(--veil-text-muted)" />}
-                title="No contacts yet"
-                description="Search users by @username above to send contact requests."
+                title={activeChip === 'group' ? 'No groups yet' : activeChip === 'unread' ? 'No unread chats' : 'No conversations yet'}
+                description="Start a new chat with your contacts or search by @username."
+                action={
+                  <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
+                    <PlusIcon size={16} />
+                    <span>Start Chat</span>
+                  </Button>
+                }
               />
             ) : (
-              contacts.map((contact) => (
-                <div
-                  key={contact.identityId}
-                  className="veil-conversation-item"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => selectConversation(contact.identityId)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') selectConversation(contact.identityId);
-                  }}
-                >
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openModal({
-                        type: 'profile',
-                        peerId: contact.identityId,
-                        peerUsername: contact.accountUsername || (contact.name?.startsWith('@') ? contact.name.slice(1) : undefined),
-                      });
-                    }}
-                    title="View Profile"
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <Avatar name={contact.name} imageUrl={contact.avatar} size="md" />
-                  </div>
-                  <div className="veil-conversation-info">
-                    <div className="veil-conversation-top">
-                      <span className="veil-conversation-name">{contact.name}</span>
-                    </div>
-                    <div className="veil-conversation-preview">
-                      {contact.identityId.slice(0, 14)}...
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        ) : (
-          /* Normal Conversations List */
-          filteredConversations.length === 0 ? (
-            <EmptyState
-              icon={<UsersIcon size={40} color="var(--veil-text-muted)" />}
-              title={activeTab === 'group' ? 'No groups yet' : 'No conversations yet'}
-              description="Start a new chat with your contacts or search by @username."
-              action={
-                <Button variant="primary" size="sm" onClick={() => openModal({ type: 'newChat' })}>
-                  <PlusIcon size={16} />
-                  <span>Start Chat</span>
-                </Button>
-              }
-            />
-          ) : (
-            filteredConversations.map((conv) => {
-              const isSelected = activeChatId === conv.id;
-              const isMuted = typeof isConversationMuted === 'function' && isConversationMuted(conv.id);
-              const convMsgs = (messages && messages[conv.id]) || [];
-              const latestMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
-              const isOutgoing = !!latestMsg?.isOutgoing;
+              filteredConversations.map((conv) => {
+                const isSelected = activeChatId === conv.id;
+                const isMuted = typeof isConversationMuted === 'function' && isConversationMuted(conv.id);
+                const convMsgs = (messages && messages[conv.id]) || [];
+                const latestMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
+                const isOutgoing = !!latestMsg?.isOutgoing;
 
-              return (
-                <div
-                  key={conv.id}
-                  className={`veil-conversation-item ${isSelected ? 'active' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => selectConversation(conv.id)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (conv.isPinned) {
-                      unpinConversation(conv.id);
-                    } else {
-                      pinConversation(conv.id);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                return (
+                  <div
+                    key={conv.id}
+                    className={`veil-conversation-item ${isSelected ? 'active' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => selectConversation(conv.id)}
+                    onContextMenu={(e) => {
                       e.preventDefault();
-                      selectConversation(conv.id);
-                    }
-                  }}
-                >
-                  <Avatar
-                    name={conv.name}
-                    imageUrl={conv.avatar || (contacts || []).find((c) => c.identityId === conv.id)?.avatar}
-                    size="md"
-                    isGroup={conv.type === 'group'}
-                    aria-label={`${conv.name} avatar`}
-                  />
-                  <div className="veil-conversation-info">
-                    <div className="veil-conversation-top">
-                      <span className="veil-conversation-name">{conv.name}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {conv.isPinned && (
-                          <span
-                            title="Pinned Conversation"
-                            aria-label="Pinned"
-                            style={{ color: 'var(--accent-color, #14b8a6)', display: 'inline-flex', alignItems: 'center' }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="17" x2="12" y2="22" />
-                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                            </svg>
+                      if (conv.isPinned) {
+                        unpinConversation(conv.id);
+                      } else {
+                        pinConversation(conv.id);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectConversation(conv.id);
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0.75rem 0.85rem',
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      marginBottom: '4px',
+                      backgroundColor: isSelected ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
+                      border: isSelected ? '1px solid rgba(20, 184, 166, 0.25)' : '1px solid transparent',
+                      transition: 'background 0.15s ease',
+                    }}
+                  >
+                    <Avatar
+                      name={conv.name}
+                      imageUrl={conv.avatar || (contacts || []).find((c) => c.identityId === conv.id)?.avatar}
+                      size="md"
+                      isGroup={conv.type === 'group'}
+                      aria-label={`${conv.name} avatar`}
+                    />
+                    <div className="veil-conversation-info" style={{ marginLeft: '0.75rem', flex: 1, minWidth: 0 }}>
+                      <div className="veil-conversation-top" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                        <span className="veil-conversation-name" style={{ fontWeight: 600, color: '#f3f4f6', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.name}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                          {conv.isPinned && (
+                            <span
+                              title="Pinned Conversation"
+                              aria-label="Pinned"
+                              style={{ color: '#14b8a6', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="12" y1="17" x2="12" y2="22" />
+                                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                              </svg>
+                            </span>
+                          )}
+                          {isMuted && <BellOffIcon size={12} color="#64748b" aria-label="Muted" />}
+                          {conv.timestamp && (
+                            <span className="veil-conversation-time" style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                              {formatConversationTime(conv.timestamp)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="veil-conversation-preview" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem', color: '#94a3b8' }}>
+                          {isOutgoing && latestMsg && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                              <MessageStatus status={latestMsg.status} size={14} />
+                            </span>
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {renderMessageSnippet(conv.lastMessage || latestMsg?.text)}
                           </span>
-                        )}
-                        {isMuted && <BellOffIcon size={12} color="var(--veil-text-muted)" aria-label="Muted" />}
-                        {conv.timestamp && (
-                          <span className="veil-conversation-time">
-                            {formatConversationTime(conv.timestamp)}
+                        </div>
+
+                        {conv.unreadCount > 0 && (
+                          <span
+                            className="veil-unread-pill"
+                            style={{
+                              backgroundColor: isMuted ? '#475569' : '#14b8a6',
+                              color: '#ffffff',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              padding: '2px 7px',
+                              borderRadius: '12px',
+                              marginLeft: '6px',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {conv.unreadCount}
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className="veil-conversation-preview" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {isOutgoing && latestMsg && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
-                          <MessageStatus status={latestMsg.status} size={14} />
-                        </span>
-                      )}
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {renderMessageSnippet(conv.lastMessage || latestMsg?.text)}
-                      </span>
-                    </div>
                   </div>
-                  {conv.unreadCount > 0 && (
-                    <span
-                      className="veil-unread-pill"
-                      style={isMuted ? { backgroundColor: 'var(--veil-text-muted)', opacity: 0.8 } : undefined}
-                    >
-                      {conv.unreadCount}
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          )
+                );
+              })
+            )}
+          </>
         )}
       </div>
 
-      {/* Floating / Action Footer */}
-      <div className="veil-sidebar-footer">
-        <Button
-          variant="primary"
-          onClick={() => openModal({ type: 'newChat' })}
-          icon={<PlusIcon size={16} />}
-          fullWidth
+      {/* Floating Action Button (+) (Screen 4) */}
+      <button
+        type="button"
+        onClick={() => openModal({ type: 'newChat' })}
+        aria-label="New Chat"
+        title="Start New Chat"
+        style={{
+          position: 'absolute',
+          bottom: '72px',
+          right: '18px',
+          width: '52px',
+          height: '52px',
+          borderRadius: '50%',
+          backgroundColor: '#14b8a6',
+          color: '#ffffff',
+          border: 'none',
+          boxShadow: '0 6px 20px rgba(20, 184, 166, 0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 20,
+          transition: 'transform 0.15s ease',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+      >
+        <PlusIcon size={24} strokeWidth={2.5} />
+      </button>
+
+      {/* Bottom Navigation Bar (Screen 4: Chats, Calls, Groups, Settings) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          height: '60px',
+          backgroundColor: '#0a0e17',
+          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+          padding: '0 0.5rem',
+          zIndex: 10,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setActiveNavTab('chats');
+            setActiveChip('all');
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeNavTab === 'chats' ? '#14b8a6' : '#64748b',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.725rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            borderRadius: '10px',
+          }}
         >
-          New Chat
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => openModal({ type: 'newGroup' })}
-          icon={<UsersIcon size={16} />}
-          fullWidth
+          <MessageSquareIcon size={20} />
+          <span>Chats</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveNavTab('calls');
+            // Inform the user about secure E2EE calls
+            openModal({
+              type: 'help' as any,
+            });
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeNavTab === 'calls' ? '#14b8a6' : '#64748b',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.725rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            borderRadius: '10px',
+          }}
         >
-          New Group
-        </Button>
+          <PhoneIcon size={20} />
+          <span>Calls</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveNavTab('groups');
+            setActiveChip('group');
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeNavTab === 'groups' ? '#14b8a6' : '#64748b',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.725rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            borderRadius: '10px',
+          }}
+        >
+          <UsersIcon size={20} />
+          <span>Groups</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveNavTab('settings');
+            openModal({ type: 'settings' as any });
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeNavTab === 'settings' ? '#14b8a6' : '#64748b',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '3px',
+            fontSize: '0.725rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            borderRadius: '10px',
+          }}
+        >
+          <SettingsIcon size={20} />
+          <span>Settings</span>
+        </button>
       </div>
     </div>
   );
 };
+
