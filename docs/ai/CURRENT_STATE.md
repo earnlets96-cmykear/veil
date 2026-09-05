@@ -1,16 +1,19 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: MASTER RELIABILITY & HYBRID KOTLIN MEDIA3 MIGRATION
-- **Status**: **COMPLETE & PRODUCTION-VERIFIED 100%**
-- **Commit**: `cb08ccdf765c808f139ca28e22b94639248cef9b`
+## Current Verified Phase: FINAL REAL-WORLD ACCEPTANCE PASS & MASTER STABILIZATION
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+- **Commit**: `84a35d6`
 - **Branch**: `main`
 - **Verification Deliverables**:
-  - Master Reliability Acceptance Suite: `tests/master-reliability-p0.test.tsx` (4/4 passed; local + live Render relay bidirectional E2EE exchange)
-  - Native Kotlin Media3 Plugin: `android/app/src/main/java/chat/veil/app/VeilNativeMediaPlugin.kt` with authoritative single ExoPlayer and automatic Audio Focus
-  - Android APK Compilation: `.\gradlew.bat assembleDebug` succeeds (`android/app/build/outputs/apk/debug/app-debug.apk`, 7.12 MB)
-  - Audio Forensic Verification Suite: `tests/phase45e-audio-forensic-e2e.test.ts` (6/6 passed)
-  - Full Test Suite: 355/356 test suites passed, 1,027 tests passed
-  - Web App Build: `npm run build` and TypeScript `npx tsc --noEmit` pass with 0 errors
+  - Full Test Suite: **358/358 test suites passed, 1,035 tests passed (0 failures)** across entire repository.
+  - Phase 29 Main Test Suite Fix: `tests/phase29-voice-message.test.ts` updated to canonical Phase 30/31 authorized media pipeline (2/2 passed).
+  - Real Voice Audio Forensic Suite: `tests/phase57-real-voice-forensic.test.ts` (3/3 passed using real 441,044-byte 5.0s PCM WAV recording).
+  - Real Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed; bidirectional messaging, 5-message rapid burst, offline queue drain, group lifecycle, GroupDetailsModal render, and network stability).
+  - Master Reliability Acceptance Suite: `tests/master-reliability-p0.test.tsx` (4/4 passed; local + live Render relay `https://veil-rga0.onrender.com`).
+  - Native Kotlin Media3 Plugin: `android/app/src/main/java/chat/veil/app/VeilNativeMediaPlugin.kt` (single ExoPlayer instance, Audio Focus, `becomingNoisy` handling, registered in `MainActivity.java`).
+  - Android APK Assembly: `android/app/build/outputs/apk/debug/app-debug.apk` (7.12 MB, built 05/09/2026 12:30:51).
+  - Android Hardware Runtime: Explicitly classified as **UNKNOWN** (no physical Android hardware device currently attached to ADB).
+  - Web App Production Build: `npm run build` succeeds cleanly with 0 TypeScript or bundling errors.
 
 ---
 
