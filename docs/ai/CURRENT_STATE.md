@@ -1,6 +1,43 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 66 — ACCOUNT RESTORE HEALING, RECOVERY VAULT RESILIENCE & LOGIN ERROR RESOLUTION
+## Current Verified Phase: PHASE 67 — APP LOCK LATENCY ELIMINATION, FILE PICKER LIFECYCLE GUARD, ATOMIC PROFILE UPDATES & CROSS-ACCOUNT SYNC
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+- **Verification Deliverables**:
+  - Phase 67 App Lock Performance & Timing Suite: `tests/phase67-applock-perf-and-timing.test.ts` (4/4 passed in 393ms).
+  - Phase 67 Cross-Account Communication Suite: `tests/phase67-cross-account-comm.test.ts` (1/1 passed in 308ms).
+  - Phase 65 Multi-Account Isolation Suite: `tests/phase65-multi-account-isolation.test.ts` (5/5 passed in 27.18s).
+  - Phase 66 Account Restore Healing Suite: `tests/phase66-account-restore-healing.test.ts` (2/2 passed).
+  - Phase 50C Password Forensic Suite: `tests/phase50c-password-validation-forensic.test.ts` (7/7 passed in 2.75s).
+  - Multi-Space PIN Suite: `tests/applock-multi-space-pin.test.ts` (8/8 passed in 500ms).
+  - Web App Production Build: `npm run build` succeeds cleanly in 1.90s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Android APK Compilation: `cd android; .\gradlew.bat assembleDebug` succeeds cleanly in 48s (`android/app/build/outputs/apk/debug/app-debug.apk` and `release/v1.0.0/app-debug.apk`).
+- **Root Cause Analyses & Architectural Fixes**:
+  1. **Single-Derivation App Lock Fast-Path (Latency Root-Cause Elimination)**:
+     - Root cause: Entering a PIN was performing TWO sequential, heavy Argon2id derivations (~1s each): the first to verify the PIN and decrypt the wrapped password in `SpacePinManager`, and the second when passing that password to `vault.unlockSpace(password)` to derive the Space Master Key again.
+     - Fix: Extended `WrappedCredentialsPayload` to store the Base64-encoded 32-byte Space Master Key (SMK), securely encrypted with XChaCha20-Poly1305 under the PIN KEK (`kek_pin`).
+     - Added `vault.unlockSpaceWithMasterKey(spaceId, masterKey)` and `sessionController.unlockWithMasterKey(spaceId, masterKey)`, enabling instantaneous (0ms KDF) vault session activation.
+     - Implemented automatic backward-compatible credential upgrade (`upgradeWrappedCredentialsWithMasterKey`) upon first unlock for spaces configured under earlier schemas.
+     - Instrumented timing benchmarks: logs sanitized execution breakdown (`pin_verification_ms`, `credential_resolution_ms`, `vault_unlock_ms`, `session_activation_ms`, `total_ms`) in development mode with zero sensitive data disclosure.
+  2. **File Picker Lifecycle Guard (Profile Photo Update App-Lock Prevention)**:
+     - Root cause: On native Android, opening the system file/image selector switches the host activity to the background (`visibilitychange: hidden` / Capacitor `appStateChange: { isActive: false }`). When the user selected a photo or cancelled, `AppState`'s auto-lock listener fired `sessionController.lock()`, destroying volatile session keys, clearing active modals, and returning to the PIN lock screen.
+     - Fix: Implemented `isFilePickerActiveRef` and `markFilePickerActive`/`markFilePickerInactive` with a 4,000ms safety grace window.
+     - Added global document-level capture listeners for `click`, `change`, and `cancel` on `input[type="file"]`, preventing accidental background auto-lock during system file picker transitions while preserving strict auto-lock when switching away to other apps.
+  3. **Atomic Profile Picture Updates**:
+     - Implemented `updateProfileAvatar(avatarDataUrl)` in `AppState`:
+       - Compresses/optimizes avatars to < 32 KB and 128x128 JPEG dimensions.
+       - Generates and signs a fresh `SignedProfileDocument` with the space's Ed25519 identity key.
+       - Atomically updates the encrypted local partition (`veil:user:profile`), privacy settings, PIN registry avatar (`spacePinManager.updateSpaceAvatar`), and registers the profile with the relay directory client.
+       - Updates local UI state and closes no modals unexpectedly, eliminating the false logout/reset loop.
+  4. **Cross-Account Communication (A ↔ B) & Provisioning Repair**:
+     - Root cause: Secondary spaces created via `createSecondaryAccount` previously omitted genuine prekey bundles and relay mailboxes when `PrekeyManager` was not explicitly passed, causing peer inbound validation (`verifySignedProfile`) to fail and drop messages.
+     - Fix: Secondary account creation now automatically provisions full `PrekeyManager` instances, generates signed prekeys and one-time prekeys (10 OPKs), allocates relay mailboxes, signs profile documents, and registers profiles in the directory.
+     - Enables verified bi-directional contact requests and end-to-end encrypted messaging between Account A and Account B on the same or distinct devices.
+  5. **Real Visible Connection Status**:
+     - Added a subtle, non-intrusive status pill in the top header below the VEIL branding (`● Connected`, `↻ Connecting...`, `↻ Reconnecting...`, `● Offline`) dynamically driven by `networkState`.
+
+---
+
+## Previous Verified Phase: PHASE 66 — ACCOUNT RESTORE HEALING, RECOVERY VAULT RESILIENCE & LOGIN ERROR RESOLUTION
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
   - Phase 66 Account Restore Healing Suite: `tests/phase66-account-restore-healing.test.ts` (2/2 passed in 6.85s).

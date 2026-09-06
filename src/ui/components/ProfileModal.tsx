@@ -87,6 +87,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     isConversationMuted,
     toggleMuteConversation,
     deleteAvatar,
+    updateProfileAvatar,
+    markFilePickerActive,
+    markFilePickerInactive,
   } = useApp();
 
   const { showToast } = useToast();
@@ -285,20 +288,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   // Avatar Selection for Self Profile
   const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      markFilePickerInactive();
+      return;
+    }
     try {
       const processed = await processAvatarImage(file);
       setAvatarPreview(processed);
-      if (!isEditing && myProfile) {
+      if (!isEditing) {
         setIsSaving(true);
-        await registerUsername(myProfile.username, myProfile.displayName, privacySettings.bio, processed);
-        await updatePrivacySettings({ avatar: processed });
+        await updateProfileAvatar(processed);
         showToast({ type: 'success', message: 'Profile photo updated!' });
       }
     } catch (err: any) {
       showToast({ type: 'error', message: getErrorMessage(err, 'Failed to process avatar image') });
     } finally {
       setIsSaving(false);
+      markFilePickerInactive();
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -525,7 +532,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
               <button
                 type="button"
                 className="veil-avatar-camera-btn"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => {
+                  markFilePickerActive();
+                  fileInputRef.current?.click();
+                }}
                 title="Change Avatar Photo"
                 style={{
                   position: 'absolute',
@@ -644,7 +654,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleAvatarSelect} />
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
-                <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    markFilePickerActive();
+                    fileInputRef.current?.click();
+                  }}
+                >
                   <CameraIcon size={14} />
                   <span>{avatarPreview ? 'Change Photo' : 'Upload Photo'}</span>
                 </Button>

@@ -139,7 +139,16 @@ const cloudClient = new CloudClient({
   baseUrl: appConfig.relayHttpUrl || 'http://127.0.0.1:8787',
   requestTimeoutMs: appConfig.requestTimeoutMs || 30000,
 });
-const accountManager = new AccountManager(cloudClient, vault, idMgr, store, storageAdapter);
+const accountManager = new AccountManager(
+  cloudClient,
+  vault,
+  idMgr,
+  store,
+  storageAdapter,
+  netManager,
+  prekeyManager,
+  directoryClient
+);
 const syncEngine = new SyncEngine(store, cloudClient);
 const groupManager = new GroupManager(store, idMgr);
 
@@ -233,6 +242,9 @@ export interface AppContextType {
 
   // Phase 23 & Phase 32 Actions
   registerUsername: (username: string, displayName?: string, bio?: string, avatar?: string) => Promise<SignedProfileDocument>;
+  updateProfileAvatar: (avatarDataUrl: string) => Promise<void>;
+  markFilePickerActive: () => void;
+  markFilePickerInactive: () => void;
   deleteAvatar: () => Promise<void>;
   searchDirectory: (query: string) => Promise<DirectorySearchResult[]>;
   sendContactRequest: (targetUsername: string, greeting?: string) => Promise<void>;
@@ -279,6 +291,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
   const [isAppLocked, setIsAppLocked] = useState<boolean>(() => spacePinManager.isAppLockEnabled());
   const lastBackgroundTimeRef = useRef<number | null>(null);
+  const isFilePickerActiveRef = useRef<boolean>(false);
+  const filePickerGraceTimerRef = useRef<any>(null);
+
+  const markFilePickerActive = useCallback(() => {
+    if (filePickerGraceTimerRef.current) {
+      clearTimeout(filePickerGraceTimerRef.current);
+      filePickerGraceTimerRef.current = null;
+    }
+    isFilePickerActiveRef.current = true;
+  }, []);
+
+  const markFilePickerInactive = useCallback(() => {
+    if (filePickerGraceTimerRef.current) {
+      clearTimeout(filePickerGraceTimerRef.current);
+    }
+    filePickerGraceTimerRef.current = setTimeout(() => {
+      isFilePickerActiveRef.current = false;
+      filePickerGraceTimerRef.current = null;
+    }, 4000);
+  }, []);
+
   const cloudCredentials = useRef(new Map<string, string>());
   const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
   const syncTimeoutRef = useRef<any>(null);
@@ -1466,7 +1499,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Background auto-lock tracking
   useEffect(() => {
+    // Intercept native file picker clicks globally so Android activity pauses don't lock the app
+    const handleFileInputClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.matches('input[type="file"]') ||
+         target.closest('input[type="file"]') ||
+         target.getAttribute('type') === 'file')
+      ) {
+        markFilePickerActive();
+      }
+    };
+
+    const handleFileInputChange = () => {
+      markFilePickerInactive();
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', handleFileInputClick, true);
+      document.addEventListener('change', handleFileInputChange, true);
+      document.addEventListener('cancel', handleFileInputChange, true);
+    }
+
     const handleBackground = () => {
+      if (isFilePickerActiveRef.current) {
+        // System file picker / gallery activity active; DO NOT destroy or lock session!
+        return;
+      }
       if (!spacePinManager.isAppLockEnabled()) return;
       lastBackgroundTimeRef.current = Date.now();
       if (spacePinManager.isLockOnBackgroundEnabled() || spacePinManager.getAutoLockInterval() === 'immediately') {
@@ -1476,6 +1536,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const handleForeground = () => {
+      if (isFilePickerActiveRef.current) {
+        markFilePickerInactive();
+        return;
+      }
       if (!spacePinManager.isAppLockEnabled()) return;
       if (lastBackgroundTimeRef.current !== null) {
         const elapsed = Date.now() - lastBackgroundTimeRef.current;
@@ -1524,13 +1588,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     return () => {
       if (typeof document !== 'undefined') {
+        document.removeEventListener('click', handleFileInputClick, true);
+        document.removeEventListener('change', handleFileInputChange, true);
+        document.removeEventListener('cancel', handleFileInputChange, true);
         document.removeEventListener('visibilitychange', onVisibilityChange);
       }
       if (capListenerHandle && typeof capListenerHandle.remove === 'function') {
         capListenerHandle.remove();
       }
     };
-  }, []);
+  }, [markFilePickerActive, markFilePickerInactive]);
 
   const unlockSpace = useCallback(
     async (passphrase: string, username?: string) => {
@@ -1657,6 +1724,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               password: passphrase,
               pin,
               isMainAccount: true,
+              masterKey: session.getMasterKey(),
             });
           } catch (_pinErr) {}
         }
@@ -1688,6 +1756,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         spaceName: name.trim() || 'Secondary Space',
         pin,
         mainSpaceId: activeSession.spaceId,
+        netManager,
+        prekeyManager,
+        directoryClient,
       });
 
       setKnownSpacesCount(vault.listEnvelopes().length);
@@ -1911,13 +1982,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const unlockWithPin = useCallback(
     async (pin: string) => {
+      const t0 = performance.now();
       const result = await spacePinManager.verifyAndResolvePin(pin);
+      const t1 = performance.now(); // pin_verification
       if (!result || !result.spaceId || !result.password) {
         throw new Error('Incorrect PIN');
       }
 
       if (activeSession && activeSession.spaceId === result.spaceId && activeSession.isActive()) {
         setIsAppLocked(false);
+        const tEnd = performance.now();
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[AppLock-Timing] Active session restored immediately', {
+            pin_verification_ms: Math.round(t1 - t0),
+            session_activation_ms: Math.round(tEnd - t1),
+            total_ms: Math.round(tEnd - t0),
+          });
+        }
         return;
       }
 
@@ -1925,10 +2006,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sessionController.lock();
       }
 
-      await unlockSpace(result.password, result.username);
+      const t2 = performance.now(); // credential_resolution
+
+      let session: SpaceSession;
+      let usedFastPath = false;
+      if (result.masterKey) {
+        // FAST PATH: Single-derivation unlock! Directly activates vault using unwrapped master key (0ms KDF)
+        session = await sessionController.unlockWithMasterKey(result.spaceId, base64ToBytes(result.masterKey));
+        usedFastPath = true;
+      } else {
+        // FALLBACK: Legacy entry without unwrapped master key -> full unlock + upgrade
+        session = await unlockSpace(result.password, result.username);
+        // Automatically upgrade PIN entry in background for subsequent instant unlocks
+        spacePinManager.upgradeWrappedCredentialsWithMasterKey({
+          spaceId: result.spaceId,
+          pin,
+          masterKey: session.getMasterKey(),
+        }).catch(() => {});
+      }
+
+      const t3 = performance.now(); // vault_unlock
+
+      setActiveSession(session);
       setIsAppLocked(false);
+      sessionController.recordUserActivity();
+      setKnownSpacesCount(vault.listEnvelopes().length);
+      await loadSpaceData(session);
+
+      const t4 = performance.now(); // session_activation
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[AppLock-Timing] PIN unlock flow completed', {
+          pin_verification_ms: Math.round(t1 - t0),
+          credential_resolution_ms: Math.round(t2 - t1),
+          vault_unlock_ms: Math.round(t3 - t2),
+          session_activation_ms: Math.round(t4 - t3),
+          total_ms: Math.round(t4 - t0),
+          fast_path: usedFastPath,
+        });
+      }
+
+      // Background cloud session sync
+      ensureCloudSession(session, false, result.password).catch(() => {});
     },
-    [activeSession, unlockSpace]
+    [activeSession, loadSpaceData, unlockSpace, ensureCloudSession]
   );
 
   const setupSpacePin = useCallback(
@@ -1939,6 +2060,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!passwordToStore) {
         throw new Error('Space password required to configure PIN lock');
       }
+      const targetMasterKey = (activeSession && activeSession.spaceId === targetSpaceId)
+        ? activeSession.getMasterKey()
+        : undefined;
+
       await spacePinManager.assignPinToSpace({
         spaceId: targetSpaceId,
         canonicalUsername: params.username || creds?.username || '',
@@ -1946,6 +2071,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         password: passwordToStore,
         pin: params.pin,
         accountId: params.accountId,
+        masterKey: targetMasterKey,
       });
       setIsAppLocked(false);
     },
@@ -3906,6 +4032,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [activeSession, myProfile, privacySettings.bio, updatePrivacySettings, registerUsername]);
 
+  const updateProfileAvatar = useCallback(
+    async (avatarDataUrl: string) => {
+      if (!activeSession) throw new Error('No active Space');
+      const identity = idMgr.loadIdentity(activeSession, store);
+      if (!identity) throw new Error('Identity not loaded');
+
+      const binding = await netManager.getOrCreateMailbox(activeSession);
+      const prekeyBundle = prekeyManager.createPrekeyBundle(activeSession);
+      const currentProfile = myProfile || (await store.getAsync<SignedProfileDocument>(activeSession, 'veil:user:profile'));
+      const envelope = vault.getEnvelope(activeSession.spaceId);
+      const username = currentProfile?.username || envelope?.canonicalUsername || activeSession.name;
+      const displayName = currentProfile?.displayName || username;
+
+      let optimizedAvatar = avatarDataUrl;
+      if (optimizedAvatar && optimizedAvatar.length > 32 * 1024) {
+        try {
+          optimizedAvatar = await processAvatarImage(optimizedAvatar);
+        } catch (_err) {}
+      }
+
+      await store.deleteAsync(activeSession, 'veil:avatar:tombstone');
+
+      const updatedSignedProfile = createSignedProfile(
+        identity.document.identityId,
+        identity.signingPrivateKey,
+        username,
+        displayName,
+        binding.mailboxId,
+        prekeyBundle,
+        optimizedAvatar
+      );
+
+      await store.setAsync(activeSession, 'veil:user:profile', updatedSignedProfile);
+      await updatePrivacySettings({ avatar: optimizedAvatar });
+      setMyProfile(updatedSignedProfile);
+
+      // Update in spacePinManager as well for instant space UI reflection
+      spacePinManager.updateSpaceAvatar(activeSession.spaceId, optimizedAvatar);
+
+      try {
+        await directoryClient.registerProfile(updatedSignedProfile);
+      } catch (_e) {}
+    },
+    [activeSession, myProfile, updatePrivacySettings]
+  );
+
   const searchDirectory = useCallback(
     async (query: string) => {
       return directoryClient.searchProfiles(query);
@@ -4169,6 +4341,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ensureCloudSession,
     updateContactMediaPermissions,
     registerUsername,
+    updateProfileAvatar,
+    markFilePickerActive,
+    markFilePickerInactive,
     deleteAvatar,
     searchDirectory,
     sendContactRequest,

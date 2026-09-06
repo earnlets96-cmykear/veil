@@ -1,6 +1,42 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 66 — ACCOUNT RESTORE HEALING, RECOVERY VAULT RESILIENCE & LOGIN ERROR RESOLUTION
+## Active Phase: PHASE 67 — APP LOCK LATENCY ELIMINATION, FILE PICKER LIFECYCLE GUARD, ATOMIC PROFILE UPDATES & CROSS-ACCOUNT SYNC
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+- **Branch**: `main`
+- **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 67 Latency, Lifecycle & Sync Tasks:
+- [x] **Single-Derivation App Lock Fast-Path (`src/privacy/pinManager.ts`, `src/spaces/vault.ts`, `src/ui/app/sessionController.ts`, `src/ui/app/AppState.tsx`)**:
+  - Identified root cause of App Lock slowness: double sequential Argon2id derivations (~2s total on mobile).
+  - Extended `WrappedCredentialsPayload` to securely carry the Base64-encoded 32-byte Space Master Key (SMK), encrypted with XChaCha20-Poly1305 under PIN KEK (`kek_pin`).
+  - Added `vault.unlockSpaceWithMasterKey(spaceId, masterKey)` and `sessionController.unlockWithMasterKey(spaceId, masterKey)` for 0ms vault session activation.
+  - Implemented automatic legacy wrapped credentials upgrade upon unlock (`upgradeWrappedCredentialsWithMasterKey`).
+  - Added sanitized timing instrumentation in dev mode (`pin_verification_ms`, `credential_resolution_ms`, `vault_unlock_ms`, `session_activation_ms`).
+- [x] **File Picker Lifecycle Guard (`src/ui/app/AppState.tsx`, `src/ui/components/ProfileModal.tsx`, `src/ui/components/SettingsModal.tsx`)**:
+  - Identified root cause of profile photo update app-reset: Android system file picker switches app to background (`visibilityState: hidden`), firing `sessionController.lock()`.
+  - Added `isFilePickerActiveRef` and `markFilePickerActive`/`markFilePickerInactive` with a 4,000ms grace window.
+  - Added global capture listeners for `click`, `change`, and `cancel` on `input[type="file"]`.
+- [x] **Atomic Profile Updates (`src/ui/app/AppState.tsx`)**:
+  - Implemented `updateProfileAvatar(avatarDataUrl)`:
+    - Compresses/optimizes avatars to < 32 KB and 128x128 JPEG dimensions.
+    - Generates and signs fresh `SignedProfileDocument` with Ed25519 identity key.
+    - Atomically updates encrypted local partition (`veil:user:profile`), privacy settings, and PIN registry avatar (`updateSpaceAvatar`).
+    - Registers profile with relay directory client without resetting active session or closing modals.
+- [x] **Cross-Account Communication & Provisioning Repair (`src/account/accountManager.ts`)**:
+  - Identified root cause of cross-account message drops: secondary spaces lacked signed profiles, valid prekey bundles, and mailboxes when `PrekeyManager` was not injected.
+  - Implemented self-sufficient `PrekeyManager` fallback (`new PrekeyManager(this.store, this.idMgr)`).
+  - Automatically provisions signed prekeys, one-time prekeys (10 OPKs), relay mailboxes, signed profiles, and directory registration.
+- [x] **Real Visible Connection Status (`src/ui/components/Sidebar.tsx`)**:
+  - Implemented subtle, clean status indicator below top-header VEIL branding (`● Connected`, `↻ Connecting...`, `↻ Reconnecting...`, `● Offline`) reflecting `networkState`.
+- [x] **Automated Testing & Builds**:
+  - Created `tests/phase67-applock-perf-and-timing.test.ts` (4/4 tests pass).
+  - Created `tests/phase67-cross-account-comm.test.ts` (1/1 test passes).
+  - Regression verified: `tests/phase65-multi-account-isolation.test.ts`, `tests/phase66-account-restore-healing.test.ts`, `tests/phase50c-password-validation-forensic.test.ts`, `tests/applock-multi-space-pin.test.ts` (27/27 tests pass).
+  - Production build (`npm run build`) and Android APK (`gradlew.bat assembleDebug`) compiled cleanly.
+
+---
+
+## Previous Phase: PHASE 66 — ACCOUNT RESTORE HEALING, RECOVERY VAULT RESILIENCE & LOGIN ERROR RESOLUTION
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`

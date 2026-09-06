@@ -2,6 +2,37 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase67-applock-perf-sync] - 2026-09-07
+
+### App Lock Latency Elimination, File Picker Lifecycle Guard, Atomic Profile Updates & Cross-Account Synchronization (Phase 67)
+- **Single-Derivation App Lock Fast-Path (Latency Root-Cause Elimination)**:
+  - Root cause: Entering a PIN was performing TWO sequential, heavy Argon2id derivations (~1s each): the first to verify the PIN and decrypt the wrapped password in `SpacePinManager`, and the second when passing that password to `vault.unlockSpace(password)` to derive the Space Master Key again.
+  - Fix: Extended `WrappedCredentialsPayload` to store the Base64-encoded 32-byte Space Master Key (SMK), securely encrypted with XChaCha20-Poly1305 under the PIN KEK (`kek_pin`).
+  - Added `vault.unlockSpaceWithMasterKey(spaceId, masterKey)` and `sessionController.unlockWithMasterKey(spaceId, masterKey)`, enabling instantaneous (0ms KDF) vault session activation.
+  - Implemented automatic backward-compatible credential upgrade (`upgradeWrappedCredentialsWithMasterKey`) upon first unlock for spaces configured under earlier schemas.
+  - Instrumented timing benchmarks: logs sanitized execution breakdown (`pin_verification_ms`, `credential_resolution_ms`, `vault_unlock_ms`, `session_activation_ms`, `total_ms`) in development mode with zero sensitive data disclosure.
+- **File Picker Lifecycle Guard (Profile Photo Update App-Lock Prevention)**:
+  - Root cause: On native Android, opening the system file/image selector switches the host activity to the background (`visibilitychange: hidden` / Capacitor `appStateChange: { isActive: false }`). When the user selected a photo or cancelled, `AppState`'s auto-lock listener fired `sessionController.lock()`, destroying volatile session keys, clearing active modals, and returning to the PIN lock screen.
+  - Fix: Implemented `isFilePickerActiveRef` and `markFilePickerActive`/`markFilePickerInactive` with a 4,000ms safety grace window.
+  - Added global document-level capture listeners for `click`, `change`, and `cancel` on `input[type="file"]`, preventing accidental background auto-lock during system file picker transitions while preserving strict auto-lock when switching away to other apps.
+- **Atomic Profile Picture Updates**:
+  - Implemented `updateProfileAvatar(avatarDataUrl)` in `AppState`:
+    - Compresses/optimizes avatars to < 32 KB and 128x128 JPEG dimensions.
+    - Generates and signs a fresh `SignedProfileDocument` with the space's Ed25519 identity key.
+    - Atomically updates the encrypted local partition (`veil:user:profile`), privacy settings, PIN registry avatar (`spacePinManager.updateSpaceAvatar`), and registers the profile with the relay directory client.
+    - Updates local UI state and closes no modals unexpectedly, eliminating the false logout/reset loop.
+- **Cross-Account Communication (A ↔ B) & Provisioning Repair**:
+  - Root cause: Secondary spaces created via `createSecondaryAccount` previously omitted genuine prekey bundles and relay mailboxes when `PrekeyManager` was not explicitly passed, causing peer inbound validation (`verifySignedProfile`) to fail and drop messages.
+  - Fix: Secondary account creation now automatically provisions full `PrekeyManager` instances, generates signed prekeys and one-time prekeys (10 OPKs), allocates relay mailboxes, signs profile documents, and registers profiles in the directory.
+  - Enables verified bi-directional contact requests and end-to-end encrypted messaging between Account A and Account B on the same or distinct devices.
+- **Real Visible Connection Status**:
+  - Added a subtle, non-intrusive status pill in the top header below the VEIL branding (`● Connected`, `↻ Connecting...`, `↻ Reconnecting...`, `● Offline`) dynamically driven by `networkState`.
+- **Automated Verification**:
+  - Created `tests/phase67-applock-perf-and-timing.test.ts` (4/4 tests pass).
+  - Created `tests/phase67-cross-account-comm.test.ts` (1/1 test passes).
+  - Verified regression across `tests/phase65-multi-account-isolation.test.ts`, `tests/phase66-account-restore-healing.test.ts`, `tests/phase50c-password-validation-forensic.test.ts`, and `tests/applock-multi-space-pin.test.ts` (27/27 tests passing).
+  - Web production build passed in 1.90s; Android debug APK compiled cleanly in 48s.
+
 ## [1.0.0-phase66-account-restore-healing] - 2026-09-06
 
 ### Account Restore Self-Healing, Recovery Vault Resilience & Login Error Resolution (Phase 66)

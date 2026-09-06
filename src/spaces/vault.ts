@@ -378,6 +378,44 @@ export class SpaceVaultManager {
   }
 
   /**
+   * Directly activates a SpaceSession using an already unwrapped Space Master Key (SMK).
+   * Bypasses secondary Argon2id derivation for instantaneous (0ms) unlock.
+   *
+   * @param spaceId Target spaceId
+   * @param masterKey 32-byte Space Master Key
+   * @returns Active unlocked SpaceSession
+   */
+  public unlockSpaceWithMasterKey(spaceId: string, masterKey: Uint8Array): SpaceSession {
+    if (!spaceId || spaceId.trim().length === 0) {
+      throw new Error('Unable to unlock Space: empty spaceId');
+    }
+    if (!masterKey || masterKey.length !== 32) {
+      throw new Error('Unable to unlock Space: invalid master key length');
+    }
+
+    const envelope = this.envelopes.get(spaceId);
+    if (!envelope) {
+      throw new Error('Unable to unlock Space: space envelope not found');
+    }
+
+    // Check if session is already active
+    const existing = this.activeSessions.get(spaceId);
+    if (existing && existing.isActive()) {
+      return existing;
+    }
+
+    const session = new SpaceSession(
+      envelope.spaceId,
+      envelope.name,
+      envelope.isDecoy,
+      masterKey
+    );
+
+    this.activeSessions.set(envelope.spaceId, session);
+    return session;
+  }
+
+  /**
    * Returns an active in-memory SpaceSession by spaceId if unlocked.
    */
   public getActiveSession(spaceId: string): SpaceSession | undefined {

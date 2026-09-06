@@ -26,6 +26,10 @@ import type { IdentityDocument } from '../identity/document.ts';
 import type { KdfParameters } from '../types/index.ts';
 import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
 import { spacePinManager } from '../privacy/pinManager.ts';
+import { createSignedProfile } from '../identity/profile.ts';
+import { PrekeyManager } from '../ratchet/prekeys.ts';
+import type { NetworkManager } from '../network/networkManager.ts';
+import type { DirectoryClient } from '../network/directoryClient.ts';
 
 export interface IdentityBackupPayload {
   version: 1;
@@ -60,19 +64,28 @@ export class AccountManager {
   private idMgr: SpaceIdentityManager;
   private store: EncryptedSpaceStore;
   private storageAdapter: IStorageAdapter;
+  private netManager?: NetworkManager;
+  private prekeyManager?: PrekeyManager;
+  private directoryClient?: DirectoryClient;
 
   constructor(
     cloudClient: CloudClient,
     vault: SpaceVaultManager,
     idMgr: SpaceIdentityManager,
     store: EncryptedSpaceStore,
-    storageAdapter: IStorageAdapter
+    storageAdapter: IStorageAdapter,
+    netManager?: NetworkManager,
+    prekeyManager?: PrekeyManager,
+    directoryClient?: DirectoryClient
   ) {
     this.cloudClient = cloudClient;
     this.vault = vault;
     this.idMgr = idMgr;
     this.store = store;
     this.storageAdapter = storageAdapter;
+    this.netManager = netManager;
+    this.prekeyManager = prekeyManager;
+    this.directoryClient = directoryClient;
   }
 
   /**
@@ -166,7 +179,12 @@ export class AccountManager {
     spaceName: string;
     pin: string;
     mainSpaceId: string;
+    avatar?: string;
     kdfParams?: Partial<KdfParameters>;
+    netManager?: NetworkManager;
+    prekeyManager?: PrekeyManager;
+    directoryClient?: DirectoryClient;
+    pinManager?: typeof spacePinManager;
   }): Promise<{
     spaceId: string;
     username: string;
@@ -184,6 +202,11 @@ export class AccountManager {
     if (!pin || !/^\d{4,6}$/.test(pin)) {
       throw new Error('A 4 or 6-digit PIN is required for the new space/account');
     }
+
+    const effectiveNetMgr = params.netManager || this.netManager;
+    const effectivePrekeyMgr = params.prekeyManager || this.prekeyManager || new PrekeyManager(this.store, this.idMgr);
+    const effectiveDirClient = params.directoryClient || this.directoryClient;
+    const effectivePinMgr = params.pinManager || spacePinManager;
 
     const deviceId = `dev_${bytesToHex(randomBytes(8))}`;
     const deviceName = `${cleanUsername}'s Device`;
@@ -247,26 +270,61 @@ export class AccountManager {
       spaceHeader.accountId = accountId;
       await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
 
-      // Create initial signed profile in store
-      const initialProfile = {
-        identityId: identityDoc.identityId,
-        username: cleanUsername,
-        displayName: cleanUsername,
-        mailboxId: `mbx_${bytesToHex(randomBytes(16))}`,
-        issuedAt: Date.now(),
-      };
-      await this.store.setAsync(tempSession, 'veil:user:profile', initialProfile);
+      // Generate prekeys for tempSession if prekeyManager is available
+      let prekeyBundle = undefined;
+      if (effectivePrekeyMgr) {
+        try {
+          if (!effectivePrekeyMgr.getSignedPrekeyPublic(tempSession)) {
+            effectivePrekeyMgr.generateSignedPrekey(tempSession);
+          }
+          effectivePrekeyMgr.generateOneTimePrekeys(tempSession, 10);
+          prekeyBundle = effectivePrekeyMgr.createPrekeyBundle(tempSession);
+        } catch (_prekeyErr) {}
+      }
 
-      // 5. Assign PIN in pinManager as secondary account
-      await spacePinManager.assignPinToSpace({
+      // Allocate or obtain real mailbox on relay
+      let mailboxId = `mbx_${bytesToHex(randomBytes(16))}`;
+      if (effectiveNetMgr) {
+        try {
+          const binding = await effectiveNetMgr.getOrCreateMailbox(tempSession);
+          if (binding && binding.mailboxId) {
+            mailboxId = binding.mailboxId;
+          }
+        } catch (_mbxErr) {}
+      }
+
+      // Create genuine signed profile
+      const signedProfile = createSignedProfile(
+        identityDoc.identityId,
+        loadedId.signingPrivateKey,
+        cleanUsername,
+        cleanUsername,
+        mailboxId,
+        prekeyBundle,
+        params.avatar
+      );
+
+      await this.store.setAsync(tempSession, 'veil:user:profile', signedProfile);
+
+      // Register with directory so peer accounts can discover and verify B
+      if (effectiveDirClient) {
+        try {
+          await effectiveDirClient.registerProfile(signedProfile);
+        } catch (_dirErr) {}
+      }
+
+      // 5. Assign PIN in pinManager as secondary account with masterKey for instant unlock
+      await effectivePinMgr.assignPinToSpace({
         spaceId: spaceHeader.spaceId,
         canonicalUsername: cleanUsername,
         spaceName,
         password,
         pin,
+        avatar: params.avatar,
         accountId,
         isMainAccount: false,
         parentSpaceId: mainSpaceId,
+        masterKey: tempSession.getMasterKey(),
       });
 
       return {

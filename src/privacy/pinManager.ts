@@ -23,6 +23,7 @@ export interface WrappedCredentialsPayload {
   spaceId: string;
   username: string;
   accountId?: string;
+  masterKey?: string; // Base64 encoded 32-byte Space Master Key
 }
 
 export interface VerifyPinResult extends WrappedCredentialsPayload {
@@ -86,6 +87,13 @@ export class SpacePinManager {
       ...customKdfParams,
     };
     this.registry = this.loadRegistry();
+  }
+
+  public setKdfParams(customKdfParams: Partial<KdfParameters>): void {
+    this.kdfParams = {
+      ...this.kdfParams,
+      ...customKdfParams,
+    };
   }
 
   /**
@@ -448,8 +456,9 @@ export class SpacePinManager {
     accountId?: string;
     isMainAccount?: boolean;
     parentSpaceId?: string;
+    masterKey?: Uint8Array | string;
   }): Promise<SpacePinEntry> {
-    const { spaceId, canonicalUsername, spaceName, password, pin, avatar, accountId, isMainAccount, parentSpaceId } = params;
+    const { spaceId, canonicalUsername, spaceName, password, pin, avatar, accountId, isMainAccount, parentSpaceId, masterKey } = params;
 
     const isAvail = await this.isPinAvailable(pin, spaceId);
     if (!isAvail) {
@@ -474,11 +483,16 @@ export class SpacePinManager {
       }
 
       // Wrap credentials
+      const formattedMasterKey = masterKey
+        ? (typeof masterKey === 'string' ? masterKey : bytesToBase64(masterKey))
+        : undefined;
+
       const payload: WrappedCredentialsPayload = {
         password,
         spaceId,
         username: canonicalUsername.trim().toLowerCase().replace(/^@/, ''),
         accountId,
+        masterKey: formattedMasterKey,
       };
 
       const aad = new TextEncoder().encode(`veil-pin-cred|space:${spaceId}|ver:1`);
@@ -581,6 +595,34 @@ export class SpacePinManager {
       pin: newPin,
       avatar,
       accountId: resolved.accountId,
+      masterKey: resolved.masterKey,
+    });
+  }
+
+  /**
+   * Upgrades existing wrapped credentials to include the Space Master Key (SMK).
+   * Ensures subsequent unlocks with this PIN only execute 1 Argon2id derivation.
+   */
+  public async upgradeWrappedCredentialsWithMasterKey(params: {
+    spaceId: string;
+    pin: string;
+    masterKey: Uint8Array | string;
+  }): Promise<void> {
+    const { spaceId, pin, masterKey } = params;
+    const resolved = await this.verifyAndResolvePin(pin);
+    if (resolved.spaceId !== spaceId) {
+      throw new Error('PIN does not match target space');
+    }
+    const spaceMeta = this.getSpaceMetadata(spaceId);
+    await this.assignPinToSpace({
+      spaceId,
+      canonicalUsername: resolved.username,
+      spaceName: spaceMeta?.spaceName || 'My Space',
+      password: resolved.password,
+      pin,
+      avatar: spaceMeta?.avatar,
+      accountId: resolved.accountId,
+      masterKey,
     });
   }
 

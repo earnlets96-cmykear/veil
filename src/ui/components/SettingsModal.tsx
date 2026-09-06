@@ -94,6 +94,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     changeAccountPassword,
     isMainAccount,
     verifyMainAccount,
+    updateProfileAvatar,
+    markFilePickerActive,
+    markFilePickerInactive,
   } = useApp();
 
   const { showToast } = useToast();
@@ -242,14 +245,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      markFilePickerInactive();
+      return;
+    }
 
     try {
       const optimizedThumbnail = await processAvatarImage(file);
       setAvatarPreview(optimizedThumbnail);
-      showToast({ type: 'info', message: 'Profile photo optimized (<32 KB)' });
+      // Atomically persist avatar to encrypted store, directory, and PIN manager without modal reset
+      await updateProfileAvatar(optimizedThumbnail);
+      showToast({ type: 'success', message: 'Profile photo updated successfully (<32 KB)' });
     } catch (err: any) {
       showToast({ type: 'error', message: err.message || 'Failed to process profile photo' });
+    } finally {
+      markFilePickerInactive();
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -627,7 +638,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      markFilePickerActive();
+                      fileInputRef.current?.click();
+                    }}
                   >
                     Change Photo
                   </Button>

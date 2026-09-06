@@ -266,18 +266,61 @@ export const Sidebar: React.FC = () => {
           <MenuIcon size={22} />
         </button>
 
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <h1
             style={{
-              fontSize: '1.25rem',
+              fontSize: '1.15rem',
               fontWeight: 800,
               letterSpacing: '0.04em',
               color: '#ffffff',
               margin: 0,
+              lineHeight: 1.15,
             }}
           >
             VEIL
           </h1>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.68rem',
+              color:
+                networkState === 'connected'
+                  ? '#10b981'
+                  : networkState === 'connecting' || networkState === 'reconnecting' || networkState === 'degraded'
+                  ? '#f59e0b'
+                  : '#ef4444',
+              fontWeight: 500,
+              marginTop: '1px',
+            }}
+            title={`Relay status: ${networkState}`}
+          >
+            <span
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                backgroundColor:
+                  networkState === 'connected'
+                    ? '#10b981'
+                    : networkState === 'connecting' || networkState === 'reconnecting' || networkState === 'degraded'
+                    ? '#f59e0b'
+                    : '#ef4444',
+                display: 'inline-block',
+                boxShadow: networkState === 'connected' ? '0 0 4px #10b981' : undefined,
+              }}
+            />
+            <span>
+              {networkState === 'connected'
+                ? 'Connected'
+                : networkState === 'connecting'
+                ? 'Connecting...'
+                : networkState === 'reconnecting'
+                ? 'Reconnecting...'
+                : 'Offline'}
+            </span>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

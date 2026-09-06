@@ -84,6 +84,25 @@ export class SessionController {
   }
 
   /**
+   * Unlocks a Space directly using its already unwrapped Space Master Key (SMK).
+   * Bypasses the secondary Argon2id derivation, providing instantaneous (0ms) vault activation.
+   */
+  public async unlockWithMasterKey(spaceId: string, masterKey: Uint8Array): Promise<SpaceSession> {
+    const session = this.vault.unlockSpaceWithMasterKey(spaceId, masterKey);
+
+    await this.store.loadPartitionFromStorage(session);
+
+    let identity = this.idMgr.loadIdentity(session, this.store);
+    if (!identity) {
+      this.idMgr.createIdentity(session, this.store);
+    }
+
+    this.activeSession = session;
+    this.resetAutoLockTimer();
+    return session;
+  }
+
+  /**
    * Creates a new isolated Space and persists its envelope to storage.
    */
   public async createSpace(
