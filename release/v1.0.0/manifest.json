@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-06T08:08:45.937Z",
+  "generatedAt": "2026-09-06T09:04:28.562Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
+      "path": "dist/assets/index-C36XKb68.js",
+      "sizeBytes": 805843,
+      "sha256": "01c0f8973746292db3949f89a94c091ff7542d9027b8a79edf94953ee439e9f1"
+    },
+    {
       "path": "dist/assets/index-DIAKkkyn.css",
       "sizeBytes": 72107,
       "sha256": "144f56feb05c371bc12076dcb0f5123d7369d0d4ab999ab37418f038ee693273"
-    },
-    {
-      "path": "dist/assets/index-MUvo8600.js",
-      "sizeBytes": 807215,
-      "sha256": "b5a529d0a6220baf839e8b00a668992bc8550de25c49147ca0aea764d44f9094"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-CrCSGNht.js",
+      "path": "dist/assets/web-BIXkree9.js",
       "sizeBytes": 842,
-      "sha256": "81a1841e9805278c63948918c30cee76374b9f1fe4e8996b9f4bbc54c0e88f9a"
+      "sha256": "6702d77ce860ba9fa2d2b72212404cce6959a4ef0ca10b0129a61b75c47d1a17"
     },
     {
-      "path": "dist/assets/web-DK6x1kUT.js",
+      "path": "dist/assets/web-DloyTpv6.js",
       "sizeBytes": 361,
-      "sha256": "f694629bfecfa2d605a6af16a06a929ebdc5cd902daa24a3fd756113c946191f"
+      "sha256": "446732a9eaa81aca8ac7dd628d0239dc26ef2791b3a3f1c4326a29033dd50b21"
     },
     {
-      "path": "dist/assets/web-JtVhgPrl.js",
+      "path": "dist/assets/web-S5FFaHvp.js",
       "sizeBytes": 8728,
-      "sha256": "c213dbdf13856fd7f09f7b5f37658d20ed5112db0c702e80f9c98adb659a269f"
+      "sha256": "d0ab57f80565647c40c71d6bee28440e0cf88aec2674da705c6b4f178fabb28a"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "22e6a608d7dfbc4aefd0f5aaae66de9435e04f9ea37c8e38341a6d1fbea702e6"
+      "sha256": "2a23e9c809f56662b0440dc04cc0661b081185cb38119912e2fa3fc5ebbe71c8"
     }
   ]
 }

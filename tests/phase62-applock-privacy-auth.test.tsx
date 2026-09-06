@@ -145,13 +145,14 @@ describe('Phase 62: App Lock, Privacy & Authentication Suite', () => {
         </AppProvider>
       );
 
-      // Calls tab must NOT exist in bottom navigation
+      // Bottom navigation bar must be completely removed (no Calls, Chats, Groups, or Settings tabs at bottom)
+      expect(html).not.toMatch(/veil-bottom-nav/);
       expect(html).not.toMatch(/>Calls<\/span>/);
+      expect(html).not.toMatch(/>Chats<\/span>/);
+      expect(html).not.toMatch(/>Settings<\/span>/);
 
-      // Exactly 3 balanced tabs: Chats, Groups, Settings
-      expect(html).toMatch(/>Chats<\/span>/);
-      expect(html).toMatch(/>Groups<\/span>/);
-      expect(html).toMatch(/>Settings<\/span>/);
+      // Hamburger button opens Settings
+      expect(html).toMatch(/aria-label="Open Settings"/);
     });
   });
 

@@ -81,6 +81,7 @@ export const App: React.FC = () => {
           showCancel={hasRegisteredPins}
           onCancelPasswordFallback={hasRegisteredPins ? () => setShowPasswordLogin(false) : undefined}
           onSuccessAuth={(params) => {
+            setShowPasswordLogin(false);
             const targetId = params.spaceId || params.username;
             if (!spacePinManager.isOnboardingCompleted(targetId) && !spacePinManager.hasPinForSpace(targetId)) {
               setPendingPinSetup(params);

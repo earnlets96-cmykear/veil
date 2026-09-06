@@ -1461,10 +1461,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       setActiveSession(session);
+      setIsAppLocked(false);
       sessionController.recordUserActivity();
       setKnownSpacesCount(vault.listEnvelopes().length);
       await loadSpaceData(session);
-      await ensureCloudSession(session, false, passphrase);
+
+      // Trigger cloud sync asynchronously in background without blocking local unlock
+      ensureCloudSession(session, false, passphrase).catch((syncErr) => {
+        console.warn('[VEIL-AUTH] Non-blocking cloud session sync warning:', syncErr);
+      });
 
       const profile = await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile');
       const cloudSess = await store.getAsync<any>(session, 'veil:cloud:session');
@@ -1542,7 +1547,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         await loadSpaceData(session);
-        await ensureCloudSession(session, false, passphrase);
+        setIsAppLocked(false);
+        ensureCloudSession(session, false, passphrase).catch((syncErr) => {
+          console.warn('[VEIL-AUTH] Non-blocking cloud session sync warning:', syncErr);
+        });
         return session;
       }
 
@@ -1562,6 +1570,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setKnownSpacesCount(vault.listEnvelopes().length);
       const session = await sessionController.unlock(passphrase, activeUsername);
       setActiveSession(session);
+      setIsAppLocked(false);
 
       try {
         const loadedId = idMgr.loadIdentity(session, store);
@@ -1590,8 +1599,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
 
       await loadSpaceData(session);
-      await ensureCloudSession(session, false, passphrase);
-      await accountManager.createOrUpdateRecoveryVault(session, passphrase, activeUsername);
+      ensureCloudSession(session, false, passphrase).catch((syncErr) => {
+        console.warn('[VEIL-AUTH] Non-blocking cloud session sync warning:', syncErr);
+      });
+      accountManager.createOrUpdateRecoveryVault(session, passphrase, activeUsername).catch((recErr) => {
+        console.warn('[VEIL-AUTH] Non-blocking recovery vault warning:', recErr);
+      });
       return session;
     },
     [activeSession, ensureCloudSession, loadSpaceData]
@@ -1642,10 +1655,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const unlockWithPin = useCallback(
     async (pin: string) => {
       const result = await spacePinManager.verifyAndResolvePin(pin);
-      if (!result.success || !result.spaceId) {
-        if (result.isLockedOut) {
-          throw new Error(`Too many incorrect attempts. Please wait ${result.remainingLockoutSeconds || 30} seconds.`);
-        }
+      if (!result || !result.spaceId || !result.password) {
         throw new Error('Incorrect PIN');
       }
 
@@ -1658,17 +1668,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sessionController.lock();
       }
 
-      if (result.wrappedCredentials) {
-        await unlockSpace(result.wrappedCredentials, result.username);
-      } else {
-        const creds = activeCredentialsRef.current.get(result.spaceId);
-        if (creds?.passphrase) {
-          await unlockSpace(creds.passphrase, creds.username || result.username);
-        } else {
-          throw new Error('Password required to unlock this space.');
-        }
-      }
-
+      await unlockSpace(result.password, result.username);
       setIsAppLocked(false);
     },
     [activeSession, unlockSpace]

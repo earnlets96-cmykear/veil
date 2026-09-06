@@ -507,7 +507,7 @@ export class VoicePlaybackManager {
    * Seeks playback position to a percentage (0 - 100).
    * Works whether audio is currently playing, paused, or staged before initial play.
    */
-  public seek(percent: number, messageId?: string): void {
+  public seek(percent: number, messageId?: string, durationSeconds?: number): void {
     const clampedPercent = Math.max(0, Math.min(100, isNaN(percent) ? 0 : percent));
     const targetId = messageId || this.currentPlayingId;
 
@@ -515,7 +515,10 @@ export class VoicePlaybackManager {
       this.stagedSeekPercent[targetId] = clampedPercent;
     }
 
-    const duration = this.getDuration() || 1;
+    const duration =
+      durationSeconds && durationSeconds > 0
+        ? durationSeconds
+        : this.getDuration() || 1;
     const targetTime = (clampedPercent / 100) * duration;
     let actualCurrentTime = targetTime;
 

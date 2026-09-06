@@ -2,6 +2,39 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase63-deep-repair] - 2026-09-06
+
+### Deep Authentication, App Lock, Navigation & Performance Repair (Phase 63)
+- **Fast Space Authentication (< 1s Local Unlock)**:
+  - Decoupled local space unlocking (`unlockSpace`) from synchronous cloud session negotiation (`ensureCloudSession`).
+  - Key derivation, XChaCha20 vault decryption, and session activation now unlock the UI immediately.
+  - Cloud synchronization and session establishment run asynchronously in the background.
+- **App Lock PIN Resolution & Format Selection**:
+  - Corrected `verifyAndResolvePin` in `src/privacy/pinManager.ts` to return explicit `VerifyPinResult` (`{ success: true, spaceId, username, password, accountId }`).
+  - Updated `AppState.unlockWithPin` to consume `result.password` and properly activate the space session.
+  - Added `preferredPinType` field to `DevicePinRegistry` and exposed `setPinType`/`getPinType` for 4-digit and 6-digit preferences.
+  - Wired PIN Type toggle in `AppLockSettingsView.tsx` to persist user selection immediately.
+- **Elimination of Stuck Loading Spinners & "Forgot PIN" Recovery**:
+  - Added `finally { setLoadingPhase('idle'); }` in `LockScreen.handleUnlock` to ensure loading phase always resets on password login.
+  - Reset `isUnlocking(false)` upon success in `PinLockScreen.tsx`.
+  - Added `setShowPasswordLogin(false)` on successful login in `App.tsx` so the fallback modal is dismissed cleanly.
+- **Removal of Bottom Navigation Bar & Direct Settings Access**:
+  - Completely eliminated the bottom navigation bar (`veil-bottom-nav`) from `Sidebar.tsx`, reclaiming vertical screen estate.
+  - Wired top header hamburger menu button directly to open Settings modal (`openModal({ type: 'settings' })`).
+  - Adjusted FAB button positioning for comfortable single-hand access (`bottom: 24px`).
+- **Voice Message Seeking & Scrubber Touch Repair**:
+  - Removed blocking `onTouchStart={stopAllEvents}` from `VoiceNoteCard.tsx` scrubber track, restoring touch scrubbing on mobile.
+  - Added pointer capture on `onPointerDown` and dedicated `onClick` track handler for instant seek.
+  - Passed voice note's actual `durationSeconds` to `VoicePlayer.seek` to compute exact seek target time.
+- **Conversation Header & UI Polish**:
+  - Removed non-functional audio and video call buttons from conversation header in `ConversationView.tsx`.
+  - Fixed delivery status tooltip in `MessageStatus.tsx` to display `"Delivered"`.
+- **Automated Verification & Packaging**:
+  - Created and executed `tests/phase63-deep-repair.test.tsx` (10/10 tests passing).
+  - Verified regression suites `tests/phase62-applock-privacy-auth.test.tsx` (10/10) and `tests/applock-multi-space-pin.test.ts` (8/8).
+  - Generated release build (`npm run build`, 7 release artifacts in `release/v1.0.0/`).
+  - Built Android debug APK (`android/app/build/outputs/apk/debug/app-debug.apk`, 7.38 MB).
+
 ## [1.0.0-phase62-applock-privacy-auth] - 2026-09-06
 
 ### App Lock, Privacy, Space Isolation, Authentication & UI Overhaul (Phase 62)

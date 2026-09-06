@@ -67,6 +67,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
 
     try {
       await unlockWithPin(pin);
+      setIsUnlocking(false);
     } catch (err: any) {
       setIsShaking(true);
       setError(err?.message || 'Incorrect PIN');

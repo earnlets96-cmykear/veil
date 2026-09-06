@@ -209,6 +209,7 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
           onClick={() => {
             const nextType = pinType === '6-digit' ? '4-digit' : '6-digit';
             setPinType(nextType);
+            spacePinManager.setPinType(nextType, currentSpaceId);
             showNotice(`Default PIN format: ${nextType}`);
           }}
           role="button"
@@ -217,6 +218,8 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
             if (e.key === 'Enter' || e.key === ' ') {
               const nextType = pinType === '6-digit' ? '4-digit' : '6-digit';
               setPinType(nextType);
+              spacePinManager.setPinType(nextType, currentSpaceId);
+              showNotice(`Default PIN format: ${nextType}`);
             }
           }}
           style={{

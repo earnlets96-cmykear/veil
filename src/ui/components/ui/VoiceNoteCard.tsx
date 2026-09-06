@@ -100,10 +100,10 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       if (onSeek) {
         onSeek(percent);
       } else if (messageId) {
-        VoicePlayer.seek(percent, messageId);
+        VoicePlayer.seek(percent, messageId, effectiveDuration);
       }
     },
-    [onSeek, messageId]
+    [onSeek, messageId, effectiveDuration]
   );
 
   const handleSeekFromClientX = useCallback(
@@ -131,7 +131,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
             if (pendingSeekPercentRef.current !== null) {
               executeSeek(pendingSeekPercentRef.current);
             }
-          }, 120);
+          }, 80);
         }
       }
     },
@@ -139,12 +139,15 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   );
 
   // Mouse / Touch scrubbing handlers
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    e.preventDefault();
     if (isUploading || isError) return;
     setIsScrubbing(true);
-    handleSeekFromClientX(e.clientX, false);
+    handleSeekFromClientX(e.clientX, true);
+
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (_e) {}
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       moveEvent.stopPropagation();
@@ -165,6 +168,12 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
+  };
+
+  const handleClickTrack = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (isUploading || isError) return;
+    handleSeekFromClientX(e.clientX, true);
   };
 
   const timerDisplay =
@@ -325,9 +334,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
         ref={trackRef}
         className="veil-waveform-container"
         onPointerDown={handlePointerDown}
-        onTouchStart={stopAllEvents}
-        onTouchMove={stopAllEvents}
-        onTouchEnd={stopAllEvents}
+        onClick={handleClickTrack}
         style={{
           width: '100%',
           height: '14px',

@@ -1,16 +1,39 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 62 — APP LOCK, PRIVACY, AUTHENTICATION & UI OVERHAUL
+## Active Phase: PHASE 63 — DEEP AUTHENTICATION, APP LOCK, NAVIGATION & PERFORMANCE REPAIR
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 
-### Phase 62 App Lock, Privacy, Authentication & UI Overhaul Tasks:
-- [x] **Fix Critical Login Error (`src/privacy/pinManager.ts`, `src/ui/app/AppState.tsx`, `src/ui/components/LockScreen.tsx`)**:
-  - Implemented `hasPinForSpace(spaceIdentifier: string)` on `SpacePinManager`, resolving by both `spaceId` and `canonicalUsername`.
-  - Updated `isOnboardingCompleted`, `setOnboardingCompleted`, and `getPinType` to cross-resolve between space ID and username.
-  - Sanitized `LockScreen` authentication error handling to catch internal JS/type exceptions and present clean, secure messages.
-  - Returned active `SpaceSession` from `unlockSpace` and `createSpace`, and guarded secondary state notifications in try/catch.
+### Phase 63 Deep Authentication, App Lock, Navigation & Performance Repair Tasks:
+- [x] **Trace and Fix Slow Authentication (`src/ui/app/AppState.tsx`)**:
+  - Decoupled local space unlock from synchronous cloud network calls (`ensureCloudSession`).
+  - Local Argon2id derivation, key decryption, session activation, and UI unlock complete immediately (< 1s) on both Desktop and Android.
+  - Cloud session negotiation and sync run asynchronously in the background.
+- [x] **App Lock PIN Resolution & Format (`src/privacy/pinManager.ts`, `src/ui/app/AppState.tsx`, `src/ui/components/AppLockSettingsView.tsx`)**:
+  - Fixed `verifyAndResolvePin` to return explicit `VerifyPinResult` (`{ success: true, spaceId, username, password, accountId }`).
+  - Corrected `AppState.tsx` caller to extract `result.password` and pass it to `unlockSpace(result.password, result.username)`.
+  - Added `preferredPinType` to `DevicePinRegistry` and wired `setPinType`/`getPinType` to persist 4-digit vs 6-digit preference.
+- [x] **Stuck Loading States & Forgot PIN Cleanup (`src/ui/components/LockScreen.tsx`, `src/ui/components/PinLockScreen.tsx`, `src/ui/App.tsx`)**:
+  - Wrapped `LockScreen.handleUnlock` in `try ... finally { setLoadingPhase('idle'); }` to prevent stuck loading spinners on password auth.
+  - Reset `isUnlocking(false)` upon success in `PinLockScreen.tsx`.
+  - Added `setShowPasswordLogin(false)` on successful login in `App.tsx` to exit the fallback screen cleanly.
+- [x] **Eliminate Bottom Navigation Bar (`src/ui/components/Sidebar.tsx`)**:
+  - Completely removed `<div className="veil-bottom-nav">` and all bottom tab buttons.
+  - Connected top-header hamburger menu button directly to Settings modal (`openModal({ type: 'settings' })`).
+  - Adjusted FAB button position to `bottom: 24px`.
+- [x] **Voice Message Seek System & Playback Controls (`src/ui/components/ui/VoiceNoteCard.tsx`, `src/attachments/voicePlayer.ts`, `src/ui/components/ConversationView.tsx`)**:
+  - Removed blocking `onTouchStart={stopAllEvents}` from scrubber container.
+  - Added pointer capture on `onPointerDown` and added `onClick` track handler for instant seek.
+  - Passed `durationSeconds` to `VoicePlayer.seek` to accurately compute seek position.
+- [x] **Clean Up Conversation Header & Delivery Tooltip (`src/ui/components/ConversationView.tsx`, `src/ui/components/ui/MessageStatus.tsx`)**:
+  - Removed fake audio and video call buttons from conversation header.
+  - Fixed delivery status tooltip to `"Delivered"`.
+- [x] **Cross-Platform Verification & Packaging**:
+  - Automated tests: `tests/phase63-deep-repair.test.tsx` (10/10 passed), `tests/phase62-applock-privacy-auth.test.tsx` (10/10 passed), `tests/applock-multi-space-pin.test.ts` (8/8 passed).
+  - Production Web build: `npm run build` compiled 7 release artifacts in `release/v1.0.0/`.
+  - Android APK: `cd android; .\gradlew.bat assembleDebug` built `app-debug.apk` (7.38 MB).
+
 - [x] **PIN Entry & Dynamic Dots Overhaul (`src/ui/components/PinLockScreen.tsx`)**:
   - Removed premature auto-submission on 4 digits; support 4 and 6 digits with an explicit Enter/Unlock keypad button ("OK" / checkmark).
   - Implemented dynamic dot indicators (`displayLength` adapts from configured PIN length, expanding to 6 if 5+ digits typed).

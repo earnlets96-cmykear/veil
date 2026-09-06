@@ -98,6 +98,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         setError(rawMsg);
       }
       setPassword('');
+    } finally {
       setLoadingPhase('idle');
     }
   };

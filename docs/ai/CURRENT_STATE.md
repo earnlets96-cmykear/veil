@@ -1,16 +1,20 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 62 — APP LOCK, PRIVACY, AUTHENTICATION & UI OVERHAUL
+## Current Verified Phase: PHASE 63 — DEEP AUTHENTICATION, APP LOCK, NAVIGATION & PERFORMANCE REPAIR
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
-  - Phase 62 Acceptance Suite: `tests/phase62-applock-privacy-auth.test.tsx` (10/10 passed).
-  - Security & Privacy Suites: `tests/applock-multi-space-pin.test.ts` (8/8 passed), `tests/identity-isolation.test.ts` (4/4 passed), `tests/decoy-space.test.ts` (2/2 passed), `tests/auto-lock.test.ts` (3/3 passed), `tests/panic-lock.test.ts` (1/1 passed), `tests/quick-lock.test.ts` (1/1 passed), `tests/phase31-lockscreen-privacy.test.tsx` (1/1 passed), `tests/error-disclosure.test.ts` (2/2 passed).
-  - UI Verification Suites: `tests/phase31-ui-components.test.tsx` (27/27 passed), `tests/conversation-view-render.test.tsx` (6/6 passed), `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed), `tests/accessibility-ui.test.ts` (1/1 passed).
-  - Web App Production Build: `npm run build` succeeds cleanly in ~2.2s with 0 TypeScript or bundling errors (7 release artifacts generated).
-  - Resolved Critical Authentication Bug: `hasPinForSpace` method implemented on `SpacePinManager` with bidirectional resolution by spaceId and username.
-  - Resolved Premature PIN Auto-Submit: Dedicated Enter/Unlock submission semantics on `PinLockScreen` and `AppLockSetupModal`, dynamic indicators matching configured length, no premature 4-digit unlock on 6-digit PINs.
-  - Eliminated Space Enumeration: Removed directory listing from `AccountsAndSpacesModal`, preserving zero-knowledge plausible deniability and decoy spaces.
-  - Cleaned Navigation & Mobile Tap Highlight: Removed nonfunctional "Calls" tab, removed "Spaces" pill, rebalanced bottom navigation to 3 equal items, suppressed web/mobile tap highlights with `-webkit-tap-highlight-color: transparent` and `.veil-filter-pill`.
+  - Phase 63 Acceptance Suite: `tests/phase63-deep-repair.test.tsx` (10/10 passed in 228ms).
+  - Phase 62 Regression Suite: `tests/phase62-applock-privacy-auth.test.tsx` (10/10 passed in 138ms).
+  - Multi-Space PIN Suite: `tests/applock-multi-space-pin.test.ts` (8/8 passed in 517ms).
+  - Web App Production Build: `npm run build` succeeds cleanly in 1.90s with 0 TypeScript or bundling errors (7 release artifacts in `release/v1.0.0/`).
+  - Android APK Compilation: `cd android; .\gradlew.bat assembleDebug` succeeds cleanly in 17s (`android/app/build/outputs/apk/debug/app-debug.apk`, 7.38 MB / 7,381,868 bytes).
+  - Authentication Speed Fix: Decoupled local space unlock from synchronous cloud network calls (`ensureCloudSession`). Local space decryption, session activation, and UI unlock now complete immediately (< 1s) on Desktop and Android, while cloud sync runs asynchronously in the background.
+  - App Lock PIN Resolution Fix: Updated `verifyAndResolvePin` in `src/privacy/pinManager.ts` to return explicit `VerifyPinResult` (`{ success: true, spaceId, username, password, accountId }`) matching `AppState.tsx` caller expectations, resolving "Incorrect PIN" on valid entries.
+  - PIN Format Persistence: Added `preferredPinType` to `DevicePinRegistry` and wired `setPinType`/`getPinType` in `pinManager.ts` and `AppLockSettingsView.tsx`.
+  - Stuck Loading & Forgot PIN Fix: Enforced `finally { setLoadingPhase('idle'); }` on `LockScreen.tsx`, reset `isUnlocking(false)` in `PinLockScreen.tsx`, and reset `showPasswordLogin(false)` on successful login in `App.tsx`.
+  - Bottom Navigation Replaced: Completely removed bottom navigation bar (`veil-bottom-nav`) from `Sidebar.tsx`. Wired top-header hamburger menu button directly to Settings modal.
+  - Voice Seek Control Repair: Removed blocking `onTouchStart={stopAllEvents}` from `VoiceNoteCard.tsx` scrubber, added pointer capture, and wired `VoicePlayer.seek` to use the voice note's actual `durationSeconds`.
+  - Cleaned Chat Header: Removed non-functional audio/video call buttons from `ConversationView.tsx`. Fixed delivery status tooltip in `MessageStatus.tsx`.
 
 ---
 

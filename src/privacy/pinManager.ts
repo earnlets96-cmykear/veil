@@ -25,6 +25,12 @@ export interface WrappedCredentialsPayload {
   accountId?: string;
 }
 
+export interface VerifyPinResult extends WrappedCredentialsPayload {
+  success: true;
+  isLockedOut?: boolean;
+  remainingLockoutSeconds?: number;
+}
+
 export interface SpacePinEntry {
   spaceId: string;
   canonicalUsername: string;
@@ -46,6 +52,7 @@ export interface DevicePinRegistry {
   deviceSalt: string; // 32-byte Base64 salt
   appLockEnabled: boolean;
   autoLockInterval: AutoLockIntervalSetting;
+  preferredPinType?: '4-digit' | '6-digit';
   lockOnBackground: boolean;
   lockOnScreenOff: boolean;
   afterExitingApp?: string;
@@ -278,11 +285,27 @@ export class SpacePinManager {
         }
       }
     }
+    if (this.registry.preferredPinType) {
+      return this.registry.preferredPinType;
+    }
     const all = this.listRegisteredSpaces();
     if (all.length > 0) {
       return all[0].pinLength === 4 ? '4-digit' : '6-digit';
     }
     return '4-digit';
+  }
+
+  public setPinType(type: '4-digit' | '6-digit', spaceIdentifier?: string): void {
+    this.registry.preferredPinType = type;
+    if (spaceIdentifier) {
+      const clean = spaceIdentifier.trim().toLowerCase().replace(/^@/, '');
+      for (const entry of Object.values(this.registry.entries)) {
+        if (entry.spaceId === spaceIdentifier || entry.canonicalUsername === clean) {
+          entry.pinLength = type === '6-digit' ? 6 : 4;
+        }
+      }
+    }
+    this.saveRegistry();
   }
 
   /**
@@ -564,7 +587,7 @@ export class SpacePinManager {
    * - Wrong PIN throws generic "Incorrect PIN" with rate-limiting.
    * - Rate-limiting progressively locks out brute-force attempts.
    */
-  public async verifyAndResolvePin(pin: string): Promise<WrappedCredentialsPayload> {
+  public async verifyAndResolvePin(pin: string): Promise<VerifyPinResult> {
     // Check lockout timer
     const now = Date.now();
     if (this.registry.lockedUntilEpoch > now) {
@@ -599,7 +622,10 @@ export class SpacePinManager {
       this.registry.lockedUntilEpoch = 0;
       this.saveRegistry();
 
-      return parsed;
+      return {
+        ...parsed,
+        success: true,
+      };
     } catch (err: any) {
       if (err.message && (err.message.includes('Too many attempts') || err.message === 'Incorrect PIN')) {
         throw err;

@@ -72,7 +72,6 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const [activeChip, setActiveChip] = useState<'all' | 'unread' | 'group'>('all');
-  const [activeNavTab, setActiveNavTab] = useState<'chats' | 'groups' | 'settings'>('chats');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalResults, setGlobalResults] = useState<DirectorySearchResult[]>([]);
   const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
@@ -249,9 +248,9 @@ export const Sidebar: React.FC = () => {
       >
         <button
           type="button"
-          onClick={() => openModal({ type: 'accountsAndSpaces' })}
-          aria-label="Open Accounts & Spaces"
-          title="Accounts & Spaces"
+          onClick={() => openModal({ type: 'settings' as any })}
+          aria-label="Open Settings"
+          title="Settings"
           style={{
             background: 'none',
             border: 'none',
@@ -794,7 +793,7 @@ export const Sidebar: React.FC = () => {
         title="Start New Chat"
         style={{
           position: 'absolute',
-          bottom: '72px',
+          bottom: '24px',
           right: '18px',
           width: '52px',
           height: '52px',
@@ -815,104 +814,6 @@ export const Sidebar: React.FC = () => {
       >
         <PlusIcon size={24} strokeWidth={2.5} />
       </button>
-
-      {/* Bottom Navigation Bar (Screen 4: Chats, Groups, Settings) */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-around',
-          height: '62px',
-          backgroundColor: '#0a0e17',
-          borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-          padding: '0 0.5rem',
-          zIndex: 10,
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            setActiveNavTab('chats');
-            setActiveChip('all');
-          }}
-          style={{
-            flex: 1,
-            background: 'none',
-            border: 'none',
-            color: activeNavTab === 'chats' ? '#14b8a6' : '#64748b',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            padding: '6px 12px',
-            borderRadius: '12px',
-            transition: 'color 0.15s ease',
-          }}
-        >
-          <MessageSquareIcon size={20} />
-          <span>Chats</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveNavTab('groups');
-            setActiveChip('group');
-          }}
-          style={{
-            flex: 1,
-            background: 'none',
-            border: 'none',
-            color: activeNavTab === 'groups' ? '#14b8a6' : '#64748b',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            padding: '6px 12px',
-            borderRadius: '12px',
-            transition: 'color 0.15s ease',
-          }}
-        >
-          <UsersIcon size={20} />
-          <span>Groups</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveNavTab('settings');
-            openModal({ type: 'settings' as any });
-          }}
-          style={{
-            flex: 1,
-            background: 'none',
-            border: 'none',
-            color: activeNavTab === 'settings' ? '#14b8a6' : '#64748b',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '3px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            padding: '6px 12px',
-            borderRadius: '12px',
-            transition: 'color 0.15s ease',
-          }}
-        >
-          <SettingsIcon size={20} />
-          <span>Settings</span>
-        </button>
-      </div>
     </div>
   );
 };
