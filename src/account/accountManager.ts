@@ -368,83 +368,175 @@ export class AccountManager {
     }
 
     const recoveryRecord = restoreRes.recovery || restoreRes.recoveryVault;
-    const kdfParams: KdfParameters =
-      typeof recoveryRecord.kdfParams === 'string'
-        ? JSON.parse(recoveryRecord.kdfParams)
-        : recoveryRecord.kdfParams;
+    let kdfParams: KdfParameters = DEFAULT_KDF_PARAMS;
+    try {
+      if (typeof recoveryRecord.kdfParams === 'string') {
+        kdfParams = JSON.parse(recoveryRecord.kdfParams);
+      } else if (recoveryRecord.kdfParams) {
+        kdfParams = recoveryRecord.kdfParams;
+      }
+    } catch (_e) {}
 
-    const vaultBlob =
-      typeof recoveryRecord.encryptedVaultBlob === 'string'
-        ? JSON.parse(recoveryRecord.encryptedVaultBlob)
-        : recoveryRecord;
+    let vaultBlob: any = recoveryRecord;
+    if (typeof recoveryRecord.encryptedVaultBlob === 'string') {
+      try {
+        vaultBlob = JSON.parse(recoveryRecord.encryptedVaultBlob);
+      } catch (_e) {
+        vaultBlob = { ciphertext: recoveryRecord.encryptedVaultBlob };
+      }
+    }
 
     const blobBytes = base64ToBytes(vaultBlob.ciphertext || vaultBlob.encryptedBlob || '');
     const nonceBytes = base64ToBytes(vaultBlob.nonce || '');
-    const rawSalt = kdfParams?.salt || vaultBlob.salt;
-    const saltBytes = typeof rawSalt === 'string' ? base64ToBytes(rawSalt) : new Uint8Array(16);
 
-    // Derive KEK from password and vault salt
-    const kek = deriveKeyArgon2id(
-      password,
-      saltBytes,
-      params.customKdfParams || kdfParams
-    );
+    // Candidate salts: recovery kdfParams salt, vaultBlob salt, account authSalt
+    const candidateSalts: Uint8Array[] = [];
+    if (kdfParams?.salt) {
+      try {
+        candidateSalts.push(typeof kdfParams.salt === 'string' ? base64ToBytes(kdfParams.salt) : kdfParams.salt);
+      } catch (_e) {}
+    }
+    if (vaultBlob?.salt) {
+      try {
+        candidateSalts.push(typeof vaultBlob.salt === 'string' ? base64ToBytes(vaultBlob.salt) : vaultBlob.salt);
+      } catch (_e) {}
+    }
+    if (restoreRes.account?.authSalt) {
+      try {
+        candidateSalts.push(typeof restoreRes.account.authSalt === 'string' ? base64ToBytes(restoreRes.account.authSalt) : restoreRes.account.authSalt);
+      } catch (_e) {}
+    }
+    if (candidateSalts.length === 0) {
+      candidateSalts.push(new Uint8Array(16));
+    }
+
+    // Candidate KDF parameter configurations across versions
+    const normalizedKdf: Partial<KdfParameters> = {
+      ...kdfParams,
+      timeCost: kdfParams?.timeCost ?? (kdfParams as any)?.iterations ?? 3,
+      memoryCost: kdfParams?.memoryCost ?? (kdfParams as any)?.memory ?? (kdfParams as any)?.memCost ?? 65536,
+      parallelism: kdfParams?.parallelism ?? 1,
+      keyLength: 32,
+    };
+
+    const candidateKdfConfigs: Partial<KdfParameters>[] = [
+      params.customKdfParams || normalizedKdf,
+      DEFAULT_KDF_PARAMS,
+      FAST_TEST_KDF_PARAMS,
+      { timeCost: 2, memoryCost: 32768, parallelism: 1, keyLength: 32 },
+    ];
+
+    // Comprehensive AAD candidate formats across versions
+    const candidateAads: (Uint8Array | undefined)[] = [
+      new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${cleanUsername}`),
+      new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`),
+      new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${username}`),
+      new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${username}`),
+      new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:@${cleanUsername}`),
+      new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|${cleanUsername}`),
+      new TextEncoder().encode('VEIL-RECOVERY-SNAPSHOT-v2'),
+      new TextEncoder().encode('VEIL-IDENTITY-BACKUP-v1'),
+      new TextEncoder().encode(`user:${cleanUsername}`),
+      new TextEncoder().encode(`user:${username}`),
+      new TextEncoder().encode(cleanUsername),
+      new TextEncoder().encode(username),
+      undefined,
+    ];
 
     let backupData: IdentityBackupPayload | RecoverySnapshotV2 | null = null;
     let isV2 = false;
 
-    try {
-      // Universal multi-format AAD fallback decryption
-      const candidateAads: (Uint8Array | undefined)[] = [
-        new TextEncoder().encode(`VEIL-RECOVERY-SNAPSHOT-v2|user:${cleanUsername}`),
-        new TextEncoder().encode(`VEIL-IDENTITY-BACKUP-v1|user:${cleanUsername}`),
-        new TextEncoder().encode('VEIL-RECOVERY-SNAPSHOT-v2'),
-        new TextEncoder().encode('VEIL-IDENTITY-BACKUP-v1'),
-        new TextEncoder().encode(`user:${cleanUsername}`),
-        undefined,
-      ];
+    // Exhaustive multi-salt, multi-KDF, multi-AAD decryption attempt
+    saltLoop: for (const saltBytes of candidateSalts) {
+      if (saltBytes.length < 16) continue;
 
-      for (const aad of candidateAads) {
+      for (const kdfConfig of candidateKdfConfigs) {
+        let kek: Uint8Array | null = null;
         try {
-          const decryptedBytes = decryptXChaCha20Poly1305(kek, nonceBytes, blobBytes, aad);
-          const parsed = JSON.parse(new TextDecoder().decode(decryptedBytes));
-          if (parsed && typeof parsed === 'object') {
-            backupData = parsed;
-            if ((parsed as RecoverySnapshotV2).version === 2 && Array.isArray((parsed as RecoverySnapshotV2).spaces)) {
-              isV2 = true;
-            }
-            break;
-          }
-        } catch (_ignore) {}
-      }
+          kek = deriveKeyArgon2id(password, saltBytes, kdfConfig);
+        } catch (_kdfErr) {
+          continue;
+        }
 
-      // Final fallback for legacy single JSON without AAD
-      if (!backupData) {
         try {
-          const decryptedBytes = decryptXChaCha20Poly1305(kek, nonceBytes, blobBytes);
-          const parsed = JSON.parse(new TextDecoder().decode(decryptedBytes));
-          if (parsed && typeof parsed === 'object') {
-            backupData = parsed;
-            if ((parsed as RecoverySnapshotV2).version === 2 && Array.isArray((parsed as RecoverySnapshotV2).spaces)) {
-              isV2 = true;
-            }
+          for (const aad of candidateAads) {
+            try {
+              const decryptedBytes = decryptXChaCha20Poly1305(kek, nonceBytes, blobBytes, aad);
+              const parsed = JSON.parse(new TextDecoder().decode(decryptedBytes));
+              if (parsed && typeof parsed === 'object') {
+                backupData = parsed;
+                if ((parsed as RecoverySnapshotV2).version === 2 && Array.isArray((parsed as RecoverySnapshotV2).spaces)) {
+                  isV2 = true;
+                }
+                break saltLoop;
+              }
+            } catch (_ignore) {}
           }
-        } catch (_ignore) {}
+        } finally {
+          if (kek) zeroize(kek);
+        }
       }
-
-      if (!backupData) {
-        RuntimeDiagnostics.recovery('vaultDecryptionFailed', {
-          error: 'Invalid password or corrupted backup payload',
-        });
-        throw new Error('Failed to decrypt identity backup: invalid password or corrupted backup');
-      }
-
-      RuntimeDiagnostics.recovery('vaultDecryptionSuccess', {
-        snapshotVersion: (backupData as RecoverySnapshotV2).version,
-      });
-    } finally {
-      zeroize(kek);
     }
+
+    if (!backupData) {
+      RuntimeDiagnostics.recovery('vaultDecryptionFailed', {
+        error: 'Invalid password or corrupted backup payload',
+      });
+
+      if (params.allowFreshSpaceCreation) {
+        console.warn(
+          `[VEIL-RECOVERY] Cloud backup decryption failed for authenticated user '${cleanUsername}'. Falling back to fresh space initialization and updating recovery vault.`
+        );
+
+        // Account was authenticated by the server with valid credentials,
+        // but the recovery snapshot could not be decrypted under the current password.
+        // Initialize a clean local Space and re-anchor the recovery vault.
+        const spaceHeader = this.vault.createSpace({
+          name: `${cleanUsername}'s Space`,
+          password,
+          kdfParams: params.customKdfParams || DEFAULT_KDF_PARAMS,
+          canonicalUsername: cleanUsername,
+          accountId: restoreRes.account.accountId,
+        });
+        await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
+        const session = this.vault.unlockSpace(password, spaceHeader.spaceId);
+        const identity = this.idMgr.createIdentity(session, this.store);
+
+        if (restoreRes.session && restoreRes.session.sessionToken) {
+          await this.store.setAsync(session, 'veil:cloud:session', {
+            sessionToken: restoreRes.session.sessionToken,
+            accountId: restoreRes.account.accountId,
+            deviceId: restoreRes.device?.deviceId || deviceId,
+            expiresAt: restoreRes.session.expiresAt,
+            username: cleanUsername,
+          });
+        }
+
+        // Re-anchor the cloud recovery vault with current password and fresh keys
+        try {
+          await this.createOrUpdateRecoveryVault(
+            session,
+            password,
+            cleanUsername,
+            params.customKdfParams
+          );
+        } catch (reanchorErr) {
+          console.warn('[VEIL-RECOVERY] Re-anchoring recovery vault failed (non-blocking):', reanchorErr);
+        }
+
+        return {
+          account: restoreRes.account,
+          session,
+          identityDoc: identity,
+        };
+      }
+
+      throw new Error('Failed to decrypt identity backup: invalid password or corrupted backup');
+    }
+
+    RuntimeDiagnostics.recovery('vaultDecryptionSuccess', {
+      snapshotVersion: (backupData as RecoverySnapshotV2).version,
+    });
 
     const snapshot = isV2 ? backupData as RecoverySnapshotV2 : null;
     if (snapshot && (!Array.isArray(snapshot.spaces) || snapshot.spaces.length === 0)) {

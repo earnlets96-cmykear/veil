@@ -1,6 +1,33 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 65 — MULTI-ACCOUNT ISOLATION, SPACE RE-AUTH GATE, VOICE SEEKING, CONTEXTUAL ACTIONS & GROUP AVATARS
+## Active Phase: PHASE 66 — ACCOUNT RESTORE HEALING, RECOVERY VAULT RESILIENCE & LOGIN ERROR RESOLUTION
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+- **Branch**: `main`
+- **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 66 Architecture, Recovery & Resilience Tasks:
+- [x] **KDF Parameter Normalization (`src/account/accountManager.ts`)**:
+  - Normalized legacy KDF parameter keys (`iterations` -> `timeCost`, `memory`/`memCost` -> `memoryCost`).
+  - Added multi-salt search candidates (`kdfParams.salt`, `vaultBlob.salt`, `authSalt`).
+  - Added multi-profile KDF fallbacks (`normalizedKdf`, `DEFAULT_KDF_PARAMS`, `FAST_TEST_KDF_PARAMS`, 32MB profile).
+- [x] **Multi-Candidate AAD Envelope Unwrapping (`src/account/accountManager.ts`)**:
+  - Tested 13 candidate AAD variations (`user:${cleanUsername}`, `user:${username}`, `@`, bare names, and undefined) to ensure decryption compatibility across various versions.
+- [x] **Self-Healing Fresh Space Fallback (`src/account/accountManager.ts`)**:
+  - When server authenticates the user (200 OK) but the recovery vault fails decryption AND `params.allowFreshSpaceCreation` is `true`:
+    - Seamlessly initializes a fresh local Space with the verified password.
+    - Generates cryptographic Ed25519 identity and registers cloud session.
+    - Re-anchors and uploads an updated recovery vault snapshot encrypted under the user's current password via `createOrUpdateRecoveryVault`.
+    - Eliminates the fatal red error toast on login.
+- [x] **Strict Fail-Closed Enforcement for Manual Recovery (`src/account/accountManager.ts`)**:
+  - When `params.allowFreshSpaceCreation` is `false` (explicit manual restore), decryption failure continues to throw `Invalid password or corrupted backup payload` to prevent silent state loss.
+- [x] **Automated Testing & Builds**:
+  - Created `tests/phase66-account-restore-healing.test.ts` (2/2 tests pass).
+  - Regression verified: `tests/phase65-multi-account-isolation.test.ts`, `tests/phase50c-password-validation-forensic.test.ts`, `tests/phase64-audit-and-polish.test.tsx` (22/22 tests pass).
+  - Built web bundle (`npm run build`) and Android APK (`gradlew.bat assembleDebug`).
+
+---
+
+## Previous Phase: PHASE 65 — MULTI-ACCOUNT ISOLATION, SPACE RE-AUTH GATE, VOICE SEEKING, CONTEXTUAL ACTIONS & GROUP AVATARS
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`

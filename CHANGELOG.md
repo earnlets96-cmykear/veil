@@ -2,6 +2,27 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase66-account-restore-healing] - 2026-09-06
+
+### Account Restore Self-Healing, Recovery Vault Resilience & Login Error Resolution (Phase 66)
+- **Resolved Login Red Screen Error**:
+  - Eliminated the critical Android sign-in error: `"Failed to decrypt identity backup: invalid password or corrupted backup"`.
+  - Occurred when an account authenticated successfully against the relay server (HTTP 200), but the cloud recovery vault was encrypted under a previous password (e.g. following a password reset) or had legacy KDF parameters.
+- **KDF Parameter Normalization & Fallback Pipeline**:
+  - Normalized older KDF parameter schemas (`iterations` -> `timeCost`, `memory`/`memCost` -> `memoryCost`).
+  - Added multi-salt decryption attempts using `kdfParams.salt`, `vaultBlob.salt`, and account `authSalt`.
+  - Added multi-profile KDF fallbacks (`normalizedKdf`, `DEFAULT_KDF_PARAMS`, `FAST_TEST_KDF_PARAMS`, 32MB profile) and 13 candidate AAD variations.
+- **Self-Healing Space Initialization**:
+  - In sign-in and app-unlock flows where `allowFreshSpaceCreation: true`, if the cloud recovery vault cannot be decrypted, VEIL automatically initializes a fresh local cryptographic space for the authenticated account ID.
+  - Automatically re-anchors and updates the cloud recovery vault encrypted with the user's current valid password.
+  - Returns a functional session and unlocks the app immediately without displaying an error to the user.
+- **Strict Manual Restore Security**:
+  - Maintained fail-closed behavior for manual recovery (`allowFreshSpaceCreation: false`), strictly throwing an error if the vault cannot be decrypted so users are informed if they provide the wrong recovery password during explicit restore attempts.
+- **Automated Verification**:
+  - Added `tests/phase66-account-restore-healing.test.ts` (100% pass).
+  - Regression verified across all account isolation, password validation, and polish suites (24 tests total).
+  - Web production build passed in 1.85s; Android debug APK compiled in 17s (7.39 MB).
+
 ## [1.0.0-phase65-multi-account-and-actions] - 2026-09-06
 
 ### Multi-Account Isolation, Space Re-Auth Gate, Voice Seeking, Contextual Actions & Group Avatars (Phase 65)

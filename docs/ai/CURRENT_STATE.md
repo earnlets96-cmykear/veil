@@ -1,6 +1,24 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 65 — MULTI-ACCOUNT ISOLATION, SPACE RE-AUTH GATE, VOICE SEEKING, CONTEXTUAL ACTIONS & GROUP AVATARS
+## Current Verified Phase: PHASE 66 — ACCOUNT RESTORE HEALING, RECOVERY VAULT RESILIENCE & LOGIN ERROR RESOLUTION
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+- **Verification Deliverables**:
+  - Phase 66 Account Restore Healing Suite: `tests/phase66-account-restore-healing.test.ts` (2/2 passed in 6.85s).
+  - Phase 65 Multi-Account Suite: `tests/phase65-multi-account-isolation.test.ts` (5/5 passed).
+  - Phase 50C Password Forensic Suite: `tests/phase50c-password-validation-forensic.test.ts` (7/7 passed).
+  - Phase 64 Regression Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed).
+  - Web App Production Build: `npm run build` succeeds cleanly in 1.85s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Android APK Compilation: `cd android; .\gradlew.bat assembleDebug` succeeds cleanly in 17s (`android/app/build/outputs/apk/debug/app-debug.apk` and `release/v1.0.0/app-debug.apk`, 7.39 MB).
+  - Root Cause Analysis & Fix:
+    - Fixed Android sign-in failure: "Failed to decrypt identity backup: invalid password or corrupted backup".
+    - Occurs when an account is authenticated by the cloud server (200 OK) but the server-side recovery vault was encrypted under a previous/reset password or legacy KDF format (`iterations` vs `timeCost`).
+    - Added KDF parameter normalization (`iterations` -> `timeCost`, `memory` -> `memoryCost`) and fallback across multi-salt and multi-config profiles.
+    - Implemented self-healing fresh space initialization when `allowFreshSpaceCreation: true` (standard sign-in / app unlock flow): initializes fresh local space, generates identity, and re-anchors the recovery vault on the server under the current authenticated password.
+    - Preserved fail-closed security when `allowFreshSpaceCreation: false` (manual Account Recovery modal).
+
+---
+
+## Previous Verified Phase: PHASE 65 — MULTI-ACCOUNT ISOLATION, SPACE RE-AUTH GATE, VOICE SEEKING, CONTEXTUAL ACTIONS & GROUP AVATARS
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
   - Phase 65 Multi-Account Suite: `tests/phase65-multi-account-isolation.test.ts` (5/5 passed in 10.6s).

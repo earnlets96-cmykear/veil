@@ -1,6 +1,6 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-06T11:30:03.724Z",
+  "generatedAt": "2026-09-06T11:52:34.958Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
@@ -11,9 +11,9 @@
       "sha256": "6705cf590796ca3a99cca4bca291d5ba58b6545f0f098ebde7a8af58fa22a860"
     },
     {
-      "path": "dist/assets/index-Dnk7bDDB.js",
-      "sizeBytes": 821353,
-      "sha256": "ee57974879e2a34754361d3af6edc2a467f184a66f431ebed1be5765c966f7bb"
+      "path": "dist/assets/index-D7k7tz85.js",
+      "sizeBytes": 823336,
+      "sha256": "9b29eee385bc7ab21a807e8b91b009e862f7d4ccbf3cee078c266433546a297c"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-aIC0z5S0.js",
-      "sizeBytes": 8728,
-      "sha256": "05637045df534af43b8cf3ee1f8105f81c810cdd863cef57ec451bb5a83f95fe"
-    },
-    {
-      "path": "dist/assets/web-DHOuZYLL.js",
+      "path": "dist/assets/web-f7IrCxCE.js",
       "sizeBytes": 842,
-      "sha256": "d77c767f63ee6958456e53144d8d22b81eebcbb117eefb12dce83742a13a18c4"
+      "sha256": "a0952e0686ac8b7d5c059bea23b27b0fd53961809bc6c801c23760ca1168843d"
     },
     {
-      "path": "dist/assets/web-D_bnNXpt.js",
+      "path": "dist/assets/web-HMJBlu_I.js",
+      "sizeBytes": 8728,
+      "sha256": "eb2abec1a61a054000aa6da04004b0b1bdacb101995000d50d21baf6dc4dc55c"
+    },
+    {
+      "path": "dist/assets/web-wawIsO_5.js",
       "sizeBytes": 361,
-      "sha256": "e0b7a6fe952ef4ec671ee57b2c8eb4a079c9e963c56d3a4b4b18547a248b342a"
+      "sha256": "169b41c38b9f168f1cb2ddc519ec794d847618cb6ce175d4722982684882b06d"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "8d75ea52d900dccb2f3d637c3a8e2658814fa163bf912a25fefc81f234d1e5fa"
+      "sha256": "b32da128ccc2fc9f7c6174800c4a1255b781e954b7516a532cc01f97be6bc628"
     }
   ]
 }
