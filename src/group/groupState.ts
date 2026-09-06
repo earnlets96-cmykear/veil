@@ -300,6 +300,61 @@ export class GroupStateManager {
   }
 
   /**
+   * Updates group metadata (e.g. Group profile picture / avatar / name / description).
+   * STRICT AUTHORIZATION: Enforces that only the group CREATOR can update group metadata.
+   */
+  public static updateMetadata(
+    state: GroupState,
+    actorIdentityId: string,
+    actorSigningPriv: Uint8Array,
+    newMetadata: GroupMetadata,
+    groupMasterSecret: Uint8Array
+  ): GroupAction {
+    const actor = state.members[actorIdentityId];
+    if (!actor || actor.role !== 'CREATOR') {
+      throw new Error('Unauthorized: only the group CREATOR can update group metadata and profile picture');
+    }
+
+    const epochKey = deriveGroupEpochKey(groupMasterSecret, state.epoch);
+    const metadataKey = deriveGroupMetadataKey(epochKey);
+    const { nonce: metaNonce, ciphertext: metaCipher } = encryptXChaCha20Poly1305(
+      metadataKey,
+      JSON.stringify(newMetadata)
+    );
+    zeroize(epochKey);
+    zeroize(metadataKey);
+
+    const metaCipherB64 = bytesToBase64(metaCipher);
+    const metaNonceB64 = bytesToBase64(metaNonce);
+
+    const actionData: Omit<GroupAction, 'signature'> = {
+      actionId: `act_${Date.now()}_meta_${state.groupId.slice(0, 6)}`,
+      groupId: state.groupId,
+      epoch: state.epoch,
+      actionType: 'UPDATE_METADATA',
+      actorIdentityId,
+      encryptedMetadataPayload: metaCipherB64,
+      timestamp: Date.now(),
+    };
+
+    const canonicalBytes = canonicalizeGroupAction(actionData);
+    const digest = sha256(canonicalBytes);
+    const signature = ed25519.sign(digest, actorSigningPriv);
+
+    const action: GroupAction = {
+      ...actionData,
+      signature: bytesToBase64(signature),
+    };
+
+    state.encryptedMetadata = metaCipherB64;
+    state.metadataNonce = metaNonceB64;
+    state.actionHistory.push(action);
+    state.updatedAt = Date.now();
+
+    return action;
+  }
+
+  /**
    * Verifies and applies a received GroupAction to the local state.
    */
   public static verifyAndApplyAction(
@@ -356,6 +411,16 @@ export class GroupStateManager {
         }
         if (state.members[action.targetIdentityId]) {
           state.members[action.targetIdentityId].role = action.newRole;
+        }
+        break;
+      }
+      case 'UPDATE_METADATA': {
+        const actor = state.members[action.actorIdentityId];
+        if (!actor || actor.role !== 'CREATOR') {
+          throw new Error('Rejected: only group CREATOR is authorized to UPDATE_METADATA');
+        }
+        if (action.encryptedMetadataPayload) {
+          state.encryptedMetadata = action.encryptedMetadataPayload;
         }
         break;
       }

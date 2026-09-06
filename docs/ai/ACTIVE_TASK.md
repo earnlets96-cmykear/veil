@@ -1,6 +1,44 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 64 — SETTINGS REDESIGN, CHAT UI POLISH, MEDIA PERFORMANCE & DYNAMIC PIN UX
+## Active Phase: PHASE 65 — MULTI-ACCOUNT ISOLATION, SPACE RE-AUTH GATE, VOICE SEEKING, CONTEXTUAL ACTIONS & GROUP AVATARS
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+- **Branch**: `main`
+- **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 65 Architecture, Isolation & Polish Tasks:
+- [x] **Multi-Account & Space Isolation Architecture (`src/privacy/pinManager.ts`, `src/account/accountManager.ts`)**:
+  - Designated the first registered space as Main Account (`isMainAccount: true`).
+  - Marked all subsequent spaces as secondary (`isMainAccount: false`) linked by `parentSpaceId`.
+  - Implemented `createSecondaryAccount` in `AccountManager`: takes explicit `@username`, derives independent Ed25519 identity, registers PIN in pinManager, locks temporary session, and leaves active Main Account session untouched.
+- [x] **Privilege Gate & Re-Authentication (`src/ui/components/SettingsModal.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Gated "Accounts & Spaces" menu item behind `isMainAccount === true` (secondary spaces never see this row).
+  - Implemented Re-Auth gate: clicking "Accounts & Spaces" requires entering Main Account PIN or passphrase to unlock management view.
+- [x] **Space Creation Modal & Username Prompt (`src/ui/components/AccountsAndSpacesModal.tsx`)**:
+  - Added required `@username` input field with real-time formatting.
+  - Eliminated dangerous session overwrites; non-destructive creation flows cleanly into secondary account registry.
+- [x] **Message Reactions & Context Menu Actions (`src/ui/components/ConversationView.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Added floating reaction quick bar (❤️, 👍, 😂, 😮, 😢, 🙏, 🔥) to message context menu.
+  - Implemented reaction toggle mechanics (count increments, decrements, userReacted highlighting) with wire `'MESSAGE_REACTION'` protocol broadcast.
+  - Added "Save Audio" context menu option for voice notes and "Forward" action.
+  - Rendered sender `Avatar` next to incoming messages for direct and group chats.
+- [x] **Reciprocal Delete for Everyone (`src/ui/app/AppState.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Solved 1-to-1 perspective divergence (Alice indexes under `bobId`, Bob indexes under `aliceId`): `'DELETE_MESSAGE'` checks `conversationId`, fallback `senderId`, and exhaustive lookup across stores.
+- [x] **Group Avatar Cryptographic Security (`src/group/groupState.ts`, `src/ui/components/GroupDetailsModal.tsx`)**:
+  - Strictly restricted metadata/avatar changes to group `CREATOR` role.
+  - Action encrypted with epoch metadata key and signed with creator's Ed25519 private key.
+  - Added camera upload overlay visible only to group creator, optimizing images to 128x128.
+- [x] **Reliable Voice Seeking & File Saving (`src/ui/components/ui/VoiceNoteCard.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Fixed pointer capture on scrubber by tracking and releasing pointer listeners on both element and window.
+  - Verified real device file saving by testing `saved && saved.success === true`.
+- [x] **Automated Acceptance Testing & Packaging**:
+  - Created `tests/phase65-multi-account-isolation.test.ts` (5/5 passed).
+  - Created `tests/phase65-reactions-and-actions.test.ts` (6/6 passed).
+  - Production Web build compiled cleanly in 2.23s (`npm run build`).
+  - Android APK compiled cleanly in 18s (`app-debug.apk`, 7.38 MB).
+
+---
+
+## Previous Phase: PHASE 64 — SETTINGS REDESIGN, CHAT UI POLISH, MEDIA PERFORMANCE & DYNAMIC PIN UX
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`

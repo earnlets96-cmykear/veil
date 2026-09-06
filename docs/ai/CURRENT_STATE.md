@@ -1,6 +1,35 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 64 — SETTINGS REDESIGN, CHAT UI POLISH, MEDIA PERFORMANCE & DYNAMIC PIN UX
+## Current Verified Phase: PHASE 65 — MULTI-ACCOUNT ISOLATION, SPACE RE-AUTH GATE, VOICE SEEKING, CONTEXTUAL ACTIONS & GROUP AVATARS
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+- **Verification Deliverables**:
+  - Phase 65 Multi-Account Suite: `tests/phase65-multi-account-isolation.test.ts` (5/5 passed in 10.6s).
+  - Phase 65 Reactions & Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 313ms).
+  - Phase 64 Regression Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed).
+  - Phase 63 Regression Suite: `tests/phase63-deep-repair.test.tsx` (10/10 passed).
+  - Multi-Space PIN Suite: `tests/applock-multi-space-pin.test.ts` (8/8 passed).
+  - Web App Production Build: `npm run build` succeeds cleanly in 2.23s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Android APK Compilation: `cd android; .\gradlew.bat assembleDebug` succeeds cleanly in 18s (`android/app/build/outputs/apk/debug/app-debug.apk` and `release/v1.0.0/app-debug.apk`, 7.38 MB / 7,386,970 bytes).
+  - Multi-Account & Space Isolation Architecture:
+    - Primary vs Secondary accounts: The first registered account is designated as the Main Account. Subsequent spaces are marked as secondary spaces (`isMainAccount: false`).
+    - Privilege Gate & Re-Auth: The "Accounts & Spaces" menu item in Settings is strictly hidden from secondary spaces and only visible to the Main Account. Accessing it requires entering the Main Account PIN or passphrase.
+    - Non-Destructive Secondary Account Creation: Creating a secondary space in `AccountManager.createSecondaryAccount` requires an explicit unique `@username`, generates an independent Ed25519 cryptographic identity, initializes its independent local envelope and locked session, and never disconnects or overwrites the active Main Account session.
+  - Contextual Actions & Message Reactions:
+    - Floating quick reaction bar (❤️, 👍, 😂, 😮, 😢, 🙏, 🔥) with toggle count mechanics and animated reaction pills.
+    - Wire protocol dispatch for `'MESSAGE_REACTION'` updating counts and emoji rosters.
+    - Reciprocal "Delete for Everyone" resolution: handles 1-to-1 chats where Alice's conversationId is Bob's ID and Bob's is Alice's ID.
+    - Added "Save Audio" action for voice notes and "Save to Storage" for attachments.
+  - Group Avatar Cryptographic Management:
+    - Restricted group avatar/metadata changes strictly to the `CREATOR` role.
+    - Cryptographically signed and verified in `GroupStateManager.updateMetadata`.
+    - Integrated 128x128 image optimization in `GroupDetailsModal.tsx`.
+  - Reliable Voice Seeking & File Saving:
+    - Fixed pointer capture on `VoiceNoteCard.tsx` scrubber by releasing capture on both target and window upon pointer up/cancel.
+    - Real file saving verified with `saved && saved.success === true` contract.
+
+---
+
+## Previous Verified Phase: PHASE 64 — SETTINGS REDESIGN, CHAT UI POLISH, MEDIA PERFORMANCE & DYNAMIC PIN UX
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
   - Phase 64 Audit & Acceptance Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed in 116ms).

@@ -37,6 +37,8 @@ export interface SpacePinEntry {
   spaceName: string;
   avatar?: string;
   pinLength: 4 | 6;
+  isMainAccount?: boolean;
+  parentSpaceId?: string;
   wrappedCredentials: {
     algorithm: 'XChaCha20-Poly1305';
     nonce: string;
@@ -53,6 +55,7 @@ export interface DevicePinRegistry {
   appLockEnabled: boolean;
   autoLockInterval: AutoLockIntervalSetting;
   preferredPinType?: '4-digit' | '6-digit';
+  mainSpaceId?: string;
   lockOnBackground: boolean;
   lockOnScreenOff: boolean;
   afterExitingApp?: string;
@@ -443,8 +446,10 @@ export class SpacePinManager {
     pin: string;
     avatar?: string;
     accountId?: string;
-  }): Promise<void> {
-    const { spaceId, canonicalUsername, spaceName, password, pin, avatar, accountId } = params;
+    isMainAccount?: boolean;
+    parentSpaceId?: string;
+  }): Promise<SpacePinEntry> {
+    const { spaceId, canonicalUsername, spaceName, password, pin, avatar, accountId, isMainAccount, parentSpaceId } = params;
 
     const isAvail = await this.isPinAvailable(pin, spaceId);
     if (!isAvail) {
@@ -459,6 +464,13 @@ export class SpacePinManager {
         if (entry.spaceId === spaceId) {
           delete this.registry.entries[hash];
         }
+      }
+
+      // Check if this is the first space registered on the device
+      const isFirst = Object.keys(this.registry.entries).length === 0 || !this.registry.mainSpaceId;
+      const designatedMain = isMainAccount !== undefined ? isMainAccount : isFirst;
+      if (designatedMain && (!this.registry.mainSpaceId || isFirst)) {
+        this.registry.mainSpaceId = spaceId;
       }
 
       // Wrap credentials
@@ -482,6 +494,8 @@ export class SpacePinManager {
         spaceName,
         avatar,
         pinLength: pin.length === 6 ? 6 : 4,
+        isMainAccount: designatedMain,
+        parentSpaceId: designatedMain ? undefined : (parentSpaceId || this.registry.mainSpaceId),
         wrappedCredentials: {
           algorithm: 'XChaCha20-Poly1305',
           nonce: bytesToBase64(nonce),
@@ -493,9 +507,42 @@ export class SpacePinManager {
       this.registry.entries[pinHash] = entry;
       this.registry.appLockEnabled = true;
       this.saveRegistry();
+      return entry;
     } finally {
       zeroize(kek);
     }
+  }
+
+  /**
+   * Checks if a specific space is the privileged Main Account on this device.
+   */
+  public isMainAccount(spaceId: string): boolean {
+    if (!spaceId) return false;
+    if (this.registry.mainSpaceId && this.registry.mainSpaceId === spaceId) {
+      return true;
+    }
+    for (const entry of Object.values(this.registry.entries)) {
+      if (entry.spaceId === spaceId) {
+        return !!entry.isMainAccount;
+      }
+    }
+    const all = this.listRegisteredSpaces();
+    if (all.length === 1 && all[0].spaceId === spaceId) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Returns the primary / main spaceId if registered.
+   */
+  public getMainSpaceId(): string | undefined {
+    if (this.registry.mainSpaceId) return this.registry.mainSpaceId;
+    for (const entry of Object.values(this.registry.entries)) {
+      if (entry.isMainAccount) return entry.spaceId;
+    }
+    const all = this.listRegisteredSpaces();
+    return all.length > 0 ? all[0].spaceId : undefined;
   }
 
   /**

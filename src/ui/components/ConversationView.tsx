@@ -99,6 +99,8 @@ interface ConversationMessageRowProps {
   onToggleVoice: (msg: UIMessage) => void;
   onSeekVoice: (msg: UIMessage, percent: number) => void;
   onRetry?: (msg: UIMessage) => void;
+  peerAvatar?: string;
+  onReactionClick?: (msg: UIMessage, emoji: string) => void;
 }
 
 const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
@@ -124,6 +126,8 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   onToggleVoice,
   onSeekVoice,
   onRetry,
+  peerAvatar,
+  onReactionClick,
 }) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -240,6 +244,19 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
             aria-hidden="true"
           >
             <ReplyIcon size={14} />
+          </div>
+        )}
+
+        {!msg.isOutgoing && (
+          <div style={{ flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end', marginBottom: '4px', width: '28px' }}>
+            {!isGroupedWithNext ? (
+              <Avatar
+                src={msg.senderAvatar || peerAvatar}
+                seed={msg.senderId || msg.senderName || 'peer'}
+                name={msg.senderName}
+                size={28}
+              />
+            ) : null}
           </div>
         )}
 
@@ -370,6 +387,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               isGroupedWithPrevious={isGroupedWithPrevious}
               isGroupedWithNext={isGroupedWithNext}
               reactions={(msg as any).reactions}
+              onReactionClick={onReactionClick ? (emoji) => onReactionClick(msg, emoji) : undefined}
             />
           )}
         </div>
@@ -400,6 +418,7 @@ export const ConversationView: React.FC = () => {
     pinMessage,
     unpinMessage,
     forwardMessage,
+    toggleMessageReaction,
   } = useApp();
 
   const { showToast } = useToast();
@@ -570,10 +589,10 @@ export const ConversationView: React.FC = () => {
 
   // Handle Attachment Download & Saving with Privacy Enforcement
   const handleDownloadAttachment = async (msg: UIMessage) => {
-    if (!msg.attachment || !activeSession) return;
+    if ((!msg.attachment && !msg.voice) || !activeSession) return;
 
     // Check if sender disallowed saving
-    if (msg.attachment.allowSave === false && !msg.isOutgoing) {
+    if (msg.attachment && msg.attachment.allowSave === false && !msg.isOutgoing) {
       showToast({
         type: 'error',
         message: 'Saving disabled by sender for this media item',
@@ -583,26 +602,60 @@ export const ConversationView: React.FC = () => {
 
     setDownloadingAttachmentId(msg.id);
     try {
-      const key = msg.attachment.objectId || msg.attachment.attachmentId || msg.attachment.name;
-      let cached = MediaCache.get(key);
+      let data: Uint8Array | null = null;
+      let filename = msg.attachment?.name || `file_${msg.id.slice(0, 8)}`;
+      let mimeType = msg.attachment?.mimeType || 'application/octet-stream';
 
-      if (!cached) {
-        if (!cloudClient.getSessionToken()) {
-          await ensureCloudSession(activeSession);
+      if (msg.voice) {
+        filename = msg.text && (msg.text.endsWith('.m4a') || msg.text.endsWith('.mp3'))
+          ? msg.text
+          : `voice_note_${msg.id.slice(0, 8)}.m4a`;
+        mimeType = msg.voice.mimeType || 'audio/m4a';
+
+        const cached = MediaCache.get(msg.voice.objectId);
+        if (cached && cached.data) {
+          data = cached.data;
+        } else {
+          if (!cloudClient.getSessionToken()) {
+            await ensureCloudSession(activeSession);
+          }
+          const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice);
+          const res = await fetch(blobUrl);
+          const buf = await res.arrayBuffer();
+          data = new Uint8Array(buf);
         }
-        cached = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
+      } else if (msg.attachment) {
+        const key = msg.attachment.objectId || msg.attachment.attachmentId || msg.attachment.name;
+        let cached = MediaCache.get(key);
+
+        if (!cached) {
+          if (!cloudClient.getSessionToken()) {
+            await ensureCloudSession(activeSession);
+          }
+          cached = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
+        }
+
+        if (cached && cached.data) {
+          data = cached.data;
+        }
       }
 
-      if (cached && cached.data) {
+      if (data) {
         const saved = await FileSaver.saveFile({
-          data: cached.data,
-          filename: msg.attachment.name,
-          mimeType: msg.attachment.mimeType,
+          data,
+          filename,
+          mimeType,
+          triggerShare: true,
         });
-        if (saved) {
+        if (saved && saved.success) {
           showToast({
             type: 'success',
-            message: `Saved ${msg.attachment.name} successfully`,
+            message: `Saved ${filename} to ${saved.location || 'storage'}`,
+          });
+        } else {
+          showToast({
+            type: 'error',
+            message: saved?.error || 'Failed to save file on device',
           });
         }
       } else {
@@ -1099,6 +1152,8 @@ export const ConversationView: React.FC = () => {
                   }));
                 }}
                 onRetry={(m) => activeChatId && retryFailedMessage(activeChatId, m.id)}
+                peerAvatar={activeConversation?.avatar || activeConversation?.avatarUrl}
+                onReactionClick={(m, emoji) => activeChatId && toggleMessageReaction(activeChatId, m.id, emoji)}
               />
             );
           })
@@ -1114,6 +1169,49 @@ export const ConversationView: React.FC = () => {
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
+          {/* Reaction Quick Bar */}
+          <div
+            className="veil-context-reactions-bar"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 8px 8px 8px',
+              borderBottom: '1px solid var(--veil-border)',
+              marginBottom: '4px',
+              gap: '4px',
+            }}
+          >
+            {['❤️', '👍', '😂', '😮', '😢', '🙏', '🔥'].map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                className="veil-context-reaction-btn"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.35rem',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  lineHeight: 1,
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.25)')}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                onClick={() => {
+                  if (activeChatId) {
+                    toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
+                  }
+                  setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                }}
+                aria-label={`React with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
           <button
             type="button"
             className="veil-context-item"
@@ -1155,7 +1253,18 @@ export const ConversationView: React.FC = () => {
               onClick={() => handleDownloadAttachment(contextMenu.message!)}
             >
               <DownloadIcon size={16} />
-              <span>Save to Gallery</span>
+              <span>Save to Storage</span>
+            </button>
+          )}
+
+          {contextMenu.message.voice && !contextMenu.message.attachment && (
+            <button
+              type="button"
+              className="veil-context-item"
+              onClick={() => handleDownloadAttachment(contextMenu.message!)}
+            >
+              <DownloadIcon size={16} />
+              <span>Save Audio</span>
             </button>
           )}
 

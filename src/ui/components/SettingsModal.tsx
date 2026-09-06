@@ -60,6 +60,7 @@ export type SettingsCategory =
   | 'overview'
   | 'profile'
   | 'account'
+  | 'accountsAndSpaces'
   | 'devices'
   | 'privacy'
   | 'securityOptions'
@@ -91,12 +92,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     lockSpace,
     knownSpacesCount,
     changeAccountPassword,
+    isMainAccount,
+    verifyMainAccount,
   } = useApp();
 
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(initialCategory);
+
+  // Privilege Verification State for Accounts & Spaces
+  const [showVerifyPrompt, setShowVerifyPrompt] = useState(false);
+  const [verifyCredential, setVerifyCredential] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const handleOpenAccountsAndSpaces = () => {
+    setVerifyCredential('');
+    setVerifyError(null);
+    setShowVerifyPrompt(true);
+  };
+
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyCredential || isVerifying) return;
+    setIsVerifying(true);
+    setVerifyError(null);
+    try {
+      const valid = await verifyMainAccount(verifyCredential);
+      if (valid) {
+        setShowVerifyPrompt(false);
+        openModal({ type: 'accountsAndSpaces' });
+      } else {
+        setVerifyError('Incorrect PIN or Space Password');
+      }
+    } catch (err: any) {
+      setVerifyError(err?.message || 'Verification failed');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   React.useEffect(() => {
     if (initialCategory) {
@@ -387,21 +422,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                   <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
                 </div>
 
-                <div
-                  className="veil-settings-row"
-                  onClick={() => openModal({ type: 'accountsAndSpaces' })}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="veil-settings-icon-badge badge-cyan">
-                    <UserIcon size={18} color="#ffffff" />
+                {isMainAccount && (
+                  <div
+                    className="veil-settings-row"
+                    onClick={handleOpenAccountsAndSpaces}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="veil-settings-icon-badge badge-cyan">
+                      <UserIcon size={18} color="#ffffff" />
+                    </div>
+                    <div className="veil-settings-row-text">
+                      <div className="veil-settings-row-title">Accounts & Spaces</div>
+                      <div className="veil-settings-row-sub">Switch spaces, add accounts, manage PINs</div>
+                    </div>
+                    <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
                   </div>
-                  <div className="veil-settings-row-text">
-                    <div className="veil-settings-row-title">Accounts & Spaces</div>
-                    <div className="veil-settings-row-sub">Switch spaces, add accounts, manage PINs</div>
-                  </div>
-                  <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
-                </div>
+                )}
 
                 <div
                   className="veil-settings-row"
@@ -851,7 +888,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               <AppLockSettingsView
                 onBack={() => setActiveCategory('overview')}
                 onOpenPinSetup={() => openModal({ type: 'appLockSetup' })}
-                onOpenAccountsAndSpaces={() => openModal({ type: 'accountsAndSpaces' })}
+                onOpenAccountsAndSpaces={isMainAccount ? handleOpenAccountsAndSpaces : undefined}
               />
             </div>
           )}
@@ -925,6 +962,99 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
             </div>
           )}
         </div>
+
+        {/* RE-AUTH PRIVILEGE VERIFICATION MODAL */}
+        {showVerifyPrompt && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 10001,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+            }}
+          >
+            <div
+              className="veil-card"
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                padding: '1.5rem',
+                borderRadius: '16px',
+                border: '1px solid var(--veil-border)',
+                backgroundColor: 'var(--veil-card-bg)',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="veil-settings-icon-badge badge-cyan" style={{ width: '36px', height: '36px' }}>
+                  <ShieldIcon size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: 0, color: 'var(--veil-text-primary)' }}>
+                    Verify Main Account
+                  </h3>
+                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', margin: 0 }}>
+                    Confirm your credentials to manage spaces
+                  </p>
+                </div>
+              </div>
+
+              {verifyError && (
+                <div
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    backgroundColor: 'var(--veil-danger-bg)',
+                    border: '1px solid var(--veil-danger-border)',
+                    borderRadius: '8px',
+                    color: 'var(--veil-danger)',
+                    fontSize: 'var(--veil-text-xs)',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  {verifyError}
+                </div>
+              )}
+
+              <form onSubmit={handleVerifySubmit}>
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', marginBottom: '0.35rem', color: 'var(--veil-text-secondary)' }}>
+                    Main Account PIN or Password
+                  </label>
+                  <PasswordInput
+                    value={verifyCredential}
+                    onChange={(e) => setVerifyCredential(e.target.value)}
+                    placeholder="Enter PIN or Password"
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setShowVerifyPrompt(false)}
+                    disabled={isVerifying}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    loading={isVerifying}
+                  >
+                    Unlock
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -11,8 +11,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { Button, IconButton, Avatar, Spinner } from './ui/index.ts';
-import { CloseIcon, UsersIcon, ShieldIcon, SearchIcon, UserPlusIcon, TrashIcon } from './icons/index.ts';
+import { CloseIcon, UsersIcon, ShieldIcon, SearchIcon, UserPlusIcon, TrashIcon, CameraIcon } from './icons/index.ts';
 import { GroupMember } from '../../group/types.ts';
+import { processAvatarImage } from '../utils/avatarProcessor.ts';
 
 interface SearchMemberResult {
   identityId: string;
@@ -34,14 +35,19 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
     removeGroupMember,
     activeSession,
     myProfile,
+    updateGroupProfilePicture,
+    idMgr,
+    store,
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchMemberResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
 
   const group = (conversations || []).find((c) => c.id === conversationId);
   const groupState = group?.groupState;
@@ -160,7 +166,26 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
     }
   };
 
-  const isCreator = groupState?.creatorIdentityId === activeSession?.spaceId;
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUpdatingAvatar(true);
+    setError(null);
+    try {
+      const optimized = await processAvatarImage(file);
+      await updateGroupProfilePicture(conversationId, optimized);
+      setNotice('Group profile picture updated successfully.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update group picture');
+    } finally {
+      setIsUpdatingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  const myDoc = activeSession ? idMgr.getPublicDocument(activeSession, store) : null;
+  const myIdentityId = myDoc?.identityId || activeSession?.spaceId;
+  const isCreator = Boolean(groupState?.creatorIdentityId && groupState.creatorIdentityId === myIdentityId);
 
   return (
     <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="group-details-title">
@@ -177,20 +202,49 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
 
         <div className="veil-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-            <div
-              style={{
-                width: '52px',
-                height: '52px',
-                borderRadius: 'var(--veil-radius-md)',
-                background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                marginBottom: '0.5rem',
-              }}
-            >
-              <UsersIcon size={26} />
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: '0.5rem' }}>
+              <Avatar
+                src={group?.avatar || group?.avatarUrl}
+                seed={conversationId}
+                name={group?.name}
+                size={64}
+              />
+              {isCreator && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUpdatingAvatar}
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: 'var(--veil-accent-primary)',
+                      border: '2px solid var(--veil-card-bg, #1a1a2e)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                    title="Change Group Profile Picture"
+                    aria-label="Change Group Profile Picture"
+                  >
+                    {isUpdatingAvatar ? <Spinner size="xs" color="#fff" /> : <CameraIcon size={12} />}
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    style={{ display: 'none' }}
+                  />
+                </>
+              )}
             </div>
             <h3 style={{ fontSize: 'var(--veil-text-base)', fontWeight: 600, margin: '0.2rem 0' }}>{group?.name}</h3>
             <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginTop: '0.2rem' }}>

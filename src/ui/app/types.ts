@@ -13,6 +13,7 @@ export interface UIConversation {
   name: string;
   avatarSeed: string;
   avatar?: string;
+  avatarUrl?: string;
   fingerprint?: string;
   isVerified?: boolean;
   lastMessage?: string;
@@ -30,11 +31,13 @@ export interface UIMessage {
   conversationId: string;
   senderId: string;
   senderName?: string;
+  senderAvatar?: string;
   groupId?: string;
   text: string;
   isOutgoing: boolean;
   timestamp: number;
   status: DeliveryStatus;
+  reactions?: Array<{ emoji: string; count: number; userReacted?: boolean }>;
   attachment?: {
     attachmentId?: string;
     groupId?: string;

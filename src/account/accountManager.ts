@@ -25,6 +25,7 @@ import type { SpaceSession } from '../spaces/session.ts';
 import type { IdentityDocument } from '../identity/document.ts';
 import type { KdfParameters } from '../types/index.ts';
 import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
+import { spacePinManager } from '../privacy/pinManager.ts';
 
 export interface IdentityBackupPayload {
   version: 1;
@@ -148,6 +149,136 @@ export class AccountManager {
       session,
       identityDoc,
     };
+  }
+
+  /**
+   * Creates a brand new, completely isolated secondary space and account on the device.
+   *
+   * STRICT INVARIANTS:
+   * - Does NOT alter, overwrite, or mutate the active Main Account's session or memory.
+   * - Derives unique cryptographic material and creates a separate encrypted Space envelope.
+   * - Generates an independent Ed25519 identity, mailbox, and signed profile.
+   * - Designates the new space as isMainAccount: false with parentSpaceId pointing to Main Account.
+   */
+  public async createSecondaryAccount(params: {
+    username: string;
+    password: string;
+    spaceName: string;
+    pin: string;
+    mainSpaceId: string;
+    kdfParams?: Partial<KdfParameters>;
+  }): Promise<{
+    spaceId: string;
+    username: string;
+    spaceName: string;
+    identityDoc: IdentityDocument;
+  }> {
+    const { username, password, spaceName, pin, mainSpaceId } = params;
+    const cleanUsername = username.trim().toLowerCase().replace(/^@/, '');
+    if (!cleanUsername) {
+      throw new Error('A valid username is required to create a new space/account');
+    }
+    if (!password || password.length === 0) {
+      throw new Error('A password is required for the new space/account');
+    }
+    if (!pin || !/^\d{4,6}$/.test(pin)) {
+      throw new Error('A 4 or 6-digit PIN is required for the new space/account');
+    }
+
+    const deviceId = `dev_${bytesToHex(randomBytes(8))}`;
+    const deviceName = `${cleanUsername}'s Device`;
+    const activeKdfParams = params.kdfParams;
+
+    // 1. Create independent local Space envelope
+    const spaceHeader = this.vault.createSpace({
+      name: spaceName,
+      password,
+      kdfParams: activeKdfParams,
+      canonicalUsername: cleanUsername,
+    });
+    await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
+
+    // 2. Temporarily unlock the new space session to initialize identity & profile
+    const tempSession = this.vault.unlockSpace(password, spaceHeader.spaceId);
+
+    try {
+      // 3. Generate deterministic cryptographic identity for new space
+      const identityDoc = this.idMgr.createIdentity(tempSession, this.store);
+      const loadedId = this.idMgr.loadIdentity(tempSession, this.store);
+      if (!loadedId) {
+        throw new Error('Failed to generate identity for new space');
+      }
+
+      // 4. Try cloud registration (non-blocking fallback)
+      let accountId = `acc_${bytesToHex(randomBytes(12))}`;
+      try {
+        const regResult = await this.cloudClient.registerAccount({
+          username: cleanUsername,
+          password,
+          deviceId,
+          deviceName,
+          deviceSigningPub: identityDoc.signingPublicKey,
+          deviceKeyAgreementPub: identityDoc.keyAgreementPublicKey,
+        });
+        if (regResult?.account?.accountId) {
+          accountId = regResult.account.accountId;
+          if (regResult.session?.sessionToken) {
+            this.store.set(tempSession, 'veil:cloud:session', {
+              sessionToken: regResult.session.sessionToken,
+              accountId: regResult.account.accountId,
+              deviceId: regResult.device?.deviceId || deviceId,
+              expiresAt: regResult.session.expiresAt,
+              username: cleanUsername,
+            });
+          }
+        }
+      } catch (_cloudErr) {
+        // Safe offline fallback: local space is initialized cleanly
+        this.store.set(tempSession, 'veil:cloud:session', {
+          sessionToken: '',
+          accountId,
+          deviceId,
+          expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+          username: cleanUsername,
+        });
+      }
+
+      // Tag envelope with accountId
+      spaceHeader.accountId = accountId;
+      await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
+
+      // Create initial signed profile in store
+      const initialProfile = {
+        identityId: identityDoc.identityId,
+        username: cleanUsername,
+        displayName: cleanUsername,
+        mailboxId: `mbx_${bytesToHex(randomBytes(16))}`,
+        issuedAt: Date.now(),
+      };
+      await this.store.setAsync(tempSession, 'veil:user:profile', initialProfile);
+
+      // 5. Assign PIN in pinManager as secondary account
+      await spacePinManager.assignPinToSpace({
+        spaceId: spaceHeader.spaceId,
+        canonicalUsername: cleanUsername,
+        spaceName,
+        password,
+        pin,
+        accountId,
+        isMainAccount: false,
+        parentSpaceId: mainSpaceId,
+      });
+
+      return {
+        spaceId: spaceHeader.spaceId,
+        username: cleanUsername,
+        spaceName,
+        identityDoc,
+      };
+    } finally {
+      // Always destroy/lock the temporary session so the Main Account remains the sole active session
+      this.vault.lockSpace(tempSession.spaceId);
+    }
   }
 
   /**

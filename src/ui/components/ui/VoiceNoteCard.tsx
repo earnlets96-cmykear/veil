@@ -142,11 +142,9 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (isUploading || isError) return;
-    setIsScrubbing(true);
-    handleSeekFromClientX(e.clientX, true);
-
+    const target = e.currentTarget;
     try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      target.setPointerCapture(e.pointerId);
     } catch (_e) {}
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
@@ -160,11 +158,20 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       upEvent.preventDefault();
       setIsScrubbing(false);
       handleSeekFromClientX(upEvent.clientX, true);
+      try {
+        target.releasePointerCapture(upEvent.pointerId);
+      } catch (_e) {}
+      target.removeEventListener('pointermove', handlePointerMove);
+      target.removeEventListener('pointerup', handlePointerUp);
+      target.removeEventListener('pointercancel', handlePointerUp);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
     };
 
+    target.addEventListener('pointermove', handlePointerMove);
+    target.addEventListener('pointerup', handlePointerUp);
+    target.addEventListener('pointercancel', handlePointerUp);
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);

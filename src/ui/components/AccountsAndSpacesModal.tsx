@@ -47,17 +47,19 @@ export const AccountsAndSpacesModal: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [spaceName, setSpaceName] = useState('');
+  const [spaceUsername, setSpaceUsername] = useState('');
   const [pin, setPin] = useState('');
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [editingName, setEditingName] = useState('');
 
   const currentSpaceMeta = activeSession ? spacePinManager.getSpaceMetadata(activeSession.spaceId) : null;
   const currentUsername = myProfile?.username || currentSpaceMeta?.canonicalUsername || 'user';
-  const currentSpaceName = currentSpaceMeta?.spaceName || activeSession?.spaceName || 'Main Space';
+  const currentSpaceName = currentSpaceMeta?.spaceName || 'Main Space';
 
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,8 +110,9 @@ export const AccountsAndSpacesModal: React.FC = () => {
   const handleCreateSpace = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = spaceName.trim();
-    if (!name || !password || !pin) {
-      setError('Please fill in all fields.');
+    const cleanU = spaceUsername.trim().toLowerCase().replace(/^@/, '');
+    if (!name || !cleanU || !password || !pin) {
+      setError('Please fill in all fields (name, username, password, PIN).');
       return;
     }
     if (!/^\d{4,6}$/.test(pin)) {
@@ -125,22 +128,16 @@ export const AccountsAndSpacesModal: React.FC = () => {
 
     setIsSubmitting(true);
     setError(null);
+    setSuccessMsg(null);
 
     try {
-      await createSpace(name, password, currentUsername);
-      if (activeSession) {
-        await spacePinManager.assignPinToSpace({
-          spaceId: activeSession.spaceId,
-          canonicalUsername: currentUsername,
-          spaceName: name,
-          password,
-          pin,
-        });
-      }
+      await createSpace(name, password, cleanU, pin);
       setSubView('list');
       setSpaceName('');
+      setSpaceUsername('');
       setPassword('');
       setPin('');
+      setSuccessMsg(`Space "${name}" created with its own PIN. Switch to it anytime using that PIN.`);
     } catch (err: any) {
       setError(err?.message || 'Failed to create new Space');
     } finally {
@@ -199,7 +196,6 @@ export const AccountsAndSpacesModal: React.FC = () => {
   const handleSaveRename = () => {
     if (activeSession && editingName.trim()) {
       spacePinManager.renameSpace(activeSession.spaceId, editingName.trim());
-      activeSession.spaceName = editingName.trim();
       setIsRenaming(false);
       setEditingName('');
     }
@@ -283,6 +279,26 @@ export const AccountsAndSpacesModal: React.FC = () => {
           >
             <AlertCircleIcon size={14} />
             <span>{error}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div
+            style={{
+              padding: '0.65rem 0.85rem',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '12px',
+              color: 'var(--veil-accent)',
+              fontSize: 'var(--veil-text-xs)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              marginBottom: '1.25rem',
+            }}
+          >
+            <ShieldIcon size={14} />
+            <span>{successMsg}</span>
           </div>
         )}
 
@@ -706,6 +722,20 @@ export const AccountsAndSpacesModal: React.FC = () => {
                 placeholder="e.g. Private Space, Whistleblowing"
                 value={spaceName}
                 onChange={(e) => setSpaceName(e.target.value)}
+                required
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div style={{ marginBottom: '0.85rem' }}>
+              <label style={{ display: 'block', fontSize: 'var(--veil-text-xs)', marginBottom: '0.35rem' }}>
+                Account Username (@username)
+              </label>
+              <input
+                type="text"
+                className="veil-input"
+                placeholder="e.g. alice_ops"
+                value={spaceUsername}
+                onChange={(e) => setSpaceUsername(e.target.value)}
                 required
                 style={{ width: '100%' }}
               />

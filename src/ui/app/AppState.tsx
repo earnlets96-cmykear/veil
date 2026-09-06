@@ -73,7 +73,7 @@ export function resolveReplyReference(
 }
 import { SpaceSession } from '../../spaces/session.ts';
 import { IdentityDocument } from '../../identity/document.ts';
-import { NetworkState } from '../../network/types.ts';
+import { NetworkState, DeliveryStatus } from '../../network/types.ts';
 import { Contact, InvitationPayload, VerificationStatus } from '../../contacts/types.ts';
 import { ContactManager } from '../../contacts/contactManager.ts';
 import { InvitationManager } from '../../contacts/invitationManager.ts';
@@ -89,6 +89,7 @@ import { SpaceMailboxBinding } from '../../network/types.ts';
 import { PrekeyBundle } from '../../ratchet/types.ts';
 import { DirectoryClient } from '../../network/directoryClient.ts';
 import { GroupManager } from '../../group/groupManager.ts';
+import { GroupStateManager } from '../../group/groupState.ts';
 import { ContactRequestManager, ContactRequest } from '../../contacts/contactRequestManager.ts';
 import { SignedProfileDocument, createSignedProfile, verifySignedProfile } from '../../identity/profile.ts';
 import { DirectorySearchResult } from '../../server/types.ts';
@@ -186,7 +187,11 @@ export interface AppContextType {
 
   // Actions
   unlockSpace: (passphrase: string, username?: string) => Promise<any>;
-  createSpace: (name: string, passphrase: string, explicitUsername?: string) => Promise<any>;
+  createSpace: (name: string, passphrase: string, explicitUsername?: string, pin?: string) => Promise<any>;
+  isMainAccount: boolean;
+  verifyMainAccount: (credential: string) => Promise<boolean>;
+  toggleMessageReaction: (conversationId: string, messageId: string, emoji: string) => Promise<void>;
+  updateGroupProfilePicture: (groupId: string, avatarUrl: string) => Promise<void>;
   changeAccountPassword: (oldPassword: string, newPassword: string) => Promise<void>;
   restoreAccount: (username: string, password: string) => Promise<void>;
   registerCloudAccount: (username: string, password: string, spaceName?: string) => Promise<void>;
@@ -686,21 +691,117 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
           } else if (payload.includes('"type":"DELETE_MESSAGE"')) {
             const parsed = JSON.parse(payload);
-            if (parsed.messageId && parsed.conversationId) {
+            if (parsed.messageId) {
+              const targetMsgId = parsed.messageId;
               const tombstone: DeletedMessageTombstone = {
-                messageId: parsed.messageId,
-                conversationId: parsed.conversationId,
+                messageId: targetMsgId,
+                conversationId: parsed.conversationId || '',
                 deletedAt: parsed.deletedAt || Date.now(),
               };
               const existingTombstones = (await store.getAsync<DeletedMessageTombstone[]>(session, 'veil:ui:deleted_messages')) || [];
-              await store.setAsync(session, 'veil:ui:deleted_messages', [...existingTombstones.filter((t) => t.messageId !== parsed.messageId), tombstone]);
+              await store.setAsync(session, 'veil:ui:deleted_messages', [
+                ...existingTombstones.filter((t) => t.messageId !== targetMsgId),
+                tombstone,
+              ]);
               setMessages((prev) => {
-                const list = prev[parsed.conversationId] || [];
-                const filtered = list.filter((m) => m.id !== parsed.messageId);
-                const updated = { ...prev, [parsed.conversationId]: filtered };
+                let targetCid = parsed.conversationId;
+                if (!prev[targetCid]?.some((m) => m.id === targetMsgId)) {
+                  if (parsed.senderId && prev[parsed.senderId]?.some((m) => m.id === targetMsgId)) {
+                    targetCid = parsed.senderId;
+                  } else {
+                    for (const cid of Object.keys(prev)) {
+                      if (prev[cid]?.some((m) => m.id === targetMsgId)) {
+                        targetCid = cid;
+                        break;
+                      }
+                    }
+                  }
+                }
+                const list = prev[targetCid] || [];
+                const filtered = list.filter((m) => m.id !== targetMsgId);
+                const updated = { ...prev, [targetCid]: filtered };
                 store.setAsync(session, 'veil:ui:messages', updated);
                 return updated;
               });
+              return;
+            }
+          } else if (payload.includes('"type":"MESSAGE_REACTION"')) {
+            const parsed = JSON.parse(payload);
+            if (parsed.messageId && parsed.emoji) {
+              setMessages((prev) => {
+                let targetCid = parsed.conversationId;
+                if (!prev[targetCid]?.some((m) => m.id === parsed.messageId)) {
+                  if (parsed.senderId && prev[parsed.senderId]?.some((m) => m.id === parsed.messageId)) {
+                    targetCid = parsed.senderId;
+                  } else {
+                    for (const cid of Object.keys(prev)) {
+                      if (prev[cid]?.some((m) => m.id === parsed.messageId)) {
+                        targetCid = cid;
+                        break;
+                      }
+                    }
+                  }
+                }
+                const list = prev[targetCid] || [];
+                const updatedList = list.map((m) => {
+                  if (m.id !== parsed.messageId) return m;
+                  const reactions = m.reactions ? [...m.reactions] : [];
+                  const existingIdx = reactions.findIndex((r) => r.emoji === parsed.emoji);
+
+                  if (parsed.action === 'REMOVE') {
+                    if (existingIdx >= 0) {
+                      const newCount = reactions[existingIdx].count - 1;
+                      if (newCount <= 0) {
+                        reactions.splice(existingIdx, 1);
+                      } else {
+                        reactions[existingIdx] = {
+                          ...reactions[existingIdx],
+                          count: newCount,
+                        };
+                      }
+                    }
+                  } else {
+                    if (existingIdx >= 0) {
+                      reactions[existingIdx] = {
+                        ...reactions[existingIdx],
+                        count: reactions[existingIdx].count + 1,
+                      };
+                    } else {
+                      reactions.push({ emoji: parsed.emoji, count: 1 });
+                    }
+                  }
+                  return { ...m, reactions };
+                });
+                const updated = { ...prev, [targetCid]: updatedList };
+                store.setAsync(session, 'veil:ui:messages', updated);
+                return updated;
+              });
+              return;
+            }
+          } else if (payload.includes('"type":"GROUP_ACTION"')) {
+            const parsed = JSON.parse(payload);
+            if (parsed.groupId && parsed.action) {
+              try {
+                const group = groupManager.loadGroupState(session, parsed.groupId);
+                if (group) {
+                  const actorKey = group.members[parsed.action.actorIdentityId]?.signingPublicKey;
+                  if (actorKey) {
+                    const keyBytes = typeof actorKey === 'string' ? base64ToBytes(actorKey) : actorKey;
+                    GroupStateManager.verifyAndApplyAction(group, parsed.action, keyBytes);
+                    groupManager.saveGroupState(session, group);
+
+                    if (parsed.avatarUrl) {
+                      setConversations((prev) =>
+                        prev.map((c) =>
+                          c.id === parsed.groupId
+                            ? { ...c, avatar: parsed.avatarUrl, avatarUrl: parsed.avatarUrl }
+                            : c
+                        )
+                      );
+                    }
+                  }
+                }
+              } catch (_e) {}
               return;
             }
           } else if (payload.includes('"type":"GROUP_INVITE"')) {
@@ -1493,8 +1594,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const createSpace = useCallback(
-    async (name: string, passphrase: string, explicitUsername?: string) => {
-      // If no active session, register a distinct account
+    async (name: string, passphrase: string, explicitUsername?: string, pin?: string) => {
+      // If no active session, register a distinct main account
       if (!activeSession) {
         if (!explicitUsername || !explicitUsername.trim()) {
           throw new Error('An account username is required to create an account');
@@ -1546,6 +1647,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           } catch (_e) {}
         }
 
+        // If a PIN was provided during main account setup, register it as Main Account PIN
+        if (pin && /^\d{4,6}$/.test(pin)) {
+          try {
+            await spacePinManager.assignPinToSpace({
+              spaceId: session.spaceId,
+              canonicalUsername: cleanUsername,
+              spaceName: name,
+              password: passphrase,
+              pin,
+              isMainAccount: true,
+            });
+          } catch (_pinErr) {}
+        }
+
         await loadSpaceData(session);
         setIsAppLocked(false);
         ensureCloudSession(session, false, passphrase).catch((syncErr) => {
@@ -1554,60 +1669,202 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return session;
       }
 
-      // If session is already active, create additional space on the current account
-      const activeCloud = await store.getAsync<any>(activeSession, 'veil:cloud:session');
-      const activeProfile = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:user:profile');
-      const activeEnvelope = vault.getEnvelope(activeSession.spaceId);
-      const activeUsername = normalizeUsername(
-        activeProfile?.username || activeCloud?.username || activeEnvelope?.canonicalUsername || ''
-      );
-      if (!activeUsername) {
-        throw new Error('Cannot create secondary Space: active account username not found');
+      // If session IS active: creating an isolated secondary space/account
+      // Must NOT switch, disconnect, or overwrite the active Main Account session!
+      if (!explicitUsername || !explicitUsername.trim()) {
+        throw new Error('A username is required to create a new space/account');
       }
-      const activeAccountId = activeCloud?.accountId || activeEnvelope?.accountId || '';
+      if (!passphrase) {
+        throw new Error('A password is required for the new space');
+      }
+      if (!pin || !/^\d{4,6}$/.test(pin)) {
+        throw new Error('A 4 or 6-digit PIN is required for the new space');
+      }
 
-      await sessionController.createSpace(name, passphrase, false, activeUsername, activeAccountId);
+      const cleanSecondaryUsername = normalizeUsername(explicitUsername);
+      const result = await accountManager.createSecondaryAccount({
+        username: cleanSecondaryUsername,
+        password: passphrase,
+        spaceName: name.trim() || 'Secondary Space',
+        pin,
+        mainSpaceId: activeSession.spaceId,
+      });
+
       setKnownSpacesCount(vault.listEnvelopes().length);
-      const session = await sessionController.unlock(passphrase, activeUsername);
-      setActiveSession(session);
-      setIsAppLocked(false);
-
-      try {
-        const loadedId = idMgr.loadIdentity(session, store);
-        if (loadedId) {
-          const binding = await netManager.getOrCreateMailbox(session);
-          const prekeyBundle = prekeyManager.createPrekeyBundle(session);
-          const signedProfile = createSignedProfile(
-            loadedId.document.identityId,
-            loadedId.signingPrivateKey,
-            activeUsername,
-            activeProfile?.displayName || activeUsername,
-            binding.mailboxId,
-            prekeyBundle
-          );
-          await store.setAsync(session, 'veil:user:profile', signedProfile);
-          setMyProfile(signedProfile);
-        }
-      } catch (_pErr) {}
-
-      await store.setAsync(session, 'veil:cloud:session', {
-        sessionToken: cloudClient.getSessionToken() || '',
-        accountId: activeAccountId,
-        deviceId: cloudClient.getDeviceId() || '',
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        username: activeUsername,
-      });
-
-      await loadSpaceData(session);
-      ensureCloudSession(session, false, passphrase).catch((syncErr) => {
-        console.warn('[VEIL-AUTH] Non-blocking cloud session sync warning:', syncErr);
-      });
-      accountManager.createOrUpdateRecoveryVault(session, passphrase, activeUsername).catch((recErr) => {
-        console.warn('[VEIL-AUTH] Non-blocking recovery vault warning:', recErr);
-      });
-      return session;
+      return result;
     },
     [activeSession, ensureCloudSession, loadSpaceData]
+  );
+
+  const isMainAccount = React.useMemo(() => {
+    if (!activeSession) return false;
+    const allRegistered = spacePinManager.listRegisteredSpaces();
+    if (allRegistered.length === 0) return true;
+    return spacePinManager.isMainAccount(activeSession.spaceId);
+  }, [activeSession, knownSpacesCount]);
+
+  const verifyMainAccount = useCallback(
+    async (credential: string): Promise<boolean> => {
+      if (!activeSession) return false;
+      const cred = credential.trim();
+      if (!cred) return false;
+      if (/^\d{4,6}$/.test(cred)) {
+        try {
+          const verified = await spacePinManager.verifyAndResolvePin(cred);
+          if (verified && verified.spaceId === activeSession.spaceId) {
+            return true;
+          }
+        } catch (_e) {}
+      }
+      try {
+        const session = vault.unlockSpace(cred, activeSession.spaceId);
+        if (session) {
+          vault.lockSpace(session.spaceId);
+          return true;
+        }
+      } catch (_e) {}
+      return false;
+    },
+    [activeSession]
+  );
+
+  const toggleMessageReaction = useCallback(
+    async (conversationId: string, messageId: string, emoji: string) => {
+      if (!activeSession) return;
+      sessionController.recordUserActivity();
+      const myDoc = idMgr.getPublicDocument(activeSession, store);
+      const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+
+      let action: 'ADD' | 'REMOVE' = 'ADD';
+
+      setMessages((prev) => {
+        const list = prev[conversationId] || [];
+        const updatedList = list.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          const reactions = msg.reactions ? [...msg.reactions] : [];
+          const existingIdx = reactions.findIndex((r) => r.emoji === emoji);
+
+          if (existingIdx >= 0) {
+            const existing = reactions[existingIdx];
+            if (existing.userReacted) {
+              action = 'REMOVE';
+              const newCount = existing.count - 1;
+              if (newCount <= 0) {
+                reactions.splice(existingIdx, 1);
+              } else {
+                reactions[existingIdx] = {
+                  ...existing,
+                  count: newCount,
+                  userReacted: false,
+                };
+              }
+            } else {
+              action = 'ADD';
+              reactions[existingIdx] = {
+                ...existing,
+                count: existing.count + 1,
+                userReacted: true,
+              };
+            }
+          } else {
+            action = 'ADD';
+            reactions.push({ emoji, count: 1, userReacted: true });
+          }
+
+          return { ...msg, reactions };
+        });
+
+        const updated = { ...prev, [conversationId]: updatedList };
+        store.setAsync(activeSession, 'veil:ui:messages', updated);
+        return updated;
+      });
+
+      const reactionPayload = JSON.stringify({
+        type: 'MESSAGE_REACTION',
+        messageId,
+        conversationId,
+        senderId: myIdentityId,
+        emoji,
+        action,
+        timestamp: Date.now(),
+      });
+
+      const targetConv = conversations.find((c) => c.id === conversationId);
+      if (targetConv?.type === 'group') {
+        const members = targetConv.groupState?.members || {};
+        for (const memberId of Object.keys(members)) {
+          if (memberId === myIdentityId) continue;
+          const member = members[memberId];
+          const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
+          if (mailbox) {
+            netManager.sendEnvelope(activeSession, mailbox, reactionPayload).catch(() => {});
+          }
+        }
+      } else {
+        const targetContact = contacts.find((c) => c.identityId === conversationId);
+        const targetMailboxId = targetContact?.mailboxId || conversationId;
+        netManager.sendEnvelope(activeSession, targetMailboxId, reactionPayload).catch(() => {});
+      }
+    },
+    [activeSession, contacts, conversations]
+  );
+
+  const updateGroupProfilePicture = useCallback(
+    async (groupId: string, avatarUrl: string) => {
+      if (!activeSession) return;
+      sessionController.recordUserActivity();
+      const group = groupManager.loadGroupState(activeSession, groupId);
+      if (!group) throw new Error('Group not found');
+
+      const myDoc = idMgr.getPublicDocument(activeSession, store);
+      const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+      if (group.creatorIdentityId !== myIdentityId) {
+        throw new Error('Only the group creator can update the group profile picture');
+      }
+
+      const loadedId = idMgr.loadIdentity(activeSession, store);
+      if (!loadedId) {
+        throw new Error('Identity private key required to authorize group metadata update');
+      }
+
+      const currentConv = conversations.find((c) => c.id === groupId);
+      const groupMasterSecret = groupManager.loadGroupSecret(activeSession, groupId) || randomBytes(32);
+      const action = GroupStateManager.updateMetadata(
+        group,
+        myIdentityId,
+        loadedId.signingPrivateKey,
+        {
+          name: currentConv?.name || 'Group Chat',
+          avatarUrl,
+        },
+        groupMasterSecret
+      );
+
+      groupManager.saveGroupState(activeSession, group);
+
+      setConversations((prev) =>
+        prev.map((c) => (c.id === groupId ? { ...c, avatar: avatarUrl, avatarUrl } : c))
+      );
+
+      const actionPayload = JSON.stringify({
+        type: 'GROUP_ACTION',
+        groupId,
+        action,
+        avatarUrl,
+        name: currentConv?.name || 'Group Chat',
+      });
+
+      const members = group.members || {};
+      for (const memberId of Object.keys(members)) {
+        if (memberId === myIdentityId) continue;
+        const member = members[memberId];
+        const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
+        if (mailbox) {
+          netManager.sendEnvelope(activeSession, mailbox, actionPayload).catch(() => {});
+        }
+      }
+    },
+    [activeSession, contacts, conversations]
   );
 
   const changeAccountPassword = useCallback(
@@ -2922,11 +3179,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // 1. Delete locally first
       await deleteMessageLocally(conversationId, messageId);
 
+      const myDoc = idMgr.getPublicDocument(activeSession, store);
+      const myIdentityId = myDoc?.identityId || activeSession.spaceId;
+
       // 2. Dispatch wire tombstone to peer or group
       const deleteWirePayload = JSON.stringify({
         type: 'DELETE_MESSAGE',
         conversationId,
         messageId,
+        senderId: myIdentityId,
         deletedAt: Date.now(),
       });
 
@@ -2936,7 +3197,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         for (const memberId of Object.keys(members)) {
           const member = members[memberId];
           const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
-          if (mailbox && memberId !== activeSession.spaceId) {
+          if (mailbox && memberId !== myIdentityId) {
             await netManager.sendEnvelope(activeSession, mailbox, deleteWirePayload).catch(() => {});
           }
         }
@@ -3875,6 +4136,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     forwardMessage,
     unlockSpace,
     createSpace,
+    isMainAccount,
+    verifyMainAccount,
+    toggleMessageReaction,
+    updateGroupProfilePicture,
     changeAccountPassword,
     restoreAccount,
     registerCloudAccount,

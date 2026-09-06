@@ -12,6 +12,7 @@ export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface AvatarProps {
   name?: string;
+  seed?: string;
   imageUrl?: string;
   src?: string; // Phase 56: Compatibility alias for imageUrl
   size?: AvatarSize | number;
@@ -23,7 +24,8 @@ export interface AvatarProps {
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
-  name = 'User',
+  name,
+  seed,
   imageUrl,
   src,
   size = 'md',
@@ -33,6 +35,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   className = '',
   'aria-label': ariaLabel,
 }) => {
+  const effectiveName = name || seed || 'User';
   const effectiveImageUrl = imageUrl || src;
   const isNumericSize = typeof size === 'number';
   const sizeClass = isNumericSize ? '' : `veil-avatar-${size}`;
@@ -82,7 +85,7 @@ export const Avatar: React.FC<AvatarProps> = ({
       className={`veil-avatar ${sizeClass} ${shapeClass} ${className}`.trim()}
       style={{
         ...numericStyle,
-        background: effectiveImageUrl ? 'none' : getGradient(name, isGroup),
+        background: effectiveImageUrl ? 'none' : getGradient(effectiveName, isGroup),
         backgroundImage: effectiveImageUrl ? `url(${effectiveImageUrl})` : undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -92,7 +95,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     >
       {!effectiveImageUrl && (
         <span aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {isGroup ? <UsersIcon size={getGroupIconSize()} color="#ffffff" /> : getInitials(name)}
+          {isGroup ? <UsersIcon size={getGroupIconSize()} color="#ffffff" /> : getInitials(effectiveName)}
         </span>
       )}
 

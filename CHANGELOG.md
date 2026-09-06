@@ -2,6 +2,35 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase65-multi-account-and-actions] - 2026-09-06
+
+### Multi-Account Isolation, Space Re-Auth Gate, Voice Seeking, Contextual Actions & Group Avatars (Phase 65)
+- **Multi-Account & Space Isolation Model**:
+  - Designated first registered account as Main Account (`isMainAccount: true`).
+  - Secondary spaces created via `AccountManager.createSecondaryAccount` require unique `@username`, generate isolated Ed25519 identity, and initialize local envelope and locked session without modifying or disconnecting the active Main Account.
+  - Secondary accounts have `isMainAccount: false` and are strictly barred from seeing "Accounts & Spaces" or discovering other spaces on the device.
+- **Privilege Gate & Re-Authentication**:
+  - Gated "Accounts & Spaces" behind Main Account status and a Re-Auth prompt requiring PIN or passphrase verification before management access is granted.
+- **Message Reactions & Context Actions**:
+  - Added floating quick reaction bar (❤️, 👍, 😂, 😮, 😢, 🙏, 🔥) with toggle count mechanics and animated reaction pills.
+  - Implemented wire protocol dispatch for `'MESSAGE_REACTION'` updating counts and emoji rosters.
+  - Implemented reciprocal "Delete for Everyone" resolution across 1-to-1 chats and groups.
+  - Added "Save Audio" context menu option for voice notes and "Forward" action.
+  - Rendered sender `Avatar` next to incoming messages for direct and group chats.
+- **Group Avatar Cryptographic Security**:
+  - Strictly restricted metadata/avatar changes to group `CREATOR` role.
+  - Action encrypted with epoch metadata key and signed with creator's Ed25519 private key.
+  - Added camera upload overlay visible only to group creator, optimizing images to 128x128.
+- **Reliable Voice Seeking & File Saving**:
+  - Fixed pointer capture on scrubber by tracking and releasing pointer listeners on both element and window.
+  - Verified real device file saving by testing `saved && saved.success === true`.
+- **Automated Verification & Artifacts**:
+  - Created `tests/phase65-multi-account-isolation.test.ts` (5/5 tests passing).
+  - Created `tests/phase65-reactions-and-actions.test.ts` (6/6 tests passing).
+  - Regression suites passed (`phase64`, `phase63`, `applock-multi-space-pin`).
+  - Production Web build compiled cleanly in 2.23s (`npm run build`).
+  - Android APK compiled cleanly in 18s (`app-debug.apk`, 7.38 MB).
+
 ## [1.0.0-phase64-audit-and-polish] - 2026-09-06
 
 ### Settings Redesign, Chat UI Polish, Media Performance & Dynamic PIN UX (Phase 64)
