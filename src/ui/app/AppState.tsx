@@ -185,8 +185,8 @@ export interface AppContextType {
   forwardMessage: (targetConversationId: string, message: UIMessage) => Promise<void>;
 
   // Actions
-  unlockSpace: (passphrase: string, username?: string) => Promise<void>;
-  createSpace: (name: string, passphrase: string, explicitUsername?: string) => Promise<void>;
+  unlockSpace: (passphrase: string, username?: string) => Promise<any>;
+  createSpace: (name: string, passphrase: string, explicitUsername?: string) => Promise<any>;
   changeAccountPassword: (oldPassword: string, newPassword: string) => Promise<void>;
   restoreAccount: (username: string, password: string) => Promise<void>;
   registerCloudAccount: (username: string, password: string, spaceName?: string) => Promise<void>;
@@ -1481,6 +1481,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           localStorage.setItem('veil:last_username', canonicalU);
         } catch (_e) {}
       }
+
+      return session;
     },
     [ensureCloudSession, loadSpaceData]
   );
@@ -1541,7 +1543,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         await loadSpaceData(session);
         await ensureCloudSession(session, false, passphrase);
-        return;
+        return session;
       }
 
       // If session is already active, create additional space on the current account
@@ -1590,6 +1592,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await loadSpaceData(session);
       await ensureCloudSession(session, false, passphrase);
       await accountManager.createOrUpdateRecoveryVault(session, passphrase, activeUsername);
+      return session;
     },
     [activeSession, ensureCloudSession, loadSpaceData]
   );
@@ -1673,14 +1676,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setupSpacePin = useCallback(
     async (params: { spaceId: string; username: string; spaceName: string; password?: string; pin: string; accountId?: string }) => {
-      const creds = activeCredentialsRef.current.get(params.spaceId);
-      const passwordToStore = params.password || creds?.passphrase || cloudCredentials.current.get(params.spaceId);
+      const targetSpaceId = params.spaceId || activeSession?.spaceId || '';
+      const creds = targetSpaceId ? activeCredentialsRef.current.get(targetSpaceId) : undefined;
+      const passwordToStore = params.password || creds?.passphrase || (targetSpaceId ? cloudCredentials.current.get(targetSpaceId) : undefined);
       if (!passwordToStore) {
         throw new Error('Space password required to configure PIN lock');
       }
       await spacePinManager.assignPinToSpace({
-        spaceId: params.spaceId,
-        username: params.username,
+        spaceId: targetSpaceId,
+        canonicalUsername: params.username || creds?.username || '',
         spaceName: params.spaceName,
         password: passwordToStore,
         pin: params.pin,
@@ -1688,7 +1692,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       });
       setIsAppLocked(false);
     },
-    []
+    [activeSession]
   );
 
   const switchSpaceWithPin = useCallback(

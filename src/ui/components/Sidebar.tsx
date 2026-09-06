@@ -41,7 +41,6 @@ import {
   BellOffIcon,
   MenuIcon,
   SearchIcon,
-  PhoneIcon,
   MessageSquareIcon,
   CloseIcon,
 } from './icons/index.ts';
@@ -73,7 +72,7 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const [activeChip, setActiveChip] = useState<'all' | 'unread' | 'group'>('all');
-  const [activeNavTab, setActiveNavTab] = useState<'chats' | 'calls' | 'groups' | 'settings'>('chats');
+  const [activeNavTab, setActiveNavTab] = useState<'chats' | 'groups' | 'settings'>('chats');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [globalResults, setGlobalResults] = useState<DirectorySearchResult[]>([]);
   const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
@@ -409,7 +408,7 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Category Chips Bar (Screen 4: All, Unread, Groups, Spaces) */}
+      {/* Category Chips Bar (Screen 4: All, Unread, Groups) */}
       {!searchQuery.trim() && (
         <div
           style={{
@@ -423,6 +422,7 @@ export const Sidebar: React.FC = () => {
         >
           <button
             type="button"
+            className="veil-filter-pill"
             onClick={() => setActiveChip('all')}
             style={{
               padding: '6px 14px',
@@ -442,6 +442,7 @@ export const Sidebar: React.FC = () => {
 
           <button
             type="button"
+            className="veil-filter-pill"
             onClick={() => setActiveChip('unread')}
             style={{
               padding: '6px 14px',
@@ -461,6 +462,7 @@ export const Sidebar: React.FC = () => {
 
           <button
             type="button"
+            className="veil-filter-pill"
             onClick={() => setActiveChip('group')}
             style={{
               padding: '6px 14px',
@@ -476,25 +478,6 @@ export const Sidebar: React.FC = () => {
             }}
           >
             Groups
-          </button>
-
-          <button
-            type="button"
-            onClick={() => openModal({ type: 'accountsAndSpaces' })}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              backgroundColor: '#121824',
-              color: '#94a3b8',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Spaces
           </button>
         </div>
       )}
@@ -833,13 +816,13 @@ export const Sidebar: React.FC = () => {
         <PlusIcon size={24} strokeWidth={2.5} />
       </button>
 
-      {/* Bottom Navigation Bar (Screen 4: Chats, Calls, Groups, Settings) */}
+      {/* Bottom Navigation Bar (Screen 4: Chats, Groups, Settings) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
-          height: '60px',
+          height: '62px',
           backgroundColor: '#0a0e17',
           borderTop: '1px solid rgba(255, 255, 255, 0.06)',
           padding: '0 0.5rem',
@@ -853,18 +836,21 @@ export const Sidebar: React.FC = () => {
             setActiveChip('all');
           }}
           style={{
+            flex: 1,
             background: 'none',
             border: 'none',
             color: activeNavTab === 'chats' ? '#14b8a6' : '#64748b',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '3px',
-            fontSize: '0.725rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             cursor: 'pointer',
             padding: '6px 12px',
-            borderRadius: '10px',
+            borderRadius: '12px',
+            transition: 'color 0.15s ease',
           }}
         >
           <MessageSquareIcon size={20} />
@@ -874,50 +860,25 @@ export const Sidebar: React.FC = () => {
         <button
           type="button"
           onClick={() => {
-            setActiveNavTab('calls');
-            // Inform the user about secure E2EE calls
-            openModal({
-              type: 'help' as any,
-            });
-          }}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: activeNavTab === 'calls' ? '#14b8a6' : '#64748b',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '3px',
-            fontSize: '0.725rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            padding: '6px 12px',
-            borderRadius: '10px',
-          }}
-        >
-          <PhoneIcon size={20} />
-          <span>Calls</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
             setActiveNavTab('groups');
             setActiveChip('group');
           }}
           style={{
+            flex: 1,
             background: 'none',
             border: 'none',
             color: activeNavTab === 'groups' ? '#14b8a6' : '#64748b',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '3px',
-            fontSize: '0.725rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             cursor: 'pointer',
             padding: '6px 12px',
-            borderRadius: '10px',
+            borderRadius: '12px',
+            transition: 'color 0.15s ease',
           }}
         >
           <UsersIcon size={20} />
@@ -931,18 +892,21 @@ export const Sidebar: React.FC = () => {
             openModal({ type: 'settings' as any });
           }}
           style={{
+            flex: 1,
             background: 'none',
             border: 'none',
             color: activeNavTab === 'settings' ? '#14b8a6' : '#64748b',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: '3px',
-            fontSize: '0.725rem',
+            fontSize: '0.75rem',
             fontWeight: 600,
             cursor: 'pointer',
             padding: '6px 12px',
-            borderRadius: '10px',
+            borderRadius: '12px',
+            transition: 'color 0.15s ease',
           }}
         >
           <SettingsIcon size={20} />

@@ -1845,4 +1845,28 @@
   transform-origin: center center;
 }
 
+/* ==========================================================================
+   Phase 62 Oval Filter Pill Styling & Tap Highlight Suppression
+   ========================================================================== */
+
+.veil-filter-pill {
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  user-select: none !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+}
+
+.veil-filter-pill:active {
+  transform: scale(0.96);
+}
+
+.veil-filter-pill:focus-visible {
+  box-shadow: 0 0 0 2px var(--veil-accent-primary);
+}
+
+
 

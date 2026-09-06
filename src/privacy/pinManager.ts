@@ -269,32 +269,74 @@ export class SpacePinManager {
     this.saveRegistry();
   }
 
-  public getPinType(spaceId?: string): '4-digit' | '6-digit' {
-    if (spaceId) {
-      const meta = this.getSpaceMetadata(spaceId);
-      if (meta) {
-        return meta.pinLength === 4 ? '4-digit' : '6-digit';
+  public getPinType(spaceIdentifier?: string): '4-digit' | '6-digit' {
+    if (spaceIdentifier) {
+      const clean = spaceIdentifier.trim().toLowerCase().replace(/^@/, '');
+      for (const entry of Object.values(this.registry.entries)) {
+        if (entry.spaceId === spaceIdentifier || entry.canonicalUsername === clean) {
+          return entry.pinLength === 4 ? '4-digit' : '6-digit';
+        }
       }
     }
     const all = this.listRegisteredSpaces();
     if (all.length > 0) {
       return all[0].pinLength === 4 ? '4-digit' : '6-digit';
     }
-    return '6-digit';
+    return '4-digit';
   }
 
-  public isOnboardingCompleted(spaceId: string): boolean {
+  /**
+   * Checks whether a PIN has been configured for a given space or username.
+   */
+  public hasPinForSpace(spaceIdentifier: string): boolean {
+    if (!spaceIdentifier) return false;
+    const clean = spaceIdentifier.trim().toLowerCase().replace(/^@/, '');
+    for (const entry of Object.values(this.registry.entries)) {
+      if (entry.spaceId === spaceIdentifier || entry.canonicalUsername === clean) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public isOnboardingCompleted(spaceIdentifier: string): boolean {
+    if (!spaceIdentifier) return false;
     if (!this.registry.onboardingCompletedSpaces) {
       this.registry.onboardingCompletedSpaces = {};
     }
-    return Boolean(this.registry.onboardingCompletedSpaces[spaceId]);
+    if (this.registry.onboardingCompletedSpaces[spaceIdentifier]) return true;
+    const clean = spaceIdentifier.trim().toLowerCase().replace(/^@/, '');
+    if (this.registry.onboardingCompletedSpaces[clean]) return true;
+
+    for (const entry of Object.values(this.registry.entries || {})) {
+      if (entry.spaceId === spaceIdentifier || entry.canonicalUsername === clean) {
+        if (
+          this.registry.onboardingCompletedSpaces[entry.spaceId] ||
+          this.registry.onboardingCompletedSpaces[entry.canonicalUsername]
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
-  public setOnboardingCompleted(spaceId: string, completed: boolean): void {
+  public setOnboardingCompleted(spaceIdentifier: string, completed: boolean): void {
+    if (!spaceIdentifier) return;
     if (!this.registry.onboardingCompletedSpaces) {
       this.registry.onboardingCompletedSpaces = {};
     }
-    this.registry.onboardingCompletedSpaces[spaceId] = completed;
+    this.registry.onboardingCompletedSpaces[spaceIdentifier] = completed;
+    const clean = spaceIdentifier.trim().toLowerCase().replace(/^@/, '');
+    if (clean) {
+      this.registry.onboardingCompletedSpaces[clean] = completed;
+    }
+    for (const entry of Object.values(this.registry.entries || {})) {
+      if (entry.spaceId === spaceIdentifier || entry.canonicalUsername === clean) {
+        this.registry.onboardingCompletedSpaces[entry.spaceId] = completed;
+        this.registry.onboardingCompletedSpaces[entry.canonicalUsername] = completed;
+      }
+    }
     this.saveRegistry();
   }
 

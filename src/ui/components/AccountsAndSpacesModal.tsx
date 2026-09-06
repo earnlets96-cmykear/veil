@@ -16,7 +16,6 @@ import {
   ShieldIcon,
   PlusIcon,
   CheckIcon,
-  TrashIcon,
   KeyIcon,
   UserIcon,
   EditIcon,
@@ -38,6 +37,7 @@ export const AccountsAndSpacesModal: React.FC = () => {
     switchSpaceWithPin,
     unlockSpace,
     createSpace,
+    lockSpace,
   } = useApp();
 
   const [subView, setSubView] = useState<'list' | 'addAccount' | 'createSpace' | 'changePin' | 'switchPin'>('list');
@@ -52,10 +52,9 @@ export const AccountsAndSpacesModal: React.FC = () => {
   const [newPin, setNewPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
   const [editingName, setEditingName] = useState('');
 
-  const registeredSpaces = spacePinManager.listRegisteredSpaces();
   const currentSpaceMeta = activeSession ? spacePinManager.getSpaceMetadata(activeSession.spaceId) : null;
   const currentUsername = myProfile?.username || currentSpaceMeta?.canonicalUsername || 'user';
   const currentSpaceName = currentSpaceMeta?.spaceName || activeSession?.spaceName || 'Main Space';
@@ -151,7 +150,8 @@ export const AccountsAndSpacesModal: React.FC = () => {
 
   const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetSpaceId || !oldPin || !newPin) {
+    const currentSpaceId = targetSpaceId || activeSession?.spaceId;
+    if (!currentSpaceId || !oldPin || !newPin) {
       setError('Please enter both current and new PIN.');
       return;
     }
@@ -165,7 +165,7 @@ export const AccountsAndSpacesModal: React.FC = () => {
 
     try {
       await spacePinManager.changePin({
-        spaceId: targetSpaceId,
+        spaceId: currentSpaceId,
         oldPin,
         newPin,
       });
@@ -189,32 +189,21 @@ export const AccountsAndSpacesModal: React.FC = () => {
       await switchSpaceWithPin(pin);
       closeModal();
     } catch (err: any) {
-      setError(err?.message || 'Incorrect PIN');
+      setError(err?.message || 'Incorrect PIN or space not found');
       setPin('');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRemoveSpace = (spaceId: string) => {
-    if (confirm('Remove this space from this device?')) {
-      spacePinManager.removeSpace(spaceId);
-      if (activeSession && activeSession.spaceId === spaceId) {
-        closeModal();
-        window.location.reload();
-      }
-    }
-  };
-
-  const handleSaveRename = (spaceId: string) => {
-    if (editingName.trim()) {
-      spacePinManager.renameSpace(spaceId, editingName.trim());
-      setEditingSpaceId(null);
+  const handleSaveRename = () => {
+    if (activeSession && editingName.trim()) {
+      spacePinManager.renameSpace(activeSession.spaceId, editingName.trim());
+      activeSession.spaceName = editingName.trim();
+      setIsRenaming(false);
       setEditingName('');
     }
   };
-
-  const [isEditMode, setIsEditMode] = useState(false);
 
   return (
     <div
@@ -247,7 +236,7 @@ export const AccountsAndSpacesModal: React.FC = () => {
           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
         }}
       >
-        {/* Header matching Screen 6 */}
+        {/* Header */}
         <div
           style={{
             display: 'flex',
@@ -274,21 +263,7 @@ export const AccountsAndSpacesModal: React.FC = () => {
           <h2 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--veil-text-primary)' }}>
             Accounts &amp; Spaces
           </h2>
-          <button
-            type="button"
-            onClick={() => setIsEditMode(!isEditMode)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: isEditMode ? 'var(--veil-accent-primary)' : 'var(--veil-accent-primary)',
-              cursor: 'pointer',
-              fontSize: 'var(--veil-text-sm)',
-              fontWeight: 600,
-              padding: '4px 8px',
-            }}
-          >
-            {isEditMode ? 'Done' : 'Edit'}
-          </button>
+          <div style={{ width: '24px' }} />
         </div>
 
         {error && (
@@ -311,7 +286,7 @@ export const AccountsAndSpacesModal: React.FC = () => {
           </div>
         )}
 
-        {/* SUBVIEW: LIST */}
+        {/* SUBVIEW: LIST (ZERO SPACE ENUMERATION) */}
         {subView === 'list' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Current Active Space */}
@@ -331,42 +306,139 @@ export const AccountsAndSpacesModal: React.FC = () => {
               </span>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '1rem',
+                  padding: '1.1rem',
                   backgroundColor: 'var(--veil-bg-surface)',
                   border: '1px solid var(--veil-border)',
                   borderRadius: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.85rem',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  <Avatar name={currentSpaceName} size="md" />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-                      {currentSpaceName}
-                    </div>
-                    <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
-                      {currentUsername.includes('@') ? currentUsername : `${currentUsername}@veil.space`}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flex: 1, minWidth: 0 }}>
+                    <Avatar name={currentSpaceName} size="md" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {isRenaming ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <input
+                            type="text"
+                            className="veil-input"
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            placeholder="Space Name"
+                            autoFocus
+                            style={{ padding: '3px 8px', fontSize: 'var(--veil-text-xs)', width: '130px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveRename}
+                            title="Save"
+                            style={{ background: 'none', border: 'none', color: 'var(--veil-accent-primary)', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <CheckIcon size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setIsRenaming(false); setEditingName(''); }}
+                            title="Cancel"
+                            style={{ background: 'none', border: 'none', color: 'var(--veil-text-muted)', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <CloseIcon size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {currentSpaceName}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => { setIsRenaming(true); setEditingName(currentSpaceName); }}
+                            title="Rename Space"
+                            style={{ background: 'none', border: 'none', color: 'var(--veil-text-muted)', cursor: 'pointer', padding: '2px' }}
+                          >
+                            <EditIcon size={13} />
+                          </button>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {currentUsername.includes('@') ? currentUsername : `${currentUsername}@veil.space`}
+                      </div>
                     </div>
                   </div>
+                  <div
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: '20px',
+                      backgroundColor: 'rgba(20, 184, 166, 0.15)',
+                      color: 'var(--veil-accent-primary)',
+                      border: '1px solid rgba(20, 184, 166, 0.3)',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    ACTIVE
+                  </div>
                 </div>
-                <div
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: '20px',
-                    backgroundColor: 'var(--veil-accent-primary)',
-                    color: '#ffffff',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                  }}
-                >
-                  Active
+
+                <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--veil-border-subtle)', paddingTop: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetSpaceId(activeSession?.spaceId || null);
+                      setSubView('changePin');
+                      setError(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid var(--veil-border)',
+                      color: 'var(--veil-text-secondary)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <KeyIcon size={13} />
+                    <span>Change PIN</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      lockSpace();
+                      closeModal();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      color: 'var(--veil-danger)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <LockIcon size={13} />
+                    <span>Lock Space</span>
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Your Spaces List */}
+            {/* Privacy-Preserving Space Actions (No List of Spaces) */}
             <div>
               <span
                 style={{
@@ -379,192 +451,152 @@ export const AccountsAndSpacesModal: React.FC = () => {
                   marginBottom: '0.5rem',
                 }}
               >
-                Your Spaces ({registeredSpaces.length})
+                Space Actions
               </span>
 
-              <div
-                style={{
-                  backgroundColor: 'var(--veil-bg-surface)',
-                  border: '1px solid var(--veil-border)',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                }}
-              >
-                {registeredSpaces.length === 0 ? (
-                  <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--veil-text-muted)', fontSize: 'var(--veil-text-xs)' }}>
-                    No other spaces configured on this device.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPin('');
+                    setSubView('switchPin');
+                    setError(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.85rem',
+                    padding: '0.9rem 1rem',
+                    borderRadius: '16px',
+                    backgroundColor: 'var(--veil-bg-surface)',
+                    border: '1px solid var(--veil-border)',
+                    color: 'var(--veil-text-primary)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: '0.15s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(20, 184, 166, 0.12)',
+                      color: 'var(--veil-accent-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <KeyIcon size={18} />
                   </div>
-                ) : (
-                  registeredSpaces.map((sp, idx) => {
-                    const isCurrent = activeSession?.spaceId === sp.spaceId;
-                    const displayHandle = sp.canonicalUsername.includes('@')
-                      ? sp.canonicalUsername
-                      : `${sp.canonicalUsername}@veil.space`;
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
+                      Switch Space
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
+                      Enter PIN to unlock any registered space directly
+                    </div>
+                  </div>
+                  <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
+                </button>
 
-                    return (
-                      <div
-                        key={sp.spaceId}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.9rem 1rem',
-                          borderBottom: idx < registeredSpaces.length - 1 ? '1px solid var(--veil-border-subtle)' : 'none',
-                        }}
-                      >
-                        <div
-                          onClick={() => {
-                            if (!isCurrent) {
-                              setTargetSpaceId(sp.spaceId);
-                              setSubView('switchPin');
-                              setError(null);
-                            }
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.85rem',
-                            cursor: isCurrent ? 'default' : 'pointer',
-                            flex: 1,
-                          }}
-                        >
-                          <Avatar name={sp.spaceName} size="sm" />
-                          <div>
-                            {editingSpaceId === sp.spaceId ? (
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                <input
-                                  type="text"
-                                  className="veil-input"
-                                  value={editingName}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  style={{ padding: '2px 8px', fontSize: 'var(--veil-text-xs)' }}
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveRename(sp.spaceId)}
-                                  style={{ background: 'transparent', border: 'none', color: 'var(--veil-accent-primary)', cursor: 'pointer' }}
-                                >
-                                  <CheckIcon size={14} />
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-                                {sp.spaceName}
-                              </div>
-                            )}
-                            <div style={{ fontSize: '11px', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
-                              {displayHandle}
-                            </div>
-                          </div>
-                        </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubView('createSpace');
+                    setError(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.85rem',
+                    padding: '0.9rem 1rem',
+                    borderRadius: '16px',
+                    backgroundColor: 'var(--veil-bg-surface)',
+                    border: '1px solid var(--veil-border)',
+                    color: 'var(--veil-text-primary)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: '0.15s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(20, 184, 166, 0.12)',
+                      color: 'var(--veil-accent-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <PlusIcon size={18} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
+                      Create New Space
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
+                      Isolated cryptographic space with dedicated PIN
+                    </div>
+                  </div>
+                  <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
+                </button>
 
-                        {/* Status / Edit actions */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {isEditMode ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTargetSpaceId(sp.spaceId);
-                                  setSubView('changePin');
-                                  setError(null);
-                                }}
-                                title="Change PIN"
-                                style={{ background: 'transparent', border: 'none', color: 'var(--veil-text-secondary)', cursor: 'pointer', padding: '4px' }}
-                              >
-                                <KeyIcon size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingSpaceId(sp.spaceId);
-                                  setEditingName(sp.spaceName);
-                                }}
-                                title="Rename"
-                                style={{ background: 'transparent', border: 'none', color: 'var(--veil-text-secondary)', cursor: 'pointer', padding: '4px' }}
-                              >
-                                <EditIcon size={16} />
-                              </button>
-                              {!isCurrent && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveSpace(sp.spaceId)}
-                                  title="Remove Space"
-                                  style={{ background: 'transparent', border: 'none', color: 'var(--veil-danger)', cursor: 'pointer', padding: '4px' }}
-                                >
-                                  <TrashIcon size={16} />
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <div style={{ color: isCurrent ? 'var(--veil-accent-primary)' : 'var(--veil-text-muted)' }}>
-                              <LockIcon size={18} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubView('addAccount');
+                    setError(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.85rem',
+                    padding: '0.9rem 1rem',
+                    borderRadius: '16px',
+                    backgroundColor: 'var(--veil-bg-surface)',
+                    border: '1px solid var(--veil-border)',
+                    color: 'var(--veil-text-primary)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: '0.15s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
+                      backgroundColor: 'rgba(20, 184, 166, 0.12)',
+                      color: 'var(--veil-accent-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <UserIcon size={18} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
+                      Add Existing Account
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
+                      Authenticate and isolate another account on this device
+                    </div>
+                  </div>
+                  <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
+                </button>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setSubView('addAccount');
-                  setError(null);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  padding: '0.9rem',
-                  borderRadius: '16px',
-                  backgroundColor: 'var(--veil-bg-surface)',
-                  border: '1px solid var(--veil-border)',
-                  color: 'var(--veil-accent-primary)',
-                  fontSize: 'var(--veil-text-sm)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: '0.15s',
-                }}
-              >
-                <PlusIcon size={16} />
-                <span>Add Existing Account</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSubView('createSpace');
-                  setError(null);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  padding: '0.9rem',
-                  borderRadius: '16px',
-                  backgroundColor: 'var(--veil-bg-surface)',
-                  border: '1px solid var(--veil-border)',
-                  color: 'var(--veil-accent-primary)',
-                  fontSize: 'var(--veil-text-sm)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: '0.15s',
-                }}
-              >
-                <PlusIcon size={16} />
-                <span>Create New Space</span>
-              </button>
-            </div>
-
-            {/* Bottom Info Card: How it works? */}
+            {/* Bottom Info Card: Plausible Deniability */}
             <div
               style={{
                 backgroundColor: 'var(--veil-bg-surface)',
@@ -573,22 +605,18 @@ export const AccountsAndSpacesModal: React.FC = () => {
                 padding: '1rem 1.1rem',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem',
+                gap: '0.85rem',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                <ShieldIcon size={22} color="var(--veil-accent-primary)" />
-                <div>
-                  <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 700, color: 'var(--veil-text-primary)' }}>
-                    How it works?
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--veil-text-muted)', marginTop: '2px' }}>
-                    Different PIN = different space. Your data never mixes.
-                  </div>
+              <ShieldIcon size={24} color="var(--veil-accent-primary)" style={{ flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 700, color: 'var(--veil-text-primary)' }}>
+                  Zero Space Enumeration
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--veil-text-muted)', marginTop: '2px', lineHeight: 1.4 }}>
+                  VEIL never lists inactive or decoy spaces. Provide the secret PIN to switch directly into any space.
                 </div>
               </div>
-              <ChevronRightIcon size={18} color="var(--veil-text-muted)" />
             </div>
           </div>
         )}

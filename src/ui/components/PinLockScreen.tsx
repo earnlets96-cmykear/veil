@@ -14,7 +14,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { spacePinManager } from '../../privacy/pinManager.ts';
-import { ShieldIcon, DeleteIcon, AlertCircleIcon, ChevronRightIcon } from './icons/index.ts';
+import { ShieldIcon, DeleteIcon, AlertCircleIcon, ChevronRightIcon, CheckIcon } from './icons/index.ts';
 import { Spinner } from './ui/Spinner.tsx';
 
 interface PinLockScreenProps {
@@ -55,6 +55,29 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     setPin('');
   }, [isUnlocking]);
 
+  const handleUnlock = useCallback(async () => {
+    if (isUnlocking) return;
+    if (pin.length !== 4 && pin.length !== 6) {
+      setError('Please enter a 4 or 6-digit PIN');
+      return;
+    }
+
+    setIsUnlocking(true);
+    setError(null);
+
+    try {
+      await unlockWithPin(pin);
+    } catch (err: any) {
+      setIsShaking(true);
+      setError(err?.message || 'Incorrect PIN');
+      setTimeout(() => {
+        setPin('');
+        setIsShaking(false);
+        setIsUnlocking(false);
+      }, 450);
+    }
+  }, [isUnlocking, pin, unlockWithPin]);
+
   // Physical keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -65,52 +88,16 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
         handleBackspace();
       } else if (e.key === 'Escape') {
         handleClear();
+      } else if (e.key === 'Enter') {
+        if (pin.length === 4 || pin.length === 6) {
+          handleUnlock();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleDigit, handleBackspace, handleClear, isUnlocking]);
-
-  // Trigger unlock when PIN length reaches 4 or 6 digits
-  useEffect(() => {
-    let active = true;
-
-    async function attemptUnlock() {
-      if (pin.length === 4 || pin.length === 6) {
-        setIsUnlocking(true);
-        setError(null);
-
-        try {
-          await unlockWithPin(pin);
-        } catch (err: any) {
-          if (!active) return;
-          setIsShaking(true);
-          setError(err?.message || 'Incorrect PIN');
-          setTimeout(() => {
-            if (active) {
-              setPin('');
-              setIsShaking(false);
-              setIsUnlocking(false);
-            }
-          }, 450);
-          return;
-        }
-
-        if (active) {
-          setIsUnlocking(false);
-        }
-      }
-    }
-
-    if (pin.length === 4 || pin.length === 6) {
-      attemptUnlock();
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [pin, unlockWithPin]);
+  }, [handleDigit, handleBackspace, handleClear, handleUnlock, isUnlocking, pin.length]);
 
   const handleBiometricUnlock = async () => {
     if (isUnlocking) return;
@@ -127,11 +114,15 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     }
   };
 
+  const configuredPinType = spacePinManager.getPinType();
+  const defaultLength = configuredPinType === '6-digit' ? 6 : 4;
+  const displayLength = pin.length > 4 ? 6 : defaultLength;
+
   const keypadDigits = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
-    ['', '0', 'backspace'],
+    ['enter', '0', 'backspace'],
   ];
 
   return (
@@ -206,8 +197,9 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
           Simple. Private. Yours.
         </p>
 
-        {/* 6 PIN Dot Indicators */}
+        {/* Dynamic PIN Dot Indicators */}
         <div
+          role="group"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -216,9 +208,9 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             marginBottom: '1.75rem',
             minHeight: '24px',
           }}
-          aria-label={`${pin.length} digits entered`}
+          aria-label={`${pin.length} of ${displayLength} digits entered`}
         >
-          {Array.from({ length: 6 }).map((_, idx) => {
+          {Array.from({ length: displayLength }).map((_, idx) => {
             const isFilled = idx < pin.length;
             return (
               <div
@@ -280,6 +272,40 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             row.map((val, colIdx) => {
               if (val === '') {
                 return <div key={`${rowIdx}-${colIdx}`} />;
+              }
+
+              if (val === 'enter') {
+                const isSupportedLength = pin.length === 4 || pin.length === 6;
+                return (
+                  <button
+                    key="enter"
+                    type="button"
+                    onClick={handleUnlock}
+                    disabled={isUnlocking || !isSupportedLength}
+                    aria-label="Unlock"
+                    title="Unlock"
+                    style={{
+                      height: '54px',
+                      borderRadius: '16px',
+                      border: isSupportedLength
+                        ? '1px solid var(--veil-accent-primary)'
+                        : '1px solid var(--veil-border-subtle, rgba(255, 255, 255, 0.08))',
+                      backgroundColor: isSupportedLength ? 'var(--veil-accent-primary)' : 'transparent',
+                      color: isSupportedLength ? '#ffffff' : 'var(--veil-text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      cursor: isSupportedLength && !isUnlocking ? 'pointer' : 'default',
+                      opacity: isSupportedLength ? 1 : 0.35,
+                      boxShadow: isSupportedLength ? '0 0 14px var(--veil-accent-glow)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <CheckIcon size={18} strokeWidth={2.5} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>OK</span>
+                  </button>
+                );
               }
 
               if (val === 'backspace') {

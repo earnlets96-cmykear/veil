@@ -8,6 +8,12 @@
  * voice UI foundations, and toast notifications.
  */
 
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
 :root {
   /* =========================================================================
      1. COLORS & SURFACES

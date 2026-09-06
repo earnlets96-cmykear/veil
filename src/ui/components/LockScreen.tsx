@@ -47,29 +47,56 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     setLoadingPhase('deriving');
 
     try {
+      let session: any = null;
       if (mode === 'signin') {
-        await unlockSpace(password, cleanUsername);
-        if (onSuccessAuth) {
-          onSuccessAuth({
-            spaceId: '',
-            username: cleanUsername,
-            spaceName: 'Main Space',
-            password,
-          });
+        session = await unlockSpace(password, cleanUsername);
+        try {
+          if (onSuccessAuth) {
+            onSuccessAuth({
+              spaceId: session?.spaceId || '',
+              username: cleanUsername,
+              spaceName: session?.spaceName || 'Main Space',
+              password,
+            });
+          }
+        } catch (postAuthErr) {
+          console.error('[VEIL-AUTH] Post-authentication callback notification error:', postAuthErr);
         }
       } else {
-        await createSpace(spaceName.trim() || 'Main Space', password, cleanUsername);
-        if (onSuccessAuth) {
-          onSuccessAuth({
-            spaceId: '',
-            username: cleanUsername,
-            spaceName: spaceName.trim() || 'Main Space',
-            password,
-          });
+        session = await createSpace(spaceName.trim() || 'Main Space', password, cleanUsername);
+        try {
+          if (onSuccessAuth) {
+            onSuccessAuth({
+              spaceId: session?.spaceId || '',
+              username: cleanUsername,
+              spaceName: spaceName.trim() || 'Main Space',
+              password,
+            });
+          }
+        } catch (postAuthErr) {
+          console.error('[VEIL-AUTH] Post-authentication callback notification error:', postAuthErr);
         }
       }
     } catch (err: any) {
-      setError(err?.message || (mode === 'signin' ? 'Invalid username or password.' : 'Failed to create account.'));
+      console.error('[VEIL-AUTH-ERROR]', err);
+      const rawMsg = String(err?.message || '');
+      const isInternalError =
+        !rawMsg ||
+        rawMsg.includes('is not a function') ||
+        rawMsg.includes('undefined') ||
+        rawMsg.includes('Cannot read properties') ||
+        rawMsg.includes('TypeError') ||
+        rawMsg.includes('ReferenceError');
+
+      if (isInternalError) {
+        setError(
+          mode === 'signin'
+            ? 'Invalid username or password. Please try again.'
+            : 'Unable to create account. Please verify your details and try again.'
+        );
+      } else {
+        setError(rawMsg);
+      }
       setPassword('');
       setLoadingPhase('idle');
     }

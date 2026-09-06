@@ -2,6 +2,39 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase62-applock-privacy-auth] - 2026-09-06
+
+### App Lock, Privacy, Space Isolation, Authentication & UI Overhaul (Phase 62)
+- **Critical Authentication & Error Sanitization (`src/privacy/pinManager.ts`, `src/ui/app/AppState.tsx`, `src/ui/components/LockScreen.tsx`)**:
+  - Implemented `hasPinForSpace(spaceIdentifier: string): boolean` on `SpacePinManager`, resolving by both `spaceId` and canonical username (with or without `@` prefix).
+  - Enhanced `isOnboardingCompleted`, `setOnboardingCompleted`, and `getPinType` to cross-resolve between space ID and canonical username.
+  - Sanitized login screen error display to intercept raw runtime JS/TypeError exceptions (such as `is not a function`) and present user-friendly error banners while securely logging details to console.
+  - Ensured `unlockSpace` and `createSpace` return the active `SpaceSession`, and wrapped secondary post-auth notifications in protected try/catch blocks.
+- **PIN Entry & Dynamic Dots Model (`src/ui/components/PinLockScreen.tsx`)**:
+  - Removed premature auto-submission on 4 digits for 6-digit configured PINs.
+  - Added explicit Enter/Unlock keypad button ("OK" / checkmark) and physical keyboard `Enter` listener.
+  - Implemented dynamic dot indicators (`displayLength` matches configured PIN length and expands to 6 if 5+ digits entered).
+  - Added shake-and-reset error feedback on invalid attempts.
+- **App Lock Setup Modal Matching Entry Semantics (`src/ui/components/AppLockSetupModal.tsx`)**:
+  - Removed premature auto-advance upon typing the last digit of first and confirm PINs.
+  - Added explicit "Continue" / "Confirm PIN" buttons, physical keyboard `Enter` support, and dedicated OK keypad cell.
+  - Toggle between 4-digit and 6-digit PIN length dynamically updates the indicator count.
+- **Space Isolation & Anti-Enumeration Overhaul (`src/ui/components/AccountsAndSpacesModal.tsx`)**:
+  - Completely eliminated the `Your Spaces ({registeredSpaces.length})` directory list that leaked stored spaces and accounts.
+  - Retained the Current Active Space card with inline rename and change PIN capabilities.
+  - Implemented privacy-preserving direct action buttons: "Switch Space" (prompts for PIN/passphrase without listing other spaces), "Create New Space", "Add Existing Account", "Lock Space Now".
+  - Preserved zero-knowledge plausible deniability and decoy spaces.
+- **Navigation Cleanup & Touch Highlight Suppression (`src/ui/components/Sidebar.tsx`, `src/styles/veil-design-system.css`, `src/styles/veil-components.css`)**:
+  - Removed "Spaces" button from conversation category chips bar (retaining `All`, `Unread`, `Groups`).
+  - Removed nonfunctional "Calls" tab button from bottom navigation bar.
+  - Rebalanced the 3 remaining navigation tabs (`Chats`, `Groups`, `Settings`) with equal flex layout.
+  - Added global `-webkit-tap-highlight-color: transparent` to eliminate gray rectangular touch flashes on mobile/WebViews.
+  - Added `.veil-filter-pill` with oval boundary clipping (`border-radius: 9999px !important; overflow: hidden !important;`) and active scale transition.
+- **Automated Verification**:
+  - Created `tests/phase62-applock-privacy-auth.test.tsx` (10/10 tests passing).
+  - Verified core security, privacy, and UI suites (32/32 tests passing).
+  - Production build cleanly compiled (`npm run build`, 7 release artifacts).
+
 ## [1.0.0-showcase-ui-redesign] - 2026-09-06
 
 ### Completed Full UI/UX Redesign (10 Showcase Screens & App Lock Overhaul)

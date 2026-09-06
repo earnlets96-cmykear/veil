@@ -9,10 +9,11 @@
  * - Real collision prevention and persistent onboarding completion
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { spacePinManager } from '../../privacy/pinManager.ts';
-import { LockIcon, ShieldIcon, AlertCircleIcon, DeleteIcon, ArrowLeftIcon } from './icons/index.ts';
+import { LockIcon, ShieldIcon, AlertCircleIcon, DeleteIcon, ArrowLeftIcon, CheckIcon, ChevronRightIcon } from './icons/index.ts';
+import { Button } from './ui/Button.tsx';
 
 interface AppLockSetupModalProps {
   onComplete?: () => void;
@@ -56,42 +57,23 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
     }
   };
 
-  const handleDigit = (d: string) => {
+  const handleDigit = useCallback((d: string) => {
     if (isSubmitting) return;
     setError(null);
     if (step === 'create') {
-      if (firstPin.length < pinLength) {
-        const next = firstPin + d;
-        setFirstPin(next);
-        if (next.length === pinLength) {
-          const avail = spacePinManager.isPinAvailableSync(next, targetSpaceId);
-          if (!avail) {
-            setError('This PIN is unavailable. Please choose a different PIN.');
-            setFirstPin('');
-            return;
-          }
-          setTimeout(() => setStep('confirm'), 200);
-        }
-      }
+      setFirstPin((prev) => {
+        if (prev.length >= pinLength) return prev;
+        return prev + d;
+      });
     } else {
-      if (confirmPin.length < pinLength) {
-        const next = confirmPin + d;
-        setConfirmPin(next);
-        if (next.length === pinLength) {
-          if (next !== firstPin) {
-            setError('PINs do not match. Please try again.');
-            setConfirmPin('');
-            setStep('create');
-            setFirstPin('');
-            return;
-          }
-          submitPin(next);
-        }
-      }
+      setConfirmPin((prev) => {
+        if (prev.length >= pinLength) return prev;
+        return prev + d;
+      });
     }
-  };
+  }, [isSubmitting, pinLength, step]);
 
-  const handleBackspace = () => {
+  const handleBackspace = useCallback(() => {
     if (isSubmitting) return;
     setError(null);
     if (step === 'create') {
@@ -99,9 +81,24 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
     } else {
       setConfirmPin((prev) => prev.slice(0, -1));
     }
-  };
+  }, [isSubmitting, step]);
 
-  const submitPin = async (finalPin: string) => {
+  const handleContinueCreate = useCallback(() => {
+    if (firstPin.length !== pinLength) {
+      setError(`Please enter a full ${pinLength}-digit PIN.`);
+      return;
+    }
+    const avail = spacePinManager.isPinAvailableSync(firstPin, targetSpaceId);
+    if (!avail) {
+      setError('This PIN is unavailable. Please choose a different PIN.');
+      setFirstPin('');
+      return;
+    }
+    setError(null);
+    setStep('confirm');
+  }, [firstPin, pinLength, targetSpaceId]);
+
+  const submitPin = useCallback(async (finalPin: string) => {
     setIsSubmitting(true);
     setError(null);
     try {
@@ -127,13 +124,49 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
       setConfirmPin('');
       setIsSubmitting(false);
     }
-  };
+  }, [accountId, closeModal, onComplete, password, setupSpacePin, targetSpaceId, targetSpaceName, targetUsername]);
+
+  const handleConfirmSubmit = useCallback(() => {
+    if (confirmPin.length !== pinLength) {
+      setError(`Please enter all ${pinLength} digits to confirm.`);
+      return;
+    }
+    if (confirmPin !== firstPin) {
+      setError('PINs do not match. Please try again.');
+      setConfirmPin('');
+      setStep('create');
+      setFirstPin('');
+      return;
+    }
+    submitPin(confirmPin);
+  }, [confirmPin, firstPin, pinLength, submitPin]);
+
+  // Physical keyboard support
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isSubmitting) return;
+      if (/^[0-9]$/.test(e.key)) {
+        handleDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        handleBackspace();
+      } else if (e.key === 'Enter') {
+        if (step === 'create') {
+          if (firstPin.length === pinLength) handleContinueCreate();
+        } else {
+          if (confirmPin.length === pinLength) handleConfirmSubmit();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [confirmPin.length, firstPin.length, handleBackspace, handleConfirmSubmit, handleContinueCreate, handleDigit, isSubmitting, pinLength, step]);
 
   const keypadDigits = [
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
-    ['', '0', 'backspace'],
+    ['enter', '0', 'backspace'],
   ];
 
   return (
@@ -250,6 +283,8 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
 
         {/* PIN Dot Indicators */}
         <div
+          role="group"
+          aria-label="PIN setup indicator"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -321,6 +356,41 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
                 return <div key={`${rowIdx}-${colIdx}`} />;
               }
 
+              if (val === 'enter') {
+                const isReady = step === 'create' ? firstPin.length === pinLength : confirmPin.length === pinLength;
+                const onAction = step === 'create' ? handleContinueCreate : handleConfirmSubmit;
+                return (
+                  <button
+                    key="enter"
+                    type="button"
+                    onClick={onAction}
+                    disabled={isSubmitting || !isReady}
+                    aria-label={step === 'create' ? 'Continue' : 'Confirm PIN'}
+                    title={step === 'create' ? 'Continue' : 'Confirm PIN'}
+                    style={{
+                      height: '52px',
+                      borderRadius: '16px',
+                      border: isReady
+                        ? '1px solid var(--veil-accent-primary)'
+                        : '1px solid var(--veil-border-subtle, rgba(255, 255, 255, 0.08))',
+                      backgroundColor: isReady ? 'var(--veil-accent-primary)' : 'transparent',
+                      color: isReady ? '#ffffff' : 'var(--veil-text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      cursor: isReady && !isSubmitting ? 'pointer' : 'default',
+                      opacity: isReady ? 1 : 0.35,
+                      boxShadow: isReady ? '0 0 14px var(--veil-accent-glow)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <CheckIcon size={18} strokeWidth={2.5} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>OK</span>
+                  </button>
+                );
+              }
+
               if (val === 'backspace') {
                 return (
                   <button
@@ -368,6 +438,63 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
                 </button>
               );
             })
+          )}
+        </div>
+
+        {/* Explicit Continue / Confirm Button */}
+        <div style={{ width: '100%', maxWidth: '280px', marginBottom: '0.85rem' }}>
+          {step === 'create' ? (
+            <Button
+              type="button"
+              variant="primary"
+              fullWidth
+              onClick={handleContinueCreate}
+              disabled={firstPin.length !== pinLength}
+              aria-label="Continue"
+              style={{
+                height: '46px',
+                borderRadius: '14px',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+              }}
+            >
+              <span>Continue</span>
+              <ChevronRightIcon size={16} />
+            </Button>
+          ) : (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setStep('create');
+                  setConfirmPin('');
+                  setError(null);
+                }}
+                disabled={isSubmitting}
+                style={{ height: '46px', borderRadius: '14px', flex: '0 0 auto' }}
+              >
+                Back
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                fullWidth
+                onClick={handleConfirmSubmit}
+                disabled={confirmPin.length !== pinLength || isSubmitting}
+                loading={isSubmitting}
+                aria-label="Confirm PIN"
+                style={{
+                  height: '46px',
+                  borderRadius: '14px',
+                  fontWeight: 600,
+                  fontSize: '0.9rem',
+                }}
+              >
+                <CheckIcon size={16} />
+                <span>Confirm PIN</span>
+              </Button>
+            </div>
           )}
         </div>
 
