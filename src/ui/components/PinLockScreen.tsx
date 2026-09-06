@@ -209,28 +209,37 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             marginBottom: '1.75rem',
             minHeight: '24px',
           }}
-          aria-label={`${pin.length} of ${displayLength} digits entered`}
+          aria-label={`${pin.length} digits entered`}
         >
-          {Array.from({ length: displayLength }).map((_, idx) => {
-            const isFilled = idx < pin.length;
-            return (
+          {pin.length === 0 ? (
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--veil-text-muted)',
+                letterSpacing: '0.04em',
+                fontWeight: 500,
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              Enter PIN
+            </div>
+          ) : (
+            Array.from({ length: pin.length }).map((_, idx) => (
               <div
                 key={idx}
                 style={{
-                  width: '12px',
-                  height: '12px',
+                  width: '14px',
+                  height: '14px',
                   borderRadius: '50%',
-                  backgroundColor: isFilled ? 'var(--veil-accent-primary)' : 'transparent',
-                  border: isFilled
-                    ? '1px solid var(--veil-accent-primary)'
-                    : '2px solid rgba(255, 255, 255, 0.25)',
-                  boxShadow: isFilled ? '0 0 8px var(--veil-accent-glow)' : 'none',
-                  transition: 'all 0.15s ease',
-                  transform: isFilled ? 'scale(1.2)' : 'scale(1)',
+                  backgroundColor: 'var(--veil-accent-primary)',
+                  boxShadow: '0 0 10px var(--veil-accent-glow)',
+                  animation: 'veil-pin-dot-pop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 }}
               />
-            );
-          })}
+            ))
+          )}
         </div>
 
         {/* Error Alert */}

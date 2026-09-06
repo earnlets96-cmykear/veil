@@ -27,6 +27,8 @@ export interface MessageBubbleProps {
   onReplyTrigger?: () => void;
   attachmentElement?: ReactNode;
   voiceElement?: ReactNode;
+  reactions?: Array<{ emoji: string; count: number; userReacted?: boolean }>;
+  onReactionClick?: (emoji: string) => void;
   isSelected?: boolean;
   isSelectionMode?: boolean;
   onSelectToggle?: () => void;
@@ -54,6 +56,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onReplyTrigger,
   attachmentElement,
   voiceElement,
+  reactions,
+  onReactionClick,
   isSelected = false,
   isSelectionMode = false,
   onSelectToggle,
@@ -280,6 +284,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <MessageTimestamp timestamp={timestamp} />
           {isOutgoing && <MessageStatus status={effectiveStatus} />}
         </div>
+
+        {reactions && reactions.length > 0 && (
+          <div className="veil-message-reactions" role="group" aria-label="Reactions">
+            {reactions.map((r, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`veil-reaction-pill ${r.userReacted ? 'user-reacted' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReactionClick?.(r.emoji);
+                }}
+                aria-label={`Reaction ${r.emoji} count ${r.count}`}
+              >
+                <span className="veil-reaction-emoji">{r.emoji}</span>
+                <span className="veil-reaction-count">{r.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

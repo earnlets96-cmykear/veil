@@ -1569,38 +1569,64 @@
 /* Telegram-Inspired Settings Modal */
 .veil-settings-modal-container {
   width: 100%;
-  max-width: 560px;
-  height: 85vh;
-  max-height: 760px;
+  max-width: 620px;
+  height: 88vh;
+  max-height: 820px;
   background-color: var(--veil-bg-surface);
   border: 1px solid var(--veil-border);
-  border-radius: var(--veil-radius-xl);
+  border-radius: var(--veil-radius-2xl, 24px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
-  animation: veil-modal-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
+  animation: veil-modal-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 768px) {
+  .veil-modal-overlay:has(.veil-settings-modal-container) {
+    padding: 0 !important;
+  }
+  .veil-settings-modal-container {
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    animation: veil-slide-up-mobile 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .veil-settings-modal-header {
+    padding-top: max(var(--veil-space-3), env(safe-area-inset-top, 0px)) !important;
+  }
+  .veil-settings-modal-body {
+    padding-bottom: max(var(--veil-space-4), env(safe-area-inset-bottom, 0px)) !important;
+  }
 }
 
 .veil-settings-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--veil-space-3) var(--veil-space-4);
+  padding: 0.85rem 1.25rem;
   border-bottom: 1px solid var(--veil-border);
   background: var(--veil-bg-surface);
+  flex-shrink: 0;
 }
 
 .veil-settings-header-title {
-  font-size: var(--veil-text-base);
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--veil-text-primary);
+  letter-spacing: -0.01em;
 }
 
 .veil-settings-modal-body {
   flex: 1;
   overflow-y: auto;
-  padding: var(--veil-space-4);
+  padding: 1.25rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .veil-settings-overview {
@@ -1731,6 +1757,29 @@
   display: flex;
   flex-direction: column;
   gap: var(--veil-space-3);
+  animation: veil-settings-subpage-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes veil-settings-subpage-enter {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes veil-slide-up-mobile {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .veil-settings-form {

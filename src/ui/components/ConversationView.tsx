@@ -82,6 +82,8 @@ interface ConversationMessageRowProps {
   isSelected: boolean;
   isSelectionMode: boolean;
   isHighlighted: boolean;
+  isGroupedWithPrevious?: boolean;
+  isGroupedWithNext?: boolean;
   downloadingAttachmentId: string | null;
   playbackProgress: Record<string, number>;
   playbackCurrentTime: Record<string, number>;
@@ -105,6 +107,8 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   isSelected,
   isSelectionMode,
   isHighlighted,
+  isGroupedWithPrevious,
+  isGroupedWithNext,
   downloadingAttachmentId,
   playbackProgress,
   playbackCurrentTime,
@@ -363,6 +367,9 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               onReplyClick={onJumpToMessage}
               onReplyTrigger={() => onReplyTrigger(msg)}
               onRetry={onRetry ? () => onRetry(msg) : undefined}
+              isGroupedWithPrevious={isGroupedWithPrevious}
+              isGroupedWithNext={isGroupedWithNext}
+              reactions={(msg as any).reactions}
             />
           )}
         </div>
@@ -1055,6 +1062,10 @@ export const ConversationView: React.FC = () => {
             const isUnreadFirst = index === firstUnreadIndex;
             const isSelected = selectedMessageIds.has(msg.id);
             const isHighlighted = highlightedMessageId === msg.id;
+            const prevMsg = index > 0 ? activeMessages[index - 1] : null;
+            const nextMsg = index < activeMessages.length - 1 ? activeMessages[index + 1] : null;
+            const isGroupedWithPrevious = Boolean(prevMsg && prevMsg.isOutgoing === msg.isOutgoing && Math.abs(msg.timestamp - prevMsg.timestamp) < 60000);
+            const isGroupedWithNext = Boolean(nextMsg && nextMsg.isOutgoing === msg.isOutgoing && Math.abs(nextMsg.timestamp - msg.timestamp) < 60000);
 
             return (
               <ConversationMessageRow
@@ -1064,6 +1075,8 @@ export const ConversationView: React.FC = () => {
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}
                 isHighlighted={isHighlighted}
+                isGroupedWithPrevious={isGroupedWithPrevious}
+                isGroupedWithNext={isGroupedWithNext}
                 downloadingAttachmentId={downloadingAttachmentId}
                 playbackProgress={playbackProgress}
                 playbackCurrentTime={playbackCurrentTime}

@@ -2315,7 +2315,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             for (const k of keys) {
               updated[k] = list;
             }
-            store.setAsync(activeSession, 'veil:ui:messages', updated);
+            if (status === 'SENT' || status === 'FAILED') {
+              store.setAsync(activeSession, 'veil:ui:messages', updated);
+            }
             return updated;
           });
         };
@@ -2331,6 +2333,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             currentAtt.state = 'UPLOADING';
             updateTimeline(activeAttachments, 'UPLOADING');
 
+            // Yield to browser UI thread to maintain 60 FPS responsiveness
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
             try {
               MediaLogger.log({
                 event: 'R2_UPLOAD_STARTED',
@@ -2340,6 +2345,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
 
               const fileBytes = new Uint8Array(await file.arrayBuffer());
+
+              // Yield before SHA-256 computation
+              await new Promise((resolve) => setTimeout(resolve, 0));
 
               // Pre-cache staging bytes for immediate inline rendering
               MediaCache.set(currentAtt.attachmentId, {

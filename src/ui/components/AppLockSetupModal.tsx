@@ -291,28 +291,38 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
             justifyContent: 'center',
             gap: '12px',
             marginBottom: '1.5rem',
+            minHeight: '24px',
           }}
         >
-          {Array.from({ length: pinLength }).map((_, idx) => {
-            const isFilled = idx < activePin.length;
-            return (
+          {activePin.length === 0 ? (
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--veil-text-muted)',
+                letterSpacing: '0.04em',
+                fontWeight: 500,
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              Enter {pinLength}-digit PIN
+            </div>
+          ) : (
+            Array.from({ length: activePin.length }).map((_, idx) => (
               <div
                 key={idx}
                 style={{
-                  width: '12px',
-                  height: '12px',
+                  width: '14px',
+                  height: '14px',
                   borderRadius: '50%',
-                  backgroundColor: isFilled ? 'var(--veil-accent-primary)' : 'transparent',
-                  border: isFilled
-                    ? '1px solid var(--veil-accent-primary)'
-                    : '2px solid rgba(255, 255, 255, 0.25)',
-                  boxShadow: isFilled ? '0 0 8px var(--veil-accent-glow)' : 'none',
-                  transition: 'all 0.15s ease',
-                  transform: isFilled ? 'scale(1.2)' : 'scale(1)',
+                  backgroundColor: 'var(--veil-accent-primary)',
+                  boxShadow: '0 0 10px var(--veil-accent-glow)',
+                  animation: 'veil-pin-dot-pop 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                 }}
               />
-            );
-          })}
+            ))
+          )}
         </div>
 
         {/* Error Notification */}

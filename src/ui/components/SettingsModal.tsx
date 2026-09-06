@@ -293,6 +293,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               {activeCategory === 'profile' && 'My Profile'}
               {activeCategory === 'account' && 'Account & Identity'}
               {activeCategory === 'privacy' && 'Privacy & Security'}
+              {activeCategory === 'securityOptions' && 'Security Options'}
               {activeCategory === 'appLock' && 'App Lock & PIN'}
               {activeCategory === 'appearance' && 'Appearance'}
               {activeCategory === 'notifications' && 'Notifications'}
@@ -323,18 +324,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                   if (e.key === 'Enter' || e.key === ' ') setActiveCategory('profile');
                 }}
               >
-                <Avatar
-                  name={displayNameInput || activeSession?.name || 'User'}
-                  imageUrl={avatarPreview || undefined}
-                  size="xl"
-                  aria-label="Profile Avatar"
-                />
+                <div style={{ position: 'relative' }}>
+                  <Avatar
+                    name={displayNameInput || activeSession?.name || 'User'}
+                    imageUrl={avatarPreview || undefined}
+                    size="xl"
+                    aria-label="Profile Avatar"
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--veil-accent-primary)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                      border: '2px solid var(--veil-bg-surface-elevated)',
+                    }}
+                    title="Edit profile"
+                  >
+                    <UserIcon size={12} />
+                  </div>
+                </div>
                 <div className="veil-settings-profile-info">
                   <div className="veil-settings-profile-name">
                     {displayNameInput || activeSession?.name || 'Active User'}
                   </div>
                   <div className="veil-settings-profile-handle">
-                    {myProfile?.username ? `@${myProfile.username}` : 'No username set (Tap to configure)'}
+                    {myProfile?.username ? `@${myProfile.username}` : 'Tap to set username'}
                   </div>
                   <div className="veil-settings-profile-space">
                     <span className="veil-status-dot online" />

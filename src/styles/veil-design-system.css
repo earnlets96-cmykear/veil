@@ -11,7 +11,38 @@
 *,
 *::before,
 *::after {
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.veil-filter-pill,
+.veil-pill,
+.veil-btn-pill,
+.veil-mode-toggle-btn,
+button.veil-filter-pill,
+button.veil-pill {
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  clip-path: inset(0 round 9999px) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  user-select: none !important;
+  outline: none !important;
+}
+
+@keyframes veil-pin-dot-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 :root {
@@ -870,15 +901,15 @@ body {
 }
 
 .veil-message-bubble {
-  max-width: 100%;
+  max-width: 82%;
   width: fit-content;
-  padding: var(--veil-msg-padding-y, 0.55rem) var(--veil-msg-padding-x, 0.8rem);
-  border-radius: var(--veil-radius-lg);
-  font-size: var(--veil-msg-font-size, var(--veil-text-sm));
-  line-height: 1.4;
+  padding: 0.62rem 0.95rem;
+  border-radius: 18px;
+  font-size: var(--veil-msg-font-size, 0.9375rem);
+  line-height: 1.45;
   position: relative;
   word-break: break-word;
-  box-shadow: var(--veil-shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   display: inline-block;
   overflow-wrap: break-word;
 }
@@ -892,9 +923,9 @@ body {
 
 .veil-message-row.incoming .veil-message-bubble,
 .veil-message-bubble.incoming {
-  background-color: var(--veil-bubble-incoming, var(--veil-bg-surface-elevated));
+  background-color: var(--veil-bubble-incoming, #161922);
   color: var(--veil-bubble-incoming-text, var(--veil-text-primary));
-  border: 1px solid var(--veil-border);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   border-bottom-left-radius: 4px;
 }
 
@@ -911,6 +942,52 @@ body {
   float: right;
   margin-left: 0.6rem;
   line-height: 1.3;
+}
+
+/* Reactions Tray & Pills */
+.veil-message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.veil-reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  clip-path: inset(0 round 9999px);
+  -webkit-tap-highlight-color: transparent;
+  color: var(--veil-text-primary);
+}
+
+.veil-reaction-pill:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}
+
+.veil-reaction-pill.user-reacted {
+  background-color: var(--veil-accent-primary-alpha, rgba(20, 184, 166, 0.25));
+  border-color: var(--veil-accent-primary, #14b8a6);
+}
+
+.veil-reaction-emoji {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.veil-reaction-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 /* Mobile-First Message Composer */

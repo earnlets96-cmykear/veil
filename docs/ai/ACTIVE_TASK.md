@@ -1,6 +1,41 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 63 — DEEP AUTHENTICATION, APP LOCK, NAVIGATION & PERFORMANCE REPAIR
+## Active Phase: PHASE 64 — SETTINGS REDESIGN, CHAT UI POLISH, MEDIA PERFORMANCE & DYNAMIC PIN UX
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+- **Branch**: `main`
+- **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 64 Audit, Polish & Acceptance Tasks:
+- [x] **Settings Redesign (`src/ui/components/SettingsModal.tsx`, `src/styles/veil-components.css`)**:
+  - Upgraded Profile card with edit profile badge (`title="Edit profile"`, `UserIcon`, clean layout).
+  - Added clean category headers (`ACCOUNT`, `PRIVACY & SECURITY`, `APP SETTINGS`, `ABOUT`).
+  - Added `securityOptions` header title mapping for all subpages.
+  - Implemented responsive full-screen modal container on mobile (`100vw`, `100dvh`, zero border-radius, top/bottom safe-area padding).
+  - Added smooth transition animations (`veil-settings-subpage-enter`, `veil-slide-up-mobile`).
+- [x] **Chat UI Redesign (`src/ui/components/ui/MessageBubble.tsx`, `src/styles/veil-design-system.css`, `src/ui/components/ConversationView.tsx`)**:
+  - Updated message bubble geometry to 18px radius with 82% max-width and modern charcoal surface (`#161922`).
+  - Implemented consecutive message grouping logic (< 60s from same sender) reducing gaps to 3px.
+  - Added interactive reaction pills (`.veil-reaction-pill`) with animated entry and user-reacted accent highlighting.
+  - Preserved clean 56px header without fake call buttons and streamlined capsule composer.
+- [x] **Media Performance Optimization (`src/ui/app/AppState.tsx`)**:
+  - Eliminated UI freezing during large file uploads by introducing async yielding (`await new Promise((r) => setTimeout(r, 0))`) before `file.arrayBuffer()` and before SHA-256 chunk hashing.
+  - Throttled IndexedDB message persistence in `sendAttachments`: updates only trigger full storage writes upon terminal states (`SENT` or `FAILED`), eliminating redundant writes on every chunk progress event.
+- [x] **Voice Message Experience (`src/ui/components/ui/VoiceNoteCard.tsx`, `src/attachments/voicePlayer.ts`)**:
+  - Full recording, sending, receiving, play, pause, seek, and replay-on-ended lifecycle verified.
+  - Direct pointer capture and duration-aware scrubber calculations.
+- [x] **PIN UX: Pure Dynamic Dot Indicators (`src/ui/components/PinLockScreen.tsx`, `src/ui/components/AppLockSetupModal.tsx`)**:
+  - Eliminated static empty circles completely.
+  - When empty, displays clean placeholder ("Enter PIN" or "Enter {pinLength}-digit PIN").
+  - As digits are entered, renders strictly `pin.length` dots with `veil-pin-dot-pop` scale animation.
+  - Supported 4 and 6 digits without premature auto-submission on 4 digits; explicit Enter/OK submissions.
+- [x] **Oval Touch Feedback & Zero Rectangular Highlights (`src/styles/veil-design-system.css`)**:
+  - Applied `clip-path: inset(0 round 9999px) !important;` and `-webkit-tap-highlight-color: transparent !important;` to all filter pills and capsule buttons, ensuring zero rectangular tap artifacts on mobile WebViews.
+- [x] **Privacy & Anti-Enumeration Preserved (`src/ui/components/LockScreen.tsx`, `src/ui/components/PinLockScreen.tsx`)**:
+  - Zero disclosure of space count, space names, or registered accounts to unauthenticated users.
+- [x] **Automated Acceptance Suite (`tests/phase64-audit-and-polish.test.tsx`)**:
+  - 10/10 tests passing covering all 8 audit points.
+
+## Previous Phase: PHASE 63 — DEEP AUTHENTICATION, APP LOCK, NAVIGATION & PERFORMANCE REPAIR
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`

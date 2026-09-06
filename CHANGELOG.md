@@ -2,6 +2,36 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase64-audit-and-polish] - 2026-09-06
+
+### Settings Redesign, Chat UI Polish, Media Performance & Dynamic PIN UX (Phase 64)
+- **Settings Experience Redesign**:
+  - Upgraded Profile Card with an interactive avatar edit badge (`title="Edit profile"`, `UserIcon`, clean typography, status indicator).
+  - Organized settings into grouped cards with clear category headers (`ACCOUNT`, `PRIVACY & SECURITY`, `APP SETTINGS`, `ABOUT`).
+  - Added full mobile responsive experience: on mobile devices (`max-width: 768px`), Settings opens full-screen (`100vw`, `100dvh`, zero border-radius, top/bottom safe-area padding).
+  - Added smooth transition animations (`veil-settings-subpage-enter`, `veil-slide-up-mobile`).
+- **Chat UI Redesign & Geometry Polish**:
+  - Redesigned message bubbles with 18px border radius, 82% max-width, modern padding (`10px 14px`), and deep charcoal background (`#161922`) for incoming messages.
+  - Implemented consecutive message grouping logic: consecutive messages from the same sender within 60s tighten vertical gap to 3px and adjust curvature.
+  - Added interactive reaction pills (`.veil-reaction-pill`) with animated entry, emoji display, count badge, and user-reacted accent styling.
+  - Retained clean 56px conversation header without fake call buttons and capsule composer.
+- **Media Performance Optimization**:
+  - Eliminated UI freezing during large file/video/audio encryption and upload by introducing event loop yielding (`setTimeout(r, 0)`) before reading array buffers and computing SHA-256 chunk digests.
+  - Throttled IndexedDB message persistence during uploads in `sendAttachments`: writes only occur on terminal states (`SENT` or `FAILED`), eliminating redundant serialization overhead during chunk progress events.
+- **Pure Dynamic PIN Dot Indicators**:
+  - Eliminated static empty circle outlines from `PinLockScreen.tsx` and `AppLockSetupModal.tsx`.
+  - When no digits are entered, displays clean placeholder ("Enter PIN" or "Enter {pinLength}-digit PIN").
+  - As digits are entered, renders strictly `pin.length` dots with popping scale animation (`veil-pin-dot-pop`).
+  - Preserved 4 and 6 digit support without premature 4-digit auto-submission; explicit OK/Enter triggers submission.
+- **Oval Touch Feedback & Zero Rectangular Highlights**:
+  - Applied `clip-path: inset(0 round 9999px) !important;` and `-webkit-tap-highlight-color: transparent !important;` to all filter pills and capsule buttons to prevent rectangular gray tap highlights on Android WebViews.
+- **Privacy & Anti-Enumeration Preserved**:
+  - Ensured unauthenticated users cannot discover space count, space names, or registered accounts.
+- **Automated Verification & Artifacts**:
+  - Created `tests/phase64-audit-and-polish.test.tsx` (10/10 tests passing).
+  - All regression suites passing (`phase63`, `phase62`, `applock-multi-space-pin`, `voice`).
+  - Generated production Web build (`npm run build`, 7 artifacts) and compiled Android debug APK (7.38 MB).
+
 ## [1.0.0-phase63-deep-repair] - 2026-09-06
 
 ### Deep Authentication, App Lock, Navigation & Performance Repair (Phase 63)
