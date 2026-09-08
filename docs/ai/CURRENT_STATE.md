@@ -1,20 +1,23 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+## Current Verified Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
-  - Phase 68 Profile Polish & Image Cropper Suite: `tests/phase68-profile-and-cropper.test.tsx` (7/7 passed in 14ms).
-  - Phase 68 Real-World Forwarding Acceptance Suite: `tests/phase68-real-world-forwarding.test.tsx` (11/11 passed in 791ms with 2 real clients + live RelayServer).
-  - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed in 46ms).
-  - Phase 58 Real Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed).
-  - Phase 44A Icon Audit & Layout Suite: `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed in 33ms).
-  - Phase 31 Main Chat UI Modernization Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 48ms).
-  - Phase 64 Audit & Polish Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed in 62ms).
-  - Phase 45E Reply UI Rendering Suite: `tests/phase45e-reply-rendering.test.tsx` (3/3 passed in 27ms).
-  - Phase 37 Android Layout Regression Suite: `tests/phase37-android-layout.test.ts` (9/9 passed in 15ms).
-  - Phase 65 Reactions & Contextual Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 321ms).
-  - Web App Production Build: `npm run build` succeeds cleanly in 2.24s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
-  - Android Debug APK: Built cleanly via `gradlew assembleDebug` (22s), verified in `release/v1.0.0/app-debug.apk`.
+  - Phase 69 Chat UX Enhancement Suite: `tests/phase69-chat-ux-enhancements.test.tsx` (10/10 passed in 50ms).
+  - Phase 68 Chat Bubbles & Context Menu Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed in 47ms).
+  - Phase 63 Voice & Audio System Suite: `tests/phase63-deep-repair.test.tsx` (10/10 passed in 214ms).
+  - Phase 31 Main Chat UI Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 50ms).
+  - Phase 37 Mobile Layout Suite: `tests/phase37-mobile-layout.test.tsx` (2/2 passed in 21ms).
+  - Web App Production Build: `npm run build` succeeds cleanly with 0 TypeScript errors.
+- **Architectural Enhancements**:
+  1. **Audio UI Speed Controls & Loading Animation**: Added 1x/1.5x/2x cycle toggle in `VoiceNoteCard`, pulse glow animation during loading, and waveform bar classes.
+  2. **Transfer Progress Circles**: SVG radial `ProgressCircle` showing percentage, dynamic stroke offset, and byte counts during media and file transfers.
+  3. **Save-to-Gallery with Permission Handling**: Native `saveToGallery()` targeting `Pictures/VEIL` and `DCIM/VEIL` with native media scan intent and fallback share sheet.
+  4. **Message Editing**: Full pipeline with `UIMessage.edited`/`editedAt`, `AppState.editMessage()`, `MessageComposer` edit mode, and `(edited)` indicator.
+  5. **Tap Across Message Context Menu**: Instant click-to-open on message rows with edge-safe viewport bounds clamping.
+  6. **Smart Emoji Reactions & Full Categorized Modal**: Dynamic recent reaction bar with high-contrast expand button and 8-category `EmojiPickerModal`.
+
+## Previous Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 - **Root Cause Analyses & Architectural Fixes**:
   1. **1-to-1 Chat Bubble Omissions (Sender Name & Avatar)**:
      - In 1-to-1 / P2P conversations, both the sender display name (`showSenderName={false}`) and the 28px incoming message avatar container are completely omitted because the conversation header already identifies the peer. Incoming bubbles align cleanly to the left edge.

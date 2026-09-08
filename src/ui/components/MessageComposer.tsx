@@ -18,12 +18,27 @@ import {
   CloseIcon,
   StopIcon,
   CheckIcon,
+  EditIcon,
 } from './icons/index.ts';
 import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
 import { PermissionsModal } from './PermissionsModal.tsx';
 
-export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversationId }) => {
+import type { UIMessage } from '../app/types.ts';
+
+interface MessageComposerProps {
+  conversationId: string;
+  editingMessage?: UIMessage | null;
+  onCancelEdit?: () => void;
+  onConfirmEdit?: (newText: string) => void;
+}
+
+export const MessageComposer: React.FC<MessageComposerProps> = ({
+  conversationId,
+  editingMessage = null,
+  onCancelEdit,
+  onConfirmEdit,
+}) => {
   const {
     sendMessage,
     sendAttachment,
@@ -63,12 +78,33 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
       textareaRef.current.style.height = 'auto';
     }
 
+    // If editing, confirm the edit instead of sending a new message
+    if (editingMessage && onConfirmEdit) {
+      onConfirmEdit(msgText);
+      return;
+    }
+
     // Fire-and-forget: AppState optimistically displays the message in 0ms
     // while Double Ratchet encryption and relay transport proceed in the background.
     sendMessage(conversationId, msgText).catch((_err) => {
       // Offline queue preserves message
     });
   };
+
+  // Pre-fill text when entering edit mode
+  React.useEffect(() => {
+    if (editingMessage && editingMessage.text) {
+      setText(editingMessage.text);
+      // Auto-focus and resize textarea
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+        }
+      }, 50);
+    }
+  }, [editingMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Send on Enter (without Shift) on desktop; allow normal newline on mobile keyboards
@@ -236,8 +272,59 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
         />
       )}
 
+      {/* Editing Message Banner */}
+      {editingMessage && (
+        <div
+          className="veil-edit-banner"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 14px',
+            background: 'rgba(20, 184, 166, 0.08)',
+            borderLeft: '3px solid var(--veil-accent-primary, #14b8a6)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          }}
+        >
+          <EditIcon size={14} color="var(--veil-accent-primary)" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--veil-accent-primary)', marginBottom: '2px' }}>Editing message</div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--veil-text-secondary, rgba(255,255,255,0.6))',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {editingMessage.text}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (onCancelEdit) onCancelEdit();
+              setText('');
+              if (textareaRef.current) textareaRef.current.style.height = 'auto';
+            }}
+            style={{
+              appearance: 'none',
+              background: 'none',
+              border: 'none',
+              color: 'var(--veil-text-secondary)',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: '4px',
+              display: 'inline-flex',
+            }}
+            aria-label="Cancel edit"
+          >
+            <CloseIcon size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Quoted Message Reply Banner */}
-      {replyTarget && (
+      {replyTarget && !editingMessage && (
         <ReplyPreview
           replyTo={{
             ...resolveReplyReference(replyTarget, selfName, peerName)!,
@@ -347,10 +434,11 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
               className="veil-btn-composer-send"
               onClick={handleSend}
               disabled={!text.trim()}
-              aria-label="Send Message"
-              title="Send Message"
+              aria-label={editingMessage ? 'Confirm Edit' : 'Send Message'}
+              title={editingMessage ? 'Confirm Edit' : 'Send Message'}
+              style={editingMessage ? { background: 'var(--veil-accent-primary, #14b8a6)' } : undefined}
             >
-              <SendIcon size={18} color="#ffffff" />
+              {editingMessage ? <CheckIcon size={18} color="#ffffff" /> : <SendIcon size={18} color="#ffffff" />}
             </button>
           </>
         )}

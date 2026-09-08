@@ -28,3 +28,5 @@ export * from './MessageTimestamp.tsx';
 export * from './UserSearchResult.tsx';
 export * from './LoadingSpinner.tsx';
 export * from './AvatarCropModal.tsx';
+export * from './ProgressCircle.tsx';
+export * from './EmojiPickerModal.tsx';

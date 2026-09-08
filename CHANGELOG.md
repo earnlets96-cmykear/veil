@@ -2,6 +2,35 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase69-chat-ux-enhancements] - 2026-09-08
+
+### Chat UX Enhancements: Audio Speed Toggle, Progress Circle, Gallery Saving, Message Editing, Tap Context & Smart Emojis (Phase 69)
+- **Audio UI Polish & Speed Controls**:
+  - Added playback speed toggle pill (`1x / 1.5x / 2x`) in `VoiceNoteCard.tsx`.
+  - Added pulse glow animation on play button during loading states.
+  - Added `veil-waveform-bar` and `active` classes with smooth CSS transitions.
+- **Progress Circle for Media & File Transfers**:
+  - Implemented `ProgressCircle.tsx` SVG radial progress component with animated stroke dashoffset, percentage text, and subtle byte counters.
+  - Integrated ProgressCircle into `AttachmentCard.tsx` during upload and download states.
+  - Added radial progress overlay on decrypted media thumbnails in `ConversationView.tsx`.
+  - Added progressive download stage tracking in `handleDownloadAttachment`.
+- **Save-to-Gallery with Permission Handling**:
+  - Added `FileSaver.saveToGallery()` targeting `Pictures/VEIL` for images and `DCIM/VEIL` for videos.
+  - Added fallback to native share sheet dialog (`dialogTitle: Save image/video to Gallery`).
+  - Automatically routes image and video downloads to gallery in `ConversationView.tsx`.
+- **Message Editing with "(edited)" Indicator**:
+  - Added `edited?: boolean` and `editedAt?: number` to `UIMessage`.
+  - Implemented `AppState.editMessage()` with persistent encrypted storage updates.
+  - Added edit mode to `MessageComposer.tsx` with top editing banner, cancel button, and checkmark confirmation.
+  - Added subtle italic `edited` tag next to message timestamps.
+- **Tap Across Message Field to Open Context Menu**:
+  - Allowed users to tap anywhere on a message bubble or row to open the floating context menu.
+  - Added dynamic viewport edge protection measuring the rendered menu via `contextMenuRef` and re-clamping.
+- **Smart Emoji Reaction Bar & Categorized Modal**:
+  - Quick reaction bar dynamically tracks and displays user's top recent emojis (`veil:ui:recentEmojis`).
+  - Added high-contrast expand button with `ChevronRightIcon`.
+  - Implemented `EmojiPickerModal.tsx` categorized grid (Smileys, Emotions, Hearts, Hands, Animals, Food, Objects, Symbols).
+
 ## [1.0.0-phase68-chat-ui-polish] - 2026-09-08
 
 ### Chat UI Polish: Message Bubbles, Action Row Alignment, P2P Sender Omission & Forwarding Pipeline (Phase 68)

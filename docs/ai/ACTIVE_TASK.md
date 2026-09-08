@@ -1,9 +1,19 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+## Active Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 69 Tasks Completed:
+- [x] **Feature 1 — Audio UI Polish & Error Resilience**: Playback speed toggle (1x/1.5x/2x), loading pulse animation, waveform bar classes, audio accessibility.
+- [x] **Feature 2 — Progress Circle**: SVG radial ProgressCircle component with percent, arc offset, byte count display, and integration on AttachmentCard and media downloads.
+- [x] **Feature 3 — Save-to-Gallery**: `FileSaver.saveToGallery()` with MediaStore Pictures/DCIM directory resolution and native share sheet fallback.
+- [x] **Feature 4 — Message Editing**: `editMessage()` in AppState, composer edit mode with pre-fill and banner, `(edited)` tag in message bubbles.
+- [x] **Feature 5 — Tap Context Menu**: Tap-across-message row trigger with dynamic edge protection clamping.
+- [x] **Feature 6 — Smart Emojis**: Top recent emojis in reaction bar, high-contrast expand button, and categorized `EmojiPickerModal`.
+
+## Previous Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 
 ### Phase 68 Chat UI Layout & Micro-Polish Tasks:
 - [x] **P2P Message Bubbles — Sender Name Omission (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:

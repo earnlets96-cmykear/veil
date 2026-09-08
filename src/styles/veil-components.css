@@ -2026,3 +2026,115 @@
   justify-content: center;
   gap: 4px;
 }
+
+/* =========================================================================
+   PHASE 69 — CHAT UX ENHANCEMENT STYLES
+   ========================================================================= */
+
+/* --- Emoji Expand Button (High Contrast Arrow) --- */
+.veil-emoji-expand-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--veil-accent-primary, #14b8a6);
+  border: none;
+  outline: none;
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 4px rgba(20, 184, 166, 0.3);
+}
+
+.veil-emoji-expand-btn:hover {
+  transform: scale(1.08);
+  background: var(--veil-accent-primary-hover, #0d9488);
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.4);
+}
+
+.veil-emoji-expand-btn:active {
+  transform: scale(0.95);
+}
+
+/* --- Emoji Picker Modal Animations --- */
+@keyframes veilSlideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.veil-emoji-picker-modal {
+  animation: veilSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Emoji grid button hover */
+.veil-emoji-picker-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: scale(1.15);
+}
+
+.veil-emoji-picker-btn:active {
+  transform: scale(0.9) !important;
+}
+
+/* --- Edited Tag --- */
+.veil-edited-tag {
+  color: var(--veil-text-muted, rgba(255, 255, 255, 0.45));
+  user-select: none;
+}
+
+/* --- Edit Banner --- */
+.veil-edit-banner {
+  animation: veilFadeIn 0.15s ease-out;
+}
+
+/* --- Voice Note Speed Button --- */
+.veil-voicenote-speed-btn:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.veil-voicenote-speed-btn:active {
+  transform: scale(0.92);
+}
+
+/* --- Progress Circle Overlay --- */
+.veil-progress-circle-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* --- Context Menu max-height on small screens --- */
+@media (max-height: 600px) {
+  .veil-context-menu {
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* --- Voice note card smooth transitions --- */
+.veil-voicenote-card {
+  transition: opacity 0.2s ease;
+}
+
+.veil-voicenote-play-btn:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.veil-voicenote-play-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}

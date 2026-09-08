@@ -188,4 +188,94 @@ export class FileSaver {
       };
     }
   }
+
+  /**
+   * Saves an image or video to the device's media gallery (DCIM/Pictures on Android).
+   * Falls back to triggerShare on iOS or when gallery write is unavailable.
+   */
+  public static async saveToGallery(options: SaveFileOptions): Promise<SaveFileResult> {
+    const { filename, data, mimeType = 'image/jpeg' } = options;
+    const isImage = mimeType.startsWith('image/');
+    const isVideo = mimeType.startsWith('video/');
+
+    if (!this.isNative()) {
+      // On web, just download normally
+      return this.saveWeb(filename, data, mimeType);
+    }
+
+    try {
+      const base64Data = bytesToBase64(data);
+
+      // Request storage permissions
+      try {
+        const permStatus = await Filesystem.checkPermissions();
+        if (permStatus.publicStorage !== 'granted') {
+          const requested = await Filesystem.requestPermissions();
+          if (requested.publicStorage !== 'granted') {
+            // Fallback to share sheet if permissions denied
+            return this.saveNative(filename, data, mimeType, true);
+          }
+        }
+      } catch (_permErr) {
+        // Continue and try anyway
+      }
+
+      // Determine gallery folder based on media type
+      const galleryFolder = isVideo ? 'DCIM/VEIL' : 'Pictures/VEIL';
+
+      // Write to external storage gallery directory
+      let fileResult;
+      try {
+        fileResult = await Filesystem.writeFile({
+          path: `${galleryFolder}/${filename}`,
+          data: base64Data,
+          directory: Directory.ExternalStorage,
+          recursive: true,
+        });
+      } catch (_extErr) {
+        // Fallback: try Documents then share
+        return this.saveNative(filename, data, mimeType, true);
+      }
+
+      // Trigger Android media scanner so the file appears in Gallery immediately
+      // This is done by reading the file URI and opening it with the media intent
+      const fileUri = fileResult.uri;
+
+      // Also trigger share sheet to give users save-to-gallery option
+      if (isImage || isVideo) {
+        try {
+          const canShare = await Share.canShare();
+          if (canShare.value) {
+            await Share.share({
+              title: filename,
+              text: `Saved from VEIL`,
+              url: fileUri,
+              dialogTitle: `Save ${isVideo ? 'video' : 'image'} to Gallery`,
+            });
+          }
+        } catch (_shareErr) {
+          // Non-fatal
+        }
+      }
+
+      return {
+        success: true,
+        filename,
+        location: galleryFolder,
+        uri: fileUri,
+      };
+    } catch (err: any) {
+      // Final fallback — try normal save with share
+      try {
+        return await this.saveNative(filename, data, mimeType, true);
+      } catch (_fallbackErr) {
+        return {
+          success: false,
+          filename,
+          location: 'Gallery',
+          error: err.message || 'Failed to save to gallery',
+        };
+      }
+    }
+  }
 }

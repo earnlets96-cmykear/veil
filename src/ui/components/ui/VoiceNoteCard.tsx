@@ -59,6 +59,8 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const [localDuration, setLocalDuration] = useState(durationSeconds);
   const isScrubbingRef = useRef(false);
   const trackRef = useRef<HTMLDivElement>(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const SPEED_OPTIONS = [1, 1.5, 2];
 
   // Generate waveform bars once per messageId
   const waveformBars = useMemo(() => generateWaveformBars(messageId, BAR_COUNT), [messageId]);
@@ -99,8 +101,8 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const isLocalError = localStatus === 'error';
   const isError = isPropError || isLocalError;
   const isLoading = propPlaybackState === 'loading' || localStatus === 'loading';
-  const isPlaying = localStatus === 'playing' || (!messageId && propPlaybackState === 'playing');
-  const isPaused = localStatus === 'paused' || (!messageId && propPlaybackState === 'paused');
+  const isPlaying = localStatus === 'playing' || propPlaybackState === 'playing';
+  const isPaused = localStatus === 'paused' || propPlaybackState === 'paused';
 
   const formatDuration = (sec: number) => {
     const safeSec = Math.max(0, Math.floor(sec || 0));
@@ -214,11 +216,24 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
 
   const totalDisplay = isPlaying || isPaused ? formatDuration(effectiveDuration) : '';
 
+  const handleSpeedCycle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const currentIdx = SPEED_OPTIONS.indexOf(playbackSpeed);
+    const nextSpeed = SPEED_OPTIONS[(currentIdx + 1) % SPEED_OPTIONS.length];
+    setPlaybackSpeed(nextSpeed);
+    // Apply speed to VoicePlayer's HTMLAudioElement
+    try {
+      const audio = (VoicePlayer as any).currentAudio as HTMLAudioElement | null;
+      if (audio) audio.playbackRate = nextSpeed;
+    } catch {}
+  };
+
   return (
     <div
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
       role="region"
-      aria-label={`${isOutgoing ? 'Sent' : 'Received'} voice message`}
+      aria-label={`${isOutgoing ? 'Sent' : 'Received'} Audio message voice note`}
       onClick={stopAllEvents}
       onDoubleClick={stopAllEvents}
       onContextMenu={stopAllEvents}
@@ -313,6 +328,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
             cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
             flexShrink: 0,
             transition: 'transform 0.15s ease, background-color 0.15s ease',
+            animation: isLoading ? 'veilPulse 1.4s infinite' : undefined,
           }}
         >
           {isUploading || isLoading ? (
@@ -352,6 +368,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
             return (
               <div
                 key={i}
+                className={`veil-waveform-bar ${isFilled && isActive ? 'active' : ''}`.trim()}
                 style={{
                   flex: '1 1 0',
                   height: `${height * 100}%`,
@@ -403,6 +420,36 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
             >
               {totalDisplay}
             </span>
+          )}
+          {/* Playback Speed Toggle */}
+          {(isPlaying || isPaused) && (
+            <button
+              type="button"
+              className="veil-voicenote-speed-btn"
+              onClick={handleSpeedCycle}
+              onPointerDown={stopAllEvents}
+              onTouchStart={stopAllEvents}
+              aria-label={`Playback speed ${playbackSpeed}x`}
+              title={`Speed: ${playbackSpeed}x`}
+              style={{
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '10px',
+                color: 'var(--veil-accent-primary, #14b8a6)',
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '2px 6px',
+                cursor: 'pointer',
+                lineHeight: 1.2,
+                fontVariantNumeric: 'tabular-nums',
+                transition: 'background-color 0.12s ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {playbackSpeed}x
+            </button>
           )}
         </div>
       </div>

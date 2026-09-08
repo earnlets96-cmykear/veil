@@ -37,6 +37,8 @@ import {
   ReplyPreview,
   MessageStatus,
   useToast,
+  EmojiPickerModal,
+  ProgressCircle,
 } from './ui/index.ts';
 import {
   ArrowLeftIcon,
@@ -59,6 +61,8 @@ import {
   AlertCircleIcon,
   InfoIcon,
   PhoneIcon,
+  EditIcon,
+  ChevronRightIcon,
 } from './icons/index.ts';
 import {
   MediaViewer,
@@ -87,6 +91,7 @@ interface ConversationMessageRowProps {
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
   downloadingAttachmentId: string | null;
+  downloadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
   playbackProgress: Record<string, number>;
   playbackCurrentTime: Record<string, number>;
   playingAudioId: string | null;
@@ -117,6 +122,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   isGroupedWithNext,
   isGroup = false,
   downloadingAttachmentId,
+  downloadProgress,
   playbackProgress,
   playbackCurrentTime,
   playingAudioId,
@@ -207,8 +213,18 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         } ${isHighlighted ? 'veil-message-highlight' : ''} ${
           isContextActive ? 'veil-context-active-message' : ''
         }`}
-        onClick={() => {
-          if (isSelectionMode) onToggleSelect(msg.id);
+        onClick={(e) => {
+          if (isSelectionMode) {
+            onToggleSelect(msg.id);
+            return;
+          }
+          const target = e.target as HTMLElement | null;
+          const isInteractive = target?.closest(
+            'button, a, input, textarea, select, [role="button"], [role="checkbox"], .veil-waveform-container, .veil-voicenote-card, .veil-reactions-bar, .veil-reaction-chip, .veil-msg-checkbox, .veil-media-bubble-container, .veil-attachment-card'
+          );
+          if (!isInteractive && (!window.getSelection || window.getSelection()?.toString().length === 0)) {
+            onContextMenu(e, msg);
+          }
         }}
         onContextMenu={(e) => onContextMenu(e, msg)}
         onTouchStart={!hasVisibleTextBubble && !msg.voice ? handleTouchStart : undefined}
@@ -345,7 +361,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
 
           {/* Single Media Image / Video Card */}
           {!isGrouped && isMedia && msg.attachment && (
-            <div className="veil-media-bubble-container">
+            <div className="veil-media-bubble-container" style={{ position: 'relative' }}>
               <MediaImage
                 attachment={msg.attachment}
                 isVideo={msg.attachment.mimeType?.startsWith('video/')}
@@ -354,6 +370,32 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                 }}
                 alt={msg.attachment.name}
               />
+              {downloadingAttachmentId === msg.id && (
+                <div
+                  className="veil-media-download-progress-overlay"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(0, 0, 0, 0.55)',
+                    borderRadius: 'var(--veil-radius-md, 12px)',
+                    zIndex: 4,
+                  }}
+                >
+                  <ProgressCircle
+                    size={52}
+                    percent={downloadProgress?.[msg.id]?.percent ?? 0}
+                    totalBytes={msg.attachment.sizeBytes}
+                    loadedBytes={downloadProgress?.[msg.id]?.loaded}
+                    variant="download"
+                  />
+                </div>
+              )}
               <div className="veil-media-meta-overlay">
                 <span className="veil-media-time">
                   {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -372,7 +414,9 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               name={msg.attachment.name}
               sizeBytes={msg.attachment.sizeBytes}
               mimeType={msg.attachment.mimeType}
-              status={downloadingAttachmentId === msg.id ? 'downloading' : 'ready'}
+              status={downloadingAttachmentId === msg.id ? 'downloading' : (msg.attachment.state as any) || 'ready'}
+              progressPercent={downloadProgress?.[msg.id]?.percent}
+              loadedBytes={downloadProgress?.[msg.id]?.loaded}
               onDownload={() => onDownloadAttachment(msg)}
             />
           )}
@@ -430,6 +474,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               isGroupedWithPrevious={isGroupedWithPrevious}
               isGroupedWithNext={isGroupedWithNext}
               reactions={(msg as any).reactions}
+              edited={msg.edited}
               onReactionClick={onReactionClick ? (emoji) => onReactionClick(msg, emoji) : undefined}
               onContextMenu={(e) => onContextMenu(e, msg)}
               onLongPress={() => {
@@ -470,6 +515,7 @@ export const ConversationView: React.FC = () => {
     deleteMessageForEveryone,
     markConversationAsRead,
     retryFailedMessage,
+    editMessage,
     pinMessage,
     unpinMessage,
     forwardMessage,
@@ -513,6 +559,25 @@ export const ConversationView: React.FC = () => {
   const [forwardingMessage, setForwardingMessage] = useState<UIMessage | null>(null);
   const [includeAttribution, setIncludeAttribution] = useState<boolean>(true);
   const [deleteForEveryoneConfirm, setDeleteForEveryoneConfirm] = useState<UIMessage | null>(null);
+
+  // Message Editing State
+  const [editingMessage, setEditingMessage] = useState<UIMessage | null>(null);
+
+  // Emoji Picker State
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [emojiTargetMessage, setEmojiTargetMessage] = useState<UIMessage | null>(null);
+  const [recentEmojis, setRecentEmojis] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('veil:ui:recentEmojis');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+
+  // Context Menu Ref for edge protection
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Download progress state
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, { percent: number; loaded: number; total: number }>>({});
 
   // Current Active Conversation Info
   const activeConversation = useMemo(() => {
@@ -658,7 +723,12 @@ export const ConversationView: React.FC = () => {
       return;
     }
 
+    const totalBytes = msg.attachment?.sizeBytes || (msg.voice ? 64 * 1024 : 0);
     setDownloadingAttachmentId(msg.id);
+    setDownloadProgress((prev) => ({
+      ...prev,
+      [msg.id]: { percent: 15, loaded: Math.round(totalBytes * 0.15), total: totalBytes },
+    }));
     try {
       let data: Uint8Array | null = null;
       let filename = msg.attachment?.name || `file_${msg.id.slice(0, 8)}`;
@@ -677,6 +747,10 @@ export const ConversationView: React.FC = () => {
           if (!cloudClient.getSessionToken()) {
             await ensureCloudSession(activeSession);
           }
+          setDownloadProgress((prev) => ({
+            ...prev,
+            [msg.id]: { percent: 50, loaded: Math.round(totalBytes * 0.5), total: totalBytes },
+          }));
           const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice);
           const res = await fetch(blobUrl);
           const buf = await res.arrayBuffer();
@@ -690,6 +764,10 @@ export const ConversationView: React.FC = () => {
           if (!cloudClient.getSessionToken()) {
             await ensureCloudSession(activeSession);
           }
+          setDownloadProgress((prev) => ({
+            ...prev,
+            [msg.id]: { percent: 45, loaded: Math.round(totalBytes * 0.45), total: totalBytes },
+          }));
           cached = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
         }
 
@@ -699,12 +777,15 @@ export const ConversationView: React.FC = () => {
       }
 
       if (data) {
-        const saved = await FileSaver.saveFile({
-          data,
-          filename,
-          mimeType,
-          triggerShare: true,
-        });
+        setDownloadProgress((prev) => ({
+          ...prev,
+          [msg.id]: { percent: 85, loaded: Math.round(totalBytes * 0.85), total: totalBytes },
+        }));
+        // Use gallery save for images/videos, regular save for other files
+        const isGalleryMedia = mimeType.startsWith('image/') || mimeType.startsWith('video/');
+        const saved = isGalleryMedia
+          ? await FileSaver.saveToGallery({ data, filename, mimeType })
+          : await FileSaver.saveFile({ data, filename, mimeType, triggerShare: true });
         if (saved && saved.success) {
           showToast({
             type: 'success',
@@ -726,6 +807,11 @@ export const ConversationView: React.FC = () => {
       });
     } finally {
       setDownloadingAttachmentId(null);
+      setDownloadProgress((prev) => {
+        const next = { ...prev };
+        delete next[msg.id];
+        return next;
+      });
     }
   };
 
@@ -876,6 +962,72 @@ export const ConversationView: React.FC = () => {
       message: msg,
     });
   };
+
+  // Edge protection: re-clamp context menu after render using its actual dimensions
+  useEffect(() => {
+    if (!contextMenu.isOpen || !contextMenuRef.current) return;
+    const el = contextMenuRef.current;
+    const rect = el.getBoundingClientRect();
+    const margin = 12;
+    let needsUpdate = false;
+    let newX = contextMenu.x;
+    let newY = contextMenu.y;
+
+    if (rect.right > window.innerWidth - margin) {
+      newX = window.innerWidth - rect.width - margin;
+      needsUpdate = true;
+    }
+    if (rect.left < margin) {
+      newX = margin;
+      needsUpdate = true;
+    }
+    if (rect.bottom > window.innerHeight - margin) {
+      newY = window.innerHeight - rect.height - margin;
+      needsUpdate = true;
+    }
+    if (rect.top < margin) {
+      newY = margin;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      setContextMenu((prev) => ({ ...prev, x: Math.max(margin, newX), y: Math.max(margin, newY) }));
+    }
+  }, [contextMenu.isOpen, contextMenu.x, contextMenu.y]);
+
+  // Handle message editing
+  const handleStartEdit = (msg: UIMessage) => {
+    setEditingMessage(msg);
+    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+  };
+
+  const handleConfirmEdit = async (newText: string) => {
+    if (!editingMessage || !activeChatId) return;
+    await editMessage(activeChatId, editingMessage.id, newText);
+    setEditingMessage(null);
+  };
+
+  // Track recent emojis for smart reaction bar
+  const handleUpdateRecentEmojis = (emoji: string) => {
+    setRecentEmojis((prev) => {
+      const filtered = prev.filter((e) => e !== emoji);
+      const updated = [emoji, ...filtered].slice(0, 20);
+      try {
+        localStorage.setItem('veil:ui:recentEmojis', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  // Get the display emojis for the reaction bar (recent or defaults)
+  const DEFAULT_REACTION_EMOJIS = ['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'];
+  const displayEmojis = recentEmojis.length > 0
+    ? [...new Set([...recentEmojis.slice(0, 6)])].slice(0, 6)
+    : DEFAULT_REACTION_EMOJIS.slice(0, 6);
 
   // Context Menu Actions
   const handleCopyText = (text?: string) => {
@@ -1258,6 +1410,7 @@ export const ConversationView: React.FC = () => {
                 isGroupedWithNext={isGroupedWithNext}
                 isGroup={isGroupConversation}
                 downloadingAttachmentId={downloadingAttachmentId}
+                downloadProgress={downloadProgress}
                 playbackProgress={playbackProgress}
                 playbackCurrentTime={playbackCurrentTime}
                 playingAudioId={playingAudioId}
@@ -1300,14 +1453,15 @@ export const ConversationView: React.FC = () => {
       {/* Floating Context Menu */}
       {contextMenu.isOpen && contextMenu.message && (
         <div
+          ref={contextMenuRef}
           className="veil-context-menu"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px`, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
-          {/* Reaction Quick Bar */}
+          {/* Smart Reaction Quick Bar */}
           <div className="veil-context-reactions-bar">
-            {['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'].map((emoji) => {
+            {displayEmojis.map((emoji) => {
               const isUserReacted = Boolean(
                 (contextMenu.message as any)?.reactions?.some(
                   (r: any) => r.emoji === emoji && r.userReacted
@@ -1321,6 +1475,7 @@ export const ConversationView: React.FC = () => {
                   onClick={() => {
                     if (activeChatId) {
                       toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
+                      handleUpdateRecentEmojis(emoji);
                     }
                     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
                   }}
@@ -1330,6 +1485,20 @@ export const ConversationView: React.FC = () => {
                 </button>
               );
             })}
+            {/* Expand button for full emoji picker */}
+            <button
+              type="button"
+              className="veil-emoji-expand-btn"
+              onClick={() => {
+                setEmojiTargetMessage(contextMenu.message);
+                setIsEmojiPickerOpen(true);
+                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+              }}
+              aria-label="More emojis"
+              title="More emojis"
+            >
+              <ChevronRightIcon size={16} />
+            </button>
           </div>
 
           <button
@@ -1340,6 +1509,18 @@ export const ConversationView: React.FC = () => {
             <ReplyIcon size={16} />
             <span>Reply</span>
           </button>
+
+          {/* Edit button — only for own text messages without attachments/voice */}
+          {contextMenu.message.isOutgoing && contextMenu.message.text && !contextMenu.message.voice && !contextMenu.message.attachment && (
+            <button
+              type="button"
+              className="veil-context-item"
+              onClick={() => handleStartEdit(contextMenu.message!)}
+            >
+              <EditIcon size={16} />
+              <span>Edit</span>
+            </button>
+          )}
 
           {contextMenu.message.text && (
             <button
@@ -1450,6 +1631,25 @@ export const ConversationView: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Emoji Picker Modal */}
+      <EmojiPickerModal
+        isOpen={isEmojiPickerOpen}
+        onSelect={(emoji) => {
+          const target = emojiTargetMessage || contextMenu.message;
+          if (activeChatId && target) {
+            toggleMessageReaction(activeChatId, target.id, emoji);
+            handleUpdateRecentEmojis(emoji);
+          }
+          setIsEmojiPickerOpen(false);
+          setEmojiTargetMessage(null);
+          setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+        }}
+        onClose={() => {
+          setIsEmojiPickerOpen(false);
+          setEmojiTargetMessage(null);
+        }}
+      />
 
       {/* Delete for Everyone Confirmation Modal */}
       {deleteForEveryoneConfirm && (
@@ -1681,7 +1881,12 @@ export const ConversationView: React.FC = () => {
       )}
 
       {/* Message Composer */}
-      <MessageComposer conversationId={activeChatId} />
+      <MessageComposer
+        conversationId={activeChatId}
+        editingMessage={editingMessage}
+        onCancelEdit={handleCancelEdit}
+        onConfirmEdit={handleConfirmEdit}
+      />
 
       {/* Fullscreen Media Viewer Modal */}
       {viewerItem && (

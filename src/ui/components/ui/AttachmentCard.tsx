@@ -8,6 +8,7 @@
 import React from 'react';
 import { Spinner } from './Spinner.tsx';
 import { Progress } from './Progress.tsx';
+import { ProgressCircle } from './ProgressCircle.tsx';
 import {
   FileIcon,
   FilePdfIcon,
@@ -28,6 +29,7 @@ export interface AttachmentCardProps {
   mimeType?: string;
   status?: AttachmentStatus;
   progressPercent?: number;
+  loadedBytes?: number;
   onDownload?: () => void;
   className?: string;
 }
@@ -38,6 +40,7 @@ export const AttachmentCard: React.FC<AttachmentCardProps> = ({
   mimeType,
   status = 'ready',
   progressPercent,
+  loadedBytes,
   onDownload,
   className = '',
 }) => {
@@ -103,7 +106,15 @@ export const AttachmentCard: React.FC<AttachmentCardProps> = ({
       </div>
 
       <div className="veil-attachment-action">
-        {isBusy ? (
+        {status === 'uploading' || status === 'downloading' ? (
+          <ProgressCircle
+            size={36}
+            percent={progressPercent ?? 0}
+            totalBytes={sizeBytes}
+            loadedBytes={loadedBytes}
+            variant={status === 'uploading' ? 'upload' : 'download'}
+          />
+        ) : isBusy ? (
           <Spinner size="sm" aria-label={status} />
         ) : status === 'completed' ? (
           <div className="veil-attachment-done-badge" title="Downloaded">

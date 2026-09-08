@@ -217,6 +217,7 @@ export interface AppContextType {
   deleteMessageForEveryone: (conversationId: string, messageId: string) => Promise<void>;
   deleteMessagesLocally: (conversationId: string, messageIds: string[]) => Promise<void>;
   retryFailedMessage: (conversationId: string, messageId: string) => Promise<void>;
+  editMessage: (conversationId: string, messageId: string, newText: string) => Promise<void>;
   markConversationAsRead: (conversationId: string) => void;
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
@@ -3541,6 +3542,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, messages, deleteMessageLocally, sendMessage]
   );
 
+  const editMessage = useCallback(
+    async (conversationId: string, messageId: string, newText: string) => {
+      if (!activeSession || !newText.trim()) return;
+      sessionController.recordUserActivity();
+
+      setMessages((prev) => {
+        const list = prev[conversationId] || [];
+        const updatedList = list.map((msg) => {
+          if (msg.id !== messageId) return msg;
+          return {
+            ...msg,
+            text: newText.trim(),
+            edited: true,
+            editedAt: Date.now(),
+          };
+        });
+        const updated = { ...prev, [conversationId]: updatedList };
+        store.setAsync(activeSession, 'veil:ui:messages', updated);
+        return updated;
+      });
+
+      // Update last message preview in conversations list if this was the latest message
+      setConversations((prev) => {
+        return prev.map((c) => {
+          if (c.id !== conversationId) return c;
+          const convMessages = messages[conversationId] || [];
+          const lastMsg = convMessages[convMessages.length - 1];
+          if (lastMsg && lastMsg.id === messageId) {
+            return { ...c, lastMessage: newText.trim() };
+          }
+          return c;
+        });
+      });
+
+      scheduleCloudSync(activeSession);
+    },
+    [activeSession, messages, scheduleCloudSync]
+  );
 
   const restoreAccount = useCallback(
     async (username: string, password: string) => {
@@ -4511,6 +4550,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     deleteMessageForEveryone,
     deleteMessagesLocally,
     retryFailedMessage,
+    editMessage,
     markConversationAsRead,
     openModal,
     closeModal,

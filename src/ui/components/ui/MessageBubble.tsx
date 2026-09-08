@@ -43,6 +43,7 @@ export interface MessageBubbleProps {
   isHighlighted?: boolean;
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
+  edited?: boolean;
   className?: string;
 }
 
@@ -76,6 +77,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isHighlighted = false,
   isGroupedWithPrevious = false,
   isGroupedWithNext = false,
+  edited = false,
   className = '',
 }) => {
   const effectiveId = id || messageId || 'msg';
@@ -389,6 +391,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </button>
               )}
 
+              {edited && (
+                <span
+                  className="veil-edited-tag"
+                  style={{
+                    fontSize: '0.62rem',
+                    opacity: 0.55,
+                    fontStyle: 'italic',
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  edited
+                </span>
+              )}
               <MessageTimestamp timestamp={timestamp} />
               {isOutgoing && <MessageStatus status={effectiveStatus} />}
             </div>

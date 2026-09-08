@@ -601,6 +601,3 @@ export const DatabaseSlashIcon: React.FC<IconProps> = ({ size = 20, className = 
     <path d="M3 12A9 3 0 0 0 21 12" />
   </svg>
 );
-
-
-
