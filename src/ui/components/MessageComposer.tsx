@@ -7,7 +7,7 @@
  * contextual Android permission handling, and 100% SVG vector iconography.
  */
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { useApp, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview, Spinner, useToast } from './ui/index.ts';
@@ -18,6 +18,7 @@ import {
   CloseIcon,
   StopIcon,
   CheckIcon,
+  EditIcon,
 } from './icons/index.ts';
 import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
@@ -31,6 +32,9 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
     sendVoiceMessage,
     replyTarget,
     setReplyTarget,
+    editTarget,
+    setEditTarget,
+    editMessage,
     myProfile,
     contacts,
     conversations,
@@ -55,12 +59,26 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorderRef = useRef<VoiceRecorder | null>(null);
 
+  // When editTarget is set, populate the composer text
+  useEffect(() => {
+    if (editTarget) {
+      setText(editTarget.text || '');
+      textareaRef.current?.focus();
+    }
+  }, [editTarget]);
+
   const handleSend = () => {
     if (!text.trim()) return;
     const msgText = text.trim();
     setText('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+    }
+
+    // If editing, update the existing message instead of sending a new one
+    if (editTarget) {
+      editMessage(conversationId, editTarget.id, msgText);
+      return;
     }
 
     // Fire-and-forget: AppState optimistically displays the message in 0ms
@@ -236,8 +254,37 @@ export const MessageComposer: React.FC<{ conversationId: string }> = ({ conversa
         />
       )}
 
+      {/* Edit Message Banner */}
+      {editTarget && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 12px',
+            background: 'var(--veil-bg-surface-elevated, #1e2530)',
+            borderTop: '1px solid var(--veil-border-subtle, rgba(255,255,255,0.06))',
+            borderLeft: '3px solid var(--veil-accent-primary, #14b8a6)',
+          }}
+        >
+          <EditIcon size={14} color="var(--veil-accent-primary, #14b8a6)" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--veil-accent-primary, #14b8a6)' }}>Editing message</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--veil-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {editTarget.text}
+            </div>
+          </div>
+          <IconButton
+            icon={<CloseIcon size={16} />}
+            onClick={() => { setEditTarget(null); setText(''); }}
+            aria-label="Cancel editing"
+            variant="ghost"
+          />
+        </div>
+      )}
+
       {/* Quoted Message Reply Banner */}
-      {replyTarget && (
+      {replyTarget && !editTarget && (
         <ReplyPreview
           replyTo={{
             ...resolveReplyReference(replyTarget, selfName, peerName)!,

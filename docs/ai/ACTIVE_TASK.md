@@ -1,9 +1,44 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+## Active Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO PLAYBACK RESILIENCE, TRANSFER PROGRESS CIRCLE, SAVE-TO-GALLERY PERMISSIONS, MESSAGE EDITING & SMART EMOJI PICKER
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 69 Chat UX Enhancement Tasks:
+- [x] **Audio UI Polish & Playback Resilience (`src/attachments/voicePlayer.ts`, `src/ui/components/ui/VoiceNoteCard.tsx`)**:
+  - Implemented auto-retry with 300ms delay for transient `AbortError` / `NotAllowedError` browser playback states.
+  - Smoothed waveform bars with `border-radius: 2px` and height transition for seamless playback tracking.
+- [x] **Circular Progress Indicator for Transfers (`src/ui/components/ui/ProgressCircle.tsx`, `src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Implemented 100% vector SVG `ProgressCircle.tsx` supporting indeterminate spinning and percentage states with `CloseIcon` cancellation affordance.
+  - Integrated overlay into `MessageBubble.tsx` during media attachment upload (`isUploading`) and download (`isDownloading`).
+- [x] **Save-to-Gallery Feedback & Directory Organization (`src/ui/utils/fileSaver.ts`)**:
+  - Organized file saver destinations (`VEIL/Images`, `VEIL/Videos`) with explicit permission denial feedback.
+- [x] **Message Editing & 'Edited' Indicator (`src/ui/app/types.ts`, `src/ui/app/AppState.tsx`, `src/ui/components/ConversationView.tsx`, `src/ui/components/MessageComposer.tsx`, `src/ui/components/ui/MessageBubble.tsx`)**:
+  - Added `editMessage(convId, msgId, newText)` to AppState with optimistic store updates, `isEdited: true`, `editedAt`, and `originalText` tracking.
+  - Added "Edit" context menu option for outgoing text messages.
+  - Added editing banner above composer with quick cancel button.
+  - Added italic `edited` label in message bubble metadata row next to timestamp.
+- [x] **Mobile Tap-to-Context Gesture (`src/ui/components/ui/MessageBubble.tsx`)**:
+  - Added tap-to-open context menu on mobile while differentiating from touch swipes (>8px delta) and selection mode toggles.
+- [x] **Smart Emoji Reaction Bar & Emoji Picker (`src/ui/components/ui/EmojiPickerPopup.tsx`, `src/utils/emojiData.json`, `src/ui/components/ConversationView.tsx`)**:
+  - Dynamic reaction bar pulling most recently used reactions from `localStorage` (`veil:recent-reactions`).
+  - Searchable 10-category categorized emoji picker popup (`EmojiPickerPopup.tsx`).
+  - Strict compliance with VEIL Phase 44A zero-Unicode icon audit (0 violations in `src/ui`).
+- [x] **Automated Testing & Build Verification**:
+  - `tests/phase69-chat-ux-enhancements.test.tsx` (13/13 passed).
+  - `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed, 0 violations).
+  - `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed).
+  - `tests/phase45e-reply-rendering.test.tsx` (3/3 passed).
+  - `npm run build` (clean in 2.03s, 0 TS errors).
+
+---
+
+## Previous Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+- **Branch**: `main`
+- **Output Report**: `docs/ai/CURRENT_STATE.md`
+
 
 ### Phase 68 Chat UI Layout & Micro-Polish Tasks:
 - [x] **P2P Message Bubbles — Sender Name Omission (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:

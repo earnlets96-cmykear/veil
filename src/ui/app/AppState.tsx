@@ -208,6 +208,9 @@ export interface AppContextType {
   panicLock: () => void;
   selectConversation: (id: string | null) => void;
   setReplyTarget: (msg: UIMessage | null) => void;
+  editTarget: UIMessage | null;
+  setEditTarget: (msg: UIMessage | null) => void;
+  editMessage: (conversationId: string, messageId: string, newText: string) => void;
   sendMessage: (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
   sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
   sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
@@ -2291,6 +2294,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const setReplyTarget = useCallback((target: UIMessage | null) => {
     replyTargetRef.current = target;
     setReplyTargetState(target);
+  }, []);
+
+  // Edit message target
+  const [editTarget, setEditTargetState] = useState<UIMessage | null>(null);
+  const setEditTarget = useCallback((target: UIMessage | null) => {
+    setEditTargetState(target);
+  }, []);
+
+  const editMessage = useCallback((conversationId: string, messageId: string, newText: string) => {
+    setMessages((prev) => {
+      const convMsgs = prev[conversationId];
+      if (!convMsgs) return prev;
+      const updated = convMsgs.map((m) =>
+        m.id === messageId
+          ? { ...m, originalText: m.originalText || m.text, text: newText, isEdited: true, editedAt: Date.now() }
+          : m
+      );
+      return { ...prev, [conversationId]: updated };
+    });
+    setEditTargetState(null);
   }, []);
 
   const sendMessage = useCallback(
@@ -4502,6 +4525,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     panicLock,
     selectConversation,
     setReplyTarget,
+    editTarget,
+    setEditTarget,
+    editMessage,
     sendMessage,
     sendAttachment,
     sendAttachments,

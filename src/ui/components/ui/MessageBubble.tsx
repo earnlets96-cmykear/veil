@@ -11,7 +11,8 @@ import { ReplyPreview, ReplyPreviewData } from './ReplyPreview.tsx';
 import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
 import { Spinner } from './Spinner.tsx';
-import { RefreshCwIcon, ReplyIcon, ForwardIcon } from '../icons/index.ts';
+import { ProgressCircle } from './ProgressCircle.tsx';
+import { RefreshCwIcon, ReplyIcon, ForwardIcon, EditIcon } from '../icons/index.ts';
 
 export interface MessageBubbleProps {
   id?: string;
@@ -43,6 +44,9 @@ export interface MessageBubbleProps {
   isHighlighted?: boolean;
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
+  isEdited?: boolean;
+  isDownloading?: boolean;
+  isUploading?: boolean;
   className?: string;
 }
 
@@ -76,6 +80,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isHighlighted = false,
   isGroupedWithPrevious = false,
   isGroupedWithNext = false,
+  isEdited = false,
+  isDownloading = false,
+  isUploading = false,
   className = '',
 }) => {
   const effectiveId = id || messageId || 'msg';
@@ -152,14 +159,38 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     isGroupedWithNext ? 'veil-message-grouped-next' : ''
   }`.trim();
 
+  // Track if touch moved (to distinguish tap from swipe)
+  const touchMovedRef = useRef(false);
+
+  const handleRowClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isSelectionMode && onSelectToggle) {
+      onSelectToggle();
+      return;
+    }
+    // On mobile: tap opens context menu (like Telegram)
+    if (isMobilePlatform && onLongPress && !touchMovedRef.current) {
+      onLongPress();
+    }
+  };
+
   return (
     <div
       id={`msg-${effectiveId}`}
       className={`veil-message-row ${isOutgoing ? 'outgoing' : 'incoming'} ${groupedClass} ${className}`.trim()}
-      onClick={isSelectionMode && onSelectToggle ? onSelectToggle : undefined}
+      onClick={handleRowClick}
       onContextMenu={onContextMenu}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
+      onTouchStart={(e) => {
+        touchMovedRef.current = false;
+        handleTouchStart(e);
+      }}
+      onTouchMove={(e) => {
+        if (touchStartRef.current && e.touches.length === 1) {
+          const dx = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
+          const dy = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+          if (dx > 8 || dy > 8) touchMovedRef.current = true;
+        }
+        handleTouchMove(e);
+      }}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       style={{
@@ -264,7 +295,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {voiceElement ? (
             <div style={{ padding: '2px 0' }}>{voiceElement}</div>
           ) : attachmentElement ? (
-            <div style={{ padding: '2px 0' }}>{attachmentElement}</div>
+            <div style={{ padding: '2px 0', position: 'relative' }}>
+              {attachmentElement}
+              {(isDownloading || isUploading) && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(0, 0, 0, 0.45)',
+                    borderRadius: 'var(--veil-radius-md, 10px)',
+                    zIndex: 2,
+                  }}
+                >
+                  <ProgressCircle percent={-1} size={40} color="#ffffff" trackColor="rgba(255,255,255,0.2)" />
+                </div>
+              )}
+            </div>
           ) : (
             <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{text}</div>
           )}
@@ -389,6 +438,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 </button>
               )}
 
+              {isEdited && (
+                <span
+                  style={{
+                    fontSize: '0.62rem',
+                    color: isOutgoing ? 'rgba(255,255,255,0.5)' : 'var(--veil-text-muted, rgba(255,255,255,0.4))',
+                    fontStyle: 'italic',
+                    marginRight: '2px',
+                  }}
+                >
+                  edited
+                </span>
+              )}
               <MessageTimestamp timestamp={timestamp} />
               {isOutgoing && <MessageStatus status={effectiveStatus} />}
             </div>

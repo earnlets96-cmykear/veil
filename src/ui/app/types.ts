@@ -94,6 +94,9 @@ export interface UIMessage {
   };
   forwarded?: boolean;
   forwardedFrom?: string;
+  isEdited?: boolean;
+  editedAt?: number;
+  originalText?: string;
 }
 
 export interface ReplyReference {

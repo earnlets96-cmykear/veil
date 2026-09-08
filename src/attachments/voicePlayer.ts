@@ -411,7 +411,27 @@ export class VoicePlaybackManager {
         } catch (_e) {}
       }
 
-      await audio.play();
+      // Play with auto-retry for transient browser errors (NotAllowedError, AbortError)
+      try {
+        await audio.play();
+      } catch (playErr: any) {
+        if (playErr?.name === 'AbortError' || playErr?.name === 'NotAllowedError' || playErr?.name === 'NotSupportedError') {
+          // Wait and retry once
+          await new Promise((r) => setTimeout(r, 300));
+          try {
+            audio.load();
+            await audio.play();
+          } catch (retryErr: any) {
+            this.currentStatus = 'error';
+            this.notifyListeners('error', 0, 0, safeDuration);
+            if (callbacks.onError) callbacks.onError(retryErr instanceof Error ? retryErr : new Error(String(retryErr)));
+            return;
+          }
+        } else {
+          throw playErr;
+        }
+      }
+
       this.currentStatus = 'playing';
       const initialDur = this.getDuration(safeDuration);
       const initialCur = audio.currentTime || 0;

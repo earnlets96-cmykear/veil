@@ -356,7 +356,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
                   flex: '1 1 0',
                   height: `${height * 100}%`,
                   minWidth: '2px',
-                  borderRadius: '1.5px',
+                  borderRadius: '2px',
                   backgroundColor: isFilled && isActive
                     ? 'var(--veil-accent-primary, #14b8a6)'
                     : isFilled
@@ -364,7 +364,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
                     : isOutgoing
                     ? 'rgba(255, 255, 255, 0.3)'
                     : 'rgba(255, 255, 255, 0.18)',
-                  transition: isScrubbingRef.current ? 'none' : 'background-color 0.12s ease',
+                  transition: isScrubbingRef.current ? 'none' : 'background-color 0.15s ease, height 0.2s ease',
                 }}
               />
             );

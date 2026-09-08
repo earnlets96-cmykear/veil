@@ -3,7 +3,29 @@
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Phase 69: Chat UX Enhancement Bundle] - 2026-09-08
+
+### Added & Verified
+- **Message Editing with Inline 'Edited' Indicator**:
+  - Added `editMessage(convId, msgId, newText)` to AppState with optimistic local store mutation, preserving `originalText`, setting `isEdited: true`, and recording `editedAt`.
+  - Added context menu "Edit" action for outgoing text messages.
+  - Added editing banner above composer with quick cancel button and auto-populated textarea.
+  - Added italic `edited` label in message bubble metadata row next to timestamp.
+- **Circular Progress Indicator for Transfers (`ProgressCircle.tsx`)**:
+  - Implemented vector SVG `ProgressCircle` with indeterminate spinning and percentage fill states.
+  - Added transfer overlay on attachment media during upload and download.
+- **Smart Emoji Reaction Bar & 10-Category Emoji Picker**:
+  - Dynamic reaction bar displaying recently used emojis tracked in `localStorage` (`veil:recent-reactions`).
+  - Searchable 10-category emoji popup (`EmojiPickerPopup.tsx`) loaded from separate `src/utils/emojiData.json` dictionary adhering strictly to Phase 44A zero-Unicode icon audit.
+- **Mobile Tap-to-Context Gesture**:
+  - Added mobile tap handler on message bubbles that triggers context menu while distinguishing taps from touch swipes (>8px movement) and selection toggles.
+- **Audio Playback Resilience & Waveform Smoothing**:
+  - Auto-retry with 300ms delay in `VoicePlaybackManager` handling transient browser `AbortError` / `NotAllowedError`.
+  - Smoothed waveform bars with 2px corner radius and height transition in `VoiceNoteCard`.
+
 ## [Master Reliability & Hybrid Kotlin Media3 Migration] - 2026-09-05
+
 
 ### Added & Verified
 - **Native AndroidX Media3 ExoPlayer Plugin (`VeilNativeMediaPlugin.kt`)**:

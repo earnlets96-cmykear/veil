@@ -1,7 +1,36 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+## Current Verified Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO PLAYBACK RESILIENCE, TRANSFER PROGRESS CIRCLE, SAVE-TO-GALLERY PERMISSIONS, MESSAGE EDITING & SMART EMOJI PICKER
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+- **Verification Deliverables**:
+  - Phase 69 Chat UX Enhancements Suite: `tests/phase69-chat-ux-enhancements.test.tsx` (13/13 passed in 45ms).
+  - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed in 43ms).
+  - Phase 44A Icon Audit & Layout Suite: `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed in 34ms, 0 Unicode violations).
+  - Phase 31 Main Chat UI Modernization Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 43ms).
+  - Phase 64 Audit & Polish Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed in 66ms).
+  - Phase 45E Reply UI Rendering Suite: `tests/phase45e-reply-rendering.test.tsx` (3/3 passed in 27ms).
+  - Phase 37 Android Layout Regression Suite: `tests/phase37-android-layout.test.ts` (9/9 passed in 8ms).
+  - Phase 65 Reactions & Contextual Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 313ms).
+  - Web App Production Build: `npm run build` succeeds cleanly in 2.03s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+- **Forensic Enhancements Delivered**:
+  1. **Audio Playback Resilience & Waveform Polish**:
+     - Auto-retry with 300ms backoff in `VoicePlaybackManager.playVoiceNote` handling transient `NotAllowedError` and `AbortError` browser audio states.
+     - Smooth waveform bars with 2px corner radius and CSS height transitions in `VoiceNoteCard`.
+  2. **Circular Progress Indicator for Transfers**:
+     - Circular SVG progress indicator (`ProgressCircle.tsx`) overlay on attachment media during upload (`msg.status === 'UPLOADING'`) and download (`downloadingAttachmentId === msg.id`).
+  3. **Save-to-Gallery Feedback & Directory Organization**:
+     - Image (`image/*`) and Video (`video/*`) media saved to organized subdirectories (`VEIL/Images`, `VEIL/Videos`) with explicit permission rejection handling.
+  4. **Message Editing & 'Edited' Indicator**:
+     - Full message editing flow via AppState `editMessage()`, context menu "Edit" action, top composer editing banner with cancel action, and inline italic `edited` label next to message timestamps.
+  5. **Mobile Tap-to-Context Gesture**:
+     - Tap gesture on mobile opens message context menu while differentiating from touch swipes (>8px delta) and selection mode toggles.
+  6. **Smart Emoji Reaction Bar & Emoji Picker**:
+     - Dynamic reaction bar pulling most recently used reactions from `localStorage` (`veil:recent-reactions`) with expand chevron toggle.
+     - 10-category categorized emoji picker popup (`EmojiPickerPopup.tsx`) loaded from separate `src/utils/emojiData.json` dictionary adhering strictly to VEIL Phase 44A zero-Unicode icon audit.
+
+## Previous Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+
 - **Verification Deliverables**:
   - Phase 68 Profile Polish & Image Cropper Suite: `tests/phase68-profile-and-cropper.test.tsx` (7/7 passed in 14ms).
   - Phase 68 Real-World Forwarding Acceptance Suite: `tests/phase68-real-world-forwarding.test.tsx` (11/11 passed in 791ms with 2 real clients + live RelayServer).

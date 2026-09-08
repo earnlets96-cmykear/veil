@@ -66,17 +66,31 @@ export class FileSaver {
       try {
         const permStatus = await Filesystem.checkPermissions();
         if (permStatus.publicStorage === 'prompt' || permStatus.publicStorage === 'prompt-with-rationale') {
-          await Filesystem.requestPermissions();
+          const result = await Filesystem.requestPermissions();
+          if (result.publicStorage === 'denied') {
+            return {
+              success: false,
+              filename,
+              location: 'Local Storage',
+              error: 'Storage permission denied. Please enable it in Settings.',
+            };
+          }
         }
       } catch (_permErr) {}
+
+      // Determine save location based on media type
+      const isImage = mimeType.startsWith('image/');
+      const isVideo = mimeType.startsWith('video/');
+      const subDir = isImage ? 'VEIL/Images' : isVideo ? 'VEIL/Videos' : 'VEIL';
+      const locationLabel = isImage ? 'Gallery (VEIL/Images)' : isVideo ? 'Gallery (VEIL/Videos)' : 'Documents/VEIL';
 
       // 1. Write file to Documents directory (user accessible)
       let fileResult;
       try {
         fileResult = await Filesystem.writeFile({
-          path: `VEIL/${filename}`,
+          path: `${subDir}/${filename}`,
           data: base64Data,
-          directory: Directory.Documents,
+          directory: isImage || isVideo ? Directory.External || Directory.Documents : Directory.Documents,
           recursive: true,
         });
       } catch (_writeDocErr) {
@@ -111,7 +125,7 @@ export class FileSaver {
       return {
         success: true,
         filename,
-        location: 'Documents/VEIL',
+        location: locationLabel,
         uri: fileUri,
       };
     } catch (err: any) {

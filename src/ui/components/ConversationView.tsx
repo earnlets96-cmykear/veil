@@ -59,6 +59,8 @@ import {
   AlertCircleIcon,
   InfoIcon,
   PhoneIcon,
+  EditIcon,
+  ChevronRightIcon,
 } from './icons/index.ts';
 import {
   MediaViewer,
@@ -69,6 +71,9 @@ import {
   MediaInfoModal,
   MediaInfoData,
 } from './media/index.ts';
+import { EmojiPickerPopup, getRecentEmojis, addRecentEmoji } from './ui/EmojiPickerPopup.tsx';
+
+const DEFAULT_REACTION_EMOJIS = ['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'];
 
 interface ContextMenuState {
   isOpen: boolean;
@@ -431,6 +436,9 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               isGroupedWithNext={isGroupedWithNext}
               reactions={(msg as any).reactions}
               onReactionClick={onReactionClick ? (emoji) => onReactionClick(msg, emoji) : undefined}
+              isEdited={msg.isEdited}
+              isDownloading={downloadingAttachmentId === msg.id}
+              isUploading={msg.status === 'UPLOADING' as any}
               onContextMenu={(e) => onContextMenu(e, msg)}
               onLongPress={() => {
                 const el = document.getElementById(`msg-${msg.id}`);
@@ -474,6 +482,8 @@ export const ConversationView: React.FC = () => {
     unpinMessage,
     forwardMessage,
     toggleMessageReaction,
+    editTarget,
+    setEditTarget,
   } = useApp();
 
   const { showToast } = useToast();
@@ -502,6 +512,9 @@ export const ConversationView: React.FC = () => {
 
   // Media Info Inspector State
   const [mediaInfoTarget, setMediaInfoTarget] = useState<MediaInfoData | null>(null);
+
+  // Emoji Picker State
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -1307,7 +1320,7 @@ export const ConversationView: React.FC = () => {
         >
           {/* Reaction Quick Bar */}
           <div className="veil-context-reactions-bar">
-            {['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'].map((emoji) => {
+            {getRecentEmojis(DEFAULT_REACTION_EMOJIS).slice(0, 6).map((emoji) => {
               const isUserReacted = Boolean(
                 (contextMenu.message as any)?.reactions?.some(
                   (r: any) => r.emoji === emoji && r.userReacted
@@ -1320,8 +1333,10 @@ export const ConversationView: React.FC = () => {
                   className={`veil-context-reaction-btn ${isUserReacted ? 'veil-reaction-active' : ''}`}
                   onClick={() => {
                     if (activeChatId) {
+                      addRecentEmoji(emoji);
                       toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
                     }
+                    setEmojiPickerOpen(false);
                     setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
                   }}
                   aria-label={`React with ${emoji}`}
@@ -1330,7 +1345,33 @@ export const ConversationView: React.FC = () => {
                 </button>
               );
             })}
+            <button
+              type="button"
+              className="veil-context-reaction-btn"
+              onClick={(e) => { e.stopPropagation(); setEmojiPickerOpen(!emojiPickerOpen); }}
+              aria-label={emojiPickerOpen ? 'Close emoji picker' : 'More emojis'}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {emojiPickerOpen ? <CloseIcon size={14} /> : <ChevronRightIcon size={14} />}
+            </button>
           </div>
+
+          {/* Expanded Emoji Picker */}
+          {emojiPickerOpen && (
+            <div style={{ margin: '0 -4px' }}>
+              <EmojiPickerPopup
+                onSelect={(emoji) => {
+                  if (activeChatId && contextMenu.message) {
+                    addRecentEmoji(emoji);
+                    toggleMessageReaction(activeChatId, contextMenu.message.id, emoji);
+                  }
+                  setEmojiPickerOpen(false);
+                  setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                }}
+                onClose={() => setEmojiPickerOpen(false)}
+              />
+            </div>
+          )}
 
           <button
             type="button"
@@ -1349,6 +1390,21 @@ export const ConversationView: React.FC = () => {
             >
               <CopyIcon size={16} />
               <span>Copy Text</span>
+            </button>
+          )}
+
+          {/* Edit Message (outgoing text only) */}
+          {contextMenu.message.isOutgoing && contextMenu.message.text && !contextMenu.message.voice && !contextMenu.message.attachment && (
+            <button
+              type="button"
+              className="veil-context-item"
+              onClick={() => {
+                setEditTarget(contextMenu.message!);
+                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+              }}
+            >
+              <EditIcon size={16} />
+              <span>Edit</span>
             </button>
           )}
 
