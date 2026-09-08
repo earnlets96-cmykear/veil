@@ -41,8 +41,22 @@
 - [x] **Delete for Everyone Confirmation & Forward Recipient Picker (`src/ui/components/ConversationView.tsx`)**:
   - Implemented `deleteForEveryoneConfirm` state with modal dialog warning that deletion is permanent for all participants.
   - Implemented `forwardingMessage` state with modal dialog allowing user to choose target conversation to forward message to.
+- [x] **Real-World Two-Client Forwarding Verification (`tests/phase68-real-world-forwarding.test.tsx`)**:
+  - Implemented and passed all 11 real-world verification scenarios using two authenticated VEIL clients, a live in-memory `RelayServer`, and `CloudClient` storage:
+    1. Normal text message (Account A -> Account B): arrives, decrypts via Double Ratchet, and persists across full client restart.
+    2. Forward with attribution enabled: displays `↗ Forwarded from [display name]`, source identity verified.
+    3. Forward with attribution disabled: displays `↗ Forwarded message`, hides original sender identity.
+    4. Forward image attachment: chunked & AEAD encrypted with fresh symmetric key, destination decrypts, 0 errors, survives restart.
+    5. Forward video attachment: destination decrypts, loads with valid playback, survives restart.
+    6. Forward voice message: destination downloads & decrypts, duration and audio data preserved, survives restart.
+    7. Forward multi-file attachment / gallery: all files decrypt, gallery renders, survives restart.
+    8. Forward into a group: uses destination group Sender Key session and ratcheting, recipient decrypts with attribution.
+    9. Forward when source conversation is closed: correctly routes to destination contact even when source chat is unmounted.
+    10. Android -> Desktop forwarding: recipient on desktop renders action row inline reply affordance.
+    11. Desktop -> Android forwarding: recipient on mobile suppresses inline reply button and relies on swipe / long-press.
 - [x] **Automated Testing & Build Verification**:
-  - Extended `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 tests pass).
+  - `tests/phase68-real-world-forwarding.test.tsx` (11/11 tests pass in 833ms).
+  - `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 tests pass in 49ms).
   - Production build (`npm run build`) succeeded cleanly with release bundle & checksum manifest.
 
 ---

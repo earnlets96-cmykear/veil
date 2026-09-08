@@ -3,7 +3,8 @@
 ## Current Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
-  - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 passed in 46ms).
+  - Phase 68 Real-World Forwarding Acceptance Suite: `tests/phase68-real-world-forwarding.test.tsx` (11/11 passed in 833ms with 2 real clients + live RelayServer).
+  - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 passed in 49ms).
   - Phase 58 Real Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed).
   - Phase 44A Icon Audit & Layout Suite: `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed in 33ms).
   - Phase 31 Main Chat UI Modernization Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 40ms).
@@ -11,7 +12,7 @@
   - Phase 45E Reply UI Rendering Suite: `tests/phase45e-reply-rendering.test.tsx` (3/3 passed in 27ms).
   - Phase 37 Android Layout Regression Suite: `tests/phase37-android-layout.test.ts` (9/9 passed in 15ms).
   - Phase 65 Reactions & Contextual Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 321ms).
-  - Web App Production Build: `npm run build` succeeds cleanly in 1.98s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Web App Production Build: `npm run build` succeeds cleanly in 2.68s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
 - **Root Cause Analyses & Architectural Fixes**:
   1. **P2P Message Bubbles — Sender Name Omission**:
      - In 1-to-1 / P2P conversations, the sender display name is omitted inside every message bubble (`showSenderName={false}`) because the conversation header already identifies the peer.
