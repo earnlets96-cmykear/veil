@@ -45,6 +45,7 @@ import {
   MoreVerticalIcon,
   DownloadIcon,
   CopyIcon,
+  ForwardIcon,
   ReplyIcon,
   TrashIcon,
   CheckIcon,
@@ -102,6 +103,7 @@ interface ConversationMessageRowProps {
   onRetry?: (msg: UIMessage) => void;
   peerAvatar?: string;
   onReactionClick?: (msg: UIMessage, emoji: string) => void;
+  isGroup?: boolean;
 }
 
 const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
@@ -113,6 +115,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   isContextActive,
   isGroupedWithPrevious,
   isGroupedWithNext,
+  isGroup = false,
   downloadingAttachmentId,
   playbackProgress,
   playbackCurrentTime,
@@ -283,6 +286,27 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
             transition: !hasVisibleTextBubble && !msg.voice && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
           }}
         >
+          {/* Forwarded Attribution Header for Non-Text Bubbles */}
+          {msg.forwarded && !hasVisibleTextBubble && (
+            <div
+              className="veil-message-forwarded-header"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.72rem',
+                color: 'var(--veil-text-muted, #94a3b8)',
+                fontStyle: 'italic',
+                marginBottom: '4px',
+                userSelect: 'none',
+                padding: '0 4px',
+              }}
+            >
+              <ForwardIcon size={12} style={{ opacity: 0.8 }} />
+              <span>{msg.forwardedFrom ? `Forwarded from ${msg.forwardedFrom}` : 'Forwarded message'}</span>
+            </div>
+          )}
+
           {/* Quoted Reply Reference for Non-Text Bubbles */}
           {msg.replyTo && !hasVisibleTextBubble && (
             <div style={{ marginBottom: '6px', maxWidth: '320px', width: '100%', minWidth: 0 }}>
@@ -381,6 +405,9 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
             <MessageBubble
               id={msg.id}
               senderName={msg.senderName}
+              showSenderName={isGroup}
+              forwarded={msg.forwarded}
+              forwardedFrom={msg.forwardedFrom}
               isOutgoing={msg.isOutgoing}
               text={msg.text}
               timestamp={msg.timestamp}
@@ -484,6 +511,7 @@ export const ConversationView: React.FC = () => {
     message: null,
   });
   const [forwardingMessage, setForwardingMessage] = useState<UIMessage | null>(null);
+  const [includeAttribution, setIncludeAttribution] = useState<boolean>(true);
   const [deleteForEveryoneConfirm, setDeleteForEveryoneConfirm] = useState<UIMessage | null>(null);
 
   // Current Active Conversation Info
@@ -1222,6 +1250,7 @@ export const ConversationView: React.FC = () => {
                 isContextActive={contextMenu.isOpen && contextMenu.message?.id === msg.id}
                 isGroupedWithPrevious={isGroupedWithPrevious}
                 isGroupedWithNext={isGroupedWithNext}
+                isGroup={activeConversation?.type === 'group'}
                 downloadingAttachmentId={downloadingAttachmentId}
                 playbackProgress={playbackProgress}
                 playbackCurrentTime={playbackCurrentTime}
@@ -1531,7 +1560,7 @@ export const ConversationView: React.FC = () => {
                 background: 'rgba(255, 255, 255, 0.04)',
                 borderLeft: '3px solid var(--veil-accent-primary, #14b8a6)',
                 borderRadius: '6px',
-                marginBottom: '16px',
+                marginBottom: '12px',
                 fontSize: '0.85rem',
                 color: 'var(--veil-text-secondary)',
                 overflow: 'hidden',
@@ -1539,7 +1568,46 @@ export const ConversationView: React.FC = () => {
                 whiteSpace: 'nowrap',
               }}
             >
-              {forwardingMessage.text || forwardingMessage.attachment?.name || 'Media Attachment'}
+              {forwardingMessage.text || forwardingMessage.attachment?.name || (forwardingMessage.voice ? 'Voice Note' : 'Media Attachment')}
+            </div>
+
+            {/* Attribution toggle option */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 12px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '8px',
+                marginBottom: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--veil-text-primary)' }}>
+                  Include sender attribution
+                </span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--veil-text-secondary)' }}>
+                  {includeAttribution
+                    ? `Shows "Forwarded from ${forwardingMessage.senderName || conversationName || 'Sender'}"`
+                    : 'Attribution hidden (forward message only)'}
+                </span>
+              </div>
+              <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={includeAttribution}
+                  onChange={(e) => setIncludeAttribution(e.target.checked)}
+                  style={{
+                    accentColor: 'var(--veil-accent-primary, #14b8a6)',
+                    width: '18px',
+                    height: '18px',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="Include sender attribution when forwarding"
+                />
+              </label>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1573,9 +1641,10 @@ export const ConversationView: React.FC = () => {
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                       onClick={async () => {
                         const target = forwardingMessage;
+                        const withAttribution = includeAttribution;
                         setForwardingMessage(null);
                         try {
-                          await forwardMessage(conv.id, target);
+                          await forwardMessage(conv.id, target, { includeAttribution: withAttribution });
                           showToast({ type: 'success', message: `Forwarded to ${conv.name || 'Chat'}` });
                         } catch (err: any) {
                           showToast({ type: 'error', message: err.message || 'Failed to forward message' });

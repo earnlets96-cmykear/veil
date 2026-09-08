@@ -186,3 +186,161 @@ describe('Phase 68 — Context Menu & Action Polish', () => {
     expect(convView).toContain("e.key === 'Escape'");
   });
 });
+
+describe('Phase 68 — P2P Sender Name Omission & Group Display', () => {
+  it('hides sender name in 1-to-1 / P2P conversations when showSenderName is false', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-p2p"
+        senderName="pos"
+        showSenderName={false}
+        isOutgoing={false}
+        text="hey man"
+        timestamp={Date.now()}
+      />
+    );
+
+    expect(html).toContain('veil-message-bubble');
+    expect(html).toContain('hey man');
+    expect(html).not.toContain('veil-message-sender');
+    expect(html).not.toContain('>pos<');
+  });
+
+  it('shows sender name in group conversations when showSenderName is true', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-group"
+        senderName="Alice"
+        showSenderName={true}
+        isOutgoing={false}
+        text="Hello team!"
+        timestamp={Date.now()}
+      />
+    );
+
+    expect(html).toContain('veil-message-bubble');
+    expect(html).toContain('veil-message-sender');
+    expect(html).toContain('Alice');
+    expect(html).toContain('Hello team!');
+  });
+
+  it('ConversationView passes showSenderName based on group type', () => {
+    const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
+    expect(convView).toContain("isGroup={activeConversation?.type === 'group'}");
+    expect(convView).toContain('showSenderName={isGroup}');
+  });
+});
+
+describe('Phase 68 — Reaction & Reply Action Row & Platform Polish', () => {
+  it('renders reactions and reply button in a single horizontal flex row', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-action-row"
+        isOutgoing={false}
+        text="Shared article"
+        timestamp={Date.now()}
+        reactions={[{ emoji: '❤️', count: 3, userReacted: true }]}
+        onReply={() => {}}
+      />
+    );
+
+    expect(html).toContain('veil-message-action-row');
+    expect(html).toContain('veil-message-reactions');
+    expect(html).toContain('veil-message-reply-btn');
+    expect(html).toContain('Reply');
+  });
+
+  it('renders reactions without reply button cleanly if onReply is omitted', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-reactions-only"
+        isOutgoing={false}
+        text="Photo shared"
+        timestamp={Date.now()}
+        reactions={[{ emoji: '🔥', count: 1, userReacted: false }]}
+      />
+    );
+
+    expect(html).toContain('veil-message-action-row');
+    expect(html).toContain('veil-message-reactions');
+    expect(html).not.toContain('veil-message-reply-btn');
+  });
+
+  it('renders zero action row elements when neither reactions nor reply button are present', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-plain"
+        isOutgoing={true}
+        text="Simple message"
+        timestamp={Date.now()}
+      />
+    );
+
+    expect(html).not.toContain('veil-message-action-row');
+    expect(html).not.toContain('veil-message-reactions');
+    expect(html).not.toContain('veil-message-reply-btn');
+  });
+
+  it('Design system contains mobile suppression rules for inline reply button', () => {
+    const designSystemCss = fs.readFileSync(path.join(rootDir, 'src/styles/veil-design-system.css'), 'utf-8');
+    expect(designSystemCss).toContain('.veil-message-action-row');
+    expect(designSystemCss).toContain('.veil-message-reply-btn');
+    expect(designSystemCss).toMatch(/\.veil-message-reply-btn\s*\{[^}]*display\s*:\s*none\s*!important/);
+  });
+});
+
+describe('Phase 68 — Forwarded Message Header & Attribution', () => {
+  it('renders forwarded header with attribution at top of bubble', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-fwd-attr"
+        isOutgoing={false}
+        text="Forwarded text"
+        timestamp={Date.now()}
+        forwarded={true}
+        forwardedFrom="pos"
+      />
+    );
+
+    expect(html).toContain('veil-message-forwarded-header');
+    expect(html).toContain('Forwarded from pos');
+    expect(html).toContain('Forwarded text');
+  });
+
+  it('renders forwarded header without attribution when forwardedFrom is omitted', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-fwd-noattr"
+        isOutgoing={true}
+        text="Secret forwarded text"
+        timestamp={Date.now()}
+        forwarded={true}
+      />
+    );
+
+    expect(html).toContain('veil-message-forwarded-header');
+    expect(html).toContain('Forwarded message');
+    expect(html).not.toContain('Forwarded from');
+  });
+
+  it('does not render forwarded header when forwarded is false or undefined', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-normal"
+        isOutgoing={false}
+        text="Original message"
+        timestamp={Date.now()}
+      />
+    );
+
+    expect(html).not.toContain('veil-message-forwarded-header');
+  });
+
+  it('Forward dialog in ConversationView provides include attribution toggle', () => {
+    const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
+    expect(convView).toContain('includeAttribution');
+    expect(convView).toContain('setIncludeAttribution');
+    expect(convView).toContain('Include sender attribution');
+    expect(convView).toContain('forwardMessage(conv.id, target, { includeAttribution: withAttribution })');
+  });
+});

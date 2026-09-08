@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-08T09:45:14.038Z",
+  "generatedAt": "2026-09-08T10:51:54.170Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-C0OoLTF3.js",
-      "sizeBytes": 834298,
-      "sha256": "c1db228a5ee38739b69cbdd2ff0373ac8995612f3e67411e05d9855cdcb59db7"
+      "path": "dist/assets/index-3GUv5TiT.css",
+      "sizeBytes": 76984,
+      "sha256": "8aa3102d200228f94542e3e91d3fbae621542bf7d3c664742dd939eb15eaaece"
     },
     {
-      "path": "dist/assets/index-CRQBJhbr.css",
-      "sizeBytes": 76066,
-      "sha256": "eb5f67de8f13c4647e63bea981633ebdffca591abc37bc137364a02a45bf0819"
+      "path": "dist/assets/index-CzvS6fKJ.js",
+      "sizeBytes": 840042,
+      "sha256": "4ad5a90de55a5a04c576f43f0ccdf563bc3a39ebcc3e9bccf684fd8afb049c85"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-7OXxV6tO.js",
-      "sizeBytes": 8728,
-      "sha256": "a4e8c42caa5ae069ed6c706959985a0d4e1fbbeb4ded7514d7aa84044bab1c6a"
-    },
-    {
-      "path": "dist/assets/web-CwyXVxwe.js",
-      "sizeBytes": 361,
-      "sha256": "fde954e565cac9d98c9eff8c5d0b30ab4b4714149a877739656e3839f6b099ce"
-    },
-    {
-      "path": "dist/assets/web-DGuyGfBu.js",
+      "path": "dist/assets/web-Bt5gcjhD.js",
       "sizeBytes": 842,
-      "sha256": "81d9bf75312e334e83e70486dbf54212c8c2ec48b5ec40e957329755cc941147"
+      "sha256": "26a37c0a963e6be58d27cd085c2df732a99ddc47fbe0a3bb97bc5dd1730a415a"
+    },
+    {
+      "path": "dist/assets/web-C3MQnBYl.js",
+      "sizeBytes": 361,
+      "sha256": "252cc15e86279dc3855b1ac903ecb80449d26fdb673064232f1b7fc976c576a7"
+    },
+    {
+      "path": "dist/assets/web-CSaOAV9y.js",
+      "sizeBytes": 8728,
+      "sha256": "6d50dba5506f982693ba91342bddab392a5d283a4974de86f1c578db5af5eecc"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "2f02344c8a42d6f4be57df3b2a3fec41c6d6f8d24966fd1e0fe8fa1d9dcc1120"
+      "sha256": "4f6bf095ea73e7f336370a54aa9bcc5950907197a1ef087686fcd9781314afdf"
     }
   ]
 }

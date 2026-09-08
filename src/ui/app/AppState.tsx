@@ -192,7 +192,7 @@ export interface AppContextType {
   unpinConversation: (conversationId: string) => Promise<void>;
   pinMessage: (conversationId: string, messageId: string) => Promise<void>;
   unpinMessage: (conversationId: string) => Promise<void>;
-  forwardMessage: (targetConversationId: string, message: UIMessage) => Promise<void>;
+  forwardMessage: (targetConversationId: string, message: UIMessage, options?: { includeAttribution?: boolean }) => Promise<void>;
 
   // Actions
   unlockSpace: (passphrase: string, username?: string) => Promise<any>;
@@ -208,10 +208,10 @@ export interface AppContextType {
   panicLock: () => void;
   selectConversation: (id: string | null) => void;
   setReplyTarget: (msg: UIMessage | null) => void;
-  sendMessage: (conversationId: string, text: string) => Promise<void>;
-  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
-  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
-  sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => Promise<void>;
+  sendMessage: (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
+  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
+  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
+  sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
   deleteMessageForEveryone: (conversationId: string, messageId: string) => Promise<void>;
@@ -1021,6 +1021,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   attachments: parsed.attachments,
                   replyTo: parsed.replyTo,
                   voice: parsed.voice,
+                  forwarded: parsed.forwarded,
+                  forwardedFrom: parsed.forwardedFrom,
                 };
 
                 setMessages((prev) => {
@@ -1157,6 +1159,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             attachments: incomingAttachments,
             replyTo,
             voice,
+            forwarded: (result as any).forwarded ?? storedMessage.forwarded,
+            forwardedFrom: (result as any).forwardedFrom ?? storedMessage.forwardedFrom,
           };
 
           RuntimeDiagnostics.receive('wireMessageReceived', {
@@ -2287,7 +2291,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const sendMessage = useCallback(
-    async (conversationId: string, text: string) => {
+    async (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => {
       if (!activeSession || !text.trim()) return;
 
       // Phase 55 P0-2: In-memory block check (0ms overhead)
@@ -2316,6 +2320,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         timestamp: Date.now(),
         status: 'SENDING',
         replyTo: activeReply,
+        forwarded: options?.forwarded,
+        forwardedFrom: options?.forwardedFrom,
       };
 
       replyTargetRef.current = null;
@@ -2411,6 +2417,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 senderKeyDistribution: dist,
                 replyTo: activeReply,
                 timestamp: Date.now(),
+                forwarded: options?.forwarded,
+                forwardedFrom: options?.forwardedFrom,
               });
 
               const members = targetConv.groupState?.members || {};
@@ -2447,7 +2455,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 activeReply,
                 undefined,
                 undefined,
-                msgId
+                msgId,
+                {
+                  forwarded: options?.forwarded,
+                  forwardedFrom: options?.forwardedFrom,
+                }
               );
 
               let effectiveMailboxId = targetMailboxId;
@@ -2534,21 +2546,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, contacts, conversations, replyTarget, networkState, myProfile]
   );
 
-  const forwardMessage = useCallback(
-    async (targetConversationId: string, message: UIMessage) => {
-      if (!activeSession) return;
-      if (message.text) {
-        await sendMessage(targetConversationId, message.text);
-      }
-    },
-    [activeSession, sendMessage]
-  );
-
   const sendAttachments = useCallback(
     async (
       conversationId: string,
       files: File[],
-      options?: { allowSave?: boolean; allowForward?: boolean }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }
     ) => {
       if (!activeSession || files.length === 0) return;
 
@@ -2641,6 +2643,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         attachment: initialAttachments[0],
         attachments: initialAttachments,
         replyTo: activeReply,
+        forwarded: options?.forwarded,
+        forwardedFrom: options?.forwardedFrom,
         privacy: {
           allowSave,
           allowForward,
@@ -2927,6 +2931,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 attachment: wireSingle,
                 attachments: successfulAttachments.length > 1 ? wireAttachments : undefined,
                 replyTo: activeReply,
+                forwarded: options?.forwarded,
+                forwardedFrom: options?.forwardedFrom,
                 timestamp: Date.now(),
               });
 
@@ -2964,7 +2970,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 activeReply,
                 undefined,
                 successfulAttachments.length > 1 ? wireAttachments : undefined,
-                msgId
+                msgId,
+                {
+                  forwarded: options?.forwarded,
+                  forwardedFrom: options?.forwardedFrom,
+                }
               );
 
               let effectiveMailboxId = targetMailboxId;
@@ -3024,14 +3034,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const sendAttachment = useCallback(
-    async (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean }) => {
+    async (
+      conversationId: string,
+      file: File,
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }
+    ) => {
       return sendAttachments(conversationId, [file], options);
     },
     [sendAttachments]
   );
 
   const sendVoiceMessage = useCallback(
-    async (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string) => {
+    async (
+      conversationId: string,
+      durationSeconds: number,
+      audioBlob: Blob,
+      mimeType: string,
+      options?: { forwarded?: boolean; forwardedFrom?: string }
+    ) => {
       if (!activeSession) return;
 
       // Phase 55 P0-2: Check if recipient is blocked
@@ -3089,6 +3109,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           nonceBase64: '',
         },
         replyTo: activeReply,
+        forwarded: options?.forwarded,
+        forwardedFrom: options?.forwardedFrom,
       };
 
       setMessages((prev) => {
@@ -3152,6 +3174,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               text: 'Voice Message',
               voice: voiceMeta,
               replyTo: activeReply,
+              forwarded: options?.forwarded,
+              forwardedFrom: options?.forwardedFrom,
               timestamp: Date.now(),
             });
 
@@ -3189,7 +3213,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               activeReply,
               voiceMeta,
               undefined,
-              msgId
+              msgId,
+              {
+                forwarded: options?.forwarded,
+                forwardedFrom: options?.forwardedFrom,
+              }
             );
 
             let effectiveMailboxId = targetMailboxId;
@@ -3248,7 +3276,118 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       })();
     },
-    [activeSession, contacts, replyTarget]
+    [activeSession, contacts, conversations, replyTarget, myProfile]
+  );
+
+  const forwardMessage = useCallback(
+    async (targetConversationId: string, message: UIMessage, options?: { includeAttribution?: boolean }) => {
+      if (!activeSession) return;
+      sessionController.recordUserActivity();
+
+      const shouldAttribute = options?.includeAttribution ?? true;
+      let forwardedFrom: string | undefined;
+
+      if (shouldAttribute) {
+        if (message.forwarded && message.forwardedFrom) {
+          forwardedFrom = message.forwardedFrom;
+        } else if (message.senderName) {
+          forwardedFrom = message.senderName;
+        } else if (!message.isOutgoing) {
+          const contact = contacts.find((c) => c.identityId === message.senderId);
+          forwardedFrom = contact?.name || contact?.accountUsername || 'Contact';
+        } else {
+          forwardedFrom = myProfile?.displayName || myProfile?.username || activeSession.name || 'Me';
+        }
+      }
+
+      const forwardOpts = {
+        forwarded: true,
+        forwardedFrom,
+      };
+
+      // 1. Voice note forwarding
+      if (message.voice) {
+        let audioBlob: Blob | undefined;
+        let cached = MediaCache.get(message.voice.objectId);
+        if (cached && cached.data) {
+          audioBlob = new Blob([cached.data], { type: message.voice.mimeType || 'audio/webm' });
+        } else {
+          try {
+            const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, message.voice);
+            cached = MediaCache.get(message.voice.objectId);
+            if (cached && cached.data) {
+              audioBlob = new Blob([cached.data], { type: message.voice.mimeType || 'audio/webm' });
+            } else if (blobUrl) {
+              const resp = await fetch(blobUrl);
+              audioBlob = await resp.blob();
+            }
+          } catch (_vErr) {
+            console.warn('[VEIL-FORWARD] Failed to retrieve voice note for forwarding:', _vErr);
+          }
+        }
+
+        if (audioBlob) {
+          await sendVoiceMessage(
+            targetConversationId,
+            message.voice.durationSeconds || 0,
+            audioBlob,
+            message.voice.mimeType || 'audio/webm',
+            forwardOpts
+          );
+          return;
+        }
+      }
+
+      // 2. Media attachment(s) forwarding
+      const sourceAtts = (message.attachments && message.attachments.length > 0)
+        ? message.attachments
+        : message.attachment
+        ? [message.attachment]
+        : [];
+
+      if (sourceAtts.length > 0) {
+        const files: File[] = [];
+        for (const att of sourceAtts) {
+          const key = att.objectId || att.attachmentId || att.name;
+          let cached = MediaCache.get(key);
+          if (!cached) {
+            try {
+              cached = await MediaCache.getOrFetch(att as any, activeSession, cloudClient);
+            } catch (_fErr) {}
+          }
+          if (cached && cached.data) {
+            const file = new File([cached.data], att.name || 'attachment', {
+              type: att.mimeType || cached.mimeType || 'application/octet-stream',
+            });
+            files.push(file);
+          } else if (att.previewUrl || att.localPreviewUrl) {
+            try {
+              const resp = await fetch(att.localPreviewUrl || att.previewUrl!);
+              const blob = await resp.blob();
+              const file = new File([blob], att.name || 'attachment', {
+                type: att.mimeType || blob.type || 'application/octet-stream',
+              });
+              files.push(file);
+            } catch (_e) {}
+          }
+        }
+
+        if (files.length > 0) {
+          await sendAttachments(targetConversationId, files, {
+            allowSave: sourceAtts[0].allowSave,
+            allowForward: sourceAtts[0].allowForward,
+            ...forwardOpts,
+          });
+          return;
+        }
+      }
+
+      // 3. Text message forwarding
+      if (message.text) {
+        await sendMessage(targetConversationId, message.text, forwardOpts);
+      }
+    },
+    [activeSession, contacts, myProfile, cloudClient, sendVoiceMessage, sendAttachments, sendMessage]
   );
 
   const deleteMessageLocally = useCallback(

@@ -11,12 +11,15 @@ import { ReplyPreview, ReplyPreviewData } from './ReplyPreview.tsx';
 import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
 import { Spinner } from './Spinner.tsx';
-import { RefreshCwIcon, ReplyIcon } from '../icons/index.ts';
+import { RefreshCwIcon, ReplyIcon, ForwardIcon } from '../icons/index.ts';
 
 export interface MessageBubbleProps {
   id?: string;
   messageId?: string;
   senderName?: string;
+  showSenderName?: boolean;
+  forwarded?: boolean;
+  forwardedFrom?: string;
   isOutgoing: boolean;
   text?: string;
   timestamp: number | Date;
@@ -25,6 +28,7 @@ export interface MessageBubbleProps {
   replyTo?: ReplyPreviewData;
   onReplyClick?: (messageId: string) => void;
   onReplyTrigger?: () => void;
+  onReply?: () => void;
   attachmentElement?: ReactNode;
   voiceElement?: ReactNode;
   reactions?: Array<{ emoji: string; count: number; userReacted?: boolean }>;
@@ -46,6 +50,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   id,
   messageId,
   senderName,
+  showSenderName = true,
+  forwarded = false,
+  forwardedFrom,
   isOutgoing,
   text,
   timestamp,
@@ -54,6 +61,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   replyTo,
   onReplyClick,
   onReplyTrigger,
+  onReply,
   attachmentElement,
   voiceElement,
   reactions,
@@ -102,8 +110,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       return;
     }
 
+    const triggerReply = onReplyTrigger || onReply;
+
     // Swiping left (negative deltaX)
-    if (deltaX < 0 && onReplyTrigger && !isSelectionMode) {
+    if (deltaX < 0 && triggerReply && !isSelectionMode) {
       // Cancel long press if user is actively swiping
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
@@ -119,15 +129,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       longPressTimerRef.current = null;
     }
 
-    if (swipeOffset < -35 && onReplyTrigger) {
-      onReplyTrigger();
+    const triggerReply = onReplyTrigger || onReply;
+    if (swipeOffset < -35 && triggerReply) {
+      triggerReply();
     }
 
     setSwipeOffset(0);
     touchStartRef.current = null;
   };
 
+  const triggerReply = onReplyTrigger || onReply;
   const isFailed = effectiveStatus === 'FAILED';
+  const isMobilePlatform = typeof window !== 'undefined' && (
+    Boolean((window as any).Capacitor?.getPlatform() === 'android') ||
+    /Android/i.test(navigator.userAgent)
+  );
+  const hasReactions = Boolean(reactions && reactions.length > 0);
+  const canReply = Boolean(!isSelectionMode && triggerReply && !isFailed);
+  const showDesktopReply = canReply && !isMobilePlatform;
+  const shouldRenderActionRow = hasReactions || showDesktopReply;
+
   const groupedClass = `${isGroupedWithPrevious ? 'veil-message-grouped-prev' : ''} ${
     isGroupedWithNext ? 'veil-message-grouped-next' : ''
   }`.trim();
@@ -195,7 +216,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           transition: swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
         }}
       >
-        {!isOutgoing && senderName && (
+        {forwarded && (
+          <div
+            className="veil-message-forwarded-header"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '0.72rem',
+              color: 'var(--veil-text-muted, #94a3b8)',
+              fontStyle: 'italic',
+              marginBottom: '4px',
+              userSelect: 'none',
+              opacity: 0.85,
+            }}
+          >
+            <ForwardIcon size={12} style={{ opacity: 0.8 }} />
+            <span>{forwardedFrom ? `Forwarded from ${forwardedFrom}` : 'Forwarded message'}</span>
+          </div>
+        )}
+
+        {!isOutgoing && senderName && showSenderName && (
           <div
             className="veil-message-sender-tag"
             style={{
@@ -231,32 +272,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </div>
 
         <div className="veil-message-meta">
-          {!isSelectionMode && onReplyTrigger && !isFailed && (
-            <button
-              type="button"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'inherit',
-                opacity: 0.7,
-                fontSize: '0.7rem',
-                cursor: 'pointer',
-                padding: '0 4px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '2px',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onReplyTrigger();
-              }}
-              aria-label="Reply to this message"
-            >
-              <ReplyIcon size={12} />
-              <span>Reply</span>
-            </button>
-          )}
-
           {isFailed && onRetry && (
             <button
               type="button"
@@ -293,23 +308,71 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {isOutgoing && <MessageStatus status={effectiveStatus} />}
         </div>
 
-        {reactions && reactions.length > 0 && (
-          <div className="veil-message-reactions" role="group" aria-label="Reactions">
-            {reactions.map((r, i) => (
+        {shouldRenderActionRow && (
+          <div
+            className="veil-message-action-row"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              marginTop: '6px',
+              gap: '8px',
+              boxSizing: 'border-box',
+            }}
+          >
+            {hasReactions ? (
+              <div className="veil-message-reactions" role="group" aria-label="Reactions">
+                {reactions!.map((r, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`veil-reaction-pill ${r.userReacted ? 'user-reacted' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReactionClick?.(r.emoji);
+                    }}
+                    aria-label={`Reaction ${r.emoji} count ${r.count}`}
+                  >
+                    <span className="veil-reaction-emoji">{r.emoji}</span>
+                    <span className="veil-reaction-count">{r.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="veil-action-row-spacer" />
+            )}
+
+            {showDesktopReply && (
               <button
-                key={i}
                 type="button"
-                className={`veil-reaction-pill ${r.userReacted ? 'user-reacted' : ''}`}
+                className="veil-message-reply-btn"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'inherit',
+                  opacity: 0.75,
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  marginLeft: 'auto',
+                  flexShrink: 0,
+                  transition: 'opacity 0.15s ease',
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onReactionClick?.(r.emoji);
+                  triggerReply!();
                 }}
-                aria-label={`Reaction ${r.emoji} count ${r.count}`}
+                aria-label="Reply to this message"
               >
-                <span className="veil-reaction-emoji">{r.emoji}</span>
-                <span className="veil-reaction-count">{r.count}</span>
+                <ReplyIcon size={12} />
+                <span>Reply</span>
               </button>
-            ))}
+            )}
           </div>
         )}
       </div>

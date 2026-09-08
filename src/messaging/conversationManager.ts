@@ -44,6 +44,8 @@ export interface StoredMessage {
   attachments?: WireAttachmentPayload[];
   replyTo?: any;
   voice?: any;
+  forwarded?: boolean;
+  forwardedFrom?: string;
 }
 
 const MESSAGE_HISTORY_PREFIX = 'veil:messages:conv:';
@@ -308,7 +310,8 @@ export class ConversationManager {
     replyTo?: { messageId: string; senderName?: string; text: string; attachmentType?: string },
     voice?: { durationSeconds: number; sizeBytes: number; objectId: string; mimeType: string; ciphertextHash: string; encryptionKeyBase64: string; nonceBase64: string },
     attachments?: any[],
-    explicitDeliveryId?: string
+    explicitDeliveryId?: string,
+    forwardOptions?: { forwarded?: boolean; forwardedFrom?: string }
   ): Promise<{ wirePayloadBase64: string; deliveryId: string; storedMessage: StoredMessage }> {
     this.assertSession(session);
 
@@ -375,6 +378,8 @@ export class ConversationManager {
       groupId: wireGroupId,
       replyTo,
       voice,
+      forwarded: forwardOptions?.forwarded,
+      forwardedFrom: forwardOptions?.forwardedFrom,
     };
 
     // Strict validation: Reject any accidental local preview URLs or Blob/File instances
@@ -403,6 +408,8 @@ export class ConversationManager {
       attachments: wireAttachments,
       replyTo,
       voice,
+      forwarded: forwardOptions?.forwarded,
+      forwardedFrom: forwardOptions?.forwardedFrom,
     };
     this.appendMessage(session, peerId, storedMessage);
 
@@ -611,6 +618,8 @@ export class ConversationManager {
       attachments: wireObj.attachments,
       replyTo: wireObj.replyTo,
       voice: wireObj.voice,
+      forwarded: wireObj.forwarded,
+      forwardedFrom: wireObj.forwardedFrom,
     };
     this.appendMessage(session, senderId, storedMessage);
 
@@ -624,6 +633,8 @@ export class ConversationManager {
       attachments: wireObj.attachments,
       replyTo: wireObj.replyTo,
       voice: wireObj.voice,
+      forwarded: wireObj.forwarded,
+      forwardedFrom: wireObj.forwardedFrom,
     };
   }
 

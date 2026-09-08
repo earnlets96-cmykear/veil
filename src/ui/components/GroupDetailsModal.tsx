@@ -183,7 +183,7 @@ export const GroupDetailsModal: React.FC<{ conversationId: string }> = ({ conver
     }
   };
 
-  const myDoc = activeSession ? idMgr.getPublicDocument(activeSession, store) : null;
+  const myDoc = activeSession && idMgr ? idMgr.getPublicDocument(activeSession, store) : null;
   const myIdentityId = myDoc?.identityId || activeSession?.spaceId;
   const isCreator = Boolean(groupState?.creatorIdentityId && groupState.creatorIdentityId === myIdentityId);
 

@@ -1,11 +1,25 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES + CONTEXT MENU REDESIGN & LAYOUT REPAIR
+## Active Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 
-### Phase 68 Chat UI Layout & Context Menu Tasks:
+### Phase 68 Chat UI Layout & Micro-Polish Tasks:
+- [x] **P2P Message Bubbles — Sender Name Omission (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Hid sender names inside message bubbles in 1-to-1 / P2P conversations where header already identifies the peer.
+  - Kept sender names visible in group chats based on `isGroup` (`activeConversation?.type === 'group'`).
+- [x] **Reaction & Reply Horizontal Action Row (`src/ui/components/ui/MessageBubble.tsx`, `src/styles/veil-design-system.css`)**:
+  - Implemented `.veil-message-action-row` with `display: flex; align-items: center; justify-content: space-between;` containing `.veil-message-reactions` (left) and `.veil-message-reply-btn` (right).
+  - Ensured zero extra space or margins if reactions or reply button are absent.
+- [x] **Platform-Specific Reply Affordance (`src/ui/components/ui/MessageBubble.tsx`, `src/styles/veil-design-system.css`)**:
+  - Suppressed inline Reply button on mobile touch (`@media (max-width: 768px)` and `isMobilePlatform` check). Mobile users reply via horizontal swipe gesture or context menu.
+  - Retained inline Reply button on desktop.
+- [x] **End-to-End Forwarding Pipeline (`src/ui/app/AppState.tsx`, `src/ui/components/ConversationView.tsx`, `src/messaging/conversationManager.ts`, `src/ui/components/ui/MessageBubble.tsx`)**:
+  - Implemented forwarding for text, attachments (single and multi-file galleries), and voice notes via decrypted cache re-encryption.
+  - Added user toggle in forward dialog for `[✓] Include sender attribution`.
+  - Added `forwarded?: boolean; forwardedFrom?: string;` to wire, stored, and UI message layers.
+  - Rendered `↗ Forwarded from [name]` or `↗ Forwarded message` banner at top of message bubble.
 - [x] **Message Bubble Overlap Root Cause Resolution (`src/styles/veil-design-system.css`, `src/styles/veil-components.css`, `src/ui/components/ui/MessageBubble.tsx`)**:
   - Eliminated escaped `float: right` on `.veil-message-meta` which broke container height calculation and collided with adjacent incoming/outgoing bubbles.
   - Converted `.veil-message-bubble` to standard `display: flex; flex-direction: column;` participating in natural document flow.
@@ -28,9 +42,8 @@
   - Implemented `deleteForEveryoneConfirm` state with modal dialog warning that deletion is permanent for all participants.
   - Implemented `forwardingMessage` state with modal dialog allowing user to choose target conversation to forward message to.
 - [x] **Automated Testing & Build Verification**:
-  - Created `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (7/7 tests pass).
-  - Verified regression suites: `tests/phase44a-ui-layout-and-icons.test.tsx`, `tests/phase31-chat-ui.test.tsx`, `tests/phase64-audit-and-polish.test.tsx`, `tests/phase45e-reply-rendering.test.tsx`, `tests/phase37-android-layout.test.ts`, `tests/phase65-reactions-and-actions.test.ts` (48/48 tests pass).
-  - Production build (`npm run build`) succeeded with release bundle & checksum manifest.
+  - Extended `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 tests pass).
+  - Production build (`npm run build`) succeeded cleanly with release bundle & checksum manifest.
 
 ---
 

@@ -92,6 +92,8 @@ export interface UIMessage {
     allowSave?: boolean;
     allowForward?: boolean;
   };
+  forwarded?: boolean;
+  forwardedFrom?: string;
 }
 
 export interface ReplyReference {

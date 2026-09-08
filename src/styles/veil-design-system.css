@@ -947,14 +947,67 @@ body {
   line-height: 1.2;
 }
 
+/* Message Forwarded Attribution Header */
+.veil-message-forwarded-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--veil-text-muted, #94a3b8);
+  font-style: italic;
+  margin-bottom: 4px;
+  user-select: none;
+  opacity: 0.85;
+}
+
+/* Reactions & Reply Action Row */
+.veil-message-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 6px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.veil-action-row-spacer {
+  flex: 0 0 0px;
+}
+
+.veil-message-reply-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.75;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--veil-radius-sm, 4px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.veil-message-reply-btn:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
 /* Reactions Tray & Pills */
 .veil-message-reactions {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 6px;
-  width: 100%;
+  width: auto;
   clear: both;
+}
+
+.veil-message-action-row .veil-message-reactions {
+  margin-top: 0;
 }
 
 .veil-reaction-pill {
@@ -1472,6 +1525,14 @@ body,
   }
 
   .veil-composer-send-text {
+    display: none !important;
+  }
+
+  .veil-message-reply-btn {
+    display: none !important;
+  }
+
+  .veil-message-action-row:not(:has(.veil-message-reactions)) {
     display: none !important;
   }
 

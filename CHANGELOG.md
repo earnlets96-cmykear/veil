@@ -4,7 +4,22 @@ All notable changes to the VEIL project are documented in this file.
 
 ## [1.0.0-phase68-chat-ui-polish] - 2026-09-08
 
-### Chat UI Polish: Message Bubbles + Context Menu Redesign & Layout Repair (Phase 68)
+### Chat UI Polish: Message Bubbles, Action Row Alignment, P2P Sender Omission & Forwarding Pipeline (Phase 68)
+- **P2P Message Bubbles — Sender Name Omission**:
+  - In 1-to-1 / P2P conversations, the sender display name is omitted inside every message bubble (`showSenderName={false}`) because the conversation header already identifies the peer.
+  - In group conversations (`activeConversation?.type === 'group'`), sender names remain prominently displayed (`showSenderName={true}`) in their accent color (`var(--veil-accent-primary)`).
+- **Reaction + Reply Horizontal Action Row**:
+  - Reactions and Reply button are positioned on the SAME horizontal flex row (`.veil-message-action-row`) below message metadata with `display: flex; align-items: center; justify-content: space-between; gap: 8px;`.
+  - When both reactions and desktop reply are present, reactions sit left and reply sits right.
+  - When only reactions exist, reactions sit cleanly without extra margins.
+  - When neither are present, the action row does not render, taking zero vertical space.
+- **Platform-Specific Reply Affordance (Mobile vs Desktop)**:
+  - On mobile touch / Android devices, the visible inline reply button is suppressed (`display: none !important` via `@media (max-width: 768px), (pointer: coarse)` and `isMobilePlatform` check). Touch users reply via horizontal swipe gesture or the context menu.
+  - On desktop/web, the Reply button appears cleanly on the action row.
+- **End-to-End Forwarding Pipeline**:
+  - Complete message forwarding for text, attachments (single and multi-file galleries), and voice notes with fresh recipient/group AEAD re-encryption and R2 cloud authorization.
+  - Optional "Forwarded from [name]" attribution toggle in the forwarding dialog (`[✓] Include sender attribution`).
+  - Rendered via clean metadata banner `↗ Forwarded from [name]` or `↗ Forwarded message` at the top of the bubble, never prepending raw text.
 - **Eliminated Message Bubble Overlap & Collisions**:
   - Root cause: `.veil-message-meta` was declared as `float: right; margin-top: 2px;` inside an `inline-block` `.veil-message-bubble`. When message text was short ("pos"), the floated metadata escaped container height calculation, causing adjacent message rows and reaction pills to physically collide. Furthermore, `.veil-message-grouped-prev/next` injected conflicting `!important` margins.
   - Converted `.veil-message-bubble` to standard `display: flex; flex-direction: column;` participating in natural document flow.
@@ -27,9 +42,8 @@ All notable changes to the VEIL project are documented in this file.
   - Implemented `deleteForEveryoneConfirm` state with modal dialog warning that deletion is permanent for all participants.
   - Implemented `forwardingMessage` state with modal dialog allowing user to choose target conversation to forward message to.
 - **Automated Verification**:
-  - Created `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (7/7 tests pass).
-  - Verified regression across `tests/phase44a-ui-layout-and-icons.test.tsx`, `tests/phase31-chat-ui.test.tsx`, `tests/phase64-audit-and-polish.test.tsx`, `tests/phase45e-reply-rendering.test.tsx`, `tests/phase37-android-layout.test.ts`, and `tests/phase65-reactions-and-actions.test.ts` (48/48 tests passing).
-  - Web production build passed in 1.83s with 7 release artifacts in `release/v1.0.0/`.
+  - Created and extended `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 tests pass).
+  - Verified regression across full test suites and production build in 1.98s with 7 release artifacts in `release/v1.0.0/`.
 
 ## [1.0.0-phase67-applock-perf-sync] - 2026-09-07
 
