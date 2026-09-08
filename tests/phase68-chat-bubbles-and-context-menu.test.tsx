@@ -31,6 +31,7 @@ describe('Phase 68 — Message Bubbles & Layout Integrity', () => {
       <MessageBubble
         id="msg-1"
         senderName="Alice"
+        showSenderName={true}
         isOutgoing={false}
         text="Hello world"
         timestamp={Date.now()}
@@ -56,7 +57,7 @@ describe('Phase 68 — Message Bubbles & Layout Integrity', () => {
     const metaBlockMatch = designSystemCss.match(/\.veil-message-meta\s*\{[^}]*\}/);
     expect(metaBlockMatch).toBeTruthy();
     expect(metaBlockMatch![0]).not.toMatch(/float\s*:\s*right/);
-    expect(metaBlockMatch![0]).toMatch(/display\s*:\s*flex/);
+    expect(metaBlockMatch![0]).toMatch(/display\s*:\s*(?:inline-)?flex/);
   });
 
   it('Single-line short messages have min-width and proper padding without collapsing', () => {
@@ -266,7 +267,7 @@ describe('Phase 68 — Reaction & Reply Action Row & Platform Polish', () => {
     expect(html).not.toContain('veil-message-reply-btn');
   });
 
-  it('renders zero action row elements when neither reactions nor reply button are present', () => {
+  it('renders unified action row with timestamp/status but zero reactions and zero reply button when absent', () => {
     const html = renderToStaticMarkup(
       <MessageBubble
         id="msg-plain"
@@ -276,9 +277,37 @@ describe('Phase 68 — Reaction & Reply Action Row & Platform Polish', () => {
       />
     );
 
-    expect(html).not.toContain('veil-message-action-row');
+    expect(html).toContain('veil-message-action-row');
+    expect(html).toContain('veil-message-meta-group');
+    expect(html).toContain('veil-message-meta');
     expect(html).not.toContain('veil-message-reactions');
     expect(html).not.toContain('veil-message-reply-btn');
+  });
+
+  it('unifies reactions on the left and reply button + timestamp on the right on the same line', () => {
+    const html = renderToStaticMarkup(
+      <MessageBubble
+        id="msg-unified-row"
+        isOutgoing={false}
+        text="Check this layout"
+        timestamp={Date.now()}
+        reactions={[{ emoji: '👍', count: 2, userReacted: true }]}
+        onReply={() => {}}
+      />
+    );
+
+    expect(html).toContain('veil-message-action-row');
+    const rxIndex = html.indexOf('veil-message-reactions');
+    const metaGroupIndex = html.indexOf('veil-message-meta-group');
+    const replyBtnIndex = html.indexOf('veil-message-reply-btn');
+    const metaIndex = html.indexOf('class="veil-message-meta"');
+
+    // Reactions must come first (left)
+    expect(rxIndex).toBeGreaterThan(-1);
+    expect(metaGroupIndex).toBeGreaterThan(rxIndex);
+    // Reply button and timestamp must be inside meta-group on the right
+    expect(replyBtnIndex).toBeGreaterThan(metaGroupIndex);
+    expect(metaIndex).toBeGreaterThan(metaGroupIndex);
   });
 
   it('Design system contains mobile suppression rules for inline reply button', () => {

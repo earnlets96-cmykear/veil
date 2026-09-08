@@ -50,7 +50,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   id,
   messageId,
   senderName,
-  showSenderName = true,
+  showSenderName = false,
   forwarded = false,
   forwardedFrom,
   isOutgoing,
@@ -147,7 +147,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const hasReactions = Boolean(reactions && reactions.length > 0);
   const canReply = Boolean(!isSelectionMode && triggerReply && !isFailed);
   const showDesktopReply = canReply && !isMobilePlatform;
-  const shouldRenderActionRow = hasReactions || showDesktopReply;
 
   const groupedClass = `${isGroupedWithPrevious ? 'veil-message-grouped-prev' : ''} ${
     isGroupedWithNext ? 'veil-message-grouped-next' : ''
@@ -271,78 +270,50 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
         </div>
 
-        <div className="veil-message-meta">
-          {isFailed && onRetry && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRetry();
-              }}
-              className="veil-btn-retry"
-              disabled={isRetrying}
-              aria-label="Retry sending failed message"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '3px',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--veil-danger)',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                padding: 0,
-              }}
-            >
-              {isRetrying ? (
-                <Spinner size="xs" color="var(--veil-danger)" />
-              ) : (
-                <RefreshCwIcon size={12} color="var(--veil-danger)" />
-              )}
-              <span>{isRetrying ? 'Retrying...' : 'Retry'}</span>
-            </button>
+        <div
+          className="veil-message-action-row"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            marginTop: '4px',
+            gap: '8px',
+            boxSizing: 'border-box',
+          }}
+        >
+          {hasReactions ? (
+            <div className="veil-message-reactions" role="group" aria-label="Reactions">
+              {reactions!.map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`veil-reaction-pill ${r.userReacted ? 'user-reacted' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReactionClick?.(r.emoji);
+                  }}
+                  aria-label={`Reaction ${r.emoji} count ${r.count}`}
+                >
+                  <span className="veil-reaction-emoji">{r.emoji}</span>
+                  <span className="veil-reaction-count">{r.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="veil-action-row-spacer" style={{ flex: '0 0 0px' }} />
           )}
 
-          <MessageTimestamp timestamp={timestamp} />
-          {isOutgoing && <MessageStatus status={effectiveStatus} />}
-        </div>
-
-        {shouldRenderActionRow && (
           <div
-            className="veil-message-action-row"
+            className="veil-message-meta-group"
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-              marginTop: '6px',
-              gap: '8px',
-              boxSizing: 'border-box',
+              gap: '6px',
+              marginLeft: 'auto',
+              flexShrink: 0,
             }}
           >
-            {hasReactions ? (
-              <div className="veil-message-reactions" role="group" aria-label="Reactions">
-                {reactions!.map((r, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`veil-reaction-pill ${r.userReacted ? 'user-reacted' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onReactionClick?.(r.emoji);
-                    }}
-                    aria-label={`Reaction ${r.emoji} count ${r.count}`}
-                  >
-                    <span className="veil-reaction-emoji">{r.emoji}</span>
-                    <span className="veil-reaction-count">{r.count}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="veil-action-row-spacer" />
-            )}
-
             {showDesktopReply && (
               <button
                 type="button"
@@ -359,7 +330,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  marginLeft: 'auto',
                   flexShrink: 0,
                   transition: 'opacity 0.15s ease',
                 }}
@@ -373,8 +343,57 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <span>Reply</span>
               </button>
             )}
+
+            <div
+              className="veil-message-meta"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                fontSize: '0.68rem',
+                opacity: 0.85,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                lineHeight: 1.2,
+              }}
+            >
+              {isFailed && onRetry && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRetry();
+                  }}
+                  className="veil-btn-retry"
+                  disabled={isRetrying}
+                  aria-label="Retry sending failed message"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--veil-danger)',
+                    cursor: 'pointer',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    padding: 0,
+                  }}
+                >
+                  {isRetrying ? (
+                    <Spinner size="xs" color="var(--veil-danger)" />
+                  ) : (
+                    <RefreshCwIcon size={12} color="var(--veil-danger)" />
+                  )}
+                  <span>{isRetrying ? 'Retrying...' : 'Retry'}</span>
+                </button>
+              )}
+
+              <MessageTimestamp timestamp={timestamp} />
+              {isOutgoing && <MessageStatus status={effectiveStatus} />}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

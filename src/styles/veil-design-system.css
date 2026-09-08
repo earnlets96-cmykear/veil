@@ -933,18 +933,24 @@ body {
 }
 
 .veil-message-meta {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  align-self: flex-end;
   gap: 4px;
   font-size: 0.68rem;
-  margin-top: 4px;
-  margin-left: auto;
+  margin: 0;
   opacity: 0.85;
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1.2;
+}
+
+.veil-message-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Message Forwarded Attribution Header */
@@ -966,7 +972,7 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-top: 6px;
+  margin-top: 4px;
   gap: 8px;
   box-sizing: border-box;
 }
@@ -987,7 +993,6 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
   flex-shrink: 0;
   transition: opacity 0.15s ease, background-color 0.15s ease;
 }

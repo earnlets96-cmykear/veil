@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-08T11:13:18.592Z",
+  "generatedAt": "2026-09-08T11:39:47.946Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-3GUv5TiT.css",
-      "sizeBytes": 76984,
-      "sha256": "8aa3102d200228f94542e3e91d3fbae621542bf7d3c664742dd939eb15eaaece"
+      "path": "dist/assets/index-CMkDs3aC.css",
+      "sizeBytes": 77027,
+      "sha256": "922729e17c81beeb9da6996e9756310468319eabd4ba88f723b7e87807989579"
     },
     {
-      "path": "dist/assets/index-CzvS6fKJ.js",
-      "sizeBytes": 840042,
-      "sha256": "4ad5a90de55a5a04c576f43f0ccdf563bc3a39ebcc3e9bccf684fd8afb049c85"
+      "path": "dist/assets/index-D58nWtrn.js",
+      "sizeBytes": 840379,
+      "sha256": "579924b995e15cab3677a714ccb49d6c9712665775b4cc60da2a79eb07cc7d4c"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-Bt5gcjhD.js",
+      "path": "dist/assets/web-97bowtzL.js",
       "sizeBytes": 842,
-      "sha256": "26a37c0a963e6be58d27cd085c2df732a99ddc47fbe0a3bb97bc5dd1730a415a"
+      "sha256": "6e0324705ca9bd687ad80e8f6f9d231382cac5d953067097081768235e02cc35"
     },
     {
-      "path": "dist/assets/web-C3MQnBYl.js",
+      "path": "dist/assets/web-Cj3b8h7A.js",
       "sizeBytes": 361,
-      "sha256": "252cc15e86279dc3855b1ac903ecb80449d26fdb673064232f1b7fc976c576a7"
+      "sha256": "be93771d102767d3ede3090463df98de1c10fd54cb1f4a35f96c0004e7f9e93f"
     },
     {
-      "path": "dist/assets/web-CSaOAV9y.js",
+      "path": "dist/assets/web-MbFNrnua.js",
       "sizeBytes": 8728,
-      "sha256": "6d50dba5506f982693ba91342bddab392a5d283a4974de86f1c578db5af5eecc"
+      "sha256": "f82d0c64af3a7dde18439c5bec39e1d9499e91a009bd24ebeff8073bd21cd036"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "4f6bf095ea73e7f336370a54aa9bcc5950907197a1ef087686fcd9781314afdf"
+      "sha256": "c42710526a358f5c9fe1641901cb87c2c07a066d24cf16475badc4f2eb0ec0fc"
     }
   ]
 }

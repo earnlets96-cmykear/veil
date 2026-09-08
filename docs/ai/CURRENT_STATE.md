@@ -3,25 +3,27 @@
 ## Current Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
-  - Phase 68 Real-World Forwarding Acceptance Suite: `tests/phase68-real-world-forwarding.test.tsx` (11/11 passed in 833ms with 2 real clients + live RelayServer).
-  - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (18/18 passed in 49ms).
+  - Phase 68 Real-World Forwarding Acceptance Suite: `tests/phase68-real-world-forwarding.test.tsx` (11/11 passed in 791ms with 2 real clients + live RelayServer).
+  - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed in 46ms).
   - Phase 58 Real Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed).
   - Phase 44A Icon Audit & Layout Suite: `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed in 33ms).
-  - Phase 31 Main Chat UI Modernization Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 40ms).
+  - Phase 31 Main Chat UI Modernization Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 48ms).
   - Phase 64 Audit & Polish Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed in 62ms).
   - Phase 45E Reply UI Rendering Suite: `tests/phase45e-reply-rendering.test.tsx` (3/3 passed in 27ms).
   - Phase 37 Android Layout Regression Suite: `tests/phase37-android-layout.test.ts` (9/9 passed in 15ms).
   - Phase 65 Reactions & Contextual Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 321ms).
-  - Web App Production Build: `npm run build` succeeds cleanly in 2.68s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Web App Production Build: `npm run build` succeeds cleanly in 2.02s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Android Debug APK: Built cleanly via `gradlew assembleDebug` (18s), verified in `release/v1.0.0/app-debug.apk`.
 - **Root Cause Analyses & Architectural Fixes**:
   1. **P2P Message Bubbles — Sender Name Omission**:
-     - In 1-to-1 / P2P conversations, the sender display name is omitted inside every message bubble (`showSenderName={false}`) because the conversation header already identifies the peer.
+     - In 1-to-1 / P2P conversations, the sender display name is omitted inside every message bubble (`showSenderName={false}` by default) because the conversation header already identifies the peer.
      - In group conversations (`activeConversation?.type === 'group'`), sender names remain prominently displayed (`showSenderName={true}`) in their accent color (`var(--veil-accent-primary)`).
-  2. **Reaction + Reply Horizontal Action Row**:
-     - Reactions and Reply button are positioned on the SAME horizontal flex row (`.veil-message-action-row`) below message metadata with `display: flex; align-items: center; justify-content: space-between; gap: 8px;`.
-     - When both reactions and desktop reply are present, reactions sit left and reply sits right.
-     - When only reactions exist, reactions sit cleanly without extra margins.
-     - When neither are present, the action row does not render, taking zero vertical space.
+  2. **Unified Single-Line Action / Meta Row**:
+     - Eliminated bulky multi-line bubble stacking (body, timestamp, reaction/reply).
+     - Unified all actions, reactions, and metadata into a single compact horizontal bottom row (`.veil-message-action-row`):
+       - Reactions sit flushed to the **left** (`.veil-message-reactions`).
+       - Inline reply button (desktop) and message timestamp + delivery status checkmarks sit grouped on the **right** (`.veil-message-meta-group`).
+     - Slashes bubble height significantly while maintaining responsive flex containment.
   3. **Platform-Specific Reply Affordance (Mobile vs Desktop)**:
      - On mobile touch / Android devices, the visible inline reply button is suppressed (`display: none !important` via `@media (max-width: 768px), (pointer: coarse)` and `isMobilePlatform` check). Touch users reply via horizontal swipe gesture or the context menu.
      - On desktop/web, the Reply button appears cleanly on the action row.

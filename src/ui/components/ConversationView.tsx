@@ -1239,6 +1239,12 @@ export const ConversationView: React.FC = () => {
             const isGroupedWithPrevious = Boolean(prevMsg && prevMsg.isOutgoing === msg.isOutgoing && Math.abs(msg.timestamp - prevMsg.timestamp) < 60000);
             const isGroupedWithNext = Boolean(nextMsg && nextMsg.isOutgoing === msg.isOutgoing && Math.abs(nextMsg.timestamp - msg.timestamp) < 60000);
 
+            const isGroupConversation = Boolean(
+              activeConversation?.type === 'group' ||
+              (activeChatId && activeChatId.startsWith('grp_')) ||
+              Boolean(activeConversation?.groupState)
+            );
+
             return (
               <ConversationMessageRow
                 key={msg.id}
@@ -1250,7 +1256,7 @@ export const ConversationView: React.FC = () => {
                 isContextActive={contextMenu.isOpen && contextMenu.message?.id === msg.id}
                 isGroupedWithPrevious={isGroupedWithPrevious}
                 isGroupedWithNext={isGroupedWithNext}
-                isGroup={activeConversation?.type === 'group'}
+                isGroup={isGroupConversation}
                 downloadingAttachmentId={downloadingAttachmentId}
                 playbackProgress={playbackProgress}
                 playbackCurrentTime={playbackCurrentTime}

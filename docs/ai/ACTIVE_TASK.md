@@ -9,9 +9,11 @@
 - [x] **P2P Message Bubbles — Sender Name Omission (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:
   - Hid sender names inside message bubbles in 1-to-1 / P2P conversations where header already identifies the peer.
   - Kept sender names visible in group chats based on `isGroup` (`activeConversation?.type === 'group'`).
-- [x] **Reaction & Reply Horizontal Action Row (`src/ui/components/ui/MessageBubble.tsx`, `src/styles/veil-design-system.css`)**:
-  - Implemented `.veil-message-action-row` with `display: flex; align-items: center; justify-content: space-between;` containing `.veil-message-reactions` (left) and `.veil-message-reply-btn` (right).
-  - Ensured zero extra space or margins if reactions or reply button are absent.
+- [x] **Unified Single-Line Action / Meta Row (`src/ui/components/ui/MessageBubble.tsx`, `src/styles/veil-design-system.css`)**:
+  - Unified all actions, reactions, desktop reply button, and message timestamp + delivery status checkmark into a single compact horizontal bottom row (`.veil-message-action-row`).
+  - Reaction pills (`.veil-message-reactions`) sit on the **left**.
+  - Desktop inline reply button (`.veil-message-reply-btn`) and timestamp + status icon (`.veil-message-meta`) sit grouped on the **right** (`.veil-message-meta-group`).
+  - Slashes vertical bubble bulkiness while preserving natural flex containment.
 - [x] **Platform-Specific Reply Affordance (`src/ui/components/ui/MessageBubble.tsx`, `src/styles/veil-design-system.css`)**:
   - Suppressed inline Reply button on mobile touch (`@media (max-width: 768px)` and `isMobilePlatform` check). Mobile users reply via horizontal swipe gesture or context menu.
   - Retained inline Reply button on desktop.

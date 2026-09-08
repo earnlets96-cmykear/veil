@@ -8,11 +8,12 @@ All notable changes to the VEIL project are documented in this file.
 - **P2P Message Bubbles — Sender Name Omission**:
   - In 1-to-1 / P2P conversations, the sender display name is omitted inside every message bubble (`showSenderName={false}`) because the conversation header already identifies the peer.
   - In group conversations (`activeConversation?.type === 'group'`), sender names remain prominently displayed (`showSenderName={true}`) in their accent color (`var(--veil-accent-primary)`).
-- **Reaction + Reply Horizontal Action Row**:
-  - Reactions and Reply button are positioned on the SAME horizontal flex row (`.veil-message-action-row`) below message metadata with `display: flex; align-items: center; justify-content: space-between; gap: 8px;`.
-  - When both reactions and desktop reply are present, reactions sit left and reply sits right.
-  - When only reactions exist, reactions sit cleanly without extra margins.
-  - When neither are present, the action row does not render, taking zero vertical space.
+- **Unified Single-Line Action / Meta Row**:
+  - Eliminated bulky multi-line bubble stacking (body, timestamp, reaction/reply).
+  - Unified all actions, reactions, desktop reply button, and message timestamp + delivery status checkmark into a single compact horizontal bottom row (`.veil-message-action-row`):
+    - Reactions sit flushed to the **left** (`.veil-message-reactions`).
+    - Inline reply button (desktop) and message timestamp + delivery status checkmarks sit grouped on the **right** (`.veil-message-meta-group`).
+  - Slashes bubble height significantly while preserving natural flex containment.
 - **Platform-Specific Reply Affordance (Mobile vs Desktop)**:
   - On mobile touch / Android devices, the visible inline reply button is suppressed (`display: none !important` via `@media (max-width: 768px), (pointer: coarse)` and `isMobilePlatform` check). Touch users reply via horizontal swipe gesture or the context menu.
   - On desktop/web, the Reply button appears cleanly on the action row.
