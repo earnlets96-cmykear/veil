@@ -89,6 +89,7 @@ export const Avatar: React.FC<AvatarProps> = ({
         backgroundImage: effectiveImageUrl ? `url(${effectiveImageUrl})` : undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
       }}
       role="img"
       aria-label={ariaLabel || (isGroup ? 'Group Avatar' : 'Peer Avatar')}

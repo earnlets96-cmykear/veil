@@ -30,6 +30,7 @@ import {
   StatusIndicator,
   Spinner,
   useToast,
+  AvatarCropModal,
 } from './ui/index.ts';
 import {
   UserIcon,
@@ -193,6 +194,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(privacySettings.avatar || myProfile?.avatar || null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [cropModalImage, setCropModalImage] = useState<string | null>(null);
 
   // Settings State
   const [autoLockVal, setAutoLockVal] = useState('5');
@@ -243,7 +245,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   const fingerprint = loadedIdentity?.document.fingerprint || 'E2EE-IDENTITY';
   const invitationLink = exportMyInvitation?.() || null;
 
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
       markFilePickerInactive();
@@ -251,16 +253,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     }
 
     try {
-      const optimizedThumbnail = await processAvatarImage(file);
-      setAvatarPreview(optimizedThumbnail);
-      // Atomically persist avatar to encrypted store, directory, and PIN manager without modal reset
-      await updateProfileAvatar(optimizedThumbnail);
-      showToast({ type: 'success', message: 'Profile photo updated successfully (<32 KB)' });
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropModalImage(reader.result as string);
+      };
+      reader.onerror = () => {
+        showToast({ type: 'error', message: 'Failed to read image file' });
+      };
+      reader.readAsDataURL(file);
     } catch (err: any) {
-      showToast({ type: 'error', message: err.message || 'Failed to process profile photo' });
+      showToast({ type: 'error', message: err.message || 'Failed to process image file' });
     } finally {
       markFilePickerInactive();
       if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    setCropModalImage(null);
+    setAvatarPreview(croppedDataUrl);
+    try {
+      await updateProfileAvatar(croppedDataUrl);
+      showToast({ type: 'success', message: 'Profile photo updated successfully (<32 KB)' });
+    } catch (err: any) {
+      showToast({ type: 'error', message: err.message || 'Failed to save profile photo' });
     }
   };
 
@@ -1068,6 +1084,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               </form>
             </div>
           </div>
+        )}
+
+        {/* Avatar Crop Modal */}
+        {cropModalImage && (
+          <AvatarCropModal
+            imageSrc={cropModalImage}
+            onCropComplete={handleCropComplete}
+            onCancel={() => setCropModalImage(null)}
+          />
         )}
       </div>
     </div>

@@ -240,9 +240,12 @@ export interface AppContextType {
   ensureCloudSession: (session: SpaceSession, forceReauth?: boolean, customPassword?: string) => Promise<boolean | void>;
   updateContactMediaPermissions: (identityId: string, permissions: { allowSave?: boolean; allowForward?: boolean }) => Promise<void>;
 
-  // Phase 23 & Phase 32 Actions
+  // Phase 23, Phase 32 & Multi-Profile Actions
   registerUsername: (username: string, displayName?: string, bio?: string, avatar?: string) => Promise<SignedProfileDocument>;
   updateProfileAvatar: (avatarDataUrl: string) => Promise<void>;
+  addProfilePhoto: (avatarDataUrl: string) => Promise<void>;
+  setMainProfilePhoto: (photoUrl: string) => Promise<void>;
+  deleteProfilePhoto: (photoUrl: string) => Promise<void>;
   markFilePickerActive: () => void;
   markFilePickerInactive: () => void;
   deleteAvatar: () => Promise<void>;
@@ -4165,7 +4168,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const deleteAvatar = useCallback(async () => {
     if (!activeSession) return;
     await store.setAsync(activeSession, 'veil:avatar:tombstone', { deletedAt: Date.now() });
-    await updatePrivacySettings({ avatar: undefined });
+    await updatePrivacySettings({ avatar: undefined, profilePhotos: [] });
     if (myProfile) {
       await registerUsername(myProfile.username, myProfile.displayName, privacySettings.bio, '');
     }
@@ -4204,7 +4207,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       );
 
       await store.setAsync(activeSession, 'veil:user:profile', updatedSignedProfile);
-      await updatePrivacySettings({ avatar: optimizedAvatar });
+
+      const existingPhotos = privacySettings.profilePhotos || (privacySettings.avatar ? [privacySettings.avatar] : []);
+      const nextPhotos = [optimizedAvatar, ...existingPhotos.filter((p) => p !== optimizedAvatar)].slice(0, 20);
+
+      await updatePrivacySettings({ avatar: optimizedAvatar, profilePhotos: nextPhotos });
       setMyProfile(updatedSignedProfile);
 
       // Update in spacePinManager as well for instant space UI reflection
@@ -4214,7 +4221,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await directoryClient.registerProfile(updatedSignedProfile);
       } catch (_e) {}
     },
-    [activeSession, myProfile, updatePrivacySettings]
+    [activeSession, myProfile, privacySettings.profilePhotos, privacySettings.avatar, updatePrivacySettings]
+  );
+
+  const addProfilePhoto = useCallback(
+    async (avatarDataUrl: string) => {
+      await updateProfileAvatar(avatarDataUrl);
+    },
+    [updateProfileAvatar]
+  );
+
+  const setMainProfilePhoto = useCallback(
+    async (photoUrl: string) => {
+      if (!activeSession) return;
+      const existing = privacySettings.profilePhotos || (privacySettings.avatar ? [privacySettings.avatar] : []);
+      const reordered = [photoUrl, ...existing.filter((p) => p !== photoUrl)];
+      await updateProfileAvatar(photoUrl);
+      await updatePrivacySettings({ avatar: photoUrl, profilePhotos: reordered });
+    },
+    [activeSession, privacySettings.profilePhotos, privacySettings.avatar, updateProfileAvatar, updatePrivacySettings]
+  );
+
+  const deleteProfilePhoto = useCallback(
+    async (photoUrl: string) => {
+      if (!activeSession) return;
+      const existing = privacySettings.profilePhotos || (privacySettings.avatar ? [privacySettings.avatar] : []);
+      const remaining = existing.filter((p) => p !== photoUrl);
+      if (remaining.length === 0) {
+        await deleteAvatar();
+      } else {
+        const isCurrentActive = privacySettings.avatar === photoUrl;
+        const nextActive = isCurrentActive ? remaining[0] : privacySettings.avatar;
+        if (isCurrentActive && nextActive) {
+          await updateProfileAvatar(nextActive);
+        }
+        await updatePrivacySettings({ avatar: nextActive, profilePhotos: remaining });
+      }
+    },
+    [activeSession, privacySettings.profilePhotos, privacySettings.avatar, deleteAvatar, updateProfileAvatar, updatePrivacySettings]
   );
 
   const searchDirectory = useCallback(
@@ -4481,6 +4525,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     updateContactMediaPermissions,
     registerUsername,
     updateProfileAvatar,
+    addProfilePhoto,
+    setMainProfilePhoto,
+    deleteProfilePhoto,
     markFilePickerActive,
     markFilePickerInactive,
     deleteAvatar,

@@ -254,7 +254,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
           </div>
         )}
 
-        {!msg.isOutgoing && (
+        {isGroup && !msg.isOutgoing && (
           <div
             style={{
               flexShrink: 0,

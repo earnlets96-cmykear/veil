@@ -2007,5 +2007,22 @@
   box-shadow: 0 0 0 2px var(--veil-accent-primary);
 }
 
+/* =========================================================================
+   AVATAR CROPPING & MULTI-PROFILE STORY DASHES
+   ========================================================================= */
 
+.veil-crop-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--veil-radius-full, 50%);
+  background-color: #000000;
+  touch-action: none;
+  user-select: none;
+}
 
+.veil-profile-story-dashes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}

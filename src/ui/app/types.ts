@@ -115,6 +115,7 @@ export interface UserPrivacySettings {
   phoneNumber?: string;
   bio?: string;
   avatar?: string;
+  profilePhotos?: string[];
 }
 
 export type ActiveModal =

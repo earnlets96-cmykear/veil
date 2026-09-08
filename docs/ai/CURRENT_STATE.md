@@ -3,6 +3,7 @@
 ## Current Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
+  - Phase 68 Profile Polish & Image Cropper Suite: `tests/phase68-profile-and-cropper.test.tsx` (7/7 passed in 14ms).
   - Phase 68 Real-World Forwarding Acceptance Suite: `tests/phase68-real-world-forwarding.test.tsx` (11/11 passed in 791ms with 2 real clients + live RelayServer).
   - Phase 68 Chat Bubbles, Action Row & Forwarding Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed in 46ms).
   - Phase 58 Real Client UI Acceptance Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed).
@@ -12,13 +13,20 @@
   - Phase 45E Reply UI Rendering Suite: `tests/phase45e-reply-rendering.test.tsx` (3/3 passed in 27ms).
   - Phase 37 Android Layout Regression Suite: `tests/phase37-android-layout.test.ts` (9/9 passed in 15ms).
   - Phase 65 Reactions & Contextual Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 321ms).
-  - Web App Production Build: `npm run build` succeeds cleanly in 2.02s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
-  - Android Debug APK: Built cleanly via `gradlew assembleDebug` (18s), verified in `release/v1.0.0/app-debug.apk`.
+  - Web App Production Build: `npm run build` succeeds cleanly in 2.24s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+  - Android Debug APK: Built cleanly via `gradlew assembleDebug` (22s), verified in `release/v1.0.0/app-debug.apk`.
 - **Root Cause Analyses & Architectural Fixes**:
-  1. **P2P Message Bubbles — Sender Name Omission**:
-     - In 1-to-1 / P2P conversations, the sender display name is omitted inside every message bubble (`showSenderName={false}` by default) because the conversation header already identifies the peer.
-     - In group conversations (`activeConversation?.type === 'group'`), sender names remain prominently displayed (`showSenderName={true}`) in their accent color (`var(--veil-accent-primary)`).
-  2. **Unified Single-Line Action / Meta Row**:
+  1. **1-to-1 Chat Bubble Omissions (Sender Name & Avatar)**:
+     - In 1-to-1 / P2P conversations, both the sender display name (`showSenderName={false}`) and the 28px incoming message avatar container are completely omitted because the conversation header already identifies the peer. Incoming bubbles align cleanly to the left edge.
+     - In group conversations (`isGroup === true`), sender names remain prominently displayed and sender avatars render cleanly beside incoming messages.
+  2. **Interactive Profile Image Cropper & Resizer (`AvatarCropModal`)**:
+     - Built an interactive crop/resize modal with circular aperture mask, touch/mouse panning, smooth zoom slider (1.0x to 3.0x), 90° rotation, and reset.
+     - Normalizes crop output to a 512x512 high-DPI square canvas with `imageSmoothingQuality = 'high'` and downsamples to <32 KB, guaranteeing 100% crisp visual fidelity and perfect centered framing across all avatar sizes.
+  3. **Telegram-Style Multiple Profile Photos Gallery & Lightbox**:
+     - Supported multiple profile photos per account (`profilePhotos?: string[]`).
+     - Added Telegram-style story dash indicators (`— — —`) and carousel cycling in `ProfileModal`.
+     - Added "Set as Main Photo", "Delete Photo", and full-screen lightbox photo viewer.
+  4. **Unified Single-Line Action / Meta Row**:
      - Eliminated bulky multi-line bubble stacking (body, timestamp, reaction/reply).
      - Unified all actions, reactions, and metadata into a single compact horizontal bottom row (`.veil-message-action-row`):
        - Reactions sit flushed to the **left** (`.veil-message-reactions`).

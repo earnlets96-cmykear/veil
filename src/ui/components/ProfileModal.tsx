@@ -26,6 +26,7 @@ import {
   StatusIndicator,
   Spinner,
   useToast,
+  AvatarCropModal,
 } from './ui/index.ts';
 import {
   CloseIcon,
@@ -51,6 +52,8 @@ import {
   UsersIcon,
   MoreVerticalIcon,
   CameraIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from './icons/index.ts';
 
 interface ProfileModalProps {
@@ -88,6 +91,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     toggleMuteConversation,
     deleteAvatar,
     updateProfileAvatar,
+    addProfilePhoto,
+    setMainProfilePhoto,
+    deleteProfilePhoto,
     markFilePickerActive,
     markFilePickerInactive,
   } = useApp();
@@ -135,6 +141,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const [avatarPreview, setAvatarPreview] = useState<string | null>(privacySettings.avatar || myProfile?.avatar || null);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Multi-Profile & Cropper State
+  const [cropModalImage, setCropModalImage] = useState<string | null>(null);
+  const [activePhotoIdx, setActivePhotoIdx] = useState<number>(0);
+  const [showLightbox, setShowLightbox] = useState<boolean>(false);
+
+  const availablePhotos: string[] = isPeer
+    ? (peerDoc?.avatar || peerContact?.avatar ? [peerDoc?.avatar || peerContact?.avatar!] : [])
+    : (privacySettings.profilePhotos && privacySettings.profilePhotos.length > 0
+        ? privacySettings.profilePhotos
+        : (avatarPreview || myProfile?.avatar ? [avatarPreview || myProfile?.avatar!] : []));
+
+  const currentPhoto = availablePhotos[activePhotoIdx] || availablePhotos[0] || undefined;
 
   useEffect(() => {
     if (!isEditing) {
@@ -285,27 +304,44 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     (c) => c.type === 'group' && Boolean(c.groupState?.members && effectiveIdentityId && c.groupState.members[effectiveIdentityId])
   ).length;
 
-  // Avatar Selection for Self Profile
-  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Avatar Selection for Self Profile — Opens interactive cropper
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) {
       markFilePickerInactive();
       return;
     }
     try {
-      const processed = await processAvatarImage(file);
-      setAvatarPreview(processed);
-      if (!isEditing) {
-        setIsSaving(true);
-        await updateProfileAvatar(processed);
-        showToast({ type: 'success', message: 'Profile photo updated!' });
-      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropModalImage(reader.result as string);
+      };
+      reader.onerror = () => {
+        showToast({ type: 'error', message: 'Failed to read image file' });
+      };
+      reader.readAsDataURL(file);
     } catch (err: any) {
-      showToast({ type: 'error', message: getErrorMessage(err, 'Failed to process avatar image') });
+      showToast({ type: 'error', message: getErrorMessage(err, 'Failed to process image file') });
     } finally {
-      setIsSaving(false);
       markFilePickerInactive();
       if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    setCropModalImage(null);
+    setAvatarPreview(croppedDataUrl);
+    if (!isEditing) {
+      setIsSaving(true);
+      try {
+        await addProfilePhoto(croppedDataUrl);
+        setActivePhotoIdx(0);
+        showToast({ type: 'success', message: 'Profile photo updated!' });
+      } catch (err: any) {
+        showToast({ type: 'error', message: getErrorMessage(err, 'Failed to save profile photo') });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -521,61 +557,201 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
             <CloseIcon size={18} />
           </button>
 
-          {/* Large Avatar */}
-          <div style={{ display: 'inline-block', position: 'relative', marginBottom: '0.75rem' }}>
-            <Avatar
-              name={isPeer ? effectiveDisplayName : myProfile?.displayName || activeSession?.name || 'Self'}
-              imageUrl={isPeer ? (peerDoc?.avatar || peerContact?.avatar) : (avatarPreview || myProfile?.avatar || undefined)}
-              size={88}
-            />
-            {!isPeer && (
+          {/* Telegram-style story indicators for multiple profile photos */}
+          {availablePhotos.length > 1 && (
+            <div
+              className="veil-profile-story-dashes"
+              style={{
+                display: 'flex',
+                gap: '4px',
+                maxWidth: '220px',
+                margin: '0 auto 10px',
+                padding: '0 4px',
+              }}
+              aria-label={`Photo ${activePhotoIdx + 1} of ${availablePhotos.length}`}
+            >
+              {availablePhotos.map((_, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => setActivePhotoIdx(idx)}
+                  style={{
+                    flex: 1,
+                    height: '3px',
+                    borderRadius: '2px',
+                    backgroundColor: idx === activePhotoIdx ? 'var(--veil-accent-primary, #14b8a6)' : 'rgba(255, 255, 255, 0.25)',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s ease',
+                  }}
+                  title={`View photo ${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Avatar Area with Carousel Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '0.5rem' }}>
+            {availablePhotos.length > 1 && (
               <button
                 type="button"
-                className="veil-avatar-camera-btn"
-                onClick={() => {
-                  markFilePickerActive();
-                  fileInputRef.current?.click();
-                }}
-                title="Change Avatar Photo"
+                className="veil-icon-btn"
+                onClick={() => setActivePhotoIdx((prev) => (prev - 1 + availablePhotos.length) % availablePhotos.length)}
+                aria-label="Previous profile photo"
                 style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  right: 0,
-                  backgroundColor: 'var(--veil-accent-primary)',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  color: 'var(--veil-text-primary)',
                   borderRadius: '50%',
-                  width: '28px',
-                  height: '28px',
+                  width: '32px',
+                  height: '32px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '2px solid var(--veil-bg-surface)',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
                 }}
               >
-                <CameraIcon size={14} color="#ffffff" />
+                <ChevronLeftIcon size={18} />
               </button>
             )}
-            {isPeer && relState === 'CONTACT_VERIFIED' && (
-              <div
+
+            <div
+              style={{ display: 'inline-block', position: 'relative', cursor: currentPhoto ? 'pointer' : 'default' }}
+              onClick={() => {
+                if (currentPhoto) setShowLightbox(true);
+              }}
+              title={currentPhoto ? 'Click to view full photo' : undefined}
+            >
+              <Avatar
+                name={isPeer ? effectiveDisplayName : myProfile?.displayName || activeSession?.name || 'Self'}
+                imageUrl={currentPhoto}
+                size={88}
+              />
+              {!isPeer && (
+                <button
+                  type="button"
+                  className="veil-avatar-camera-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markFilePickerActive();
+                    fileInputRef.current?.click();
+                  }}
+                  title="Add Profile Photo"
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    backgroundColor: 'var(--veil-accent-primary)',
+                    borderRadius: '50%',
+                    width: '28px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px solid var(--veil-bg-surface)',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                  }}
+                >
+                  <CameraIcon size={14} color="#ffffff" />
+                </button>
+              )}
+              {isPeer && relState === 'CONTACT_VERIFIED' && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    right: 0,
+                    backgroundColor: 'var(--veil-accent-primary)',
+                    borderRadius: '50%',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  }}
+                  title="Identity Verified"
+                >
+                  <ShieldIcon size={14} color="#ffffff" />
+                </div>
+              )}
+            </div>
+
+            {availablePhotos.length > 1 && (
+              <button
+                type="button"
+                className="veil-icon-btn"
+                onClick={() => setActivePhotoIdx((prev) => (prev + 1) % availablePhotos.length)}
+                aria-label="Next profile photo"
                 style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  right: 0,
-                  backgroundColor: 'var(--veil-accent-primary)',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: 'none',
+                  color: 'var(--veil-text-primary)',
                   borderRadius: '50%',
-                  padding: '4px',
+                  width: '32px',
+                  height: '32px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  cursor: 'pointer',
                 }}
-                title="Identity Verified"
               >
-                <ShieldIcon size={14} color="#ffffff" />
-              </div>
+                <ChevronRightIcon size={18} />
+              </button>
             )}
           </div>
+
+          {/* Photo Counter and Self Management Actions */}
+          {availablePhotos.length > 1 && (
+            <div style={{ fontSize: '0.72rem', color: 'var(--veil-text-muted)', marginBottom: '0.5rem' }}>
+              Photo {activePhotoIdx + 1} of {availablePhotos.length}
+            </div>
+          )}
+
+          {!isPeer && availablePhotos.length > 0 && activePhotoIdx > 0 && (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '0.5rem' }}>
+              <button
+                type="button"
+                className="veil-btn-subtle"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await setMainProfilePhoto(availablePhotos[activePhotoIdx]);
+                  setActivePhotoIdx(0);
+                  showToast({ type: 'success', message: 'Set as main profile photo!' });
+                }}
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '3px 10px',
+                  borderRadius: 'var(--veil-radius-full)',
+                  border: '1px solid var(--veil-accent-primary)',
+                  background: 'rgba(20, 184, 166, 0.12)',
+                  color: 'var(--veil-accent-primary)',
+                  cursor: 'pointer',
+                }}
+              >
+                Set as Main Photo
+              </button>
+              <button
+                type="button"
+                className="veil-btn-subtle"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await deleteProfilePhoto(availablePhotos[activePhotoIdx]);
+                  setActivePhotoIdx(0);
+                  showToast({ type: 'info', message: 'Photo removed from profile' });
+                }}
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '3px 10px',
+                  borderRadius: 'var(--veil-radius-full)',
+                  border: '1px solid var(--veil-danger)',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  color: 'var(--veil-danger)',
+                  cursor: 'pointer',
+                }}
+              >
+                Delete Photo
+              </button>
+            </div>
+          )}
 
           {/* Display Name */}
           <h2
@@ -1065,6 +1241,139 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           )}
         </div>
       </div>
+
+      {/* Interactive Avatar Cropper Modal */}
+      {cropModalImage && (
+        <AvatarCropModal
+          imageSrc={cropModalImage}
+          onCropComplete={handleCropComplete}
+          onCancel={() => setCropModalImage(null)}
+        />
+      )}
+
+      {/* Full-Screen Profile Photo Lightbox */}
+      {showLightbox && currentPhoto && (
+        <div
+          className="veil-modal-overlay"
+          onClick={() => setShowLightbox(false)}
+          style={{
+            zIndex: 1300,
+            background: 'rgba(0, 0, 0, 0.92)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Profile photo full view"
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              zIndex: 1310,
+              display: 'flex',
+              gap: '8px',
+            }}
+          >
+            <button
+              type="button"
+              className="veil-icon-btn"
+              onClick={() => setShowLightbox(false)}
+              aria-label="Close photo"
+              style={{
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: 'none',
+                color: '#ffffff',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <CloseIcon size={20} />
+            </button>
+          </div>
+
+          <div
+            style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {availablePhotos.length > 1 && (
+              <button
+                type="button"
+                className="veil-icon-btn"
+                onClick={() => setActivePhotoIdx((prev) => (prev - 1 + availablePhotos.length) % availablePhotos.length)}
+                aria-label="Previous photo"
+                style={{
+                  position: 'absolute',
+                  left: '-48px',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <ChevronLeftIcon size={22} />
+              </button>
+            )}
+
+            <img
+              src={currentPhoto}
+              alt="Full profile view"
+              style={{
+                maxWidth: '90vw',
+                maxHeight: '80vh',
+                borderRadius: 'var(--veil-radius-lg, 12px)',
+                boxShadow: '0 12px 36px rgba(0, 0, 0, 0.8)',
+                objectFit: 'contain',
+              }}
+            />
+
+            {availablePhotos.length > 1 && (
+              <button
+                type="button"
+                className="veil-icon-btn"
+                onClick={() => setActivePhotoIdx((prev) => (prev + 1) % availablePhotos.length)}
+                aria-label="Next photo"
+                style={{
+                  position: 'absolute',
+                  right: '-48px',
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: 'none',
+                  color: '#ffffff',
+                  borderRadius: '50%',
+                  width: '40px',
+                  height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <ChevronRightIcon size={22} />
+              </button>
+            )}
+          </div>
+
+          {availablePhotos.length > 1 && (
+            <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '0.85rem', marginTop: '14px' }}>
+              {activePhotoIdx + 1} of {availablePhotos.length}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
