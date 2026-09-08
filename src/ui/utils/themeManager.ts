@@ -10,6 +10,7 @@
  */
 
 export type ThemeMode =
+  | 'obsidian'
   | 'midnight'
   | 'ocean'
   | 'forest'
@@ -49,6 +50,7 @@ export interface ThemeOption {
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
+  { id: 'obsidian', name: 'Obsidian Void', description: 'Deep #020617 obsidian with signal emerald accents', bgHex: '#020617', accentHex: '#22c55e' },
   { id: 'midnight', name: 'Midnight', description: 'Deep navy & black VEIL dark mode', bgHex: '#080b11', accentHex: '#14b8a6' },
   { id: 'ocean', name: 'Ocean', description: 'Deep marine blue encrypted tones', bgHex: '#08101a', accentHex: '#3b82f6' },
   { id: 'forest', name: 'Forest', description: 'Deep emerald pine dark surfaces', bgHex: '#07130e', accentHex: '#22c55e' },

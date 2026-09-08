@@ -15,8 +15,7 @@
    ========================================================================= */
 :root,
 [data-theme="dark"],
-[data-theme="midnight"],
-[data-theme="obsidian"] {
+[data-theme="midnight"] {
   --veil-bg-base: #080b11;
   --veil-bg-surface: #0f141d;
   --veil-bg-surface-elevated: #131926;
@@ -72,6 +71,69 @@
 
   --veil-gradient-primary: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
   --veil-gradient-dark: linear-gradient(180deg, #0f141d 0%, #080b11 100%);
+
+  --veil-scheme: dark;
+}
+
+/* =========================================================================
+   Obsidian Void & Signal Emerald (UI/UX Pro Max Design System)
+   ========================================================================= */
+[data-theme="obsidian"] {
+  --veil-bg-base: #020617;
+  --veil-bg-surface: #0f172a;
+  --veil-bg-surface-elevated: #1e293b;
+  --veil-bg-surface-active: #334155;
+  --veil-bg-surface-hover: rgba(255, 255, 255, 0.06);
+  --veil-bg-surface-subtle: rgba(15, 23, 42, 0.85);
+  --veil-bg-glass: rgba(15, 23, 42, 0.94);
+  --veil-overlay-backdrop: rgba(2, 6, 23, 0.85);
+
+  --veil-border: #334155;
+  --veil-border-subtle: rgba(51, 65, 85, 0.5);
+  --veil-border-strong: rgba(255, 255, 255, 0.2);
+  --veil-border-focus: #22c55e;
+  --veil-divider: rgba(51, 65, 85, 0.6);
+
+  --veil-text-primary: #f8fafc;
+  --veil-text-secondary: #94a3b8;
+  --veil-text-muted: #64748b;
+  --veil-text-disabled: #475569;
+  --veil-text-inverse: #020617;
+
+  /* UI/UX Pro Max Signal Emerald Accent */
+  --veil-accent-primary: #22c55e;
+  --veil-accent-primary-hover: #16a34a;
+  --veil-accent-primary-subtle: rgba(34, 197, 94, 0.15);
+  --veil-accent-primary-alpha: rgba(34, 197, 94, 0.28);
+  --veil-accent-secondary: #10b981;
+  --veil-accent-glow: rgba(34, 197, 94, 0.25);
+  --veil-accent-glow-subtle: rgba(34, 197, 94, 0.1);
+
+  /* Message Bubbles */
+  --veil-bubble-outgoing: #064e3b;
+  --veil-bubble-outgoing-border: rgba(34, 197, 94, 0.25);
+  --veil-bubble-incoming: #0f172a;
+  --veil-bubble-incoming-border: #1e293b;
+  --veil-bubble-outgoing-text: #ffffff;
+  --veil-bubble-incoming-text: #f8fafc;
+
+  --veil-input-bg: #0f172a;
+
+  --veil-success: #22c55e;
+  --veil-success-bg: rgba(34, 197, 94, 0.12);
+  --veil-success-border: rgba(34, 197, 94, 0.25);
+  --veil-warning: #f59e0b;
+  --veil-warning-bg: rgba(245, 158, 11, 0.12);
+  --veil-warning-border: rgba(245, 158, 11, 0.25);
+  --veil-danger: #ef4444;
+  --veil-danger-bg: rgba(239, 68, 68, 0.12);
+  --veil-danger-border: rgba(239, 68, 68, 0.25);
+  --veil-info: #38bdf8;
+  --veil-info-bg: rgba(56, 189, 248, 0.12);
+  --veil-info-border: rgba(56, 189, 248, 0.25);
+
+  --veil-gradient-primary: linear-gradient(180deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
+  --veil-gradient-dark: linear-gradient(180deg, #0f172a 0%, #020617 100%);
 
   --veil-scheme: dark;
 }

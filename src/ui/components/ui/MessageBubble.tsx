@@ -167,7 +167,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       onSelectToggle();
       return;
     }
-    // On mobile: tap opens context menu (like Telegram)
+    // Prevent intercepting taps on buttons, links, voice cards, media cards, or progress overlays
+    const target = e.target as HTMLElement | null;
+    if (target) {
+      const isInteractive = target.closest('button, input, a, video, audio, .veil-voicenote-card, .veil-attachment-card, .veil-progress-circle');
+      if (isInteractive) {
+        return;
+      }
+    }
+    // On mobile: tap on message bubble text opens context menu (Telegram style)
     if (isMobilePlatform && onLongPress && !touchMovedRef.current) {
       onLongPress();
     }

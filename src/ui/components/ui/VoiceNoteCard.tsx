@@ -218,7 +218,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     <div
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
       role="region"
-      aria-label={`${isOutgoing ? 'Sent' : 'Received'} voice message`}
+      aria-label={`Audio message: ${isOutgoing ? 'Sent' : 'Received'} voice message`}
       onClick={stopAllEvents}
       onDoubleClick={stopAllEvents}
       onContextMenu={stopAllEvents}
@@ -352,6 +352,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
             return (
               <div
                 key={i}
+                className={isFilled && isActive ? 'veil-waveform-bar active' : 'veil-waveform-bar'}
                 style={{
                   flex: '1 1 0',
                   height: `${height * 100}%`,
