@@ -141,6 +141,25 @@ function setStorageItem(key: string, val: string): void {
   memoryStorage[key] = val;
 }
 
+/**
+ * Per-accent dark muted outgoing bubble background colors.
+ * These are darkened/desaturated versions of each accent color,
+ * ensuring white text is always readable on the outgoing bubble.
+ */
+const ACCENT_BUBBLE_COLORS: Record<AccentColor, string> = {
+  teal:   '#0d3d38',
+  cyan:   '#0c3544',
+  blue:   '#1a2e52',
+  green:  '#133d24',
+  lime:   '#263d14',
+  amber:  '#3d2e10',
+  orange: '#3d2410',
+  red:    '#3d1414',
+  rose:   '#3d1024',
+  violet: '#2a1f52',
+  gray:   '#252a30',
+};
+
 export class ThemeManager {
   private prefs: AppearancePreferences;
   private listeners: Array<(prefs: AppearancePreferences) => void> = [];
@@ -268,6 +287,12 @@ export class ThemeManager {
     root.style.setProperty('--veil-accent-primary-hover', activeAccent.hover);
     root.style.setProperty('--veil-accent-primary-subtle', activeAccent.subtle);
     root.style.setProperty('--veil-accent-primary-alpha', activeAccent.alpha);
+
+    // Set outgoing bubble color based on accent (dark muted shade for readable white text)
+    const bubbleColor = ACCENT_BUBBLE_COLORS[this.prefs.accent];
+    if (bubbleColor) {
+      root.style.setProperty('--veil-bubble-outgoing', bubbleColor);
+    }
   }
 
   public subscribe(listener: (prefs: AppearancePreferences) => void): () => void {

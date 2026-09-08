@@ -48,7 +48,7 @@
   --veil-accent-glow-subtle: rgba(20, 184, 166, 0.1);
 
   /* Reference Chat Message Bubbles */
-  --veil-bubble-outgoing: #0d9488;
+  --veil-bubble-outgoing: #0d3d38;
   --veil-bubble-outgoing-border: transparent;
   --veil-bubble-incoming: #161a24;
   --veil-bubble-incoming-border: rgba(255, 255, 255, 0.07);
@@ -282,6 +282,7 @@
   --veil-accent-primary-subtle: rgba(20, 184, 166, 0.12);
   --veil-accent-primary-alpha: rgba(20, 184, 166, 0.25);
   --veil-accent-glow: rgba(20, 184, 166, 0.18);
+  --veil-bubble-outgoing: #0d3d38;
   --veil-bubble-outgoing-border: rgba(20, 184, 166, 0.25);
 }
 
@@ -292,6 +293,7 @@
   --veil-accent-primary-subtle: rgba(6, 182, 212, 0.12);
   --veil-accent-primary-alpha: rgba(6, 182, 212, 0.25);
   --veil-accent-glow: rgba(6, 182, 212, 0.18);
+  --veil-bubble-outgoing: #0c3544;
   --veil-bubble-outgoing-border: rgba(6, 182, 212, 0.25);
 }
 
@@ -302,6 +304,7 @@
   --veil-accent-primary-subtle: rgba(59, 130, 246, 0.12);
   --veil-accent-primary-alpha: rgba(59, 130, 246, 0.25);
   --veil-accent-glow: rgba(59, 130, 246, 0.18);
+  --veil-bubble-outgoing: #1a2e52;
   --veil-bubble-outgoing-border: rgba(59, 130, 246, 0.25);
 }
 
@@ -312,6 +315,7 @@
   --veil-accent-primary-subtle: rgba(34, 197, 94, 0.12);
   --veil-accent-primary-alpha: rgba(34, 197, 94, 0.25);
   --veil-accent-glow: rgba(34, 197, 94, 0.18);
+  --veil-bubble-outgoing: #133d24;
   --veil-bubble-outgoing-border: rgba(34, 197, 94, 0.25);
 }
 
@@ -322,6 +326,7 @@
   --veil-accent-primary-subtle: rgba(132, 204, 22, 0.12);
   --veil-accent-primary-alpha: rgba(132, 204, 22, 0.25);
   --veil-accent-glow: rgba(132, 204, 22, 0.18);
+  --veil-bubble-outgoing: #263d14;
   --veil-bubble-outgoing-border: rgba(132, 204, 22, 0.25);
 }
 
@@ -332,6 +337,7 @@
   --veil-accent-primary-subtle: rgba(245, 158, 11, 0.12);
   --veil-accent-primary-alpha: rgba(245, 158, 11, 0.25);
   --veil-accent-glow: rgba(245, 158, 11, 0.18);
+  --veil-bubble-outgoing: #3d2e10;
   --veil-bubble-outgoing-border: rgba(245, 158, 11, 0.25);
 }
 
@@ -342,6 +348,7 @@
   --veil-accent-primary-subtle: rgba(249, 115, 22, 0.12);
   --veil-accent-primary-alpha: rgba(249, 115, 22, 0.25);
   --veil-accent-glow: rgba(249, 115, 22, 0.18);
+  --veil-bubble-outgoing: #3d2410;
   --veil-bubble-outgoing-border: rgba(249, 115, 22, 0.25);
 }
 
@@ -352,6 +359,7 @@
   --veil-accent-primary-subtle: rgba(239, 68, 68, 0.12);
   --veil-accent-primary-alpha: rgba(239, 68, 68, 0.25);
   --veil-accent-glow: rgba(239, 68, 68, 0.18);
+  --veil-bubble-outgoing: #3d1414;
   --veil-bubble-outgoing-border: rgba(239, 68, 68, 0.25);
 }
 
@@ -362,6 +370,7 @@
   --veil-accent-primary-subtle: rgba(244, 63, 94, 0.12);
   --veil-accent-primary-alpha: rgba(244, 63, 94, 0.25);
   --veil-accent-glow: rgba(244, 63, 94, 0.18);
+  --veil-bubble-outgoing: #3d1024;
   --veil-bubble-outgoing-border: rgba(244, 63, 94, 0.25);
 }
 
@@ -372,6 +381,7 @@
   --veil-accent-primary-subtle: rgba(139, 92, 246, 0.12);
   --veil-accent-primary-alpha: rgba(139, 92, 246, 0.25);
   --veil-accent-glow: rgba(139, 92, 246, 0.18);
+  --veil-bubble-outgoing: #2a1f52;
   --veil-bubble-outgoing-border: rgba(139, 92, 246, 0.25);
 }
 
@@ -382,8 +392,35 @@
   --veil-accent-primary-subtle: rgba(148, 163, 184, 0.12);
   --veil-accent-primary-alpha: rgba(148, 163, 184, 0.25);
   --veil-accent-glow: rgba(148, 163, 184, 0.18);
+  --veil-bubble-outgoing: #252a30;
   --veil-bubble-outgoing-border: rgba(148, 163, 184, 0.25);
 }
+
+/* --- LIGHT theme accent bubble overrides --- */
+[data-theme="light"][data-accent="teal"]   { --veil-bubble-outgoing: #d5f5f0; }
+[data-theme="light"][data-accent="cyan"]   { --veil-bubble-outgoing: #cef4fa; }
+[data-theme="light"][data-accent="blue"]   { --veil-bubble-outgoing: #dbe8fe; }
+[data-theme="light"][data-accent="green"]  { --veil-bubble-outgoing: #d4f5df; }
+[data-theme="light"][data-accent="lime"]   { --veil-bubble-outgoing: #e8f5cc; }
+[data-theme="light"][data-accent="amber"]  { --veil-bubble-outgoing: #fef3cd; }
+[data-theme="light"][data-accent="orange"] { --veil-bubble-outgoing: #feead0; }
+[data-theme="light"][data-accent="red"]    { --veil-bubble-outgoing: #fdd; }
+[data-theme="light"][data-accent="rose"]   { --veil-bubble-outgoing: #fdd5de; }
+[data-theme="light"][data-accent="violet"] { --veil-bubble-outgoing: #ece5fe; }
+[data-theme="light"][data-accent="gray"]   { --veil-bubble-outgoing: #e8eaef; }
+
+/* --- AMOLED theme accent bubble overrides (darker) --- */
+[data-theme="amoled"][data-accent="teal"]   { --veil-bubble-outgoing: #092824; }
+[data-theme="amoled"][data-accent="cyan"]   { --veil-bubble-outgoing: #082430; }
+[data-theme="amoled"][data-accent="blue"]   { --veil-bubble-outgoing: #111f3d; }
+[data-theme="amoled"][data-accent="green"]  { --veil-bubble-outgoing: #0c2a18; }
+[data-theme="amoled"][data-accent="lime"]   { --veil-bubble-outgoing: #1a2a0c; }
+[data-theme="amoled"][data-accent="amber"]  { --veil-bubble-outgoing: #2a200a; }
+[data-theme="amoled"][data-accent="orange"] { --veil-bubble-outgoing: #2a1a0a; }
+[data-theme="amoled"][data-accent="red"]    { --veil-bubble-outgoing: #2a0c0c; }
+[data-theme="amoled"][data-accent="rose"]   { --veil-bubble-outgoing: #2a0a18; }
+[data-theme="amoled"][data-accent="violet"] { --veil-bubble-outgoing: #1e143d; }
+[data-theme="amoled"][data-accent="gray"]   { --veil-bubble-outgoing: #1a1d22; }
 
 /* =========================================================================
    WALLPAPERS, BUBBLE STYLES, AND FONT SIZE MODIFIERS

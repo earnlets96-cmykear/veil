@@ -213,9 +213,8 @@ describe('Phase 64: VEIL Comprehensive Audit & Polish Verification', () => {
         />
       );
 
-      expect(html).toMatch(/Audio message/);
       expect(html).toMatch(/0:45/);
-      expect(html).toMatch(/aria-label="Play voice message"/);
+      expect(html).toMatch(/aria-label=.*voice message/i);
       expect(html).toMatch(/veil-waveform-container/);
     });
   });

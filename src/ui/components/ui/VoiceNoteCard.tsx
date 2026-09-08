@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Spinner } from './Spinner.tsx';
-import { PlayIcon, PauseIcon, RefreshCwIcon, FileAudioIcon, AlertCircleIcon } from '../icons/index.ts';
+import { PlayIcon, PauseIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
 import { VoicePlayer, VoicePlaybackStatus } from '../../../attachments/voicePlayer.ts';
 
 export type VoicePlaybackState = 'idle' | 'ready' | 'loading' | 'uploading' | 'playing' | 'paused' | 'error';
@@ -19,6 +19,27 @@ export interface VoiceNoteCardProps {
   className?: string;
 }
 
+// Generate deterministic waveform bar heights from messageId
+const generateWaveformBars = (messageId: string | undefined, count: number): number[] => {
+  const bars: number[] = [];
+  // Use a simple hash from messageId for deterministic but varied waveforms
+  let seed = 0;
+  const id = messageId || 'default';
+  for (let i = 0; i < id.length; i++) {
+    seed = ((seed << 5) - seed + id.charCodeAt(i)) | 0;
+  }
+  for (let i = 0; i < count; i++) {
+    // Simple pseudo-random from seed
+    seed = (seed * 16807 + 12345) & 0x7fffffff;
+    const normalized = (seed % 1000) / 1000;
+    // Range from 0.2 to 1.0 to avoid invisible bars
+    bars.push(0.2 + normalized * 0.8);
+  }
+  return bars;
+};
+
+const BAR_COUNT = 40;
+
 export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   messageId,
   durationSeconds,
@@ -32,21 +53,23 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   errorMessage,
   className = '',
 }) => {
-  // Local state for smooth, isolated playback tracking (prevents full timeline re-renders)
   const [localStatus, setLocalStatus] = useState<VoicePlaybackStatus>('idle');
   const [localProgress, setLocalProgress] = useState(propProgressPercent);
   const [localCurrentTime, setLocalCurrentTime] = useState(propCurrentTime);
   const [localDuration, setLocalDuration] = useState(durationSeconds);
-  const [isScrubbing, setIsScrubbing] = useState(false);
+  const isScrubbingRef = useRef(false);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // Subscribe directly to VoicePlayer events if messageId is available
+  // Generate waveform bars once per messageId
+  const waveformBars = useMemo(() => generateWaveformBars(messageId, BAR_COUNT), [messageId]);
+
+  // Subscribe directly to VoicePlayer events — use ref for scrubbing to avoid re-mounting
   useEffect(() => {
     if (!messageId) return;
 
     const unsub = VoicePlayer.subscribe(messageId, (status, progress, currentTime, dur) => {
       setLocalStatus(status);
-      if (!isScrubbing) {
+      if (!isScrubbingRef.current) {
         setLocalProgress(progress);
         setLocalCurrentTime(currentTime);
       }
@@ -56,7 +79,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     });
 
     return unsub;
-  }, [messageId, isScrubbing]);
+  }, [messageId]);
 
   // Sync prop changes if not currently playing locally
   useEffect(() => {
@@ -71,7 +94,6 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
   const effectiveCurrentTime = localCurrentTime;
   const effectiveProgress = Math.max(0, Math.min(100, localProgress));
 
-  // Determine active visual state
   const isUploading = propPlaybackState === 'uploading';
   const isPropError = propPlaybackState === 'error';
   const isLocalError = localStatus === 'error';
@@ -87,7 +109,6 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Complete event barrier: stops swipe-to-reply, parent clicks, context menus, and text selection
   const stopAllEvents = (e: React.SyntheticEvent) => {
     e.stopPropagation();
   };
@@ -138,14 +159,17 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     [effectiveDuration, executeSeek]
   );
 
-  // Mouse / Touch scrubbing handlers
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    e.preventDefault();
     if (isUploading || isError) return;
+    isScrubbingRef.current = true;
     const target = e.currentTarget;
     try {
       target.setPointerCapture(e.pointerId);
     } catch (_e) {}
+
+    handleSeekFromClientX(e.clientX, false);
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       moveEvent.stopPropagation();
@@ -156,7 +180,7 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     const handlePointerUp = (upEvent: PointerEvent) => {
       upEvent.stopPropagation();
       upEvent.preventDefault();
-      setIsScrubbing(false);
+      isScrubbingRef.current = false;
       handleSeekFromClientX(upEvent.clientX, true);
       try {
         target.releasePointerCapture(upEvent.pointerId);
@@ -185,14 +209,16 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
 
   const timerDisplay =
     isPlaying || isPaused
-      ? `${formatDuration(effectiveCurrentTime)} / ${formatDuration(effectiveDuration)}`
+      ? formatDuration(effectiveCurrentTime)
       : formatDuration(effectiveDuration);
+
+  const totalDisplay = isPlaying || isPaused ? formatDuration(effectiveDuration) : '';
 
   return (
     <div
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
       role="region"
-      aria-label={`${isOutgoing ? 'Sent' : 'Received'} Audio message`}
+      aria-label={`${isOutgoing ? 'Sent' : 'Received'} voice message`}
       onClick={stopAllEvents}
       onDoubleClick={stopAllEvents}
       onContextMenu={stopAllEvents}
@@ -205,192 +231,178 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       onTouchCancel={stopAllEvents}
       style={{
         display: 'flex',
-        flexDirection: 'column',
-        gap: '6px',
-        width: '260px',
-        minWidth: '240px',
-        maxWidth: '300px',
+        alignItems: 'center',
+        gap: '10px',
+        width: '100%',
+        minWidth: '200px',
+        maxWidth: '320px',
         padding: '8px 12px',
-        borderRadius: 'var(--veil-radius-md, 12px)',
-        background: isOutgoing
-          ? 'var(--veil-accent-primary-subtle, rgba(99, 102, 241, 0.15))'
-          : 'var(--veil-surface-elevated, rgba(255, 255, 255, 0.06))',
-        border: '1px solid var(--veil-border-subtle, rgba(255, 255, 255, 0.08))',
+        borderRadius: 'var(--veil-radius-md, 14px)',
+        background: 'transparent',
         boxSizing: 'border-box',
         userSelect: 'none',
         position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      {/* Top Header: Play/Pause/Retry Button + Label + Duration */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        {/* Play/Pause/Retry Button */}
-        {isError ? (
-          <button
-            type="button"
-            className="veil-voicenote-play-btn veil-voicenote-retry-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (onRetry) onRetry();
-              else if (onPlayToggle) onPlayToggle();
-            }}
-            onPointerDown={stopAllEvents}
-            onTouchStart={stopAllEvents}
-            aria-label="Retry audio note"
-            title="Retry audio note"
-            style={{
-              width: '32px',
-              height: '32px',
-              minWidth: '32px',
-              backgroundColor: 'var(--veil-danger, #ef4444)',
-              color: '#ffffff',
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: 'none',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <RefreshCwIcon size={14} color="#ffffff" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="veil-voicenote-play-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (onPlayToggle) {
-                onPlayToggle();
-              } else if (messageId) {
-                if (isPlaying) {
-                  VoicePlayer.pause();
-                } else if (isPaused) {
-                  VoicePlayer.resume();
-                }
-              }
-            }}
-            onPointerDown={stopAllEvents}
-            onTouchStart={stopAllEvents}
-            disabled={isLoading || isUploading}
-            aria-label={isUploading ? 'Uploading audio...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
-            title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
-            style={{
-              width: '32px',
-              height: '32px',
-              minWidth: '32px',
-              backgroundColor: 'var(--veil-accent-primary, #6366f1)',
-              color: '#ffffff',
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: 'none',
-              cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
-              flexShrink: 0,
-              transition: 'background-color 0.15s ease',
-            }}
-          >
-            {isUploading || isLoading ? (
-              <Spinner size="sm" aria-label="Loading audio..." />
-            ) : isPlaying ? (
-              <PauseIcon size={14} color="#ffffff" />
-            ) : (
-              <PlayIcon size={14} color="#ffffff" />
-            )}
-          </button>
-        )}
-
-        {/* Audio Label & Vector Icon */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-          <FileAudioIcon size={15} color="var(--veil-accent-primary, #6366f1)" />
-          <span
-            style={{
-              fontSize: 'var(--veil-text-xs, 12px)',
-              fontWeight: 500,
-              color: 'var(--veil-text-primary, #ffffff)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            Audio message
-          </span>
-        </div>
-
-        {/* Duration Timer */}
-        <span
+      {/* Play/Pause/Retry Button */}
+      {isError ? (
+        <button
+          type="button"
+          className="veil-voicenote-play-btn veil-voicenote-retry-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onRetry) onRetry();
+            else if (onPlayToggle) onPlayToggle();
+          }}
+          onPointerDown={stopAllEvents}
+          onTouchStart={stopAllEvents}
+          aria-label="Retry audio note"
+          title="Retry audio note"
           style={{
-            fontSize: 'var(--veil-text-xs, 11px)',
-            color: 'var(--veil-text-secondary, rgba(255, 255, 255, 0.7))',
-            minWidth: '36px',
-            textAlign: 'right',
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            backgroundColor: 'var(--veil-danger, #ef4444)',
+            color: '#ffffff',
+            borderRadius: '50%',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            cursor: 'pointer',
             flexShrink: 0,
-            fontVariantNumeric: 'tabular-nums',
+            transition: 'transform 0.15s ease',
           }}
         >
-          {isUploading ? 'Uploading...' : isError ? 'Failed' : timerDisplay}
-        </span>
-      </div>
+          <RefreshCwIcon size={16} color="#ffffff" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="veil-voicenote-play-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (onPlayToggle) {
+              onPlayToggle();
+            } else if (messageId) {
+              if (isPlaying) {
+                VoicePlayer.pause();
+              } else if (isPaused) {
+                VoicePlayer.resume();
+              }
+            }
+          }}
+          onPointerDown={stopAllEvents}
+          onTouchStart={stopAllEvents}
+          disabled={isLoading || isUploading}
+          aria-label={isUploading ? 'Uploading audio...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
+          title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
+          style={{
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            backgroundColor: 'var(--veil-accent-primary, #14b8a6)',
+            color: '#ffffff',
+            borderRadius: '50%',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
+            flexShrink: 0,
+            transition: 'transform 0.15s ease, background-color 0.15s ease',
+          }}
+        >
+          {isUploading || isLoading ? (
+            <Spinner size="sm" aria-label="Loading audio..." />
+          ) : isPlaying ? (
+            <PauseIcon size={18} color="#ffffff" />
+          ) : (
+            <PlayIcon size={18} color="#ffffff" />
+          )}
+        </button>
+      )}
 
-      {/* Single Subtle Integrated Scrubbing Bar */}
-      <div
-        ref={trackRef}
-        className="veil-waveform-container"
-        onPointerDown={handlePointerDown}
-        onClick={handleClickTrack}
-        style={{
-          width: '100%',
-          height: '14px',
-          display: 'flex',
-          alignItems: 'center',
-          cursor: isUploading || isError ? 'default' : 'pointer',
-          userSelect: 'none',
-          touchAction: 'none',
-        }}
-      >
+      {/* Waveform + Timer */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {/* Waveform Bars */}
         <div
+          ref={trackRef}
+          className="veil-waveform-container"
+          onPointerDown={handlePointerDown}
+          onClick={handleClickTrack}
           style={{
             width: '100%',
-            height: '3px',
-            backgroundColor: 'rgba(255, 255, 255, 0.14)',
-            borderRadius: '2px',
-            position: 'relative',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1.5px',
+            cursor: isUploading || isError ? 'default' : 'pointer',
+            userSelect: 'none',
+            touchAction: 'none',
           }}
         >
-          {/* Active Fill */}
-          <div
-            className={isPlaying ? 'veil-waveform-bar active' : 'veil-waveform-bar'}
+          {waveformBars.map((height, i) => {
+            const barPercent = ((i + 0.5) / BAR_COUNT) * 100;
+            const isFilled = barPercent <= effectiveProgress;
+            const isActive = isPlaying || isPaused;
+
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: '1 1 0',
+                  height: `${height * 100}%`,
+                  minWidth: '2px',
+                  borderRadius: '1.5px',
+                  backgroundColor: isFilled && isActive
+                    ? 'var(--veil-accent-primary, #14b8a6)'
+                    : isFilled
+                    ? 'var(--veil-accent-primary-hover, #0d9488)'
+                    : isOutgoing
+                    ? 'rgba(255, 255, 255, 0.3)'
+                    : 'rgba(255, 255, 255, 0.18)',
+                  transition: isScrubbingRef.current ? 'none' : 'background-color 0.12s ease',
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Timer Row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '4px',
+        }}>
+          <span
             style={{
-              height: '100%',
-              width: `${effectiveProgress}%`,
-              backgroundColor: isPlaying || isPaused
-                ? 'var(--veil-accent-primary, #6366f1)'
-                : 'var(--veil-text-muted, rgba(255, 255, 255, 0.4))',
-              borderRadius: '2px',
-              transition: isScrubbing ? 'none' : 'width 0.08s linear',
+              fontSize: '11px',
+              color: isOutgoing
+                ? 'rgba(255, 255, 255, 0.75)'
+                : 'var(--veil-text-secondary, rgba(255, 255, 255, 0.6))',
+              fontVariantNumeric: 'tabular-nums',
+              fontWeight: 500,
+              letterSpacing: '0.02em',
             }}
-          />
-          {/* Scrubbing Thumb */}
-          {(isPlaying || isPaused || isScrubbing) && (
-            <div
+          >
+            {isUploading ? 'Uploading...' : isError ? 'Failed' : timerDisplay}
+          </span>
+          {totalDisplay && (
+            <span
               style={{
-                position: 'absolute',
-                left: `${effectiveProgress}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: isScrubbing ? '10px' : '8px',
-                height: isScrubbing ? '10px' : '8px',
-                borderRadius: '50%',
-                backgroundColor: '#ffffff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                pointerEvents: 'none',
-                transition: isScrubbing ? 'none' : 'left 0.08s linear',
+                fontSize: '11px',
+                color: isOutgoing
+                  ? 'rgba(255, 255, 255, 0.5)'
+                  : 'var(--veil-text-muted, rgba(255, 255, 255, 0.4))',
+                fontVariantNumeric: 'tabular-nums',
               }}
-            />
+            >
+              {totalDisplay}
+            </span>
           )}
         </div>
       </div>
@@ -399,17 +411,19 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       {(errorMessage || isError) && (
         <div
           style={{
-            fontSize: 'var(--veil-text-xs, 11px)',
+            position: 'absolute',
+            bottom: '-18px',
+            left: '12px',
+            fontSize: '10px',
             color: 'var(--veil-danger, #ef4444)',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
-            marginTop: '2px',
+            gap: '3px',
           }}
           role="alert"
         >
-          <AlertCircleIcon size={12} />
-          <span>{errorMessage || 'Playback error — tap retry'}</span>
+          <AlertCircleIcon size={10} />
+          <span>{errorMessage || 'Tap retry'}</span>
         </div>
       )}
     </div>
