@@ -2,6 +2,35 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase68-chat-ui-polish] - 2026-09-08
+
+### Chat UI Polish: Message Bubbles + Context Menu Redesign & Layout Repair (Phase 68)
+- **Eliminated Message Bubble Overlap & Collisions**:
+  - Root cause: `.veil-message-meta` was declared as `float: right; margin-top: 2px;` inside an `inline-block` `.veil-message-bubble`. When message text was short ("pos"), the floated metadata escaped container height calculation, causing adjacent message rows and reaction pills to physically collide. Furthermore, `.veil-message-grouped-prev/next` injected conflicting `!important` margins.
+  - Converted `.veil-message-bubble` to standard `display: flex; flex-direction: column;` participating in natural document flow.
+  - Placed `.veil-message-body` in full block flow, and anchored `.veil-message-meta` via `align-self: flex-end; margin-left: auto;` in natural document flow.
+  - Removed escaped floats and normalized grouping margins to `0px`, allowing `gap: var(--veil-msg-gap, 0.4rem)` to govern row separation without collapsing.
+  - Fixed avatar container alignment with `height: 28px; width: 28px; display: flex; align-items: flex-end; justify-content: center;`.
+- **Reply Preview Containment & Sizing Integrity**:
+  - Encapsulated reply preview inside a dedicated `.veil-message-reply-container` with `minWidth: 0, width: 100%`.
+  - Added strict `minWidth: 0, maxWidth: 100%` on `.veil-reply-preview` and `text-overflow: ellipsis, white-space: nowrap` on `.veil-reply-snippet` and `.veil-reply-sender` to prevent cyclic intrinsic sizing expansion in WebViews.
+- **Translucent Frosted Glass Context Menu**:
+  - Upgraded `.veil-context-menu` to modern dark translucent frosted glass surface (`rgba(22, 27, 34, 0.88)`, `backdrop-filter: blur(16px) saturate(180%)`, modern border, `box-shadow`, and smooth entrance animation).
+  - Designed `.veil-context-reactions-bar` with quick reaction emojis (`❤️ 👍 😂 😮 😢 🙏 🔥`) with active highlight state (`.veil-reaction-active`) reflecting `userReacted` status.
+  - Styled `.veil-context-item` and `.veil-context-item-danger` with reset appearance, hover states, and SVG iconography.
+  - Added `.veil-context-backdrop` overlay and `Escape` key listener for instant dismissal.
+  - Added `.veil-context-active-message` accent halo on the active target message row.
+- **Intelligent Viewport Positioning & Boundary Clamping**:
+  - Refactored `handleContextMenu` in `ConversationView.tsx`: calculates available space below vs above cursor/target element, automatically flips menu upwards if space below < 360px and space above is larger, and clamps horizontally and vertically to prevent off-screen clipping.
+  - Wired `onContextMenu` and `onLongPress` directly to `<MessageBubble>` on desktop and mobile touch devices.
+- **Delete for Everyone Confirmation & Forward Recipient Dialog**:
+  - Implemented `deleteForEveryoneConfirm` state with modal dialog warning that deletion is permanent for all participants.
+  - Implemented `forwardingMessage` state with modal dialog allowing user to choose target conversation to forward message to.
+- **Automated Verification**:
+  - Created `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (7/7 tests pass).
+  - Verified regression across `tests/phase44a-ui-layout-and-icons.test.tsx`, `tests/phase31-chat-ui.test.tsx`, `tests/phase64-audit-and-polish.test.tsx`, `tests/phase45e-reply-rendering.test.tsx`, `tests/phase37-android-layout.test.ts`, and `tests/phase65-reactions-and-actions.test.ts` (48/48 tests passing).
+  - Web production build passed in 1.83s with 7 release artifacts in `release/v1.0.0/`.
+
 ## [1.0.0-phase67-applock-perf-sync] - 2026-09-07
 
 ### App Lock Latency Elimination, File Picker Lifecycle Guard, Atomic Profile Updates & Cross-Account Synchronization (Phase 67)

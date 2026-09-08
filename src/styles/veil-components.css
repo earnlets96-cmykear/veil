@@ -676,46 +676,136 @@
   animation: veilHighlightPulse 1.4s ease-out;
 }
 
+@keyframes veilContextMenuIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.veil-context-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: calc(var(--veil-z-popover, 1050) - 1);
+  background: transparent;
+  cursor: default;
+}
+
 .veil-context-menu {
   position: fixed;
-  background-color: var(--veil-bg-surface-elevated);
-  border: 1px solid var(--veil-border);
-  border-radius: var(--veil-radius-md);
-  box-shadow: var(--veil-shadow-lg);
-  padding: var(--veil-space-1);
-  min-width: 160px;
-  z-index: var(--veil-z-popover);
+  background: rgba(22, 27, 34, 0.88);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  padding: 6px;
+  min-width: 220px;
+  max-width: 280px;
+  z-index: var(--veil-z-popover, 1050);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  animation: veilContextMenuIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
-.veil-context-menu-item {
+.veil-context-reactions-bar {
   display: flex;
   align-items: center;
-  gap: var(--veil-space-2);
-  padding: var(--veil-space-2) var(--veil-space-3);
+  justify-content: space-between;
+  padding: 4px 6px 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+  gap: 2px;
+}
+
+.veil-context-reaction-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  outline: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 4px 5px;
+  border-radius: 8px;
+  line-height: 1;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.12s ease;
+  user-select: none;
+}
+
+.veil-context-reaction-btn:hover {
+  transform: scale(1.22);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.veil-context-reaction-btn.veil-reaction-active {
+  background: rgba(20, 184, 166, 0.22);
+  border-color: rgba(20, 184, 166, 0.5);
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.3);
+}
+
+.veil-context-item,
+.veil-context-menu-item {
+  appearance: none;
+  -webkit-appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
   background: transparent;
   border: none;
-  color: var(--veil-text-primary);
-  font-size: var(--veil-text-sm);
-  border-radius: var(--veil-radius-sm);
+  outline: none;
+  color: var(--veil-text-primary, #e6edf3);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 8px;
   cursor: pointer;
   width: 100%;
   text-align: left;
-  transition: background-color var(--veil-duration-fast) var(--veil-easing-standard);
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
+.veil-context-item:hover,
 .veil-context-menu-item:hover {
-  background-color: var(--veil-bg-surface-hover);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
+.veil-context-item svg,
+.veil-context-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.veil-context-item:hover svg,
+.veil-context-menu-item:hover svg {
+  opacity: 1;
+}
+
+.veil-context-item-danger,
 .veil-context-menu-danger {
-  color: var(--veil-danger) !important;
+  color: var(--veil-danger, #f87171) !important;
 }
 
+.veil-context-item-danger:hover,
 .veil-context-menu-danger:hover {
-  background-color: var(--veil-danger-bg) !important;
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+}
+
+.veil-context-active-message .veil-message-bubble,
+.veil-context-active-message .veil-bubble-wrapper {
+  box-shadow: 0 0 0 2px var(--veil-accent-primary, #14b8a6), 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  transition: box-shadow 0.15s ease;
 }
 
 .veil-scroll-bottom-btn {
@@ -744,11 +834,11 @@
 
 /* Consecutive Message Grouping */
 .veil-message-grouped-prev {
-  margin-top: 2px !important;
+  margin-top: 0px !important;
 }
 
 .veil-message-grouped-next {
-  margin-bottom: 2px !important;
+  margin-bottom: 0px !important;
 }
 
 .veil-message-grouped-prev .veil-message-bubble.incoming {

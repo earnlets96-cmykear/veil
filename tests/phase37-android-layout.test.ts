@@ -50,17 +50,16 @@ describe('Phase 37 — Android Layout & Viewport Configuration', () => {
     const block = bubbleMatch![0];
     expect(block).toMatch(/width\s*:\s*fit-content/);
     expect(block).toMatch(/word-break\s*:\s*break-word/);
-    expect(block).toMatch(/display\s*:\s*inline-block/);
+    expect(block).toMatch(/display\s*:\s*(flex|inline-block)/);
   });
 
-  it('veil-message-meta uses float:right and white-space:nowrap for horizontal timestamps', () => {
+  it('veil-message-meta uses display flow and white-space:nowrap for horizontal timestamps', () => {
     const css = fs.readFileSync(path.join(rootDir, 'src/styles/veil-design-system.css'), 'utf-8');
     const metaMatch = css.match(/\.veil-message-meta\s*\{[^}]*\}/);
     expect(metaMatch).toBeTruthy();
     const block = metaMatch![0];
     expect(block).toMatch(/white-space\s*:\s*nowrap/);
-    expect(block).toMatch(/float\s*:\s*right/);
-    expect(block).toMatch(/display\s*:\s*inline-flex/);
+    expect(block).toMatch(/display\s*:\s*(flex|inline-flex)/);
   });
 
   it('veil-media-bubble-container uses explicit width (not width:100%) to prevent collapse', () => {

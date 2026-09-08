@@ -191,7 +191,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           isSelected ? 'veil-message-selected' : ''
         } ${isHighlighted ? 'veil-message-highlight' : ''}`}
         style={{
-          transform: `translateX(${swipeOffset}px)`,
+          transform: swipeOffset !== 0 ? `translateX(${swipeOffset}px)` : undefined,
           transition: swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
         }}
       >
@@ -202,8 +202,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               fontWeight: 700,
               fontSize: '0.75rem',
               color: 'var(--veil-accent-primary, #14b8a6)',
-              marginBottom: '3px',
+              marginBottom: '4px',
               letterSpacing: '0.02em',
+              userSelect: 'none',
             }}
           >
             {senderName}
@@ -211,19 +212,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         {replyTo && (
-          <ReplyPreview
-            replyTo={replyTo}
-            onClick={onReplyClick ? () => onReplyClick(replyTo.messageId) : undefined}
-          />
+          <div className="veil-message-reply-container" style={{ width: '100%', minWidth: 0, marginBottom: '6px' }}>
+            <ReplyPreview
+              replyTo={replyTo}
+              onClick={onReplyClick ? () => onReplyClick(replyTo.messageId) : undefined}
+            />
+          </div>
         )}
 
-        {voiceElement ? (
-          <div style={{ padding: '2px 0' }}>{voiceElement}</div>
-        ) : attachmentElement ? (
-          <div style={{ padding: '2px 0' }}>{attachmentElement}</div>
-        ) : (
-          <div style={{ wordBreak: 'break-word' }}>{text}</div>
-        )}
+        <div className="veil-message-body" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          {voiceElement ? (
+            <div style={{ padding: '2px 0' }}>{voiceElement}</div>
+          ) : attachmentElement ? (
+            <div style={{ padding: '2px 0' }}>{attachmentElement}</div>
+          ) : (
+            <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{text}</div>
+          )}
+        </div>
 
         <div className="veil-message-meta">
           {!isSelectionMode && onReplyTrigger && !isFailed && (
@@ -233,10 +238,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 background: 'none',
                 border: 'none',
                 color: 'inherit',
-                opacity: 0.65,
+                opacity: 0.7,
                 fontSize: '0.7rem',
                 cursor: 'pointer',
-                padding: '0 2px',
+                padding: '0 4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '2px',
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -244,7 +252,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               }}
               aria-label="Reply to this message"
             >
-              <ReplyIcon size={12} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '3px' }} />
+              <ReplyIcon size={12} />
               <span>Reply</span>
             </button>
           )}
@@ -262,7 +270,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '2px',
+                gap: '3px',
                 background: 'transparent',
                 border: 'none',
                 color: 'var(--veil-danger)',

@@ -81,7 +81,12 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
       onClick={onClick}
       role={onClick ? 'button' : 'region'}
       tabIndex={onClick ? 0 : undefined}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      style={{
+        cursor: onClick ? 'pointer' : 'default',
+        minWidth: 0,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+      }}
       aria-label={`Replying to ${effectiveSender}`}
     >
       {replyTo.thumbnailUrl && (
@@ -98,11 +103,11 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
         />
       )}
 
-      <div className="veil-reply-content" style={{ flex: 1, minWidth: 0 }}>
-        <div className="veil-reply-sender">
+      <div className="veil-reply-content" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+        <div className="veil-reply-sender" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {effectiveSender}
         </div>
-        <div className="veil-reply-snippet">
+        <div className="veil-reply-snippet" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {getPreviewSnippet()}
         </div>
       </div>

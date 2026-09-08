@@ -1,9 +1,40 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 67 — APP LOCK LATENCY ELIMINATION, FILE PICKER LIFECYCLE GUARD, ATOMIC PROFILE UPDATES & CROSS-ACCOUNT SYNC
+## Active Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES + CONTEXT MENU REDESIGN & LAYOUT REPAIR
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
+
+### Phase 68 Chat UI Layout & Context Menu Tasks:
+- [x] **Message Bubble Overlap Root Cause Resolution (`src/styles/veil-design-system.css`, `src/styles/veil-components.css`, `src/ui/components/ui/MessageBubble.tsx`)**:
+  - Eliminated escaped `float: right` on `.veil-message-meta` which broke container height calculation and collided with adjacent incoming/outgoing bubbles.
+  - Converted `.veil-message-bubble` to standard `display: flex; flex-direction: column;` participating in natural document flow.
+  - Anchored `.veil-message-meta` via `align-self: flex-end; margin-left: auto;` in natural document flow.
+  - Eliminated `margin-top: 2px !important` and `margin-bottom: 2px !important` collision in consecutive message grouping (`.veil-message-grouped-prev/next`).
+  - Added clean avatar container alignment (`align-self: flex-end; display: flex; height: 28px; width: 28px;`).
+- [x] **Reply Preview Containment (`src/ui/components/ui/ReplyPreview.tsx`, `src/ui/components/ui/MessageBubble.tsx`)**:
+  - Encapsulated reply preview in a dedicated `.veil-message-reply-container` with `minWidth: 0, width: 100%`.
+  - Added strict `minWidth: 0, maxWidth: 100%` on `.veil-reply-preview` and `text-overflow: ellipsis, white-space: nowrap` on `.veil-reply-snippet` and `.veil-reply-sender` to prevent cyclic intrinsic sizing expansion in WebViews.
+- [x] **Modern Translucent Frosted Glass Context Menu (`src/styles/veil-components.css`, `src/ui/components/ConversationView.tsx`)**:
+  - Styled `.veil-context-menu` with dark translucent frosted glass surface (`rgba(22, 27, 34, 0.88)`, `backdrop-filter: blur(16px) saturate(180%)`, modern border, `box-shadow`, and smooth entrance animation).
+  - Designed `.veil-context-reactions-bar` with quick reaction buttons (`❤️ 👍 😂 😮 😢 🙏 🔥`) and `.veil-reaction-active` highlighting for current user's reaction.
+  - Styled `.veil-context-item` and `.veil-context-item-danger` with reset button appearance, crisp hover states, and SVG iconography.
+  - Added `.veil-context-backdrop` click-outside dismisser and `Escape` keyboard dismissal.
+  - Added `.veil-context-active-message` accent halo on active target message.
+- [x] **Intelligent Viewport Positioning (`src/ui/components/ConversationView.tsx`)**:
+  - Implemented viewport-aware bounds checking in `handleContextMenu`: detects available space below vs above, flips menu upwards if space below < 360px and space above is larger, and clamps horizontally and vertically to prevent off-screen clipping.
+  - Wired `onContextMenu` and `onLongPress` directly to `<MessageBubble>`.
+- [x] **Delete for Everyone Confirmation & Forward Recipient Picker (`src/ui/components/ConversationView.tsx`)**:
+  - Implemented `deleteForEveryoneConfirm` state with modal dialog warning that deletion is permanent for all participants.
+  - Implemented `forwardingMessage` state with modal dialog allowing user to choose target conversation to forward message to.
+- [x] **Automated Testing & Build Verification**:
+  - Created `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (7/7 tests pass).
+  - Verified regression suites: `tests/phase44a-ui-layout-and-icons.test.tsx`, `tests/phase31-chat-ui.test.tsx`, `tests/phase64-audit-and-polish.test.tsx`, `tests/phase45e-reply-rendering.test.tsx`, `tests/phase37-android-layout.test.ts`, `tests/phase65-reactions-and-actions.test.ts` (48/48 tests pass).
+  - Production build (`npm run build`) succeeded with release bundle & checksum manifest.
+
+---
+
+## Previous Phase: PHASE 67 — APP LOCK LATENCY ELIMINATION, FILE PICKER LIFECYCLE GUARD, ATOMIC PROFILE UPDATES & CROSS-ACCOUNT SYNC
 
 ### Phase 67 Latency, Lifecycle & Sync Tasks:
 - [x] **Single-Derivation App Lock Fast-Path (`src/privacy/pinManager.ts`, `src/spaces/vault.ts`, `src/ui/app/sessionController.ts`, `src/ui/app/AppState.tsx`)**:

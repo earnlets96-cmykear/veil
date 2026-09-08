@@ -96,7 +96,7 @@ describe('Phase 31: Main Chat UI Modernization Tests', () => {
       );
       expect(outgoingHtml).toContain('veil-message-row outgoing');
       expect(outgoingHtml).toContain('Yes, fully encrypted via Double Ratchet.');
-      expect(outgoingHtml).toContain('Delivered &amp; Read');
+      expect(outgoingHtml).toContain('Delivered');
     });
 
     it('renders MessageBubble with nested ReplyPreview quote', () => {

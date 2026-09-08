@@ -82,6 +82,7 @@ interface ConversationMessageRowProps {
   isSelected: boolean;
   isSelectionMode: boolean;
   isHighlighted: boolean;
+  isContextActive?: boolean;
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
   downloadingAttachmentId: string | null;
@@ -109,6 +110,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   isSelected,
   isSelectionMode,
   isHighlighted,
+  isContextActive,
   isGroupedWithPrevious,
   isGroupedWithNext,
   downloadingAttachmentId,
@@ -199,7 +201,9 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         id={`msg-${msg.id}`}
         className={`veil-msg-row ${msg.isOutgoing ? 'outgoing' : 'incoming'} ${
           isSelectionMode ? 'veil-msg-selectable' : ''
-        } ${isHighlighted ? 'veil-message-highlight' : ''}`}
+        } ${isHighlighted ? 'veil-message-highlight' : ''} ${
+          isContextActive ? 'veil-context-active-message' : ''
+        }`}
         onClick={() => {
           if (isSelectionMode) onToggleSelect(msg.id);
         }}
@@ -248,7 +252,19 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         )}
 
         {!msg.isOutgoing && (
-          <div style={{ flexShrink: 0, marginRight: '8px', alignSelf: 'flex-end', marginBottom: '4px', width: '28px' }}>
+          <div
+            style={{
+              flexShrink: 0,
+              marginRight: '8px',
+              alignSelf: 'flex-end',
+              marginBottom: '2px',
+              width: '28px',
+              height: '28px',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+            }}
+          >
             {!isGroupedWithNext ? (
               <Avatar
                 src={msg.senderAvatar || peerAvatar}
@@ -269,7 +285,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         >
           {/* Quoted Reply Reference for Non-Text Bubbles */}
           {msg.replyTo && !hasVisibleTextBubble && (
-            <div style={{ marginBottom: '6px', maxWidth: '320px' }}>
+            <div style={{ marginBottom: '6px', maxWidth: '320px', width: '100%', minWidth: 0 }}>
               <ReplyPreview
                 replyTo={{
                   messageId: msg.replyTo.messageId,
@@ -388,6 +404,18 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               isGroupedWithNext={isGroupedWithNext}
               reactions={(msg as any).reactions}
               onReactionClick={onReactionClick ? (emoji) => onReactionClick(msg, emoji) : undefined}
+              onContextMenu={(e) => onContextMenu(e, msg)}
+              onLongPress={() => {
+                const el = document.getElementById(`msg-${msg.id}`);
+                const rect = el?.getBoundingClientRect();
+                const fakeEvent = {
+                  preventDefault: () => {},
+                  stopPropagation: () => {},
+                  clientX: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
+                  clientY: rect ? rect.top + rect.height / 2 : window.innerHeight / 2,
+                } as React.MouseEvent;
+                onContextMenu(fakeEvent, msg);
+              }}
             />
           )}
         </div>
@@ -455,6 +483,8 @@ export const ConversationView: React.FC = () => {
     y: 0,
     message: null,
   });
+  const [forwardingMessage, setForwardingMessage] = useState<UIMessage | null>(null);
+  const [deleteForEveryoneConfirm, setDeleteForEveryoneConfirm] = useState<UIMessage | null>(null);
 
   // Current Active Conversation Info
   const activeConversation = useMemo(() => {
@@ -746,14 +776,75 @@ export const ConversationView: React.FC = () => {
     setViewerItem(items[index] || items[0]);
   };
 
+  // Keyboard Escape listener to dismiss context menu and modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (contextMenu.isOpen) {
+          setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+        }
+        if (forwardingMessage) {
+          setForwardingMessage(null);
+        }
+        if (deleteForEveryoneConfirm) {
+          setDeleteForEveryoneConfirm(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [contextMenu.isOpen, forwardingMessage, deleteForEveryoneConfirm]);
+
   // Context Menu Trigger (Long-press / right click)
   const handleContextMenu = (e: React.MouseEvent, msg: UIMessage) => {
     e.preventDefault();
+    e.stopPropagation();
     if (isSelectionMode) return;
+
+    const menuWidth = 240;
+    const menuHeight = 360;
+    const margin = 12;
+
+    let targetX = e.clientX;
+    let targetY = e.clientY;
+
+    // If triggered from touch or keyboard without mouse coordinates
+    if (!targetX && !targetY) {
+      const el = document.getElementById(`msg-${msg.id}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        targetX = msg.isOutgoing ? rect.right - menuWidth : rect.left;
+        targetY = rect.top;
+      }
+    }
+
+    // Horizontal positioning: clamp within viewport
+    let x = targetX;
+    if (x + menuWidth > window.innerWidth - margin) {
+      x = window.innerWidth - menuWidth - margin;
+    }
+    if (x < margin) {
+      x = margin;
+    }
+
+    // Vertical positioning: check available space below vs above
+    let y = targetY;
+    const spaceBelow = window.innerHeight - targetY;
+    const spaceAbove = targetY;
+
+    if (spaceBelow < menuHeight && spaceAbove > spaceBelow) {
+      // Flip above
+      y = Math.max(margin, targetY - menuHeight);
+    } else {
+      // Place below, clamp bottom
+      y = Math.min(targetY, window.innerHeight - menuHeight - margin);
+    }
+    if (y < margin) y = margin;
+
     setContextMenu({
       isOpen: true,
-      x: Math.min(e.clientX, window.innerWidth - 220),
-      y: Math.min(e.clientY, window.innerHeight - 280),
+      x,
+      y,
       message: msg,
     });
   };
@@ -1128,6 +1219,7 @@ export const ConversationView: React.FC = () => {
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}
                 isHighlighted={isHighlighted}
+                isContextActive={contextMenu.isOpen && contextMenu.message?.id === msg.id}
                 isGroupedWithPrevious={isGroupedWithPrevious}
                 isGroupedWithNext={isGroupedWithNext}
                 downloadingAttachmentId={downloadingAttachmentId}
@@ -1161,6 +1253,15 @@ export const ConversationView: React.FC = () => {
         <div ref={timelineEndRef} />
       </div>
 
+      {/* Floating Context Menu Backdrop */}
+      {contextMenu.isOpen && (
+        <div
+          className="veil-context-backdrop"
+          onClick={() => setContextMenu({ isOpen: false, x: 0, y: 0, message: null })}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Floating Context Menu */}
       {contextMenu.isOpen && contextMenu.message && (
         <div
@@ -1170,61 +1271,31 @@ export const ConversationView: React.FC = () => {
           role="menu"
         >
           {/* Reaction Quick Bar */}
-          <div
-            className="veil-context-reactions-bar"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '6px 8px 8px 8px',
-              borderBottom: '1px solid var(--veil-border)',
-              marginBottom: '4px',
-              gap: '4px',
-            }}
-          >
-            {['❤️', '👍', '😂', '😮', '😢', '🙏', '🔥'].map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                className="veil-context-reaction-btn"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  fontSize: '1.35rem',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '6px',
-                  lineHeight: 1,
-                  transition: 'transform 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.25)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                onClick={() => {
-                  if (activeChatId) {
-                    toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
-                  }
-                  setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-                }}
-                aria-label={`React with ${emoji}`}
-              >
-                {emoji}
-              </button>
-            ))}
+          <div className="veil-context-reactions-bar">
+            {['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'].map((emoji) => {
+              const isUserReacted = Boolean(
+                (contextMenu.message as any)?.reactions?.some(
+                  (r: any) => r.emoji === emoji && r.userReacted
+                )
+              );
+              return (
+                <button
+                  key={emoji}
+                  type="button"
+                  className={`veil-context-reaction-btn ${isUserReacted ? 'veil-reaction-active' : ''}`}
+                  onClick={() => {
+                    if (activeChatId) {
+                      toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
+                    }
+                    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                  }}
+                  aria-label={`React with ${emoji}`}
+                >
+                  {emoji}
+                </button>
+              );
+            })}
           </div>
-
-          <button
-            type="button"
-            className="veil-context-item"
-            onClick={() => handleTogglePinMessage(contextMenu.message!)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22" />
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-            </svg>
-            <span>
-              {activeConversation?.pinnedMessageId === contextMenu.message.id ? 'Unpin Message' : 'Pin Message'}
-            </span>
-          </button>
 
           <button
             type="button"
@@ -1245,6 +1316,33 @@ export const ConversationView: React.FC = () => {
               <span>Copy Text</span>
             </button>
           )}
+
+          <button
+            type="button"
+            className="veil-context-item"
+            onClick={() => {
+              const target = contextMenu.message!;
+              setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+              setForwardingMessage(target);
+            }}
+          >
+            <ShareIcon size={16} />
+            <span>Forward</span>
+          </button>
+
+          <button
+            type="button"
+            className="veil-context-item"
+            onClick={() => handleTogglePinMessage(contextMenu.message!)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="17" x2="12" y2="22" />
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+            </svg>
+            <span>
+              {activeConversation?.pinnedMessageId === contextMenu.message.id ? 'Unpin Message' : 'Pin Message'}
+            </span>
+          </button>
 
           {contextMenu.message.attachment && (
             <button
@@ -1305,12 +1403,205 @@ export const ConversationView: React.FC = () => {
             <button
               type="button"
               className="veil-context-item veil-context-item-danger"
-              onClick={() => handleDeleteForEveryone(contextMenu.message!)}
+              onClick={() => {
+                const target = contextMenu.message!;
+                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                setDeleteForEveryoneConfirm(target);
+              }}
             >
               <TrashIcon size={16} />
               <span>Delete for Everyone</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Delete for Everyone Confirmation Modal */}
+      {deleteForEveryoneConfirm && (
+        <div
+          className="veil-modal-overlay"
+          onClick={() => setDeleteForEveryoneConfirm(null)}
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="veil-modal-card"
+            style={{
+              maxWidth: '400px',
+              padding: '24px',
+              background: 'var(--veil-bg-surface-elevated, #161b22)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="alertdialog"
+            aria-labelledby="delete-confirm-title"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '10px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: 'var(--veil-danger, #ef4444)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <AlertCircleIcon size={22} />
+              </div>
+              <h3 id="delete-confirm-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+                Delete for Everyone?
+              </h3>
+            </div>
+            <p style={{ margin: '0 0 20px 0', fontSize: '0.875rem', color: 'var(--veil-text-secondary)', lineHeight: 1.5 }}>
+              This message will be permanently removed for all participants in this conversation. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <Button
+                variant="ghost"
+                onClick={() => setDeleteForEveryoneConfirm(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  if (activeChatId && deleteForEveryoneConfirm) {
+                    try {
+                      await deleteMessageForEveryone(activeChatId, deleteForEveryoneConfirm.id);
+                      showToast({ type: 'info', message: 'Message deleted for everyone' });
+                    } catch (err: any) {
+                      showToast({ type: 'error', message: err.message || 'Failed to delete for everyone' });
+                    }
+                  }
+                  setDeleteForEveryoneConfirm(null);
+                }}
+              >
+                Delete for Everyone
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forward Conversation Picker Modal */}
+      {forwardingMessage && (
+        <div
+          className="veil-modal-overlay"
+          onClick={() => setForwardingMessage(null)}
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="veil-modal-card"
+            style={{
+              maxWidth: '440px',
+              width: '90vw',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '20px',
+              background: 'var(--veil-bg-surface-elevated, #161b22)',
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="forward-dialog-title"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 id="forward-dialog-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+                Forward Message
+              </h3>
+              <IconButton
+                icon={<CloseIcon size={18} />}
+                onClick={() => setForwardingMessage(null)}
+                ariaLabel="Close forward dialog"
+              />
+            </div>
+
+            {/* Message snippet preview */}
+            <div
+              style={{
+                padding: '10px 14px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                borderLeft: '3px solid var(--veil-accent-primary, #14b8a6)',
+                borderRadius: '6px',
+                marginBottom: '16px',
+                fontSize: '0.85rem',
+                color: 'var(--veil-text-secondary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {forwardingMessage.text || forwardingMessage.attachment?.name || 'Media Attachment'}
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {conversations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--veil-text-secondary)', fontSize: '0.875rem' }}>
+                  No other conversations available
+                </div>
+              ) : (
+                conversations
+                  .filter((c) => c.id !== activeChatId)
+                  .concat(conversations.filter((c) => c.id === activeChatId))
+                  .map((conv) => (
+                    <button
+                      key={conv.id}
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--veil-text-primary)',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
+                        transition: 'background 0.12s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      onClick={async () => {
+                        const target = forwardingMessage;
+                        setForwardingMessage(null);
+                        try {
+                          await forwardMessage(conv.id, target);
+                          showToast({ type: 'success', message: `Forwarded to ${conv.name || 'Chat'}` });
+                        } catch (err: any) {
+                          showToast({ type: 'error', message: err.message || 'Failed to forward message' });
+                        }
+                      }}
+                    >
+                      <Avatar
+                        src={conv.avatar || conv.avatarUrl}
+                        seed={conv.id}
+                        name={conv.name}
+                        size={36}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.name || `@${conv.id.slice(0, 8)}`}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--veil-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.id === activeChatId ? 'Current Chat' : (conv.unreadCount ? `${conv.unreadCount} unread` : 'Tap to forward')}
+                        </div>
+                      </div>
+                      <ShareIcon size={16} style={{ opacity: 0.6 }} />
+                    </button>
+                  ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 

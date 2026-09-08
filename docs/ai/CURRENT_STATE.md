@@ -1,6 +1,39 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 67 — APP LOCK LATENCY ELIMINATION, FILE PICKER LIFECYCLE GUARD, ATOMIC PROFILE UPDATES & CROSS-ACCOUNT SYNC
+## Current Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES + CONTEXT MENU REDESIGN & LAYOUT REPAIR
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
+- **Verification Deliverables**:
+  - Phase 68 Chat Bubbles & Context Menu Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (7/7 passed in 32ms).
+  - Phase 44A Icon Audit & Layout Suite: `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed in 33ms).
+  - Phase 31 Main Chat UI Modernization Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 40ms).
+  - Phase 64 Audit & Polish Suite: `tests/phase64-audit-and-polish.test.tsx` (10/10 passed in 62ms).
+  - Phase 45E Reply UI Rendering Suite: `tests/phase45e-reply-rendering.test.tsx` (3/3 passed in 27ms).
+  - Phase 37 Android Layout Regression Suite: `tests/phase37-android-layout.test.ts` (9/9 passed in 15ms).
+  - Phase 65 Reactions & Contextual Actions Suite: `tests/phase65-reactions-and-actions.test.ts` (6/6 passed in 321ms).
+  - Web App Production Build: `npm run build` succeeds cleanly in 1.83s with 0 TypeScript errors (7 release artifacts in `release/v1.0.0/`).
+- **Root Cause Analyses & Architectural Fixes**:
+  1. **Message Bubble Visual Overlapping Elimination**:
+     - Root cause: `.veil-message-meta` was declared as `float: right; margin-top: 2px;` inside an `inline-block` `.veil-message-bubble`. When message text was short ("pos"), the floated metadata escaped container height calculation in standard rendering engines. Adjacent message rows and reaction pills physically collided with previous message boundaries. Furthermore, `.veil-message-grouped-prev/next` injected conflicting `!important` margins.
+     - Fix: Converted `.veil-message-bubble` to standard `display: flex; flex-direction: column;` with `box-sizing: border-box;`. Placed `.veil-message-body` in full block flow, and anchored `.veil-message-meta` via `align-self: flex-end; margin-left: auto;` in natural document flow. Removed float properties and normalized grouping margins (`0px`) to preserve natural flex gaps (`var(--veil-msg-gap, 0.4rem)`).
+  2. **Reply Preview Containment & Sizing Integrity**:
+     - Root cause: `ReplyPreview` used `width: 100%` within dynamic width bubbles and unconstrained text snippets, triggering cyclic intrinsic sizing expansion in WebViews and causing bubbles to distort.
+     - Fix: Encapsulated reply preview inside a dedicated `.veil-message-reply-container` with `minWidth: 0, width: 100%`. Enforced `minWidth: 0, maxWidth: 100%` on `.veil-reply-preview` and strict `text-overflow: ellipsis, white-space: nowrap` on `.veil-reply-snippet` and `.veil-reply-sender`.
+  3. **Translucent Frosted Glass Context Menu**:
+     - Upgraded `.veil-context-menu` to modern dark translucent frosted glass surface (`rgba(22, 27, 34, 0.88)`, `backdrop-filter: blur(16px) saturate(180%)`, modern border, `box-shadow`, and smooth entrance animation).
+     - Upgraded `.veil-context-reactions-bar` with quick reaction emojis (`❤️ 👍 😂 😮 😢 🙏 🔥`) with active highlight state (`.veil-reaction-active`) reflecting `userReacted` status.
+     - Styled `.veil-context-item` and `.veil-context-item-danger` with reset appearance, hover states, and SVG iconography.
+     - Added `.veil-context-backdrop` overlay and `Escape` key listener for instant dismissal.
+     - Added `.veil-context-active-message` accent halo on the active target message row.
+  4. **Intelligent Viewport Positioning & Boundary Clamping**:
+     - Refactored `handleContextMenu` in `ConversationView.tsx`: calculates available space below vs above cursor/target element, automatically flips menu upwards if space below < 360px and space above is larger, and clamps horizontally and vertically to prevent off-screen clipping.
+     - Wired `onContextMenu` and `onLongPress` directly to `<MessageBubble>` on desktop and mobile touch devices.
+  5. **Delete for Everyone Confirmation & Forward Recipient Dialog**:
+     - Implemented `deleteForEveryoneConfirm` state with modal dialog warning that deletion is permanent for all participants.
+     - Implemented `forwardingMessage` state with modal dialog allowing user to choose target conversation to forward message to.
+
+---
+
+## Previous Verified Phase: PHASE 67 — APP LOCK LATENCY ELIMINATION, FILE PICKER LIFECYCLE GUARD, ATOMIC PROFILE UPDATES & CROSS-ACCOUNT SYNC
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
   - Phase 67 App Lock Performance & Timing Suite: `tests/phase67-applock-perf-and-timing.test.ts` (4/4 passed in 393ms).
