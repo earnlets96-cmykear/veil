@@ -44,6 +44,205 @@ import {
   MessageSquareIcon,
   CloseIcon,
 } from './icons/index.ts';
+import type { UIConversation, UIMessage } from '../app/types.ts';
+
+function formatConversationTime(timestamp?: number): string {
+  if (!timestamp) return '';
+  const now = new Date();
+  const date = new Date(timestamp);
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) {
+    return 'Yesterday';
+  }
+
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function renderMessageSnippet(lastMessage?: string) {
+  if (!lastMessage) return 'E2EE encrypted conversation';
+  const msg = lastMessage.trim();
+
+  if (msg === 'Photo' || msg.includes('Photo') || msg.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+    return (
+      <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <ImageIcon size={14} color="#14b8a6" />
+        <span>Photo</span>
+      </span>
+    );
+  }
+
+  if (msg === 'Video' || msg.includes('Video') || msg.match(/\.(mp4|webm|mov|mkv)$/i)) {
+    return (
+      <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <VideoIcon size={14} color="#14b8a6" />
+        <span>Video</span>
+      </span>
+    );
+  }
+
+  if (msg.includes('Media Files')) {
+    return (
+      <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <ImageIcon size={14} color="#14b8a6" />
+        <span>{msg}</span>
+      </span>
+    );
+  }
+
+  if (msg.toLowerCase().includes('voice note') || msg.toLowerCase().includes('voice message')) {
+    return (
+      <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <MicIcon size={14} color="#14b8a6" />
+        <span>Voice message</span>
+      </span>
+    );
+  }
+
+  if (msg.includes('Attachment:')) {
+    const cleanName = msg.replace(/^Attachment:\s*/i, '');
+    return (
+      <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        <FileIcon size={14} color="#14b8a6" />
+        <span>{cleanName}</span>
+      </span>
+    );
+  }
+
+  return msg;
+}
+
+interface SidebarConversationItemProps {
+  conv: UIConversation;
+  isSelected: boolean;
+  isMuted: boolean;
+  latestMsg: UIMessage | null;
+  contactAvatar?: string;
+  onSelect: (id: string) => void;
+  onTogglePin: (id: string, isPinned?: boolean) => void;
+}
+
+const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
+  conv,
+  isSelected,
+  isMuted,
+  latestMsg,
+  contactAvatar,
+  onSelect,
+  onTogglePin,
+}) => {
+  const isOutgoing = !!latestMsg?.isOutgoing;
+
+  return (
+    <div
+      className={`veil-conversation-item ${isSelected ? 'active' : ''}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(conv.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onTogglePin(conv.id, conv.isPinned);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(conv.id);
+        }
+      }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0.75rem 0.85rem',
+        borderRadius: '16px',
+        cursor: 'pointer',
+        marginBottom: '4px',
+        backgroundColor: isSelected ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
+        border: isSelected ? '1px solid rgba(20, 184, 166, 0.25)' : '1px solid transparent',
+        transition: 'background 0.15s ease',
+      }}
+    >
+      <Avatar
+        name={conv.name}
+        imageUrl={conv.avatar || contactAvatar}
+        size="md"
+        isGroup={conv.type === 'group'}
+        aria-label={`${conv.name} avatar`}
+      />
+      <div className="veil-conversation-info" style={{ marginLeft: '0.75rem', flex: 1, minWidth: 0 }}>
+        <div className="veil-conversation-top" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+          <span className="veil-conversation-name" style={{ fontWeight: 600, color: '#f3f4f6', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {conv.name}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            {conv.isPinned && (
+              <span
+                title="Pinned Conversation"
+                aria-label="Pinned"
+                style={{ color: '#14b8a6', display: 'inline-flex', alignItems: 'center' }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="17" x2="12" y2="22" />
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                </svg>
+              </span>
+            )}
+            {isMuted && <BellOffIcon size={12} color="#64748b" aria-label="Muted" />}
+            {conv.timestamp && (
+              <span className="veil-conversation-time" style={{ fontSize: '0.725rem', color: '#64748b' }}>
+                {formatConversationTime(conv.timestamp)}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="veil-conversation-preview" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem', color: '#94a3b8' }}>
+            {isOutgoing && latestMsg && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                <MessageStatus status={latestMsg.status} size={14} />
+              </span>
+            )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {renderMessageSnippet(conv.lastMessage || latestMsg?.text)}
+            </span>
+          </div>
+
+          {conv.unreadCount > 0 && (
+            <span
+              className="veil-unread-pill"
+              style={{
+                backgroundColor: isMuted ? '#475569' : '#14b8a6',
+                color: '#ffffff',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                padding: '2px 7px',
+                borderRadius: '12px',
+                marginLeft: '6px',
+                flexShrink: 0,
+              }}
+            >
+              {conv.unreadCount}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
 
 export const Sidebar: React.FC = () => {
   const {
@@ -116,99 +315,32 @@ export const Sidebar: React.FC = () => {
     };
   }, [searchQuery, searchDirectory]);
 
-  const formatConversationTime = (timestamp?: number) => {
-    if (!timestamp) return '';
-    const now = new Date();
-    const date = new Date(timestamp);
-
-    const isToday =
-      date.getDate() === now.getDate() &&
-      date.getMonth() === now.getMonth() &&
-      date.getFullYear() === now.getFullYear();
-
-    if (isToday) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const isYesterday =
-      date.getDate() === yesterday.getDate() &&
-      date.getMonth() === yesterday.getMonth() &&
-      date.getFullYear() === yesterday.getFullYear();
-
-    if (isYesterday) {
-      return 'Yesterday';
-    }
-
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
-
-  const renderMessageSnippet = (lastMessage?: string) => {
-    if (!lastMessage) return 'E2EE encrypted conversation';
-    const msg = lastMessage.trim();
-
-    if (msg === 'Photo' || msg.includes('Photo') || msg.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
-      return (
-        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <ImageIcon size={14} color="#14b8a6" />
-          <span>Photo</span>
-        </span>
-      );
-    }
-
-    if (msg === 'Video' || msg.includes('Video') || msg.match(/\.(mp4|webm|mov|mkv)$/i)) {
-      return (
-        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <VideoIcon size={14} color="#14b8a6" />
-          <span>Video</span>
-        </span>
-      );
-    }
-
-    if (msg.includes('Media Files')) {
-      return (
-        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <ImageIcon size={14} color="#14b8a6" />
-          <span>{msg}</span>
-        </span>
-      );
-    }
-
-    if (msg.toLowerCase().includes('voice note') || msg.toLowerCase().includes('voice message')) {
-      return (
-        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <MicIcon size={14} color="#14b8a6" />
-          <span>Voice message</span>
-        </span>
-      );
-    }
-
-    if (msg.includes('Attachment:')) {
-      const cleanName = msg.replace(/^Attachment:\s*/i, '');
-      return (
-        <span className="veil-snippet-with-icon" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          <FileIcon size={14} color="#14b8a6" />
-          <span>{cleanName}</span>
-        </span>
-      );
-    }
-
-    return msg;
-  };
-
   // Filter and sort conversations (pinned conversations first, then newest message)
-  const filteredConversations = conversations
-    .filter((c) => {
-      if (activeChip === 'unread') return (c.unreadCount || 0) > 0;
-      if (activeChip === 'group') return c.type === 'group';
-      return true;
-    })
-    .sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      return (b.timestamp || 0) - (a.timestamp || 0);
-    });
+  const filteredConversations = React.useMemo(() => {
+    return conversations
+      .filter((c) => {
+        if (activeChip === 'unread') return (c.unreadCount || 0) > 0;
+        if (activeChip === 'group') return c.type === 'group';
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        return (b.timestamp || 0) - (a.timestamp || 0);
+      });
+  }, [conversations, activeChip]);
+
+  const handleSelectConversation = React.useCallback((id: string) => {
+    selectConversation(id);
+  }, [selectConversation]);
+
+  const handleTogglePin = React.useCallback((id: string, isPinned?: boolean) => {
+    if (isPinned) {
+      unpinConversation(id);
+    } else {
+      pinConversation(id);
+    }
+  }, [unpinConversation, pinConversation]);
 
   const pendingIncoming = contactRequests.filter((r) => r.isIncoming && r.status === 'INCOMING_PENDING');
 
@@ -721,106 +853,19 @@ export const Sidebar: React.FC = () => {
                 const isMuted = typeof isConversationMuted === 'function' && isConversationMuted(conv.id);
                 const convMsgs = (messages && messages[conv.id]) || [];
                 const latestMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
-                const isOutgoing = !!latestMsg?.isOutgoing;
+                const contactAvatar = (contacts || []).find((c) => c.identityId === conv.id)?.avatar;
 
                 return (
-                  <div
+                  <SidebarConversationItem
                     key={conv.id}
-                    className={`veil-conversation-item ${isSelected ? 'active' : ''}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => selectConversation(conv.id)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      if (conv.isPinned) {
-                        unpinConversation(conv.id);
-                      } else {
-                        pinConversation(conv.id);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        selectConversation(conv.id);
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0.75rem 0.85rem',
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      marginBottom: '4px',
-                      backgroundColor: isSelected ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
-                      border: isSelected ? '1px solid rgba(20, 184, 166, 0.25)' : '1px solid transparent',
-                      transition: 'background 0.15s ease',
-                    }}
-                  >
-                    <Avatar
-                      name={conv.name}
-                      imageUrl={conv.avatar || (contacts || []).find((c) => c.identityId === conv.id)?.avatar}
-                      size="md"
-                      isGroup={conv.type === 'group'}
-                      aria-label={`${conv.name} avatar`}
-                    />
-                    <div className="veil-conversation-info" style={{ marginLeft: '0.75rem', flex: 1, minWidth: 0 }}>
-                      <div className="veil-conversation-top" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                        <span className="veil-conversation-name" style={{ fontWeight: 600, color: '#f3f4f6', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {conv.name}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                          {conv.isPinned && (
-                            <span
-                              title="Pinned Conversation"
-                              aria-label="Pinned"
-                              style={{ color: '#14b8a6', display: 'inline-flex', alignItems: 'center' }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="12" y1="17" x2="12" y2="22" />
-                                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                              </svg>
-                            </span>
-                          )}
-                          {isMuted && <BellOffIcon size={12} color="#64748b" aria-label="Muted" />}
-                          {conv.timestamp && (
-                            <span className="veil-conversation-time" style={{ fontSize: '0.725rem', color: '#64748b' }}>
-                              {formatConversationTime(conv.timestamp)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="veil-conversation-preview" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem', color: '#94a3b8' }}>
-                          {isOutgoing && latestMsg && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
-                              <MessageStatus status={latestMsg.status} size={14} />
-                            </span>
-                          )}
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {renderMessageSnippet(conv.lastMessage || latestMsg?.text)}
-                          </span>
-                        </div>
-
-                        {conv.unreadCount > 0 && (
-                          <span
-                            className="veil-unread-pill"
-                            style={{
-                              backgroundColor: isMuted ? '#475569' : '#14b8a6',
-                              color: '#ffffff',
-                              fontSize: '0.7rem',
-                              fontWeight: 700,
-                              padding: '2px 7px',
-                              borderRadius: '12px',
-                              marginLeft: '6px',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {conv.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    conv={conv}
+                    isSelected={isSelected}
+                    isMuted={isMuted}
+                    latestMsg={latestMsg}
+                    contactAvatar={contactAvatar}
+                    onSelect={handleSelectConversation}
+                    onTogglePin={handleTogglePin}
+                  />
                 );
               })
             )}

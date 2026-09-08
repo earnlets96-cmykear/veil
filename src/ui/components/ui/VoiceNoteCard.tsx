@@ -40,7 +40,7 @@ const generateWaveformBars = (messageId: string | undefined, count: number): num
 
 const BAR_COUNT = 40;
 
-export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
+const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   messageId,
   durationSeconds,
   currentTimeSeconds: propCurrentTime = 0,
@@ -495,3 +495,5 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     </div>
   );
 };
+
+export const VoiceNoteCard = React.memo(VoiceNoteCardComponent);

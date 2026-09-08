@@ -2,6 +2,31 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase71-performance-and-smoothness-pass] - 2026-09-08
+
+### Performance & Smoothness Pass Across Timeline, Memoization, Media Cache & Telemetry (Phase 71)
+- **Conversation Timeline & Message Row Pure Memoization**:
+  - Wrapped `ConversationMessageRow` with `React.memo` and stabilized all child callbacks with `useCallback`.
+  - Updated props to accept scalar values (`isAudioPlaying`, `isDownloading`, `downloadPercent`, `downloadLoadedBytes`) to prevent re-rendering unaffected message rows during transfer or audio playback.
+  - Eliminated redundant root-level state ticks (`setPlaybackProgress`, `setPlaybackCurrentTime`) during audio playback; `VoiceNoteCard` continues to update smoothly at 60fps via its internal `VoicePlayer.subscribe()` listener without triggering full timeline re-renders.
+  - Wrapped top-level handlers with `useCallback`: `handleToggleSelectMessage`, `handleContextMenu`, `handleOpenMedia`, `handleOpenGroupedMedia`, `handleToggleVoice`, `handleSeekVoice`, `handleRetryMessage`, `handleReactionClick`, `handleDownloadAttachment`.
+- **Large Conversation Incremental Windowing & Auto-Scroll Stabilization**:
+  - Implemented incremental windowing for large conversations (`INITIAL_MESSAGE_WINDOW = 60`, `WINDOW_INCREMENT = 40`), slicing `displayedMessages = activeMessages.slice(-renderedCount)`.
+  - Added upward scroll threshold listener (`handleTimelineScroll`) to lazily prepend older messages and preserve scroll position seamlessly.
+  - Added window auto-expansion in `handleJumpToMessage` when jumping to messages outside the active window.
+  - Polished timeline auto-scrolling to use instantaneous `behavior: 'auto'` on conversation switch (`lastChatIdRef !== activeChatId`) and `behavior: 'smooth'` for live incoming/outgoing messages.
+- **AppState Context Provider Value Stabilization**:
+  - Wrapped `AppContextType` provider value object with `React.useMemo(...)`, eliminating cascading re-renders across all `useApp()` consumers on unrelated state updates.
+- **Presentation Component Pure Memoization**:
+  - Wrapped `MessageBubble`, `VoiceNoteCard`, `AttachmentCard`, `MediaImage`, `GroupedMediaGrid`, and `MessageComposer` in `React.memo`.
+- **Sidebar Conversation Item Optimization**:
+  - Extracted `SidebarConversationItem` into `React.memo`, memoized `filteredConversations`, and stabilized click/pin callbacks with `useCallback`.
+- **Ephemeral Media RAM Cache Bounded LRU Eviction**:
+  - Added `MAX_RAM_ENTRIES = 50` bounded LRU eviction limit to `MediaCacheManager`.
+  - Automatically revokes dead object URLs via `URL.revokeObjectURL()` on eviction to prevent DOM memory leaks on mobile devices, while preserving persistent IndexedDB caching.
+- **Production Telemetry & Log Gating**:
+  - Gated routine informational `console.log` statements in production builds (`import.meta.env?.PROD`), preventing console throughput bottlenecks while retaining high-fidelity ring buffers and error traces.
+
 ## [1.0.0-phase70-voice-seeking-swipe-media-ui] - 2026-09-08
 
 ### Voice Seeking, Swipe-to-Reply on Audio, Progress Circle & Video Player UI Overhaul (Phase 70)

@@ -20,7 +20,7 @@ export interface MediaImageProps {
   isVideo?: boolean;
 }
 
-export const MediaImage: React.FC<MediaImageProps> = ({
+const MediaImageComponent: React.FC<MediaImageProps> = ({
   attachment,
   onClick,
   alt = 'Encrypted media',
@@ -296,3 +296,5 @@ export const MediaImage: React.FC<MediaImageProps> = ({
     </div>
   );
 };
+
+export const MediaImage = React.memo(MediaImageComponent);

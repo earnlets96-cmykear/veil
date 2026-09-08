@@ -136,7 +136,8 @@ class RuntimeDiagnosticsSubsystem {
     }
     this.history.push(event);
 
-    if (this.enabled && typeof console !== 'undefined') {
+    const isProd = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.PROD);
+    if (this.enabled && !isProd && typeof console !== 'undefined') {
       const prefix = `[VEIL ${category}]`;
       const lines = Object.entries(sanitized)
         .map(([k, v]) => `  ${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)

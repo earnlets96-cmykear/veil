@@ -33,7 +33,7 @@ interface MessageComposerProps {
   onConfirmEdit?: (newText: string) => void;
 }
 
-export const MessageComposer: React.FC<MessageComposerProps> = ({
+const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   conversationId,
   editingMessage = null,
   onCancelEdit,
@@ -446,3 +446,5 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     </div>
   );
 };
+
+export const MessageComposer = React.memo(MessageComposerComponent);

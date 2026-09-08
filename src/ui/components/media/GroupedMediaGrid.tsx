@@ -21,7 +21,7 @@ export interface GroupedMediaGridProps {
   className?: string;
 }
 
-export const GroupedMediaGrid: React.FC<GroupedMediaGridProps> = ({
+const GroupedMediaGridComponent: React.FC<GroupedMediaGridProps> = ({
   attachments,
   onOpenItem,
   className = '',
@@ -221,3 +221,5 @@ export const GroupedMediaGrid: React.FC<GroupedMediaGridProps> = ({
     </div>
   );
 };
+
+export const GroupedMediaGrid = React.memo(GroupedMediaGridComponent);

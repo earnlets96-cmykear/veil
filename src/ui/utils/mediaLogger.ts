@@ -49,23 +49,30 @@ class SafeMediaLogger {
   public log(data: SafeMediaEvent): void {
     if (!this.enabled) return;
 
+    const isProd = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.PROD);
+    if (isProd && data.event !== 'MEDIA_ERROR') return;
+
     const payload = {
       ...data,
       timestamp: data.timestamp || Date.now(),
     };
 
     if (typeof console !== 'undefined' && console.log) {
-      console.log(`[VEIL-MEDIA] [${payload.event}]`, {
-        attachmentId: payload.attachmentId,
-        objectId: payload.objectId,
-        mimeType: payload.mimeType,
-        sizeBytes: payload.sizeBytes,
-        ciphertextSize: payload.ciphertextSize,
-        duration: payload.duration,
-        seekPercent: payload.seekPercent,
-        error: payload.error,
-        time: new Date(payload.timestamp).toISOString(),
-      });
+      if (data.event === 'MEDIA_ERROR' && console.error) {
+        console.error(`[VEIL-MEDIA] [ERROR]`, payload);
+      } else {
+        console.log(`[VEIL-MEDIA] [${payload.event}]`, {
+          attachmentId: payload.attachmentId,
+          objectId: payload.objectId,
+          mimeType: payload.mimeType,
+          sizeBytes: payload.sizeBytes,
+          ciphertextSize: payload.ciphertextSize,
+          duration: payload.duration,
+          seekPercent: payload.seekPercent,
+          error: payload.error,
+          time: new Date(payload.timestamp).toISOString(),
+        });
+      }
     }
   }
 

@@ -34,7 +34,7 @@ export interface AttachmentCardProps {
   className?: string;
 }
 
-export const AttachmentCard: React.FC<AttachmentCardProps> = ({
+const AttachmentCardComponent: React.FC<AttachmentCardProps> = ({
   name,
   sizeBytes,
   mimeType,
@@ -142,3 +142,5 @@ export const AttachmentCard: React.FC<AttachmentCardProps> = ({
     </div>
   );
 };
+
+export const AttachmentCard = React.memo(AttachmentCardComponent);

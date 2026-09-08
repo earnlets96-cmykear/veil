@@ -1,17 +1,39 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 70 — VOICE SEEKING & TOUCH GESTURES, SWIPE-TO-REPLY ON AUDIO, PROGRESS CIRCLE REFINEMENT & VIDEO PLAYER UI OVERHAUL
-- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+## Active Phase: PHASE 71 — PERFORMANCE & SMOOTHNESS PASS (CONVERSATION TIMELINE, ROW MEMOIZATION, MEDIA CACHE & TELEMETRY GATING)
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS — 376/376 SUITES, 1155/1155 TESTS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 
-### Phase 70 Tasks Completed:
-- [x] **Feature 1 — Voice Seeking & Native Scrubber**: Direct touch dragging on waveform track (`onTouchStartTrack`, `onTouchMoveTrack`, `onTouchEndTrack`), rounded millisecond seeking in `voicePlayer.ts`, and safe `Double`/`Long` parsing in Kotlin `VeilNativeMediaPlugin.kt`.
-- [x] **Feature 2 — Swipe-to-Reply on Voice Notes**: Enabled touch drag reply gesture for audio messages in `ConversationView.tsx` by removing `!msg.voice` restriction, with proper track stopPropagation.
-- [x] **Feature 3 — Progress Circle Refinement**: Normalized case-insensitive status checks in `AttachmentCard.tsx` and `ConversationView.tsx` so progress circle displays accurately across all upload and download operations.
-- [x] **Feature 4 — Video Player UI Overhaul (`MediaViewer.tsx`)**: Upgraded to frosted-glass bottom HUD, 64px circular play overlay, auto-hiding controls during playback, and progress track gradient fill.
+### Phase 71 Tasks Completed:
+- [x] **Conversation View & Row Memoization (`ConversationView.tsx`)**:
+  - Wrapped `ConversationMessageRow` with `React.memo` and stabilized all child event callbacks (`handlePlayToggle`, `handleSeek`, `handleDownload`, `handleMediaClick`, `handleGroupedMedia`, `handleReplyTriggerAction`, `handleRetryAction`, `handleReactionAction`, `handleContextMenuAction`, `handleLongPress`).
+  - Updated props to accept scalar status values (`isAudioPlaying`, `isDownloading`, `downloadPercent`, `downloadLoadedBytes`) alongside existing props to eliminate re-renders across unaffected rows.
+  - Eliminated redundant root-level state ticks (`setPlaybackProgress`, `setPlaybackCurrentTime`) during audio playback; `VoiceNoteCard` continues to update smoothly at 60fps via its internal `VoicePlayer.subscribe()` listener.
+  - Wrapped top-level handlers with `useCallback`: `handleToggleSelectMessage`, `handleContextMenu`, `handleOpenMedia`, `handleOpenGroupedMedia`, `handleToggleVoice`, `handleSeekVoice`, `handleRetryMessage`, `handleReactionClick`, `handleDownloadAttachment`.
+- [x] **Incremental Windowing & Auto-Scroll Stabilization (`ConversationView.tsx`)**:
+  - Implemented incremental windowing for large conversations (`INITIAL_MESSAGE_WINDOW = 60`, `WINDOW_INCREMENT = 40`), slicing `displayedMessages = activeMessages.slice(-renderedCount)`.
+  - Added upward scroll threshold listener (`handleTimelineScroll`) to lazily prepend older messages and preserve scroll position seamlessly.
+  - Added window auto-expansion in `handleJumpToMessage` when jumping to messages outside the active window.
+  - Polished timeline auto-scrolling to use instantaneous `behavior: 'auto'` on conversation switch (`lastChatIdRef !== activeChatId`) and `behavior: 'smooth'` for live incoming/outgoing messages.
+- [x] **AppState Context Value Stabilization (`AppState.tsx`)**:
+  - Memoized the `AppContextType` provider value object using `React.useMemo(...)`, preventing cascading re-renders across all `useApp()` consumer components on unrelated state ticks.
+- [x] **Presentation Component Pure Memoization (`ui/index.ts`, `media/index.ts`)**:
+  - Wrapped `MessageBubble`, `VoiceNoteCard`, `AttachmentCard`, `MediaImage`, `GroupedMediaGrid`, and `MessageComposer` in `React.memo`.
+- [x] **Sidebar Conversation Item Optimization (`Sidebar.tsx`)**:
+  - Extracted and memoized `SidebarConversationItem = React.memo(...)`.
+  - Memoized `filteredConversations` calculation with `useMemo`.
+  - Stabilized selection and pin handlers with `useCallback`.
+- [x] **Ephemeral Media RAM Cache LRU Eviction (`mediaCache.ts`)**:
+  - Added `MAX_RAM_ENTRIES = 50` bounded LRU eviction limit to `MediaCacheManager`.
+  - Automatically revokes dead object URLs via `URL.revokeObjectURL()` on eviction to prevent DOM memory leaks on mobile devices, while preserving persistent IndexedDB caching.
+- [x] **Production Telemetry & Log Gating (`mediaLogger.ts`, `runtimeDiagnostics.ts`)**:
+  - Gated routine informational `console.log` statements in production builds (`import.meta.env?.PROD`), preventing console throughput bottlenecks while retaining high-fidelity ring buffers and error traces.
 
-## Previous Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
+## Previous Phase: PHASE 70 — VOICE SEEKING & TOUCH GESTURES, SWIPE-TO-REPLY ON AUDIO, PROGRESS CIRCLE REFINEMENT & VIDEO PLAYER UI OVERHAUL
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+- **Branch**: `main`
+- **Output Report**: `docs/ai/CURRENT_STATE.md`
 
 ### Phase 68 Chat UI Layout & Micro-Polish Tasks:
 - [x] **P2P Message Bubbles — Sender Name Omission (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:

@@ -268,18 +268,64 @@ class MediaCacheManager {
     return fetchPromise;
   }
 
+  private static readonly MAX_RAM_ENTRIES = 50;
+
+  private enforceLruLimit(): void {
+    if (this.cache.size <= MediaCacheManager.MAX_RAM_ENTRIES) return;
+
+    const keysToEvict: string[] = [];
+    const itemsToRevoke = new Set<DecryptedMedia>();
+
+    for (const [k, v] of this.cache.entries()) {
+      if (this.cache.size - keysToEvict.length <= MediaCacheManager.MAX_RAM_ENTRIES) {
+        break;
+      }
+      keysToEvict.push(k);
+      itemsToRevoke.add(v);
+    }
+
+    for (const k of keysToEvict) {
+      this.cache.delete(k);
+    }
+
+    for (const item of itemsToRevoke) {
+      let stillReferenced = false;
+      for (const remaining of this.cache.values()) {
+        if (remaining === item || remaining.blobUrl === item.blobUrl) {
+          stillReferenced = true;
+          break;
+        }
+      }
+      if (!stillReferenced && item.blobUrl && typeof URL !== 'undefined') {
+        try {
+          URL.revokeObjectURL(item.blobUrl);
+        } catch (_e) {}
+      }
+    }
+  }
+
   /**
    * Retrieves an item synchronously from in-memory RAM cache if present.
+   * Refreshes LRU position.
    */
   public get(key: string): DecryptedMedia | undefined {
-    return this.cache.get(key);
+    const item = this.cache.get(key);
+    if (item) {
+      this.cache.delete(key);
+      this.cache.set(key, item);
+    }
+    return item;
   }
 
   /**
    * Stores a pre-decrypted media item directly in RAM cache (e.g. freshly staged file before sending).
    */
   public set(key: string, item: DecryptedMedia): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
     this.cache.set(key, item);
+    this.enforceLruLimit();
   }
 
   /**

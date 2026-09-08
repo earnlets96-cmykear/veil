@@ -90,11 +90,16 @@ interface ConversationMessageRowProps {
   isContextActive?: boolean;
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
-  downloadingAttachmentId: string | null;
+  downloadingAttachmentId?: string | null;
   downloadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
-  playbackProgress: Record<string, number>;
-  playbackCurrentTime: Record<string, number>;
-  playingAudioId: string | null;
+  downloadPercent?: number;
+  downloadLoadedBytes?: number;
+  playbackProgress?: Record<string, number>;
+  playbackCurrentTime?: Record<string, number>;
+  currentPlaybackProgress?: number;
+  currentPlaybackTime?: number;
+  playingAudioId?: string | null;
+  isAudioPlaying?: boolean;
   unreadRef: React.RefObject<HTMLDivElement | null>;
   onToggleSelect: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, msg: UIMessage) => void;
@@ -111,7 +116,7 @@ interface ConversationMessageRowProps {
   isGroup?: boolean;
 }
 
-const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
+const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = ({
   msg,
   isUnreadFirst,
   isSelected,
@@ -123,9 +128,14 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
   isGroup = false,
   downloadingAttachmentId,
   downloadProgress,
+  downloadPercent,
+  downloadLoadedBytes,
   playbackProgress,
   playbackCurrentTime,
+  currentPlaybackProgress,
+  currentPlaybackTime,
   playingAudioId,
+  isAudioPlaying,
   unreadRef,
   onToggleSelect,
   onContextMenu,
@@ -155,6 +165,13 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
     !msg.text.includes('Attachment:') &&
     msg.text !== 'Voice Message'
   );
+
+  const isCurrentlyPlaying = isAudioPlaying ?? (playingAudioId === msg.id);
+  const isCurrentlyDownloading = downloadingAttachmentId === msg.id;
+  const currentProgress = currentPlaybackProgress ?? (playbackProgress ? playbackProgress[msg.id] || 0 : 0);
+  const currentTime = currentPlaybackTime ?? (playbackCurrentTime ? playbackCurrentTime[msg.id] || 0 : 0);
+  const dlPercent = downloadPercent ?? (downloadProgress ? downloadProgress[msg.id]?.percent : undefined);
+  const dlLoaded = downloadLoadedBytes ?? (downloadProgress ? downloadProgress[msg.id]?.loaded : undefined);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches && e.touches.length === 1) {
@@ -197,6 +214,35 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
     setSwipeOffset(0);
     touchStartRef.current = null;
   };
+
+  const handlePlayToggle = useCallback(() => onToggleVoice(msg), [onToggleVoice, msg]);
+  const handleSeek = useCallback((percent: number) => onSeekVoice(msg, percent), [onSeekVoice, msg]);
+  const handleDownload = useCallback(() => onDownloadAttachment(msg), [onDownloadAttachment, msg]);
+  const handleMediaClick = useCallback(() => {
+    if (!isSelectionMode) onOpenMedia(msg);
+  }, [isSelectionMode, onOpenMedia, msg]);
+  const handleGroupedMedia = useCallback((idx: number) => onOpenGroupedMedia(msg, idx), [onOpenGroupedMedia, msg]);
+  const handleReplyTriggerAction = useCallback(() => onReplyTrigger(msg), [onReplyTrigger, msg]);
+  const handleRetryAction = useCallback(() => {
+    if (onRetry) onRetry(msg);
+  }, [onRetry, msg]);
+  const handleReactionAction = useCallback((emoji: string) => {
+    if (onReactionClick) onReactionClick(msg, emoji);
+  }, [onReactionClick, msg]);
+  const handleContextMenuAction = useCallback((e: React.MouseEvent) => {
+    onContextMenu(e, msg);
+  }, [onContextMenu, msg]);
+  const handleLongPress = useCallback(() => {
+    const el = document.getElementById(`msg-${msg.id}`);
+    const rect = el?.getBoundingClientRect();
+    const fakeEvent = {
+      preventDefault: () => {},
+      stopPropagation: () => {},
+      clientX: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
+      clientY: rect ? rect.top + rect.height / 2 : window.innerHeight / 2,
+    } as React.MouseEvent;
+    onContextMenu(fakeEvent, msg);
+  }, [msg, onContextMenu]);
 
   return (
     <React.Fragment>
@@ -345,7 +391,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
             <div className="veil-media-bubble-container">
               <GroupedMediaGrid
                 attachments={msg.attachments}
-                onOpenItem={(idx) => onOpenGroupedMedia(msg, idx)}
+                onOpenItem={handleGroupedMedia}
               />
               <div className="veil-media-meta-overlay">
                 <span className="veil-media-time">
@@ -365,12 +411,10 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               <MediaImage
                 attachment={msg.attachment}
                 isVideo={msg.attachment.mimeType?.startsWith('video/')}
-                onClick={() => {
-                  if (!isSelectionMode) onOpenMedia(msg);
-                }}
+                onClick={handleMediaClick}
                 alt={msg.attachment.name}
               />
-              {(downloadingAttachmentId === msg.id || msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING') && (
+              {(isCurrentlyDownloading || msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING') && (
                 <div
                   className="veil-media-download-progress-overlay"
                   style={{
@@ -390,12 +434,12 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                   <ProgressCircle
                     size={52}
                     percent={
-                      downloadingAttachmentId === msg.id
-                        ? downloadProgress?.[msg.id]?.percent ?? 15
+                      isCurrentlyDownloading
+                        ? dlPercent ?? 15
                         : 50
                     }
                     totalBytes={msg.attachment.sizeBytes}
-                    loadedBytes={downloadingAttachmentId === msg.id ? downloadProgress?.[msg.id]?.loaded : undefined}
+                    loadedBytes={isCurrentlyDownloading ? dlLoaded : undefined}
                     variant={msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING' ? 'upload' : 'download'}
                   />
                 </div>
@@ -419,15 +463,15 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               sizeBytes={msg.attachment.sizeBytes}
               mimeType={msg.attachment.mimeType}
               status={
-                downloadingAttachmentId === msg.id
+                isCurrentlyDownloading
                   ? 'downloading'
                   : msg.status === 'UPLOADING' || (msg.attachment.state as any)?.toLowerCase() === 'uploading'
                   ? 'uploading'
                   : (msg.attachment.state as any)?.toLowerCase() || 'ready'
               }
-              progressPercent={downloadProgress?.[msg.id]?.percent}
-              loadedBytes={downloadProgress?.[msg.id]?.loaded}
-              onDownload={() => onDownloadAttachment(msg)}
+              progressPercent={dlPercent}
+              loadedBytes={dlLoaded}
+              onDownload={handleDownload}
             />
           )}
 
@@ -436,21 +480,21 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
             <VoiceNoteCard
               messageId={msg.id}
               durationSeconds={msg.voice.durationSeconds}
-              currentTimeSeconds={playbackCurrentTime[msg.id] || 0}
+              currentTimeSeconds={currentTime}
               isOutgoing={msg.isOutgoing}
               playbackState={
                 msg.status === 'UPLOADING'
                   ? 'uploading'
                   : msg.status === 'FAILED'
                   ? 'error'
-                  : playingAudioId === msg.id
+                  : isCurrentlyPlaying
                   ? 'playing'
                   : 'ready'
               }
-              currentProgressPercent={playbackProgress[msg.id] || 0}
-              onPlayToggle={() => onToggleVoice(msg)}
-              onSeek={(percent) => onSeekVoice(msg, percent)}
-              onRetry={() => onToggleVoice(msg)}
+              currentProgressPercent={currentProgress}
+              onPlayToggle={handlePlayToggle}
+              onSeek={handleSeek}
+              onRetry={handlePlayToggle}
             />
           )}
 
@@ -479,25 +523,15 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                   : undefined
               }
               onReplyClick={onJumpToMessage}
-              onReplyTrigger={() => onReplyTrigger(msg)}
-              onRetry={onRetry ? () => onRetry(msg) : undefined}
+              onReplyTrigger={handleReplyTriggerAction}
+              onRetry={onRetry ? handleRetryAction : undefined}
               isGroupedWithPrevious={isGroupedWithPrevious}
               isGroupedWithNext={isGroupedWithNext}
               reactions={(msg as any).reactions}
               edited={msg.edited}
-              onReactionClick={onReactionClick ? (emoji) => onReactionClick(msg, emoji) : undefined}
-              onContextMenu={(e) => onContextMenu(e, msg)}
-              onLongPress={() => {
-                const el = document.getElementById(`msg-${msg.id}`);
-                const rect = el?.getBoundingClientRect();
-                const fakeEvent = {
-                  preventDefault: () => {},
-                  stopPropagation: () => {},
-                  clientX: rect ? rect.left + rect.width / 2 : window.innerWidth / 2,
-                  clientY: rect ? rect.top + rect.height / 2 : window.innerHeight / 2,
-                } as React.MouseEvent;
-                onContextMenu(fakeEvent, msg);
-              }}
+              onReactionClick={onReactionClick ? handleReactionAction : undefined}
+              onContextMenu={handleContextMenuAction}
+              onLongPress={handleLongPress}
             />
           )}
         </div>
@@ -505,6 +539,8 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
     </React.Fragment>
   );
 };
+
+export const ConversationMessageRow = React.memo(ConversationMessageRowComponent);
 
 export const ConversationView: React.FC = () => {
   const {
@@ -640,12 +676,48 @@ export const ConversationView: React.FC = () => {
     return unreadItems.length > 0 ? unreadItems[0].idx : -1;
   }, [activeConversation, activeMessages]);
 
-  // Auto-scroll timeline to bottom on load/new message or to unread divider
+  // Incremental timeline windowing for smooth rendering of large conversations
+  const INITIAL_MESSAGE_WINDOW = 60;
+  const WINDOW_INCREMENT = 40;
+  const [renderedCount, setRenderedCount] = useState<number>(INITIAL_MESSAGE_WINDOW);
+
   useEffect(() => {
+    setRenderedCount(INITIAL_MESSAGE_WINDOW);
+  }, [activeChatId]);
+
+  const displayedMessages = useMemo(() => {
+    if (activeMessages.length <= renderedCount) return activeMessages;
+    return activeMessages.slice(-renderedCount);
+  }, [activeMessages, renderedCount]);
+
+  const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollTop < 100 && renderedCount < activeMessages.length) {
+      const prevScrollHeight = el.scrollHeight;
+      const prevScrollTop = el.scrollTop;
+      setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
+      requestAnimationFrame(() => {
+        if (timelineRef.current) {
+          const newScrollHeight = timelineRef.current.scrollHeight;
+          timelineRef.current.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+        }
+      });
+    }
+  }, [renderedCount, activeMessages.length]);
+
+  const lastChatIdRef = useRef<string | null>(null);
+
+  // Auto-scroll timeline to bottom on load/new message or to unread divider
+  // Uses instantaneous 'auto' scroll on conversation switch and 'smooth' for live messages
+  useEffect(() => {
+    const isChatSwitch = lastChatIdRef.current !== activeChatId;
+    lastChatIdRef.current = activeChatId;
+    const scrollBehavior: ScrollBehavior = isChatSwitch ? 'auto' : 'smooth';
+
     if (firstUnreadIndex >= 0 && unreadRef.current) {
-      unreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      unreadRef.current.scrollIntoView({ behavior: scrollBehavior, block: 'center' });
     } else if (timelineEndRef.current) {
-      timelineEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      timelineEndRef.current.scrollIntoView({ behavior: scrollBehavior });
     }
   }, [activeChatId, activeMessages.length, firstUnreadIndex]);
 
@@ -660,8 +732,25 @@ export const ConversationView: React.FC = () => {
     }
   }, [activeChatId, activeConversation?.unreadCount, activeMessages.length, markConversationAsRead]);
 
-  // Handle Jump-to-message
+  // Handle Jump-to-message with automatic window expansion
   const handleJumpToMessage = useCallback((targetMsgId: string) => {
+    const targetIdx = activeMessages.findIndex((m) => m.id === targetMsgId);
+    if (targetIdx >= 0 && targetIdx < activeMessages.length - renderedCount) {
+      const neededCount = activeMessages.length - targetIdx + 20;
+      setRenderedCount(neededCount);
+      requestAnimationFrame(() => {
+        const element = document.getElementById(`msg-${targetMsgId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setHighlightedMessageId(targetMsgId);
+          setTimeout(() => {
+            setHighlightedMessageId((current) => (current === targetMsgId ? null : current));
+          }, 2500);
+        }
+      });
+      return;
+    }
+
     const element = document.getElementById(`msg-${targetMsgId}`);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -672,14 +761,14 @@ export const ConversationView: React.FC = () => {
     } else {
       showToast({ type: 'info', message: 'Original message not found in timeline' });
     }
-  }, [showToast]);
+  }, [activeMessages, renderedCount, showToast]);
 
   // Track playback progress & current time per message
   const [playbackProgress, setPlaybackProgress] = useState<Record<string, number>>({});
   const [playbackCurrentTime, setPlaybackCurrentTime] = useState<Record<string, number>>({});
 
   // Handle Voice Note Playback
-  const handleToggleVoice = async (msg: UIMessage) => {
+  const handleToggleVoice = useCallback(async (msg: UIMessage) => {
     if (!msg.voice || !activeSession) return;
 
     // 1. If currently playing this message, PAUSE immediately
@@ -718,10 +807,22 @@ export const ConversationView: React.FC = () => {
       setPlayingAudioId(null);
       showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
     }
-  };
+  }, [activeSession, cloudClient, ensureCloudSession, showToast]);
+
+  const handleSeekVoice = useCallback((m: UIMessage, percent: number) => {
+    VoicePlayer.seek(percent, m.id, m.voice?.durationSeconds);
+  }, []);
+
+  const handleRetryMessage = useCallback((m: UIMessage) => {
+    if (activeChatId) retryFailedMessage(activeChatId, m.id);
+  }, [activeChatId, retryFailedMessage]);
+
+  const handleReactionClick = useCallback((m: UIMessage, emoji: string) => {
+    if (activeChatId) toggleMessageReaction(activeChatId, m.id, emoji);
+  }, [activeChatId, toggleMessageReaction]);
 
   // Handle Attachment Download & Saving with Privacy Enforcement
-  const handleDownloadAttachment = async (msg: UIMessage) => {
+  const handleDownloadAttachment = useCallback(async (msg: UIMessage) => {
     if ((!msg.attachment && !msg.voice) || !activeSession) return;
 
     // Check if sender disallowed saving
@@ -823,10 +924,10 @@ export const ConversationView: React.FC = () => {
         return next;
       });
     }
-  };
+  }, [activeSession, cloudClient, ensureCloudSession, showToast]);
 
   // Open Fullscreen Media Viewer
-  const handleOpenMedia = (msg: UIMessage) => {
+  const handleOpenMedia = useCallback((msg: UIMessage) => {
     if (!msg.attachment && (!msg.attachments || msg.attachments.length === 0)) return;
 
     const allMediaMessages = activeMessages.filter(
@@ -876,9 +977,9 @@ export const ConversationView: React.FC = () => {
     const currentIdx = items.findIndex((i) => i.id === msg.id || i.id.startsWith(`${msg.id}_`));
     setViewerMediaList(items);
     setViewerItem(items[currentIdx >= 0 ? currentIdx : 0]);
-  };
+  }, [activeMessages]);
 
-  const handleOpenGroupedMedia = (msg: UIMessage, index: number) => {
+  const handleOpenGroupedMedia = useCallback((msg: UIMessage, index: number) => {
     if (!msg.attachments || msg.attachments.length === 0) return;
     const items: MediaViewerItem[] = msg.attachments.map((att, i) => {
       const key = att.objectId || att.attachmentId || att.name;
@@ -898,7 +999,7 @@ export const ConversationView: React.FC = () => {
     });
     setViewerMediaList(items);
     setViewerItem(items[index] || items[0]);
-  };
+  }, []);
 
   // Keyboard Escape listener to dismiss context menu and modals
   useEffect(() => {
@@ -920,7 +1021,7 @@ export const ConversationView: React.FC = () => {
   }, [contextMenu.isOpen, forwardingMessage, deleteForEveryoneConfirm]);
 
   // Context Menu Trigger (Long-press / right click)
-  const handleContextMenu = (e: React.MouseEvent, msg: UIMessage) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, msg: UIMessage) => {
     e.preventDefault();
     e.stopPropagation();
     if (isSelectionMode) return;
@@ -971,7 +1072,7 @@ export const ConversationView: React.FC = () => {
       y,
       message: msg,
     });
-  };
+  }, [isSelectionMode]);
 
   // Edge protection: re-clamp context menu after render using its actual dimensions
   useEffect(() => {
@@ -1104,7 +1205,7 @@ export const ConversationView: React.FC = () => {
   };
 
   // Selection Mode Actions
-  const handleToggleSelectMessage = (msgId: string) => {
+  const handleToggleSelectMessage = useCallback((msgId: string) => {
     setSelectedMessageIds((prev) => {
       const next = new Set(prev);
       if (next.has(msgId)) {
@@ -1114,7 +1215,7 @@ export const ConversationView: React.FC = () => {
       }
       return next;
     });
-  };
+  }, []);
 
   const handleBatchDelete = () => {
     if (!activeChatId) return;
@@ -1382,8 +1483,9 @@ export const ConversationView: React.FC = () => {
         className="veil-timeline"
         role="log"
         aria-label="Message history"
+        onScroll={handleTimelineScroll}
       >
-        {activeMessages.length === 0 ? (
+        {displayedMessages.length === 0 ? (
           <div className="veil-timeline-empty">
             <div className="veil-timeline-encryption-shield">
               <ShieldIcon size={44} color="var(--veil-accent-primary)" />
@@ -1392,12 +1494,12 @@ export const ConversationView: React.FC = () => {
             <p>Messages, photos, videos, files, and voice notes are cryptographically protected.</p>
           </div>
         ) : (
-          activeMessages.map((msg, index) => {
-            const isUnreadFirst = index === firstUnreadIndex;
+          displayedMessages.map((msg, index) => {
+            const isUnreadFirst = firstUnreadIndex >= 0 && msg.id === activeMessages[firstUnreadIndex]?.id;
             const isSelected = selectedMessageIds.has(msg.id);
             const isHighlighted = highlightedMessageId === msg.id;
-            const prevMsg = index > 0 ? activeMessages[index - 1] : null;
-            const nextMsg = index < activeMessages.length - 1 ? activeMessages[index + 1] : null;
+            const prevMsg = index > 0 ? displayedMessages[index - 1] : null;
+            const nextMsg = index < displayedMessages.length - 1 ? displayedMessages[index + 1] : null;
             const isGroupedWithPrevious = Boolean(prevMsg && prevMsg.isOutgoing === msg.isOutgoing && Math.abs(msg.timestamp - prevMsg.timestamp) < 60000);
             const isGroupedWithNext = Boolean(nextMsg && nextMsg.isOutgoing === msg.isOutgoing && Math.abs(nextMsg.timestamp - msg.timestamp) < 60000);
 
@@ -1421,9 +1523,12 @@ export const ConversationView: React.FC = () => {
                 isGroup={isGroupConversation}
                 downloadingAttachmentId={downloadingAttachmentId}
                 downloadProgress={downloadProgress}
+                downloadPercent={downloadProgress?.[msg.id]?.percent}
+                downloadLoadedBytes={downloadProgress?.[msg.id]?.loaded}
                 playbackProgress={playbackProgress}
                 playbackCurrentTime={playbackCurrentTime}
                 playingAudioId={playingAudioId}
+                isAudioPlaying={playingAudioId === msg.id}
                 unreadRef={unreadRef}
                 onToggleSelect={handleToggleSelectMessage}
                 onContextMenu={handleContextMenu}
@@ -1433,17 +1538,10 @@ export const ConversationView: React.FC = () => {
                 onOpenMedia={handleOpenMedia}
                 onDownloadAttachment={handleDownloadAttachment}
                 onToggleVoice={handleToggleVoice}
-                onSeekVoice={(m, percent) => {
-                  VoicePlayer.seek(percent, m.id, m.voice?.durationSeconds);
-                  setPlaybackProgress((prev) => ({ ...prev, [m.id]: percent }));
-                  setPlaybackCurrentTime((prev) => ({
-                    ...prev,
-                    [m.id]: (percent / 100) * (m.voice?.durationSeconds || 1),
-                  }));
-                }}
-                onRetry={(m) => activeChatId && retryFailedMessage(activeChatId, m.id)}
+                onSeekVoice={handleSeekVoice}
+                onRetry={handleRetryMessage}
                 peerAvatar={activeConversation?.avatar || activeConversation?.avatarUrl}
-                onReactionClick={(m, emoji) => activeChatId && toggleMessageReaction(activeChatId, m.id, emoji)}
+                onReactionClick={handleReactionClick}
               />
             );
           })
