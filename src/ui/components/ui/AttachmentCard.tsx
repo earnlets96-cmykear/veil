@@ -76,7 +76,12 @@ export const AttachmentCard: React.FC<AttachmentCardProps> = ({
     return <FileIcon size={26} color="var(--veil-accent-primary)" />;
   };
 
-  const isBusy = status === 'uploading' || status === 'downloading' || status === 'decrypting';
+  const normalizedStatus = (status || '').toLowerCase();
+  const isUploading = normalizedStatus === 'uploading';
+  const isDownloading = normalizedStatus === 'downloading';
+  const isDecrypting = normalizedStatus === 'decrypting';
+  const isBusy = isUploading || isDownloading || isDecrypting;
+  const isTransferring = isUploading || isDownloading;
 
   return (
     <div
@@ -95,7 +100,7 @@ export const AttachmentCard: React.FC<AttachmentCardProps> = ({
             {name}
           </div>
           <div className="veil-attachment-meta">
-            {formatSize(sizeBytes)} • {status === 'decrypting' ? 'Decrypting...' : status === 'downloading' ? 'Downloading...' : 'Encrypted File'}
+            {formatSize(sizeBytes)} • {isDecrypting ? 'Decrypting...' : isDownloading ? 'Downloading...' : isUploading ? 'Uploading...' : 'Encrypted File'}
           </div>
           {progressPercent !== undefined && progressPercent > 0 && progressPercent < 100 && (
             <div style={{ marginTop: '4px' }}>
@@ -106,17 +111,17 @@ export const AttachmentCard: React.FC<AttachmentCardProps> = ({
       </div>
 
       <div className="veil-attachment-action">
-        {status === 'uploading' || status === 'downloading' ? (
+        {isTransferring ? (
           <ProgressCircle
             size={36}
-            percent={progressPercent ?? 0}
+            percent={progressPercent ?? (isUploading ? 50 : 25)}
             totalBytes={sizeBytes}
             loadedBytes={loadedBytes}
-            variant={status === 'uploading' ? 'upload' : 'download'}
+            variant={isUploading ? 'upload' : 'download'}
           />
         ) : isBusy ? (
           <Spinner size="sm" aria-label={status} />
-        ) : status === 'completed' ? (
+        ) : normalizedStatus === 'completed' ? (
           <div className="veil-attachment-done-badge" title="Downloaded">
             <CheckIcon size={16} color="var(--veil-success)" />
           </div>

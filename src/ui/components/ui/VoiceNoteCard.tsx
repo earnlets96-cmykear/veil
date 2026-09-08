@@ -203,6 +203,31 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
     window.addEventListener('pointercancel', handlePointerUp);
   };
 
+  const handleTouchStartTrack = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (isUploading || isError) return;
+    isScrubbingRef.current = true;
+    if (e.touches && e.touches[0]) {
+      handleSeekFromClientX(e.touches[0].clientX, false);
+    }
+  };
+
+  const handleTouchMoveTrack = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (!isScrubbingRef.current) return;
+    if (e.touches && e.touches[0]) {
+      handleSeekFromClientX(e.touches[0].clientX, false);
+    }
+  };
+
+  const handleTouchEndTrack = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    isScrubbingRef.current = false;
+    if (e.changedTouches && e.changedTouches[0]) {
+      handleSeekFromClientX(e.changedTouches[0].clientX, true);
+    }
+  };
+
   const handleClickTrack = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (isUploading || isError) return;
@@ -234,16 +259,6 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
       role="region"
       aria-label={`${isOutgoing ? 'Sent' : 'Received'} Audio message voice note`}
-      onClick={stopAllEvents}
-      onDoubleClick={stopAllEvents}
-      onContextMenu={stopAllEvents}
-      onPointerDown={stopAllEvents}
-      onPointerMove={stopAllEvents}
-      onPointerUp={stopAllEvents}
-      onTouchStart={stopAllEvents}
-      onTouchMove={stopAllEvents}
-      onTouchEnd={stopAllEvents}
-      onTouchCancel={stopAllEvents}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -349,6 +364,10 @@ export const VoiceNoteCard: React.FC<VoiceNoteCardProps> = ({
           className="veil-waveform-container"
           onPointerDown={handlePointerDown}
           onClick={handleClickTrack}
+          onTouchStart={handleTouchStartTrack}
+          onTouchMove={handleTouchMoveTrack}
+          onTouchEnd={handleTouchEndTrack}
+          onTouchCancel={handleTouchEndTrack}
           style={{
             width: '100%',
             height: '32px',

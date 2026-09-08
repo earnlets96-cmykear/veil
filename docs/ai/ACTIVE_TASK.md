@@ -1,19 +1,17 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
+## Active Phase: PHASE 70 — VOICE SEEKING & TOUCH GESTURES, SWIPE-TO-REPLY ON AUDIO, PROGRESS CIRCLE REFINEMENT & VIDEO PLAYER UI OVERHAUL
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 
-### Phase 69 Tasks Completed:
-- [x] **Feature 1 — Audio UI Polish & Error Resilience**: Playback speed toggle (1x/1.5x/2x), loading pulse animation, waveform bar classes, audio accessibility.
-- [x] **Feature 2 — Progress Circle**: SVG radial ProgressCircle component with percent, arc offset, byte count display, and integration on AttachmentCard and media downloads.
-- [x] **Feature 3 — Save-to-Gallery**: `FileSaver.saveToGallery()` with MediaStore Pictures/DCIM directory resolution and native share sheet fallback.
-- [x] **Feature 4 — Message Editing**: `editMessage()` in AppState, composer edit mode with pre-fill and banner, `(edited)` tag in message bubbles.
-- [x] **Feature 5 — Tap Context Menu**: Tap-across-message row trigger with dynamic edge protection clamping.
-- [x] **Feature 6 — Smart Emojis**: Top recent emojis in reaction bar, high-contrast expand button, and categorized `EmojiPickerModal`.
+### Phase 70 Tasks Completed:
+- [x] **Feature 1 — Voice Seeking & Native Scrubber**: Direct touch dragging on waveform track (`onTouchStartTrack`, `onTouchMoveTrack`, `onTouchEndTrack`), rounded millisecond seeking in `voicePlayer.ts`, and safe `Double`/`Long` parsing in Kotlin `VeilNativeMediaPlugin.kt`.
+- [x] **Feature 2 — Swipe-to-Reply on Voice Notes**: Enabled touch drag reply gesture for audio messages in `ConversationView.tsx` by removing `!msg.voice` restriction, with proper track stopPropagation.
+- [x] **Feature 3 — Progress Circle Refinement**: Normalized case-insensitive status checks in `AttachmentCard.tsx` and `ConversationView.tsx` so progress circle displays accurately across all upload and download operations.
+- [x] **Feature 4 — Video Player UI Overhaul (`MediaViewer.tsx`)**: Upgraded to frosted-glass bottom HUD, 64px circular play overlay, auto-hiding controls during playback, and progress track gradient fill.
 
-## Previous Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
+## Previous Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
 
 ### Phase 68 Chat UI Layout & Micro-Polish Tasks:
 - [x] **P2P Message Bubbles — Sender Name Omission (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:

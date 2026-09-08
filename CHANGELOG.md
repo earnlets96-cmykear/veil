@@ -2,6 +2,26 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase70-voice-seeking-swipe-media-ui] - 2026-09-08
+
+### Voice Seeking, Swipe-to-Reply on Audio, Progress Circle & Video Player UI Overhaul (Phase 70)
+- **Voice Note Seeking & Native Touch Scrubber**:
+  - Bound dedicated touch listeners (`onTouchStartTrack`, `onTouchMoveTrack`, `onTouchEndTrack`) to the waveform track container with `e.stopPropagation()` to enable scrubbing on mobile touch devices.
+  - Ensured seek position is converted to rounded integer milliseconds (`Math.round(targetTime * 1000)`) in `voicePlayer.ts` and `NativeMediaBridge.ts`.
+  - Updated Android Kotlin plugin `VeilNativeMediaPlugin.kt` to handle both `Double` and `Long` representations of `positionMs` across Capacitor bridges, resolving silent rejection of seeking on native Android.
+- **Swipe-to-Reply on Voice Messages**:
+  - Removed `!msg.voice` restriction on touch start/move/end/cancel events, reply arrow indicators, and horizontal translation transforms in `ConversationView.tsx`.
+  - Maintained event isolation on waveform scrubber and buttons so dragging the waveform seeks audio while dragging the bubble triggers reply.
+- **Transfer Progress Circle Refinement**:
+  - Normalized `status` checking case-insensitively (`'UPLOADING'`/`'uploading'`, `'DOWNLOADING'`/`'downloading'`) in `AttachmentCard.tsx` and `ConversationView.tsx`.
+  - Ensured SVG `ProgressCircle` displays smoothly for in-flight media attachments and document transfers.
+- **Video Player UI Overhaul (`MediaViewer.tsx`)**:
+  - Completely redesigned fullscreen video player with a modern translucent frosted-glass HUD bottom bar (`.veil-media-viewer-video-controls`).
+  - Replaced unstyled square play button with a 64px circular frosted-glass overlay in the center of the video.
+  - Implemented auto-hiding controls with a 3-second inactivity timer during video playback, cleanly revealing on user movement, tap, or pause.
+  - Added gradient fill on video seekbar dynamically reflecting playback progress.
+  - Styled gallery navigation chevrons to automatically hide during active video playback.
+
 ## [1.0.0-phase69-chat-ux-enhancements] - 2026-09-08
 
 ### Chat UX Enhancements: Audio Speed Toggle, Progress Circle, Gallery Saving, Message Editing, Tap Context & Smart Emojis (Phase 69)

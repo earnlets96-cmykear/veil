@@ -151,7 +151,7 @@ export class NativeMediaBridge {
   public async seekAudio(positionMs: number): Promise<boolean> {
     if (!this.isNative) return false;
     try {
-      await VeilNativeMedia.seekAudio({ positionMs });
+      await VeilNativeMedia.seekAudio({ positionMs: Math.round(positionMs) });
       return true;
     } catch (_err) {
       return false;

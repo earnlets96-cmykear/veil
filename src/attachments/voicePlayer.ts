@@ -524,7 +524,7 @@ export class VoicePlaybackManager {
 
     if (this.isNative) {
       this.nativeCurrentTime = targetTime;
-      NativeMediaBridge.getInstance().seekAudio(targetTime * 1000);
+      NativeMediaBridge.getInstance().seekAudio(Math.round(targetTime * 1000));
       this.notifyListeners(this.currentStatus, clampedPercent, targetTime, duration);
       if (this.activeCallbacks?.onProgress) {
         this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);

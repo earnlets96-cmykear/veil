@@ -152,7 +152,7 @@ class VeilNativeMediaPlugin : Plugin() {
 
         val authToken = call.getString("authToken")
         val messageId = call.getString("messageId")
-        val startPositionMs = call.getLong("startPositionMs") ?: 0L
+        val startPositionMs = call.getDouble("startPositionMs")?.toLong() ?: call.getLong("startPositionMs") ?: 0L
 
         mainHandler.post {
             try {
@@ -211,7 +211,7 @@ class VeilNativeMediaPlugin : Plugin() {
 
     @PluginMethod
     fun seekAudio(call: PluginCall) {
-        val positionMs = call.getLong("positionMs")
+        val positionMs = call.getDouble("positionMs")?.toLong() ?: call.getLong("positionMs")
         if (positionMs == null) {
             call.reject("positionMs is required")
             return

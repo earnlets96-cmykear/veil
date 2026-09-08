@@ -1,21 +1,22 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
+## Current Verified Phase: PHASE 70 — VOICE SEEKING & TOUCH GESTURES, SWIPE-TO-REPLY ON AUDIO, PROGRESS CIRCLE REFINEMENT & VIDEO PLAYER UI OVERHAUL
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 - **Verification Deliverables**:
-  - Phase 69 Chat UX Enhancement Suite: `tests/phase69-chat-ux-enhancements.test.tsx` (10/10 passed in 50ms).
-  - Phase 68 Chat Bubbles & Context Menu Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed in 47ms).
-  - Phase 63 Voice & Audio System Suite: `tests/phase63-deep-repair.test.tsx` (10/10 passed in 214ms).
-  - Phase 31 Main Chat UI Suite: `tests/phase31-chat-ui.test.tsx` (10/10 passed in 50ms).
-  - Phase 37 Mobile Layout Suite: `tests/phase37-mobile-layout.test.tsx` (2/2 passed in 21ms).
+  - Phase 70 Voice Seeking, Swipe-to-Reply, Media UI Suite: `tests/phase70-voice-seeking-swipe-media-ui.test.tsx` (4/4 passed).
+  - Phase 69 Chat UX Enhancement Suite: `tests/phase69-chat-ux-enhancements.test.tsx` (10/10 passed).
+  - Phase 68 Chat Bubbles & Context Menu Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed).
   - Web App Production Build: `npm run build` succeeds cleanly with 0 TypeScript errors.
+  - Capacitor Android Sync: `npx cap sync android` completed.
+  - Android APK Build: `app-debug.apk` (7.45 MB) built successfully via Gradle in 32s.
 - **Architectural Enhancements**:
-  1. **Audio UI Speed Controls & Loading Animation**: Added 1x/1.5x/2x cycle toggle in `VoiceNoteCard`, pulse glow animation during loading, and waveform bar classes.
-  2. **Transfer Progress Circles**: SVG radial `ProgressCircle` showing percentage, dynamic stroke offset, and byte counts during media and file transfers.
-  3. **Save-to-Gallery with Permission Handling**: Native `saveToGallery()` targeting `Pictures/VEIL` and `DCIM/VEIL` with native media scan intent and fallback share sheet.
-  4. **Message Editing**: Full pipeline with `UIMessage.edited`/`editedAt`, `AppState.editMessage()`, `MessageComposer` edit mode, and `(edited)` indicator.
-  5. **Tap Across Message Context Menu**: Instant click-to-open on message rows with edge-safe viewport bounds clamping.
-  6. **Smart Emoji Reactions & Full Categorized Modal**: Dynamic recent reaction bar with high-contrast expand button and 8-category `EmojiPickerModal`.
+  1. **Voice Note Seeking & Native Touch Scrubber**: Added dedicated touch event handlers (`onTouchStartTrack`, `onTouchMoveTrack`, `onTouchEndTrack`) on waveform track with event isolation. Integer millisecond rounding (`Math.round(targetTime * 1000)`) prevents floating-point rejection on Capacitor Android Kotlin plugin (`VeilNativeMediaPlugin.kt` safely parses both Double and Long).
+  2. **Swipe-to-Reply on Voice Messages**: Removed hardcoded `!msg.voice` constraints from touch drag/reply handlers in `ConversationView.tsx`. Voice notes now swipe smoothly to reply just like text bubbles, with gesture isolation preventing waveform scrubber conflicts.
+  3. **Transfer Progress Circle Visibility**: Normalized status check in `AttachmentCard.tsx` (`'UPLOADING'`/`'uploading'`, `'DOWNLOADING'`/`'downloading'`), displaying SVG `ProgressCircle` for all in-flight media and attachment transfers.
+  4. **Video Player UI Overhaul (`MediaViewer.tsx`)**: Replaced stacked layout with modern frosted-glass HUD bottom bar (`.veil-media-viewer-video-controls`), centered 64px circular play/pause overlay, auto-hiding HUD controls during playback (with 3-second inactivity timer), and dynamic gradient fill for scrubber progress.
+
+## Previous Verified Phase: PHASE 69 — CHAT UX ENHANCEMENTS: AUDIO SPEED TOGGLE, PROGRESS CIRCLE, GALLERY SAVING, MESSAGE EDITING, TAP CONTEXT & SMART EMOJIS
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**
 
 ## Previous Verified Phase: PHASE 68 — CHAT UI POLISH: MESSAGE BUBBLES, ACTION ROW ALIGNMENT, P2P SENDER OMISSION & FORWARDING PIPELINE
 - **Root Cause Analyses & Architectural Fixes**:

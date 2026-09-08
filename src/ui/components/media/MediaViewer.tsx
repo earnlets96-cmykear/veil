@@ -79,6 +79,34 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   const [videoDuration, setVideoDuration] = useState(0);
   const [isVideoLoading, setIsVideoLoading] = useState(true);
 
+  // Controls visibility & auto-hide
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef<any>(null);
+
+  const resetControlsTimeout = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+    if (isPlaying) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setControlsVisible(false);
+      }, 3000);
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    resetControlsTimeout();
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, [isPlaying, resetControlsTimeout]);
+
+  const areControlsVisible = !isPlaying || controlsVisible;
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
@@ -435,13 +463,20 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
             )}
 
             {currentItem.type === 'video' && (
-              <div className="veil-media-viewer-video-container">
+              <div
+                className="veil-media-viewer-video-container"
+                onMouseMove={resetControlsTimeout}
+                onTouchStart={resetControlsTimeout}
+              >
                 <video
                   ref={videoRef}
                   src={currentBlobUrl}
                   className="veil-media-viewer-video"
                   playsInline
-                  onClick={togglePlay}
+                  onClick={() => {
+                    togglePlay();
+                    resetControlsTimeout();
+                  }}
                   onLoadedMetadata={(e) => {
                     const dur = (e.target as HTMLVideoElement).duration;
                     if (Number.isFinite(dur) && dur > 0) {
@@ -486,15 +521,24 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                   }}
                 />
 
-                {/* Floating Big Play Button Overlay */}
+                {/* Bottom gradient scrim for controls legibility */}
+                <div
+                  className={`veil-media-viewer-scrim ${areControlsVisible ? 'visible' : ''}`}
+                  aria-hidden="true"
+                />
+
+                {/* Floating Sleek Glass Play/Pause Button Overlay in Center */}
                 {!isPlaying && !isVideoLoading && (
                   <button
                     type="button"
                     className="veil-media-viewer-play-overlay"
-                    onClick={togglePlay}
+                    onClick={() => {
+                      togglePlay();
+                      resetControlsTimeout();
+                    }}
                     aria-label="Play video"
                   >
-                    <PlayIcon size={44} color="#ffffff" />
+                    <PlayIcon size={32} color="#ffffff" />
                   </button>
                 )}
 
@@ -504,24 +548,40 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                   </div>
                 )}
 
-                {/* Custom Sleek Video Controls Bar */}
-                <div className="veil-media-viewer-video-controls">
-                  <IconButton
-                    icon={isPlaying ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
-                    onClick={togglePlay}
+                {/* Custom Integrated Frosted Glass Video Controls HUD */}
+                <div
+                  className={`veil-media-viewer-video-controls ${!areControlsVisible ? 'hidden' : ''}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    className="veil-media-viewer-hud-play"
+                    onClick={() => {
+                      togglePlay();
+                      resetControlsTimeout();
+                    }}
                     aria-label={isPlaying ? 'Pause video' : 'Play video'}
-                    variant="primary"
-                  />
+                  >
+                    {isPlaying ? <PauseIcon size={16} color="#ffffff" /> : <PlayIcon size={16} color="#ffffff" />}
+                  </button>
 
                   <div className="veil-media-viewer-progress-wrapper">
                     <input
                       type="range"
                       min={0}
                       max={100}
+                      step={0.1}
                       value={videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0}
                       onChange={(e) => handleVideoSeek(parseFloat(e.target.value))}
                       className="veil-media-viewer-seek"
                       aria-label="Video scrubber"
+                      style={{
+                        background: `linear-gradient(to right, var(--veil-accent-primary, #14b8a6) 0%, var(--veil-accent-primary, #14b8a6) ${
+                          videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0
+                        }%, rgba(255, 255, 255, 0.2) ${
+                          videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0
+                        }%, rgba(255, 255, 255, 0.2) 100%)`,
+                      }}
                     />
                   </div>
 
@@ -530,17 +590,19 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                   </div>
 
                   <IconButton
-                    icon={isMuted ? <VolumeXIcon size={18} /> : <VolumeIcon size={18} />}
+                    icon={isMuted ? <VolumeXIcon size={16} /> : <VolumeIcon size={16} />}
                     onClick={toggleMute}
                     aria-label={isMuted ? 'Unmute' : 'Mute'}
                     variant="ghost"
+                    size="sm"
                   />
 
                   <IconButton
-                    icon={<MaximizeIcon size={18} />}
+                    icon={<MaximizeIcon size={16} />}
                     onClick={toggleFullscreen}
                     aria-label="Fullscreen"
                     variant="ghost"
+                    size="sm"
                   />
                 </div>
               </div>
@@ -552,7 +614,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         {currentIndex > 0 && (
           <button
             type="button"
-            className="veil-media-viewer-nav veil-media-viewer-nav-prev"
+            className={`veil-media-viewer-nav veil-media-viewer-nav-prev ${currentItem.type === 'video' && !areControlsVisible ? 'veil-media-viewer-nav-hidden' : ''}`.trim()}
             onClick={handlePrev}
             aria-label="Previous media"
           >
@@ -564,7 +626,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         {currentIndex < items.length - 1 && (
           <button
             type="button"
-            className="veil-media-viewer-nav veil-media-viewer-nav-next"
+            className={`veil-media-viewer-nav veil-media-viewer-nav-next ${currentItem.type === 'video' && !areControlsVisible ? 'veil-media-viewer-nav-hidden' : ''}`.trim()}
             onClick={handleNext}
             aria-label="Next media"
           >

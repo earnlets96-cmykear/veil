@@ -227,10 +227,10 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
           }
         }}
         onContextMenu={(e) => onContextMenu(e, msg)}
-        onTouchStart={!hasVisibleTextBubble && !msg.voice ? handleTouchStart : undefined}
-        onTouchMove={!hasVisibleTextBubble && !msg.voice ? handleTouchMove : undefined}
-        onTouchEnd={!hasVisibleTextBubble && !msg.voice ? handleTouchEnd : undefined}
-        onTouchCancel={!hasVisibleTextBubble && !msg.voice ? handleTouchEnd : undefined}
+        onTouchStart={!hasVisibleTextBubble ? handleTouchStart : undefined}
+        onTouchMove={!hasVisibleTextBubble ? handleTouchMove : undefined}
+        onTouchEnd={!hasVisibleTextBubble ? handleTouchEnd : undefined}
+        onTouchCancel={!hasVisibleTextBubble ? handleTouchEnd : undefined}
         style={{ position: 'relative' }}
       >
         {isSelectionMode && (
@@ -244,7 +244,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         )}
 
         {/* Visual Swipe-to-reply icon indicator for non-text bubbles */}
-        {!hasVisibleTextBubble && !msg.voice && swipeOffset < -15 && (
+        {!hasVisibleTextBubble && swipeOffset < -15 && (
           <div
             style={{
               position: 'absolute',
@@ -298,8 +298,8 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
         <div
           className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}
           style={{
-            transform: !hasVisibleTextBubble && !msg.voice ? `translateX(${swipeOffset}px)` : undefined,
-            transition: !hasVisibleTextBubble && !msg.voice && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
+            transform: !hasVisibleTextBubble ? `translateX(${swipeOffset}px)` : undefined,
+            transition: !hasVisibleTextBubble && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
           }}
         >
           {/* Forwarded Attribution Header for Non-Text Bubbles */}
@@ -370,7 +370,7 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                 }}
                 alt={msg.attachment.name}
               />
-              {downloadingAttachmentId === msg.id && (
+              {(downloadingAttachmentId === msg.id || msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING') && (
                 <div
                   className="veil-media-download-progress-overlay"
                   style={{
@@ -389,10 +389,14 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
                 >
                   <ProgressCircle
                     size={52}
-                    percent={downloadProgress?.[msg.id]?.percent ?? 0}
+                    percent={
+                      downloadingAttachmentId === msg.id
+                        ? downloadProgress?.[msg.id]?.percent ?? 15
+                        : 50
+                    }
                     totalBytes={msg.attachment.sizeBytes}
-                    loadedBytes={downloadProgress?.[msg.id]?.loaded}
-                    variant="download"
+                    loadedBytes={downloadingAttachmentId === msg.id ? downloadProgress?.[msg.id]?.loaded : undefined}
+                    variant={msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING' ? 'upload' : 'download'}
                   />
                 </div>
               )}
@@ -414,7 +418,13 @@ const ConversationMessageRow: React.FC<ConversationMessageRowProps> = ({
               name={msg.attachment.name}
               sizeBytes={msg.attachment.sizeBytes}
               mimeType={msg.attachment.mimeType}
-              status={downloadingAttachmentId === msg.id ? 'downloading' : (msg.attachment.state as any) || 'ready'}
+              status={
+                downloadingAttachmentId === msg.id
+                  ? 'downloading'
+                  : msg.status === 'UPLOADING' || (msg.attachment.state as any)?.toLowerCase() === 'uploading'
+                  ? 'uploading'
+                  : (msg.attachment.state as any)?.toLowerCase() || 'ready'
+              }
               progressPercent={downloadProgress?.[msg.id]?.percent}
               loadedBytes={downloadProgress?.[msg.id]?.loaded}
               onDownload={() => onDownloadAttachment(msg)}
