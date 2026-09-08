@@ -147,8 +147,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   const [activePhotoIdx, setActivePhotoIdx] = useState<number>(0);
   const [showLightbox, setShowLightbox] = useState<boolean>(false);
 
+  // Build peer photo list: use profilePhotos array if available, otherwise fall back to single avatar
+  const peerPhotos: string[] = (() => {
+    if (!isPeer) return [];
+    const docPhotos = (peerDoc as any)?.profilePhotos as string[] | undefined;
+    if (docPhotos && docPhotos.length > 0) return docPhotos;
+    const singleAvatar = peerDoc?.avatar || peerContact?.avatar;
+    return singleAvatar ? [singleAvatar] : [];
+  })();
+
   const availablePhotos: string[] = isPeer
-    ? (peerDoc?.avatar || peerContact?.avatar ? [peerDoc?.avatar || peerContact?.avatar!] : [])
+    ? peerPhotos
     : (privacySettings.profilePhotos && privacySettings.profilePhotos.length > 0
         ? privacySettings.profilePhotos
         : (avatarPreview || myProfile?.avatar ? [avatarPreview || myProfile?.avatar!] : []));
@@ -706,50 +715,81 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
             </div>
           )}
 
-          {!isPeer && availablePhotos.length > 0 && activePhotoIdx > 0 && (
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '0.5rem' }}>
+          {/* Self profile photo management actions */}
+          {!isPeer && availablePhotos.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Add Photo button — always visible for self */}
               <button
                 type="button"
                 className="veil-btn-subtle"
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  await setMainProfilePhoto(availablePhotos[activePhotoIdx]);
-                  setActivePhotoIdx(0);
-                  showToast({ type: 'success', message: 'Set as main profile photo!' });
+                  markFilePickerActive();
+                  fileInputRef.current?.click();
                 }}
                 style={{
                   fontSize: '0.72rem',
                   padding: '3px 10px',
                   borderRadius: 'var(--veil-radius-full)',
                   border: '1px solid var(--veil-accent-primary)',
-                  background: 'rgba(20, 184, 166, 0.12)',
+                  background: 'var(--veil-accent-primary-subtle, rgba(20, 184, 166, 0.12))',
                   color: 'var(--veil-accent-primary)',
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
-                Set as Main Photo
+                <PlusIcon size={12} />
+                Add Photo
               </button>
-              <button
-                type="button"
-                className="veil-btn-subtle"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  await deleteProfilePhoto(availablePhotos[activePhotoIdx]);
-                  setActivePhotoIdx(0);
-                  showToast({ type: 'info', message: 'Photo removed from profile' });
-                }}
-                style={{
-                  fontSize: '0.72rem',
-                  padding: '3px 10px',
-                  borderRadius: 'var(--veil-radius-full)',
-                  border: '1px solid var(--veil-danger)',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  color: 'var(--veil-danger)',
-                  cursor: 'pointer',
-                }}
-              >
-                Delete Photo
-              </button>
+
+              {activePhotoIdx > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="veil-btn-subtle"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await setMainProfilePhoto(availablePhotos[activePhotoIdx]);
+                      setActivePhotoIdx(0);
+                      showToast({ type: 'success', message: 'Set as main profile photo!' });
+                    }}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '3px 10px',
+                      borderRadius: 'var(--veil-radius-full)',
+                      border: '1px solid var(--veil-accent-primary)',
+                      background: 'var(--veil-accent-primary-subtle, rgba(20, 184, 166, 0.12))',
+                      color: 'var(--veil-accent-primary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Set as Main
+                  </button>
+                  <button
+                    type="button"
+                    className="veil-btn-subtle"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await deleteProfilePhoto(availablePhotos[activePhotoIdx]);
+                      setActivePhotoIdx(0);
+                      showToast({ type: 'info', message: 'Photo removed from profile' });
+                    }}
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '3px 10px',
+                      borderRadius: 'var(--veil-radius-full)',
+                      border: '1px solid var(--veil-danger)',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      color: 'var(--veil-danger)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Delete Photo
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -817,6 +857,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           </div>
         )}
 
+        {/* Hidden file input for avatar selection — always available for self profile */}
+        {!isPeer && (
+          <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleAvatarSelect} />
+        )}
+
         {/* Modal Scrollable Body */}
         <div style={{ padding: '1rem 1.25rem', maxHeight: '420px', overflowY: 'auto' }}>
           {errorMessage && (
@@ -828,7 +873,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
           {/* Self Profile Edit Form */}
           {!isPeer && isEditing ? (
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleAvatarSelect} />
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '0.75rem' }}>
                 <Button
                   type="button"

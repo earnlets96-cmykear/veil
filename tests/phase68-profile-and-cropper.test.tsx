@@ -91,8 +91,9 @@ describe('Phase 68 — Telegram-Style Multi-Profile Photos Architecture', () => 
     expect(profileModalContent).toContain('veil-profile-story-dashes');
     expect(profileModalContent).toContain('availablePhotos.length > 1');
     expect(profileModalContent).toContain('AvatarCropModal');
-    expect(profileModalContent).toContain('Set as Main Photo');
+    expect(profileModalContent).toContain('Set as Main');
     expect(profileModalContent).toContain('Delete Photo');
+    expect(profileModalContent).toContain('Add Photo');
   });
 
   it('SettingsModal integrates AvatarCropModal', () => {
