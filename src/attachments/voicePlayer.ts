@@ -36,6 +36,7 @@ export class VoicePlaybackManager {
   private currentStatus: VoicePlaybackStatus = 'idle';
   private activeCallbacks: VoicePlaybackCallbacks | null = null;
   private currentDuration: number = 0;
+  private knownDurations: Record<string, number> = {};
   private stagedSeekPercent: Record<string, number> = {};
   private listeners: Map<string, Set<VoicePlaybackListener>> = new Map();
   private isNative: boolean = false;
@@ -167,9 +168,14 @@ export class VoicePlaybackManager {
     // Immediately notify listener of current state
     const isCurrent = this.currentPlayingId === messageId;
     const status = isCurrent ? this.currentStatus : 'idle';
-    const duration = isCurrent ? this.getDuration() : 0;
-    const currentTime = isCurrent ? this.getCurrentTime() : 0;
-    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+    const staged = this.stagedSeekPercent[messageId];
+    const duration = isCurrent ? this.getDuration() : (this.knownDurations[messageId] || this.currentDuration || 0);
+    let currentTime = isCurrent ? this.getCurrentTime() : 0;
+    let progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+    if (typeof staged === 'number') {
+      progress = staged;
+      if (duration > 0) currentTime = (staged / 100) * duration;
+    }
     listener(status, progress, currentTime, duration);
 
     return () => {
@@ -187,11 +193,15 @@ export class VoicePlaybackManager {
     status: VoicePlaybackStatus,
     progressPercent: number,
     currentTime: number,
-    duration: number
+    duration: number,
+    targetId?: string
   ): void {
-    this.currentStatus = status;
-    if (!this.currentPlayingId) return;
-    const set = this.listeners.get(this.currentPlayingId);
+    const id = targetId || this.currentPlayingId;
+    if (id === this.currentPlayingId) {
+      this.currentStatus = status;
+    }
+    if (!id) return;
+    const set = this.listeners.get(id);
     if (set) {
       for (const listener of set) {
         try {
@@ -203,6 +213,12 @@ export class VoicePlaybackManager {
 
   /**
    * Downloads or loads cached audio bytes, attaches to stable audio element, and starts playback.
+   *
+   * Key design decisions:
+   * - Reuses existing audio element + blob URL when the same message is re-played.
+   * - Waits for `canplay` before calling `play()` to prevent AbortError on slow media loads.
+   * - Applies staged seek in `canplay` handler where readyState >= 3 guarantees currentTime assignment.
+   * - Gracefully handles play() rejections (NotAllowedError/AbortError) without destroying the audio.
    */
   public async playVoiceNote(
     session: SpaceSession,
@@ -214,6 +230,9 @@ export class VoicePlaybackManager {
     this.activeCallbacks = callbacks;
     const safeDuration = meta.durationSeconds && isFinite(meta.durationSeconds) ? meta.durationSeconds : 0;
     this.currentDuration = safeDuration;
+    if (safeDuration > 0 && messageId) {
+      this.knownDurations[messageId] = safeDuration;
+    }
 
     // 1. If this exact message is already loaded and paused, resume immediately!
     if (this.currentPlayingId === messageId && this.currentStatus === 'paused') {
@@ -223,6 +242,15 @@ export class VoicePlaybackManager {
       }
       if (this.currentAudio && this.currentAudio.paused) {
         try {
+          // Apply any staged seek before resuming
+          const staged = this.stagedSeekPercent[messageId];
+          if (typeof staged === 'number' && staged > 0) {
+            const dur = this.getDuration(safeDuration);
+            if (dur > 0) {
+              try { this.currentAudio.currentTime = (staged / 100) * dur; } catch (_e) {}
+            }
+            delete this.stagedSeekPercent[messageId];
+          }
           await this.currentAudio.play();
           this.currentStatus = 'playing';
           const dur = this.getDuration(safeDuration);
@@ -239,7 +267,17 @@ export class VoicePlaybackManager {
           });
           return;
         } catch (resumeErr: any) {
-          // Fall through to full re-load if resume was interrupted
+          // If resume fails with AbortError / NotAllowedError, don't destroy — stay paused
+          const errName = resumeErr?.name || '';
+          if (errName === 'AbortError' || errName === 'NotAllowedError') {
+            this.currentStatus = 'paused';
+            const dur = this.getDuration(safeDuration);
+            const cur = this.getCurrentTime();
+            const pct = dur > 0 ? (cur / dur) * 100 : 0;
+            this.notifyListeners('paused', pct, cur, dur);
+            return;
+          }
+          // Fall through to full re-load for other errors
         }
       }
     }
@@ -269,6 +307,7 @@ export class VoicePlaybackManager {
         if (success) {
           this.currentStatus = 'playing';
           this.nativeIsPlaying = true;
+          if (staged) delete this.stagedSeekPercent[messageId];
           return;
         }
       } catch (_nativeErr) {
@@ -284,8 +323,18 @@ export class VoicePlaybackManager {
       });
 
       // 3. Obtain audio Blob URL (leveraging MediaCache for instant RAM/IndexedDB resolution)
-      const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(session, cloudClient, meta);
-      this.currentBlobUrl = blobUrl;
+      //    Reuse existing blob URL if we still have one for the same message
+      let blobUrl: string;
+      if (this.currentBlobUrl && this.currentPlayingId === messageId) {
+        blobUrl = this.currentBlobUrl;
+      } else {
+        // Revoke previous blob URL if switching messages
+        if (this.currentBlobUrl && typeof URL !== 'undefined') {
+          try { URL.revokeObjectURL(this.currentBlobUrl); } catch (_e) {}
+        }
+        blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(session, cloudClient, meta);
+        this.currentBlobUrl = blobUrl;
+      }
 
       MediaLogger.log({
         event: 'DECRYPTION_COMPLETED',
@@ -316,20 +365,27 @@ export class VoicePlaybackManager {
         } as any;
       }
 
+      // Clean up previous audio element's event listeners to prevent phantom errors
+      if (this.currentAudio && this.currentAudio !== audio) {
+        try {
+          this.currentAudio.onloadedmetadata = null;
+          this.currentAudio.oncanplay = null;
+          this.currentAudio.ontimeupdate = null;
+          this.currentAudio.onended = null;
+          this.currentAudio.onerror = null;
+          this.currentAudio.pause();
+          this.currentAudio.src = '';
+        } catch (_e) {}
+      }
+
       this.currentAudio = audio;
+
+      // Capture staged seek for this message
+      const stagedSeek = this.stagedSeekPercent[messageId];
 
       audio.onloadedmetadata = () => {
         if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
           this.currentDuration = audio.duration;
-        }
-
-        // Apply any pre-play staged seek position
-        const staged = this.stagedSeekPercent[messageId];
-        if (typeof staged === 'number' && staged > 0) {
-          const target = (staged / 100) * this.getDuration(safeDuration);
-          try {
-            audio.currentTime = target;
-          } catch (_e) {}
         }
 
         const dur = this.getDuration(safeDuration);
@@ -351,6 +407,18 @@ export class VoicePlaybackManager {
       };
 
       audio.oncanplay = () => {
+        // Apply staged seek HERE where readyState >= 3 guarantees currentTime assignment works
+        const seekPct = this.stagedSeekPercent[messageId];
+        if (typeof seekPct === 'number' && seekPct > 0) {
+          const dur = this.getDuration(safeDuration);
+          if (dur > 0) {
+            try {
+              audio.currentTime = (seekPct / 100) * dur;
+            } catch (_e) {}
+          }
+          delete this.stagedSeekPercent[messageId];
+        }
+
         RuntimeDiagnostics.audio('canPlay', {
           objectId: meta.objectId,
           duration: this.getDuration(safeDuration),
@@ -380,8 +448,10 @@ export class VoicePlaybackManager {
       };
 
       audio.onerror = (e: any) => {
-        // Ignore errors triggered by intentional pauses or stops
-        if (this.currentStatus === 'paused' || !this.currentPlayingId) return;
+        // Ignore errors triggered by intentional pauses, stops, or src changes
+        if (this.currentStatus === 'paused' || this.currentStatus === 'idle' || !this.currentPlayingId) return;
+        // Ignore errors if this audio element is no longer the active one
+        if (this.currentAudio !== audio) return;
 
         const err = new Error('Audio playback error occurred');
         MediaLogger.log({
@@ -402,21 +472,58 @@ export class VoicePlaybackManager {
       audio.src = blobUrl;
       audio.load();
 
-      // Set initial seek if available
-      const staged = this.stagedSeekPercent[messageId];
-      if (typeof staged === 'number' && staged > 0) {
-        const duration = this.getDuration(safeDuration) || 1;
-        try {
-          audio.currentTime = (staged / 100) * duration;
-        } catch (_e) {}
+      // 5. Wait for canplay before calling play() to prevent AbortError
+      //    For mock/test environments with readyState >= 3, skip waiting
+      if (typeof audio.readyState === 'number' && audio.readyState < 3 && typeof audio.addEventListener === 'function') {
+        await new Promise<void>((resolve) => {
+          const onReady = () => {
+            audio.removeEventListener('canplay', onReady);
+            audio.removeEventListener('error', onError);
+            resolve();
+          };
+          const onError = () => {
+            audio.removeEventListener('canplay', onReady);
+            audio.removeEventListener('error', onError);
+            resolve(); // Resolve anyway — onerror handler above will fire separately
+          };
+          audio.addEventListener('canplay', onReady);
+          audio.addEventListener('error', onError);
+        });
       }
 
-      await audio.play();
+      // 6. Attempt playback with graceful error recovery
+      try {
+        await audio.play();
+      } catch (playErr: any) {
+        const errName = playErr?.name || '';
+        // AbortError: load() interrupted play() — audio not ready yet
+        // NotAllowedError: browser autoplay policy blocked the call
+        if (errName === 'AbortError' || errName === 'NotAllowedError') {
+          // Don't destroy the audio element — keep it loaded so user can tap again
+          this.currentStatus = 'paused';
+          const dur = this.getDuration(safeDuration);
+          const cur = this.getCurrentTime();
+          const pct = dur > 0 ? (cur / dur) * 100 : 0;
+          this.notifyListeners('paused', pct, cur, dur);
+          RuntimeDiagnostics.audio('playRecoverableError', {
+            objectId: meta.objectId,
+            errorName: errName,
+            messageId,
+          });
+          return; // Do NOT throw — user can re-tap to play
+        }
+        // For other errors, fall through to the catch block below
+        throw playErr;
+      }
+
       this.currentStatus = 'playing';
       const initialDur = this.getDuration(safeDuration);
       const initialCur = audio.currentTime || 0;
       const initialPct = initialDur > 0 ? (initialCur / initialDur) * 100 : 0;
       this.notifyListeners('playing', initialPct, initialCur, initialDur);
+
+      // Clear staged seek now that playback started successfully
+      delete this.stagedSeekPercent[messageId];
 
       MediaLogger.log({
         event: 'PLAYBACK_STARTED',
@@ -482,6 +589,13 @@ export class VoicePlaybackManager {
   public async resume(): Promise<void> {
     if (this.isNative) {
       if (this.currentPlayingId && this.currentStatus === 'paused') {
+        const staged = this.stagedSeekPercent[this.currentPlayingId];
+        if (typeof staged === 'number') {
+          const dur = this.getDuration();
+          const targetTime = (staged / 100) * dur;
+          NativeMediaBridge.getInstance().seekAudio(Math.round(targetTime * 1000));
+          delete this.stagedSeekPercent[this.currentPlayingId];
+        }
         await NativeMediaBridge.getInstance().resumeAudio();
         this.currentStatus = 'playing';
         this.nativeIsPlaying = true;
@@ -490,6 +604,16 @@ export class VoicePlaybackManager {
     }
     if (this.currentAudio && this.currentAudio.paused && this.currentPlayingId) {
       try {
+        const staged = this.stagedSeekPercent[this.currentPlayingId];
+        if (typeof staged === 'number') {
+          const dur = this.getDuration();
+          if (dur > 0) {
+            try {
+              this.currentAudio.currentTime = (staged / 100) * dur;
+            } catch (_e) {}
+          }
+          delete this.stagedSeekPercent[this.currentPlayingId];
+        }
         await this.currentAudio.play();
         this.currentStatus = 'playing';
         const dur = this.getDuration();
@@ -499,7 +623,17 @@ export class VoicePlaybackManager {
         if (this.activeCallbacks?.onProgress) {
           this.activeCallbacks.onProgress(pct, cur, dur);
         }
-      } catch (_e) {}
+      } catch (e: any) {
+        const errName = e?.name || '';
+        if (errName === 'AbortError' || errName === 'NotAllowedError') {
+          this.currentStatus = 'paused';
+          const dur = this.getDuration();
+          const cur = this.getCurrentTime();
+          const pct = dur > 0 ? (cur / dur) * 100 : 0;
+          this.notifyListeners('paused', pct, cur, dur);
+          return;
+        }
+      }
     }
   }
 
@@ -513,6 +647,9 @@ export class VoicePlaybackManager {
 
     if (targetId) {
       this.stagedSeekPercent[targetId] = clampedPercent;
+      if (durationSeconds && durationSeconds > 0) {
+        this.knownDurations[targetId] = durationSeconds;
+      }
     }
 
     const duration =
@@ -525,7 +662,13 @@ export class VoicePlaybackManager {
     if (this.isNative) {
       this.nativeCurrentTime = targetTime;
       NativeMediaBridge.getInstance().seekAudio(Math.round(targetTime * 1000));
-      this.notifyListeners(this.currentStatus, clampedPercent, targetTime, duration);
+      this.notifyListeners(
+        this.currentPlayingId === targetId ? this.currentStatus : 'idle',
+        clampedPercent,
+        targetTime,
+        duration,
+        targetId || undefined
+      );
       if (this.activeCallbacks?.onProgress) {
         this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
       }
@@ -546,7 +689,13 @@ export class VoicePlaybackManager {
       }
     }
 
-    this.notifyListeners(this.currentStatus, clampedPercent, actualCurrentTime, duration);
+    this.notifyListeners(
+      this.currentPlayingId === targetId ? this.currentStatus : 'idle',
+      clampedPercent,
+      actualCurrentTime,
+      duration,
+      targetId || undefined
+    );
     if (this.activeCallbacks?.onProgress) {
       this.activeCallbacks.onProgress(clampedPercent, actualCurrentTime, duration);
     }

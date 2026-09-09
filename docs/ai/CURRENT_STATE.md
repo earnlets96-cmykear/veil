@@ -1,25 +1,25 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 71 — PERFORMANCE & SMOOTHNESS PASS (CONVERSATION TIMELINE, ROW MEMOIZATION, MEDIA CACHE & TELEMETRY GATING)
-- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS — 376/376 TEST FILES, 1155/1155 TESTS PASSING)**
+## Current Verified Phase: PHASE 72 — AUDIO SEEKING & PLAYBACK RUNTIME FORENSIC STABILIZATION (AUTOPLAY POLICY RESILIENCE, STAGED SEEK PIPELINE & LISTENER SYNCHRONIZATION)
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS — 376/376 TEST FILES, 1159/1159 TESTS PASSING)**
 - **Verification Deliverables**:
-  - Full Project Test Suite: `npm test` passed 376 test files and 1,155 individual unit/integration tests with zero regressions.
-  - Phase 70 Voice Seeking, Swipe-to-Reply, Media UI Suite: `tests/phase70-voice-seeking-swipe-media-ui.test.tsx` (4/4 passed).
-  - Phase 69 Chat UX Enhancement Suite: `tests/phase69-chat-ux-enhancements.test.tsx` (10/10 passed).
-  - Phase 68 Chat Bubbles & Context Menu Suite: `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed).
-  - Phase 58 Real-Client Two-User E2E UI Suite: `tests/phase58-ui-acceptance-twoclient.test.tsx` (4/4 passed).
-  - Production Web Bundle: `npm run build` succeeds cleanly in 2.12s with zero TypeScript/lint errors.
-  - Capacitor Android Sync: `npx cap sync android` completed in 0.157s.
-- **Architectural & Performance Enhancements**:
-  1. **Conversation View & Row Pure Memoization**: Wrapped `ConversationMessageRow` with `React.memo` and stabilized all child callbacks with `useCallback`. Passed scalar state (`isAudioPlaying`, `isDownloading`, `downloadPercent`, `downloadLoadedBytes`) to prevent re-rendering unaffected message rows.
-  2. **Elimination of Root-Level Audio Playback Rerenders**: Removed root-level `setPlaybackProgress` and `setPlaybackCurrentTime` state ticks during active playback; `VoiceNoteCard` updates at 60fps via its internal event subscription to `VoicePlayer.subscribe(messageId, ...)`.
-  3. **Large Conversation Incremental Windowing**: Implemented timeline windowing (`INITIAL_MESSAGE_WINDOW = 60`, `WINDOW_INCREMENT = 40`) with an upward scroll handler (`handleTimelineScroll`) and window expansion in `handleJumpToMessage`, keeping DOM node counts lean and scrolling butter-smooth.
-  4. **Instant Conversation Switching**: Polished timeline auto-scrolling to use instantaneous `behavior: 'auto'` on conversation switch (`lastChatIdRef !== activeChatId`) and `behavior: 'smooth'` for live incoming/outgoing messages.
-  5. **AppState Context Provider Value Stabilization**: Wrapped `AppContextType` provider value in `React.useMemo(...)`, preventing app-wide cascading re-renders across all `useApp()` consumers on unrelated state updates.
-  6. **UI Component Memoization**: Wrapped `MessageBubble`, `VoiceNoteCard`, `AttachmentCard`, `MediaImage`, `GroupedMediaGrid`, and `MessageComposer` in `React.memo`.
-  7. **Sidebar Conversation Item Optimization**: Extracted `SidebarConversationItem` into `React.memo`, memoized `filteredConversations`, and stabilized click/pin callbacks with `useCallback`.
-  8. **Ephemeral Media RAM Cache Bounded LRU Eviction**: Added `MAX_RAM_ENTRIES = 50` LRU eviction limit to `MediaCacheManager`, revoking dead blob URLs via `URL.revokeObjectURL()` on eviction while retaining persistent IndexedDB offline storage.
-  9. **Production Telemetry Gating**: Gated informational console printing in `MediaLogger` and `RuntimeDiagnostics` under production builds (`import.meta.env?.PROD`), preventing console log serialization overhead.
+  - Full Project Test Suite: `npm test` passed 376 test files and 1,159 individual unit/integration tests with zero regressions.
+  - Phase 45E Audio Playback & Seeking Lifecycle Suite: `tests/phase45e-audio-runtime.test.ts` (10/10 passed).
+  - Phase 45E Audio Playback Forensic E2E Suite: `tests/phase45e-audio-forensic-e2e.test.ts` (6/6 passed).
+  - Phase 38 Voice Seek & Media Pipeline Suite: `tests/phase38-voice-seek-and-media.test.ts` (2/2 passed).
+  - Phase 29 Voice Message Suite: `tests/phase29-voice-message.test.ts` (2/2 passed).
+  - Production Web Bundle: `npm run build` succeeds cleanly in 1.99s with zero TypeScript/lint errors.
+  - Capacitor Android Sync: `npx cap sync android` completed in 0.12s.
+- **Architectural & Forensic Fixes**:
+  1. **Audio Element & Blob URL Lifecycle Reuse (`voicePlayer.ts`)**: Eliminated aggressive instantiation of new `Audio()` objects and ephemeral blob URL discarding on repeat playback of the same voice note. Reuses existing audio instances and cached decrypted blob URLs, preventing orphaned error listeners and audio stutter.
+  2. **Canplay-Gated Playback & Asynchronous Autoplay Recovery (`voicePlayer.ts`)**: Replaced raw pre-load `audio.play()` with a promise awaiting `canplay` (`readyState >= 3`). Caught `AbortError` and `NotAllowedError` without destroying the underlying audio element or throwing fatal exceptions, allowing immediate, user-gesture-compliant recovery on subsequent taps.
+  3. **Staged Pre-Play and In-Pause Seeking Pipeline (`voicePlayer.ts`)**: Resolved silent failure where `currentTime` was set before media metadata loaded (`readyState === 0`). Staged seek percentages are reliably committed in the `oncanplay` hook and during `resume()`.
+  4. **Targeted Message Listener Notification & Known Durations (`voicePlayer.ts`)**: Added `targetId` parameter to `notifyListeners` and a `knownDurations` registry. Seeking an unplayed voice note now notifies the specific message subscriber rather than requiring `currentPlayingId` to match.
+  5. **UI Seeking Position Retention (`VoiceNoteCard.tsx`)**: Replaced aggressive prop re-sync in `useEffect` with reference-equality checking (`prevPropProgressRef`, `prevPropTimeRef`), preventing incoming zeroed progress props from clobbering local user seek interactions.
+  6. **Conversation View Playback State Synchronization (`ConversationView.tsx`)**: Stopped clearing `playingAudioId` to `null` on pause, ensuring child message rows correctly receive `'paused'` state instead of defaulting to `'ready'`.
+
+## Previous Verified Phase: PHASE 71 — PERFORMANCE & SMOOTHNESS PASS (CONVERSATION TIMELINE, ROW MEMOIZATION, MEDIA CACHE & TELEMETRY GATING)
+- **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS — 376/376 TEST FILES, 1155/1155 TESTS PASSING)**
 
 ## Previous Verified Phase: PHASE 70 — VOICE SEEKING & TOUCH GESTURES, SWIPE-TO-REPLY ON AUDIO, PROGRESS CIRCLE REFINEMENT & VIDEO PLAYER UI OVERHAUL
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS)**

@@ -487,8 +487,10 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                   ? 'uploading'
                   : msg.status === 'FAILED'
                   ? 'error'
-                  : isCurrentlyPlaying
+                  : isCurrentlyPlaying && VoicePlayer.isPlaying(msg.id)
                   ? 'playing'
+                  : isCurrentlyPlaying && VoicePlayer.isPaused(msg.id)
+                  ? 'paused'
                   : 'ready'
               }
               currentProgressPercent={currentProgress}
@@ -772,9 +774,9 @@ export const ConversationView: React.FC = () => {
     if (!msg.voice || !activeSession) return;
 
     // 1. If currently playing this message, PAUSE immediately
+    //    Keep playingAudioId set so VoiceNoteCard receives 'paused' state (not 'ready')
     if (VoicePlayer.isPlaying(msg.id)) {
       VoicePlayer.pause();
-      setPlayingAudioId(null);
       return;
     }
 

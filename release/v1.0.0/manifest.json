@@ -1,6 +1,6 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-09T20:18:09.486Z",
+  "generatedAt": "2026-09-09T21:38:38.390Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
@@ -11,9 +11,9 @@
       "sha256": "f8671f921f605afc1a88f15a026c00730d8226aead035cde05eef4c06a46d09d"
     },
     {
-      "path": "dist/assets/index-DObEwqVJ.js",
-      "sizeBytes": 872819,
-      "sha256": "3dc8d120ce584306b44b9720e42b0a88e525cbdf09aaa9503de77f60e4ed01e6"
+      "path": "dist/assets/index-CEBRONg4.js",
+      "sizeBytes": 875542,
+      "sha256": "42d554476dffa9ec04308057f2022dff67a4f7f3c309bf5a900a4ba453e1ad7b"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-BTWdQ-0e.js",
-      "sizeBytes": 361,
-      "sha256": "6fd2f0a58c30895fe0fc008704890986af6c6acc9152ae12c011eb3edef37efd"
-    },
-    {
-      "path": "dist/assets/web-BvfvFRVD.js",
-      "sizeBytes": 8728,
-      "sha256": "6a0eceee05417b0dd0e125a1470384c31d6606a6ca46cfba903cdbe5323c8528"
-    },
-    {
-      "path": "dist/assets/web-CEgyj7xs.js",
+      "path": "dist/assets/web-DM1jlrF2.js",
       "sizeBytes": 842,
-      "sha256": "c8cb33586cbf46232a8817466f727af7f70bb5deb568526402823961c4561b62"
+      "sha256": "704e72807c70bd5b13bf21a3abce5d803085ea84f7268d6c4a6c712a06056eb9"
+    },
+    {
+      "path": "dist/assets/web-Dvdn-CGZ.js",
+      "sizeBytes": 8728,
+      "sha256": "535f1107c2623fa68dd94f4f89fae39ede2ef3961f75f0e43ac35f8e68fc2794"
+    },
+    {
+      "path": "dist/assets/web-MyouwqEU.js",
+      "sizeBytes": 361,
+      "sha256": "b7d755a399d80ea7e82dd275a14d7731d7386a97de17b55b0ee19d66eb4ac1c6"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "a0bfd53467f16d298a4714988cdace43c5857958183eb2042294b35101c85692"
+      "sha256": "d4fa792aaba4f6f105d9650ee969f6f87090de0ee5bb407e513183effeb945aa"
     }
   ]
 }

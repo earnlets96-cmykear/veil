@@ -2,6 +2,25 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase72-audio-seeking-and-playback-stabilization] - 2026-09-09
+
+### Audio Seeking & Playback Runtime Forensic Stabilization (Phase 72)
+- **Audio Element & Ephemeral Object URL Reuse**:
+  - Replaced rapid re-creation of `new Audio()` instances on every play with stable reuse of existing audio elements and decrypted blob URLs for the same voice note.
+  - Mitigates audio stutter, memory growth, and orphaned event listeners firing phantom error callbacks.
+- **Canplay-Gated Playback & Autoplay Error Recovery**:
+  - Awaits `canplay` (`readyState >= 3`) before calling `play()`, eliminating `AbortError` caused by rapid play/pause/play sequences.
+  - Gracefully catches `AbortError` and browser `NotAllowedError` without destroying the audio element or revoking URLs, safely transitioning status to `'paused'` to enable immediate recovery on the next user tap.
+- **Staged Pre-Play and In-Pause Seeking Pipeline**:
+  - Fixed silent seek failure where `currentTime` was set before media metadata loaded (`readyState === 0`).
+  - Staged seek percentages are reliably committed in the `oncanplay` hook and during `resume()`.
+  - Added `knownDurations` registry so idle and unplayed notes accurately compute `currentTime` from staged percentages upon initial subscription.
+  - Extended `notifyListeners` with `targetId` to notify subscribers of unplayed notes when seeked.
+- **UI Seeking Position Retention**:
+  - Gated prop synchronization in `VoiceNoteCard.tsx` with reference-equality checks (`prevPropProgressRef`, `prevPropTimeRef`), preventing incoming zeroed progress props from clobbering local user seek interactions when idle.
+- **Conversation View Playback State Synchronization**:
+  - Removed `setPlayingAudioId(null)` on pause; keeps the active ID so `ConversationMessageRow` forwards `'paused'` state to `VoiceNoteCard`.
+
 ## [1.0.0-phase71-performance-and-smoothness-pass] - 2026-09-08
 
 ### Performance & Smoothness Pass Across Timeline, Memoization, Media Cache & Telemetry (Phase 71)

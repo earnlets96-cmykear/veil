@@ -201,4 +201,107 @@ describe('Phase 45E: Audio Playback, Seeking & Runtime Lifecycle', () => {
 
     player.stop();
   });
+
+  it('7. seeking on an idle/unplayed voice note notifies listeners with targeted message ID and stages seek', () => {
+    let capturedStatus = '';
+    let capturedPct = -1;
+    let capturedCur = -1;
+    let capturedDur = -1;
+
+    player.subscribe('msg_idle_seek', (status, pct, cur, dur) => {
+      capturedStatus = status;
+      capturedPct = pct;
+      capturedCur = cur;
+      capturedDur = dur;
+    });
+
+    // Initial state
+    expect(capturedStatus).toBe('idle');
+    expect(capturedPct).toBe(0);
+
+    // Seek to 40% with known duration 20s
+    player.seek(40, 'msg_idle_seek', 20);
+
+    expect(capturedStatus).toBe('idle');
+    expect(capturedPct).toBe(40);
+    expect(capturedCur).toBe(8); // 40% of 20s
+    expect(capturedDur).toBe(20);
+  });
+
+  it('8. subscribing to an idle voice note with pre-staged seek immediately reflects the staged position', () => {
+    // Stage seek before subscriber mounts
+    player.seek(65, 'msg_pre_staged', 10);
+
+    let initialPct = -1;
+    let initialCur = -1;
+    player.subscribe('msg_pre_staged', (_status, pct, cur) => {
+      initialPct = pct;
+      initialCur = cur;
+    });
+
+    expect(initialPct).toBe(65);
+    expect(initialCur).toBe(6.5);
+  });
+
+  it('9. resuming a paused voice note applies staged seek to audio element currentTime before playback', async () => {
+    vi.spyOn(VoiceRecorder, 'downloadAndDecryptVoiceNote').mockResolvedValue('blob:mock-audio-url');
+
+    const meta = {
+      durationSeconds: 30,
+      mimeType: 'audio/webm',
+      sizeBytes: 10000,
+      objectId: 'obj_resume_seek',
+      ciphertextHash: 'hash_resume',
+      encryptionKeyBase64: '',
+      nonceBase64: '',
+    };
+
+    await player.playVoiceNote(mockSession, mockCloud, meta, 'msg_resume_seek');
+    expect(player.isPlaying('msg_resume_seek')).toBe(true);
+
+    // Pause playback
+    player.pause();
+    expect(player.isPaused('msg_resume_seek')).toBe(true);
+
+    // Seek to 80% while paused (80% of 30s = 24s)
+    player.seek(80, 'msg_resume_seek', 30);
+    expect((player as any).currentAudio.currentTime).toBe(24);
+
+    // Resume playback
+    await player.resume();
+    expect(player.isPlaying('msg_resume_seek')).toBe(true);
+    expect((player as any).currentAudio.currentTime).toBe(24);
+
+    player.stop();
+  });
+
+  it('10. playVoiceNote handles AbortError gracefully by staying paused rather than throwing or destroying audio', async () => {
+    vi.spyOn(VoiceRecorder, 'downloadAndDecryptVoiceNote').mockResolvedValue('blob:mock-audio-url');
+
+    const meta = {
+      durationSeconds: 15,
+      mimeType: 'audio/webm',
+      sizeBytes: 5000,
+      objectId: 'obj_abort_test',
+      ciphertextHash: 'hash_abort',
+      encryptionKeyBase64: '',
+      nonceBase64: '',
+    };
+
+    // First start normal playback
+    await player.playVoiceNote(mockSession, mockCloud, meta, 'msg_abort_test');
+    player.pause();
+
+    // Mock audio play to throw AbortError (simulating rapid tap interruption)
+    const abortErr = new Error('The play() request was interrupted by a call to pause()');
+    abortErr.name = 'AbortError';
+    (player as any).currentAudio.play = vi.fn().mockRejectedValue(abortErr);
+
+    // Calling playVoiceNote for the same paused note should catch AbortError and stay paused
+    await expect(player.playVoiceNote(mockSession, mockCloud, meta, 'msg_abort_test')).resolves.not.toThrow();
+    expect(player.isPaused('msg_abort_test')).toBe(true);
+    expect((player as any).currentAudio).not.toBeNull(); // Audio element not destroyed!
+
+    player.stop();
+  });
 });

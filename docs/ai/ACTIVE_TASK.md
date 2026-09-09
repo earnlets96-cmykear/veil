@@ -1,37 +1,31 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 71 — PERFORMANCE & SMOOTHNESS PASS (CONVERSATION TIMELINE, ROW MEMOIZATION, MEDIA CACHE & TELEMETRY GATING)
-- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS — 376/376 SUITES, 1155/1155 TESTS)**
+## Active Phase: PHASE 72 — AUDIO SEEKING & PLAYBACK RUNTIME FORENSIC STABILIZATION (AUTOPLAY POLICY RESILIENCE, STAGED SEEK PIPELINE & LISTENER SYNCHRONIZATION)
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS — 376/376 SUITES, 1159/1159 TESTS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 
-### Phase 71 Tasks Completed:
-- [x] **Conversation View & Row Memoization (`ConversationView.tsx`)**:
-  - Wrapped `ConversationMessageRow` with `React.memo` and stabilized all child event callbacks (`handlePlayToggle`, `handleSeek`, `handleDownload`, `handleMediaClick`, `handleGroupedMedia`, `handleReplyTriggerAction`, `handleRetryAction`, `handleReactionAction`, `handleContextMenuAction`, `handleLongPress`).
-  - Updated props to accept scalar status values (`isAudioPlaying`, `isDownloading`, `downloadPercent`, `downloadLoadedBytes`) alongside existing props to eliminate re-renders across unaffected rows.
-  - Eliminated redundant root-level state ticks (`setPlaybackProgress`, `setPlaybackCurrentTime`) during audio playback; `VoiceNoteCard` continues to update smoothly at 60fps via its internal `VoicePlayer.subscribe()` listener.
-  - Wrapped top-level handlers with `useCallback`: `handleToggleSelectMessage`, `handleContextMenu`, `handleOpenMedia`, `handleOpenGroupedMedia`, `handleToggleVoice`, `handleSeekVoice`, `handleRetryMessage`, `handleReactionClick`, `handleDownloadAttachment`.
-- [x] **Incremental Windowing & Auto-Scroll Stabilization (`ConversationView.tsx`)**:
-  - Implemented incremental windowing for large conversations (`INITIAL_MESSAGE_WINDOW = 60`, `WINDOW_INCREMENT = 40`), slicing `displayedMessages = activeMessages.slice(-renderedCount)`.
-  - Added upward scroll threshold listener (`handleTimelineScroll`) to lazily prepend older messages and preserve scroll position seamlessly.
-  - Added window auto-expansion in `handleJumpToMessage` when jumping to messages outside the active window.
-  - Polished timeline auto-scrolling to use instantaneous `behavior: 'auto'` on conversation switch (`lastChatIdRef !== activeChatId`) and `behavior: 'smooth'` for live incoming/outgoing messages.
-- [x] **AppState Context Value Stabilization (`AppState.tsx`)**:
-  - Memoized the `AppContextType` provider value object using `React.useMemo(...)`, preventing cascading re-renders across all `useApp()` consumer components on unrelated state ticks.
-- [x] **Presentation Component Pure Memoization (`ui/index.ts`, `media/index.ts`)**:
-  - Wrapped `MessageBubble`, `VoiceNoteCard`, `AttachmentCard`, `MediaImage`, `GroupedMediaGrid`, and `MessageComposer` in `React.memo`.
-- [x] **Sidebar Conversation Item Optimization (`Sidebar.tsx`)**:
-  - Extracted and memoized `SidebarConversationItem = React.memo(...)`.
-  - Memoized `filteredConversations` calculation with `useMemo`.
-  - Stabilized selection and pin handlers with `useCallback`.
-- [x] **Ephemeral Media RAM Cache LRU Eviction (`mediaCache.ts`)**:
-  - Added `MAX_RAM_ENTRIES = 50` bounded LRU eviction limit to `MediaCacheManager`.
-  - Automatically revokes dead object URLs via `URL.revokeObjectURL()` on eviction to prevent DOM memory leaks on mobile devices, while preserving persistent IndexedDB caching.
-- [x] **Production Telemetry & Log Gating (`mediaLogger.ts`, `runtimeDiagnostics.ts`)**:
-  - Gated routine informational `console.log` statements in production builds (`import.meta.env?.PROD`), preventing console throughput bottlenecks while retaining high-fidelity ring buffers and error traces.
+### Phase 72 Tasks Completed:
+- [x] **Audio Element & Ephemeral Object URL Reuse (`voicePlayer.ts`)**:
+  - Replaced new `Audio()` instantiation on every play with stable reuse of existing audio instances and decrypted blob URLs for the same message.
+  - Revokes ephemeral blob URLs cleanly only when switching distinct voice notes or on explicit stop.
+  - Cleans up prior event listeners before attaching new ones, eliminating orphaned error callbacks.
+- [x] **Canplay-Gated Playback & Autoplay Error Recovery (`voicePlayer.ts`)**:
+  - Awaits `canplay` (`readyState >= 3`) before calling `play()`, eliminating `AbortError` caused by rapid play/pause/play sequences.
+  - Catches `AbortError` and `NotAllowedError` without destroying the audio element; updates status to `'paused'`, enabling immediate user re-tap recovery under strict browser autoplay policies.
+- [x] **Staged Pre-Play and In-Pause Seeking Pipeline (`voicePlayer.ts`)**:
+  - Eliminates silent seek failure by staging sought positions and committing them inside `oncanplay` and `resume()`.
+  - Added `knownDurations` registry so idle and unplayed notes accurately compute `currentTime` from staged percentages upon initial subscription.
+  - Extended `notifyListeners` with `targetId` to notify subscribers of unplayed notes when seeked.
+- [x] **UI Seeking Position Retention (`VoiceNoteCard.tsx`)**:
+  - Gated prop synchronization in `useEffect` with reference-equality checks (`prevPropProgressRef`, `prevPropTimeRef`), preventing zeroed parent props from wiping out user scrubbing or seek positions when idle.
+- [x] **Conversation View Playback State Synchronization (`ConversationView.tsx`)**:
+  - Removed `setPlayingAudioId(null)` on pause; keeps the active ID so `ConversationMessageRow` forwards `'paused'` state to `VoiceNoteCard`.
+- [x] **Comprehensive Automated Verification (`phase45e-audio-runtime.test.ts`)**:
+  - Added tests 7-10 validating idle note seeking, staged seek subscription, in-pause resume seeking, and graceful `AbortError` recovery. All 10/10 tests pass.
 
-## Previous Phase: PHASE 70 — VOICE SEEKING & TOUCH GESTURES, SWIPE-TO-REPLY ON AUDIO, PROGRESS CIRCLE REFINEMENT & VIDEO PLAYER UI OVERHAUL
-- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS)**
+## Previous Phase: PHASE 71 — PERFORMANCE & SMOOTHNESS PASS (CONVERSATION TIMELINE, ROW MEMOIZATION, MEDIA CACHE & TELEMETRY GATING)
+- **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS — 376/376 SUITES, 1155/1155 TESTS)**
 - **Branch**: `main`
 - **Output Report**: `docs/ai/CURRENT_STATE.md`
 

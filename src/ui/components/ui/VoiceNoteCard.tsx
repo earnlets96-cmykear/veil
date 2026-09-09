@@ -83,14 +83,21 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
     return unsub;
   }, [messageId]);
 
-  // Sync prop changes if not currently playing locally
+  // Sync prop changes only when prop values genuinely change from parent
+  const prevPropProgressRef = useRef(propProgressPercent);
+  const prevPropTimeRef = useRef(propCurrentTime);
   useEffect(() => {
-    if (!messageId || localStatus === 'idle') {
+    const progressChanged = prevPropProgressRef.current !== propProgressPercent;
+    const timeChanged = prevPropTimeRef.current !== propCurrentTime;
+    prevPropProgressRef.current = propProgressPercent;
+    prevPropTimeRef.current = propCurrentTime;
+
+    if (!isScrubbingRef.current && pendingSeekPercentRef.current === null && (progressChanged || timeChanged)) {
       setLocalProgress(propProgressPercent);
       setLocalCurrentTime(propCurrentTime);
-      if (durationSeconds > 0) setLocalDuration(durationSeconds);
     }
-  }, [propProgressPercent, propCurrentTime, durationSeconds, messageId, localStatus]);
+    if (durationSeconds > 0) setLocalDuration(durationSeconds);
+  }, [propProgressPercent, propCurrentTime, durationSeconds]);
 
   const effectiveDuration = localDuration || durationSeconds || 1;
   const effectiveCurrentTime = localCurrentTime;
