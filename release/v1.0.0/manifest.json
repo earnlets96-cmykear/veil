@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-08T20:46:18.085Z",
+  "generatedAt": "2026-09-09T20:18:09.486Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-3-2TN927.css",
-      "sizeBytes": 83087,
-      "sha256": "144bd31e3eb890e4634a69ee669568b149b52beffc360bd04b25ed6ce709ab2e"
+      "path": "dist/assets/index-757FRoCB.css",
+      "sizeBytes": 83207,
+      "sha256": "f8671f921f605afc1a88f15a026c00730d8226aead035cde05eef4c06a46d09d"
     },
     {
-      "path": "dist/assets/index-DTS8TQMw.js",
+      "path": "dist/assets/index-DObEwqVJ.js",
       "sizeBytes": 872819,
-      "sha256": "0695891a09e1e9e38df536ca1ba6a5a717e838089d80927da95f288230963f8d"
+      "sha256": "3dc8d120ce584306b44b9720e42b0a88e525cbdf09aaa9503de77f60e4ed01e6"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-B32Cg2cD.js",
+      "path": "dist/assets/web-BTWdQ-0e.js",
       "sizeBytes": 361,
-      "sha256": "408f0a65f50fd5b10c9ce1149e3af501b8b3e032d1e680cb59c1d0a41e2de87c"
+      "sha256": "6fd2f0a58c30895fe0fc008704890986af6c6acc9152ae12c011eb3edef37efd"
     },
     {
-      "path": "dist/assets/web-DvMClWVe.js",
-      "sizeBytes": 842,
-      "sha256": "253f8a1f95283ef91732b1a44e530d64c2b033e6b6009d46ff78b9e8fff5fee7"
-    },
-    {
-      "path": "dist/assets/web-DwOT9Y17.js",
+      "path": "dist/assets/web-BvfvFRVD.js",
       "sizeBytes": 8728,
-      "sha256": "0cd7e7462e2bd858dc04b3e8f0ecf109bb2369d58398c6cbb14b866b39dc3c6c"
+      "sha256": "6a0eceee05417b0dd0e125a1470384c31d6606a6ca46cfba903cdbe5323c8528"
+    },
+    {
+      "path": "dist/assets/web-CEgyj7xs.js",
+      "sizeBytes": 842,
+      "sha256": "c8cb33586cbf46232a8817466f727af7f70bb5deb568526402823961c4561b62"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 950,
-      "sha256": "e4b8977220cf21f7e6ceb2666085aa076aa6cd19876be8bf92049f2f03411e4f"
+      "sha256": "a0bfd53467f16d298a4714988cdace43c5857958183eb2042294b35101c85692"
     }
   ]
 }

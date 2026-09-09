@@ -1538,7 +1538,13 @@ body,
   }
 
   .veil-message-action-row:not(:has(.veil-message-reactions)) {
-    display: none !important;
+    justify-content: flex-end;
+    margin-top: 2px;
+    gap: 0;
+  }
+
+  .veil-message-action-row:not(:has(.veil-message-reactions)) .veil-action-row-spacer {
+    display: none;
   }
 
   .veil-message-bubble {
