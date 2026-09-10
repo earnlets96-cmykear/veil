@@ -28,6 +28,7 @@ import {
 } from '../icons/index.ts';
 import { IconButton } from '../ui/IconButton.tsx';
 import { Spinner } from '../ui/Spinner.tsx';
+import { shouldDismissMediaByDrag } from '../../utils/mobileGesturePhysics.ts';
 
 export interface MediaViewerItem {
   id: string;
@@ -71,6 +72,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dismissDragY, setDismissDragY] = useState(0);
+  const dismissTouchRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressMediaClickRef = useRef(false);
 
   // Video player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -266,6 +270,46 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     setIsDragging(false);
   };
 
+  const handleDismissTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (zoom > 1 || event.touches.length !== 1) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('button, input, .veil-media-viewer-video-controls')) return;
+    dismissTouchRef.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  };
+
+  const handleDismissTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = dismissTouchRef.current;
+    if (!start || event.touches.length !== 1) return;
+
+    const deltaX = event.touches[0].clientX - start.x;
+    const deltaY = event.touches[0].clientY - start.y;
+    if (zoom > 1 || deltaY <= 0 || deltaY <= Math.abs(deltaX)) {
+      setDismissDragY(0);
+      return;
+    }
+
+    event.preventDefault();
+    if (deltaY > 8) suppressMediaClickRef.current = true;
+    setDismissDragY(Math.min(260, deltaY));
+  };
+
+  const finishDismissTouch = (event?: React.TouchEvent<HTMLDivElement>) => {
+    const start = dismissTouchRef.current;
+    dismissTouchRef.current = null;
+    if (!start || !event || event.changedTouches.length !== 1) {
+      setDismissDragY(0);
+      return;
+    }
+
+    const deltaX = event.changedTouches[0].clientX - start.x;
+    const deltaY = event.changedTouches[0].clientY - start.y;
+    if (shouldDismissMediaByDrag({ deltaX, deltaY, zoom })) {
+      onClose();
+      return;
+    }
+    setDismissDragY(0);
+  };
+
   // Video playback controls
   const togglePlay = async () => {
     if (!videoRef.current) return;
@@ -333,12 +377,16 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
 
   return (
     <div
-      className="veil-media-viewer-overlay"
+      className={`veil-media-viewer-overlay ${dismissDragY ? 'veil-media-viewer-dragging' : ''}`}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       role="dialog"
       aria-modal="true"
       aria-label="Media viewer"
+      style={{
+        backgroundColor: dismissDragY ? `rgba(0, 0, 0, ${Math.max(0.18, 0.94 - dismissDragY / 340)})` : undefined,
+        transition: dismissDragY ? 'none' : 'background-color 180ms ease-out',
+      }}
     >
       {/* Top Header Bar */}
       <div className="veil-media-viewer-header">
@@ -418,7 +466,16 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
         className="veil-media-viewer-stage"
         onMouseDown={handleMouseDown}
         onDoubleClick={handleDoubleClick}
-        style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+        onTouchStart={handleDismissTouchStart}
+        onTouchMove={handleDismissTouchMove}
+        onTouchEnd={finishDismissTouch}
+        onTouchCancel={() => finishDismissTouch()}
+        style={{
+          cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+          transform: dismissDragY ? `translateY(${dismissDragY}px) scale(${Math.max(0.94, 1 - dismissDragY / 4000)})` : undefined,
+          opacity: dismissDragY ? Math.max(0.35, 1 - dismissDragY / 360) : undefined,
+          transition: dismissDragY ? 'none' : 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease-out',
+        }}
       >
         {isCurrentLoading && (
           <div className="veil-media-thumbnail-loading" role="progressbar" aria-label="Decrypting media...">
@@ -474,6 +531,10 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                   className="veil-media-viewer-video"
                   playsInline
                   onClick={() => {
+                    if (suppressMediaClickRef.current) {
+                      suppressMediaClickRef.current = false;
+                      return;
+                    }
                     togglePlay();
                     resetControlsTimeout();
                   }}

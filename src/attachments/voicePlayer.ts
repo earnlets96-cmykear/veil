@@ -382,6 +382,35 @@ export class VoicePlaybackManager {
 
       // Capture staged seek for this message
       const stagedSeek = this.stagedSeekPercent[messageId];
+      let stagedSeekApplied = false;
+      let stagedSeekCompleted: Promise<void> | null = null;
+
+      const applyStagedSeek = () => {
+        if (stagedSeekApplied || typeof stagedSeek !== 'number' || stagedSeek <= 0) return;
+        const dur = this.getDuration(safeDuration);
+        if (dur <= 0) return;
+
+        stagedSeekApplied = true;
+        const targetTime = (stagedSeek / 100) * dur;
+        if (typeof audio.addEventListener !== 'function') {
+          try { audio.currentTime = targetTime; } catch (_e) {}
+          return;
+        }
+
+        stagedSeekCompleted = new Promise<void>((resolve) => {
+          const onSeeked = () => {
+            audio.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          audio.addEventListener('seeked', onSeeked);
+          try {
+            audio.currentTime = targetTime;
+          } catch (_e) {
+            audio.removeEventListener('seeked', onSeeked);
+            resolve();
+          }
+        });
+      };
 
       audio.onloadedmetadata = () => {
         if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
@@ -407,17 +436,9 @@ export class VoicePlaybackManager {
       };
 
       audio.oncanplay = () => {
-        // Apply staged seek HERE where readyState >= 3 guarantees currentTime assignment works
-        const seekPct = this.stagedSeekPercent[messageId];
-        if (typeof seekPct === 'number' && seekPct > 0) {
-          const dur = this.getDuration(safeDuration);
-          if (dur > 0) {
-            try {
-              audio.currentTime = (seekPct / 100) * dur;
-            } catch (_e) {}
-          }
-          delete this.stagedSeekPercent[messageId];
-        }
+        // `canplay` guarantees seeking is accepted; wait for `seeked` below
+        // before play(), or Android WebView can still begin playback at zero.
+        applyStagedSeek();
 
         RuntimeDiagnostics.audio('canPlay', {
           objectId: meta.objectId,
@@ -489,6 +510,14 @@ export class VoicePlaybackManager {
           audio.addEventListener('canplay', onReady);
           audio.addEventListener('error', onError);
         });
+      }
+
+      // A cached element can already be ready without emitting another canplay.
+      if (typeof audio.readyState === 'number' && audio.readyState >= 3) {
+        applyStagedSeek();
+      }
+      if (stagedSeekCompleted) {
+        await stagedSeekCompleted;
       }
 
       // 6. Attempt playback with graceful error recovery

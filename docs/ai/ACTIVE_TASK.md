@@ -1,5 +1,23 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
+- **Status**: COMPLETE (focused verification and web production build passed)
+- **Branch**: `main`
+
+### Phase 73 Tasks Completed:
+- [x] **Seek-completion voice playback (`src/attachments/voicePlayer.ts`)**:
+  - Web playback waits for the browser's `seeked` event after a staged seek and before `play()`, preventing the start-at-zero race.
+  - Regression: `tests/phase71-audio-seek-lifecycle.test.ts`.
+- [x] **Edge-swipe chat back (`src/ui/components/ConversationView.tsx`)**:
+  - A deliberate logical-start edge swipe exits the chat; vertical scrolling, selection mode, focused media, and non-edge starts are ignored.
+- [x] **Focused-media pull-down dismissal (`src/ui/components/media/MediaViewer.tsx`)**:
+  - Downward, vertical, base-zoom drags animate the viewer and dismiss after the threshold; controls, zoom, and horizontal interactions are protected.
+- [x] **Gesture contract and focused verification (`src/ui/utils/mobileGesturePhysics.ts`, `tests/phase71-mobile-navigation-gestures.test.ts`)**:
+  - Gesture thresholds and RTL behavior are unit tested alongside legacy audio, reply, media, and conversation regression suites: 11 files / 36 tests passed.
+  - `npm run build` passed and generated a 7-artifact release manifest.
+
+## Previous Phase: PHASE 72 — AUDIO SEEKING & PLAYBACK RUNTIME FORENSIC STABILIZATION (AUTOPLAY POLICY RESILIENCE, STAGED SEEK PIPELINE & LISTENER SYNCHRONIZATION)
+
 ## Active Phase: PHASE 72 — AUDIO SEEKING & PLAYBACK RUNTIME FORENSIC STABILIZATION (AUTOPLAY POLICY RESILIENCE, STAGED SEEK PIPELINE & LISTENER SYNCHRONIZATION)
 - **Status**: **COMPLETE & PRODUCTION-VERIFIED (100% PASS — 376/376 SUITES, 1159/1159 TESTS)**
 - **Branch**: `main`

@@ -25,6 +25,7 @@ import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
+import { CHAT_BACK_EDGE_PX, shouldCompleteConversationBackSwipe } from '../utils/mobileGesturePhysics.ts';
 import {
   Avatar,
   Badge,
@@ -575,6 +576,7 @@ export const ConversationView: React.FC = () => {
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineEndRef = useRef<HTMLDivElement>(null);
   const unreadRef = useRef<HTMLDivElement>(null);
+  const chatBackTouchRef = useRef<{ x: number; y: number; direction: 'ltr' | 'rtl' } | null>(null);
 
   // Search & Navigation State
   const [localSearchQuery, setLocalSearchQuery] = useState('');
@@ -586,6 +588,7 @@ export const ConversationView: React.FC = () => {
   // Fullscreen Media Viewer State
   const [viewerItem, setViewerItem] = useState<MediaViewerItem | null>(null);
   const [viewerMediaList, setViewerMediaList] = useState<MediaViewerItem[]>([]);
+  const [chatBackOffset, setChatBackOffset] = useState(0);
 
   // Selection Mode State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -644,6 +647,57 @@ export const ConversationView: React.FC = () => {
     activeConversation?.name ||
     activeContact?.name ||
     (activeChatId ? `@${activeChatId.slice(0, 10)}` : 'Chat');
+
+  const handleChatBackTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    if (viewerItem || isSelectionMode || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const direction = document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr';
+    const startsAtEdge = direction === 'rtl'
+      ? touch.clientX >= window.innerWidth - CHAT_BACK_EDGE_PX
+      : touch.clientX <= CHAT_BACK_EDGE_PX;
+    if (!startsAtEdge) return;
+
+    chatBackTouchRef.current = { x: touch.clientX, y: touch.clientY, direction };
+  }, [isSelectionMode, viewerItem]);
+
+  const handleChatBackTouchMove = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    const start = chatBackTouchRef.current;
+    if (!start || event.touches.length !== 1) return;
+
+    const deltaX = event.touches[0].clientX - start.x;
+    const deltaY = event.touches[0].clientY - start.y;
+    const logicalDelta = start.direction === 'rtl' ? -deltaX : deltaX;
+    if (logicalDelta <= 0 || Math.abs(deltaY) >= Math.abs(deltaX)) {
+      setChatBackOffset(0);
+      return;
+    }
+
+    event.preventDefault();
+    setChatBackOffset(Math.min(110, logicalDelta));
+  }, []);
+
+  const finishChatBackSwipe = useCallback((event?: React.TouchEvent<HTMLDivElement>) => {
+    const start = chatBackTouchRef.current;
+    chatBackTouchRef.current = null;
+    if (!start || !event || event.changedTouches.length !== 1) {
+      setChatBackOffset(0);
+      return;
+    }
+
+    const deltaX = event.changedTouches[0].clientX - start.x;
+    const deltaY = event.changedTouches[0].clientY - start.y;
+    if (shouldCompleteConversationBackSwipe({
+      startX: start.x,
+      viewportWidth: window.innerWidth,
+      deltaX,
+      deltaY,
+      direction: start.direction,
+    })) {
+      selectConversation(null);
+    }
+    setChatBackOffset(0);
+  }, [selectConversation]);
 
   const activeMessages = useMemo(() => {
     if (!activeChatId) return [];
@@ -1269,7 +1323,19 @@ export const ConversationView: React.FC = () => {
   }
 
   return (
-    <div className="veil-conversation veil-conversation-view" role="main" aria-label={`Chat with ${conversationName}`}>
+    <div
+      className="veil-conversation veil-conversation-view"
+      role="main"
+      aria-label={`Chat with ${conversationName}`}
+      onTouchStart={handleChatBackTouchStart}
+      onTouchMove={handleChatBackTouchMove}
+      onTouchEnd={finishChatBackSwipe}
+      onTouchCancel={() => finishChatBackSwipe()}
+      style={{
+        transform: chatBackOffset ? `translateX(${chatBackOffset}px)` : undefined,
+        transition: chatBackOffset ? 'none' : 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+    >
       {/* Top Header Bar */}
       {isSelectionMode ? (
         <div className="veil-chat-header veil-selection-header" role="toolbar">

@@ -3,6 +3,15 @@
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [Phase 73] - 2026-09-10
+
+### Fixed & Added
+- **Seek-completion voice playback**: staged browser voice playback now waits for the browser `seeked` event before invoking `play()`, preventing playback from resetting to the beginning after a user seeks.
+- **Mobile chat edge-swipe back**: added a 72px logical-start edge gesture that returns from a chat to the conversation list without colliding with reply swipes or vertical scrolling. RTL direction is mirrored.
+- **Focused-media pull-down**: added a 120px downward dismiss gesture for unzoomed full-screen media with bounded transform/backdrop feedback and reduced-motion support. Media controls, horizontal motion, and zoom are excluded.
+- **Verification**: 11 focused test files / 36 tests and the production web/release-manifest build passed. Physical Android testing was not performed.
+
 ## [Master Reliability & Hybrid Kotlin Media3 Migration] - 2026-09-05
 
 ### Added & Verified

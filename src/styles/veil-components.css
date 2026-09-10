@@ -995,6 +995,17 @@
   animation: veil-fade-in 0.18s ease-out;
 }
 
+.veil-media-viewer-stage {
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veil-media-viewer-overlay,
+  .veil-media-viewer-stage {
+    transition: none !important;
+  }
+}
+
 .veil-media-viewer-header {
   display: flex;
   align-items: center;

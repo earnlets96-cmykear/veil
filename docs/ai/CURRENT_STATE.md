@@ -1,5 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Verified Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
+- **Status**: **FOCUSED VERIFICATION COMPLETE**
+- **Branch**: `main`
+- **Audio playback**: staged web voice playback now waits for `canplay`, applies the requested position, waits for `seeked`, and only then invokes `play()`. Native playback continues to receive its start position through the existing Media3 bridge.
+- **Mobile chat navigation**: an LTR left-edge (RTL right-edge) swipe in the logical back direction returns to the conversation list only after a 72px horizontal-dominant drag. Message reply swipes and vertical timeline scrolling remain separate.
+- **Focused media**: a vertical 120px pull-down dismisses unzoomed focused media; horizontal gallery interactions, controls, and zoomed images are excluded. Escape and the visible close action remain available.
+- **Verification**: 11 focused test files / 36 tests passed. `npm run build` passed and regenerated the release manifest (7 artifacts). Physical Android verification was not performed.
+
 ## Current Verified Phase: PHASE 72 — AUDIO SEEKING & PLAYBACK RUNTIME FORENSIC STABILIZATION (AUTOPLAY POLICY RESILIENCE, STAGED SEEK PIPELINE & LISTENER SYNCHRONIZATION)
 - **Status**: **VERIFIED WITH RUNTIME EVIDENCE (100% PASS — 376/376 TEST FILES, 1159/1159 TESTS PASSING)**
 - **Verification Deliverables**:
