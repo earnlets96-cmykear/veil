@@ -84,9 +84,10 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   const effectiveStatus: DeliveryStatus = status || deliveryStatus || 'DELIVERED_TO_RECIPIENT';
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Swipe-to-reply touch gesture tracking
+  // Swipe-to-reply touch gesture tracking with Telegram spring physics
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const hasTriggeredHapticRef = useRef(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches && e.touches.length === 1) {
@@ -109,19 +110,31 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
     // If scrolling vertically, cancel swipe-to-reply
     if (Math.abs(deltaY) > Math.abs(deltaX)) {
       setSwipeOffset(0);
+      hasTriggeredHapticRef.current = false;
       return;
     }
 
     const triggerReply = onReplyTrigger || onReply;
 
-    // Swiping left (negative deltaX)
+    // Swiping left (negative deltaX) with elastic spring resistance
     if (deltaX < 0 && triggerReply && !isSelectionMode) {
-      // Cancel long press if user is actively swiping
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
-      setSwipeOffset(Math.max(-50, deltaX));
+      // Elastic resistance: non-linear damping
+      const elasticOffset = -Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6);
+      setSwipeOffset(elasticOffset);
+
+      // Reply trigger threshold: -45px
+      if (elasticOffset <= -45) {
+        if (!hasTriggeredHapticRef.current && typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate(12); } catch (_e) {}
+          hasTriggeredHapticRef.current = true;
+        }
+      } else {
+        hasTriggeredHapticRef.current = false;
+      }
     }
   };
 
@@ -132,11 +145,12 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
     }
 
     const triggerReply = onReplyTrigger || onReply;
-    if (swipeOffset < -35 && triggerReply) {
+    if (swipeOffset <= -45 && triggerReply) {
       triggerReply();
     }
 
     setSwipeOffset(0);
+    hasTriggeredHapticRef.current = false;
     touchStartRef.current = null;
   };
 
@@ -181,30 +195,31 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
         </div>
       )}
 
-      {/* Visual Swipe-to-reply icon indicator */}
-      {swipeOffset < -15 && (
+      {/* Telegram-style Spring Reply Icon Indicator */}
+      {swipeOffset < -10 && (
         <div
           style={{
             position: 'absolute',
             right: '8px',
             top: '50%',
-            transform: 'translateY(-50%)',
-            width: '28px',
-            height: '28px',
+            transform: `translateY(-50%) scale(${Math.min(1, Math.max(0.4, Math.abs(swipeOffset) / 45))}) rotate(${Math.max(-25, swipeOffset * 0.35)}deg)`,
+            width: '32px',
+            height: '32px',
             borderRadius: '50%',
-            background: 'var(--veil-accent-primary)',
+            background: swipeOffset <= -45 ? 'var(--veil-accent-primary, #14b8a6)' : 'rgba(20, 184, 166, 0.65)',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-            opacity: Math.min(1, Math.abs(swipeOffset) / 35),
-            transition: 'opacity 0.1s ease',
+            boxShadow: swipeOffset <= -45 ? '0 0 12px rgba(20, 184, 166, 0.5)' : '0 2px 6px rgba(0,0,0,0.2)',
+            opacity: Math.min(1, Math.abs(swipeOffset) / 25),
+            transition: swipeOffset === 0 ? 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'background 0.15s ease, box-shadow 0.15s ease',
             zIndex: 5,
+            pointerEvents: 'none',
           }}
           aria-hidden="true"
         >
-          <ReplyIcon size={14} />
+          <ReplyIcon size={16} />
         </div>
       )}
 
@@ -214,7 +229,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
         } ${isHighlighted ? 'veil-message-highlight' : ''}`}
         style={{
           transform: swipeOffset !== 0 ? `translateX(${swipeOffset}px)` : undefined,
-          transition: swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
+          transition: swipeOffset === 0 ? 'transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none',
         }}
       >
         {forwarded && (

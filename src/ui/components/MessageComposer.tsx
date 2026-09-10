@@ -19,6 +19,8 @@ import {
   StopIcon,
   CheckIcon,
   EditIcon,
+  TrashIcon,
+  LockIcon,
 } from './icons/index.ts';
 import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
@@ -60,6 +62,9 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isCancelling, setIsCancelling] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
@@ -69,6 +74,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorderRef = useRef<VoiceRecorder | null>(null);
+  const recordStartTimeRef = useRef<number>(0);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const hapticCancelledRef = useRef<boolean>(false);
+  const hapticLockedRef = useRef<boolean>(false);
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -217,7 +226,13 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       recorderRef.current = null;
     }
     setIsRecording(false);
+    setIsLocked(false);
     setRecordSeconds(0);
+    setDragOffset({ x: 0, y: 0 });
+    setIsCancelling(false);
+    touchStartRef.current = null;
+    hapticCancelledRef.current = false;
+    hapticLockedRef.current = false;
   };
 
   const handleSendVoice = async () => {
@@ -226,13 +241,93 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     try {
       const { audioBlob, durationSeconds, mimeType } = await recorderRef.current.stopRecording();
       setIsRecording(false);
+      setIsLocked(false);
+      setDragOffset({ x: 0, y: 0 });
+      setIsCancelling(false);
       await sendVoiceMessage(conversationId, durationSeconds, audioBlob, mimeType);
     } catch (err: any) {
       showToast({ type: 'error', message: err?.message || 'Failed to send voice message' });
     } finally {
       setIsSending(false);
       setIsRecording(false);
+      setIsLocked(false);
+      setDragOffset({ x: 0, y: 0 });
+      setIsCancelling(false);
       recorderRef.current = null;
+      touchStartRef.current = null;
+    }
+  };
+
+  const handleMicTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+    if (isRecording) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    touchStartRef.current = { x: clientX, y: clientY };
+    recordStartTimeRef.current = Date.now();
+    hapticCancelledRef.current = false;
+    hapticLockedRef.current = false;
+    setIsCancelling(false);
+    setDragOffset({ x: 0, y: 0 });
+    startRecordingFlow();
+  };
+
+  const handleMicTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!isRecording || isLocked || !touchStartRef.current) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const dx = clientX - touchStartRef.current.x;
+    const dy = clientY - touchStartRef.current.y;
+
+    const clampedX = Math.min(0, Math.max(-140, dx));
+    const clampedY = Math.min(0, Math.max(-100, dy));
+    setDragOffset({ x: clampedX, y: clampedY });
+
+    // Slide left to cancel threshold: dx < -70px
+    if (dx < -70) {
+      if (!isCancelling) {
+        setIsCancelling(true);
+        if (!hapticCancelledRef.current && typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate(12); } catch (_e) {}
+          hapticCancelledRef.current = true;
+        }
+      }
+    } else {
+      if (isCancelling) {
+        setIsCancelling(false);
+        hapticCancelledRef.current = false;
+      }
+    }
+
+    // Slide up to lock threshold: dy < -60px
+    if (dy < -60) {
+      setIsLocked(true);
+      setDragOffset({ x: 0, y: 0 });
+      setIsCancelling(false);
+      if (!hapticLockedRef.current && typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate([10, 30, 10]); } catch (_e) {}
+        hapticLockedRef.current = true;
+      }
+    }
+  };
+
+  const handleMicTouchEnd = () => {
+    if (!isRecording) return;
+    if (isLocked) {
+      // In locked mode, releasing keeps hands-free recording active
+      return;
+    }
+
+    if (isCancelling || dragOffset.x < -70) {
+      handleCancelVoice();
+      return;
+    }
+
+    const elapsed = Date.now() - recordStartTimeRef.current;
+    if (elapsed >= 600) {
+      // Hold & release sends immediately
+      handleSendVoice();
+    } else {
+      // Quick tap keeps recording open so user can speak and tap Send
     }
   };
 
@@ -350,7 +445,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         />
 
         {isRecording ? (
-          /* Live Voice Recording Controls */
+          /* Live Voice Recording Controls with Telegram Gestures */
           <div
             style={{
               display: 'flex',
@@ -359,44 +454,149 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               width: '100%',
               gap: '0.75rem',
               minHeight: '44px',
+              position: 'relative',
+              overflow: 'visible',
             }}
+            onTouchMove={handleMicTouchMove}
+            onMouseMove={handleMicTouchMove}
+            onTouchEnd={handleMicTouchEnd}
+            onMouseUp={handleMicTouchEnd}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {/* Timer & Pulsing Red Indicator with Soundwave Bars */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
               <span
                 style={{
                   width: '10px',
                   height: '10px',
                   borderRadius: '50%',
-                  backgroundColor: 'var(--veil-danger)',
-                  boxShadow: '0 0 8px var(--veil-danger)',
+                  backgroundColor: 'var(--veil-danger, #ef4444)',
+                  boxShadow: '0 0 8px var(--veil-danger, #ef4444)',
                   animation: 'veilPulse 1.2s infinite',
                 }}
               />
-              <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-                Recording {formatTimer(recordSeconds)}
+              <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm, 14px)', color: 'var(--veil-text-primary)' }}>
+                {formatTimer(recordSeconds)}
               </span>
+
+              {/* Soundwave animation bars */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '14px', marginLeft: '4px' }}>
+                <span style={{ width: '3px', height: '8px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
+                <span style={{ width: '3px', height: '14px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
+                <span style={{ width: '3px', height: '6px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
+                <span style={{ width: '3px', height: '12px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleCancelVoice}
-                aria-label="Cancel Voice Recording"
+            {/* Middle: Slide to Cancel Hint (when dragging/holding and not locked) */}
+            {!isLocked ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  color: isCancelling ? 'var(--veil-danger, #ef4444)' : 'var(--veil-text-muted, #94a3b8)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  transform: `translateX(${dragOffset.x * 0.4}px)`,
+                  transition: isCancelling ? 'all 0.15s ease' : 'none',
+                  userSelect: 'none',
+                }}
               >
-                <CloseIcon size={16} />
-                <span>Cancel</span>
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSendVoice}
-                disabled={isSending}
-                aria-label="Send Voice Message"
+                <TrashIcon
+                  size={16}
+                  color={isCancelling ? 'var(--veil-danger, #ef4444)' : 'currentColor'}
+                  style={{
+                    transform: isCancelling ? 'scale(1.25) rotate(-10deg)' : 'scale(1)',
+                    transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  }}
+                />
+                <span>{isCancelling ? 'Release to cancel' : '‹ Slide to cancel'}</span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  color: 'var(--veil-accent-primary, #14b8a6)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                }}
               >
-                {isSending ? <Spinner size="xs" /> : <SendIcon size={16} />}
-                <span>Send</span>
-              </Button>
+                <LockIcon size={14} />
+                <span>Hands-free locked</span>
+              </div>
+            )}
+
+            {/* Right Side Controls */}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {isLocked ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleCancelVoice}
+                    aria-label="Cancel Voice Recording"
+                    style={{ color: 'var(--veil-danger, #ef4444)' }}
+                  >
+                    <TrashIcon size={16} />
+                    <span>Cancel</span>
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleSendVoice}
+                    disabled={isSending}
+                    aria-label="Send Voice Message"
+                  >
+                    {isSending ? <Spinner size="xs" /> : <SendIcon size={16} />}
+                    <span>Send</span>
+                  </Button>
+                </>
+              ) : (
+                /* Active Dragging / Hold Mic Indicator */
+                <div style={{ position: 'relative' }}>
+                  {/* Floating Lock indicator pill emerging above mic */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-38px',
+                      left: '50%',
+                      transform: `translateX(-50%) translateY(${dragOffset.y * 0.4}px)`,
+                      background: 'var(--veil-bg-surface, #1e293b)',
+                      borderRadius: '14px',
+                      padding: '3px 7px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      opacity: dragOffset.y < -10 ? 1 : 0.7,
+                      fontSize: '9px',
+                      color: 'var(--veil-text-secondary, #cbd5e1)',
+                      pointerEvents: 'none',
+                      transition: 'opacity 0.2s ease',
+                    }}
+                  >
+                    <LockIcon size={12} color="var(--veil-accent-primary, #14b8a6)" />
+                    <span style={{ fontSize: '8px', lineHeight: 1 }}>^</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="veil-btn-composer-send"
+                    style={{
+                      background: 'var(--veil-danger, #ef4444)',
+                      transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.08)`,
+                      transition: dragOffset.x === 0 && dragOffset.y === 0 ? 'transform 0.2s ease' : 'none',
+                      boxShadow: '0 0 12px rgba(239, 68, 68, 0.4)',
+                    }}
+                    onClick={handleSendVoice}
+                    aria-label="Send Voice Recording"
+                  >
+                    <MicIcon size={20} color="#ffffff" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -414,8 +614,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               icon={<MicIcon size={20} />}
               variant="ghost"
               onClick={handleStartVoice}
+              onTouchStart={handleMicTouchStart}
+              onMouseDown={handleMicTouchStart}
               aria-label="Record Voice Note"
-              title="Record Voice Note"
+              title="Hold to record, slide left to cancel, slide up to lock"
             />
 
             <textarea

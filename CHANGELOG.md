@@ -2,6 +2,36 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase76-webm-seekability-and-telegram-gestures] - 2026-09-11
+
+### WebM Container Seekability & Telegram-Grade Chat Gestures (Phase 76)
+- **WebM EBML Cues Indexer & Duration Injector (`src/attachments/webmFix.ts`)**:
+  - Eliminated the root cause of audio seek resetting to 0:00. Chromium `MediaRecorder` generates streaming WebM without `Duration` or `Cues` seek index tables, which caused ExoPlayer's `MatroskaExtractor` to treat files as unseekable.
+  - Implemented zero-dependency EBML parser and indexer: parses clusters, computes exact byte offsets, injects `Duration` float into `Info`, sets `TimecodeScale` to 1ms, and prepends synthesized `Cues` index with `SeekHead`.
+  - Integrated into `VoiceRecorder.stopRecording()`, `VoiceRecorder.downloadAndDecryptVoiceNote()`, and cache layer.
+  - Added Chromium `Infinity` duration probe fallback in `VoicePlaybackManager` (`voicePlayer.ts`).
+- **Telegram-Style Elastic Spring Swipe-to-Reply (`src/ui/components/ui/MessageBubble.tsx`)**:
+  - Added non-linear elastic damping curve `-Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6)` mimicking native mobile physics.
+  - Dynamic rotating reply icon that scales from 0.4x to 1.0x, rotates to -25°, transitions to accent color, and triggers haptic vibration (`navigator.vibrate(12)`) at -45px threshold.
+  - Smooth spring rebound transition (`cubic-bezier(0.175, 0.885, 0.32, 1.275)`) focusing the composer reply bar on release.
+- **Telegram-Style Hold-to-Record Mic Controls (`src/ui/components/MessageComposer.tsx`)**:
+  - Replaced basic record button with gesture-aware touch and mouse tracker.
+  - Slide left (`dx < -70px`): reveals animated trash can icon, dynamic "Release to cancel" hint, and haptic feedback.
+  - Slide up (`dy < -60px`): locks into hands-free recording mode with animated lock pill and dedicated cancel/send actions.
+  - Hold > 600ms & release: immediately dispatches voice message.
+  - Live audio visualization: animated 4-bar soundwave visualizer and pulsing red indicator.
+- **Waveform Scrubbing Tooltip & Haptic Ticks (`src/ui/components/ui/VoiceNoteCard.tsx`)**:
+  - Floating timestamp pill (`0:14 / 0:42`) following the user's finger during active scrubbing.
+  - Emits subtle haptic tick (`navigator.vibrate(5)`) at every 5% progress increment scrubbed.
+- **Chat Edge-Swipe Navigation (`src/ui/components/ConversationView.tsx`)**:
+  - Fluid back navigation across up to 85% of screen width with tactile completion feedback.
+- **Automated Verification & Artifacts**:
+  - 100% pass across all 386 test suites (1202 individual tests).
+  - New test suites: `tests/phase76-webm-seekability.test.ts` (4/4), `tests/phase76-telegram-gestures.test.ts` (8/8).
+  - Production web bundle compiled (`npm run build`, 7 artifacts).
+  - Synced with Capacitor Android (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug`, 7.45 MB).
+
 ## [1.0.0-phase75-voicenote-ref-stabilization] - 2026-09-11
 
 ### Voice Note Component Ref Stabilization & Runtime Crash Repair (Phase 75)

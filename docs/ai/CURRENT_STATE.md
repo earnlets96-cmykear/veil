@@ -1,6 +1,29 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 75 — VOICE NOTE RUNTIME CRASH REPAIR & COMPONENT REF STABILIZATION
+## Current Verified Phase: PHASE 76 — WEBM SEEKABILITY CONTAINER & TELEGRAM-GRADE CHAT GESTURE SYSTEM
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — 386/386 TEST SUITES, 1202/1202 TESTS, ANDROID GRADLE ASSEMBLE SUCCESS, RELEASE BUILD SUCCESS)**
+- **Branch**: `main`
+- **WebM Container Seekability & Cues Indexing**:
+  - Eliminated the underlying cause of voice note seeking starting from the beginning (0:00).
+  - Chromium `MediaRecorder` emits WebM streams in live mode without a `Duration` header or `Cues` seek index. Android ExoPlayer's `MatroskaExtractor` marks un-cued WebM streams as unseekable, resetting `seekTo(ms)` to 0.
+  - Implemented zero-dependency binary EBML parser and indexer in `src/attachments/webmFix.ts`.
+  - Parses clusters, computes exact byte offsets and cluster timecodes, sets `TimecodeScale` to 1,000,000ns (1ms), injects accurate float `Duration` into `Info`, and prepends a synthesized `Cues` index and `SeekHead`.
+  - Automatically transforms WebM audio upon recording stop in `VoiceRecorder.stopRecording()`, and retroactively indexes un-cued WebM streams upon download/cache decryption in `VoiceRecorder.downloadAndDecryptVoiceNote()`.
+  - Added Chromium `Infinity` duration probe workaround in `voicePlayer.ts`.
+- **Telegram-Grade Gesture System**:
+  - **Elastic Swipe-to-Reply (`MessageBubble.tsx`)**: Non-linear damping physics `-Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6)`, rotating reply icon scaling 0.4x to 1.0x with accent glow, haptic vibration (`navigator.vibrate(12)`) at -45px threshold, and spring rebound curve (`cubic-bezier(0.175, 0.885, 0.32, 1.275)`).
+  - **Hold-to-Record Mic Controls (`MessageComposer.tsx`)**: Slide left (`dx < -70px`) to cancel with pulsing trash icon and haptics; slide up (`dy < -60px`) to lock into hands-free mode; animated 4-bar live audio soundwave visualizer.
+  - **Waveform Scrubbing Tooltip (`VoiceNoteCard.tsx`)**: Floating timestamp pill (`0:14 / 0:42`) following the finger with tabular numbers and 5% haptic ticks.
+  - **Edge-Swipe Navigation (`ConversationView.tsx`)**: Fluid back navigation across up to 85% of screen width with tactile completion feedback.
+- **Verification Deliverables**:
+  - Full Project Test Suite: 386 test files, 1202 tests passing (0 failures).
+  - WebM Seekability Suite: `tests/phase76-webm-seekability.test.ts` (4/4 tests pass).
+  - Telegram Gestures Suite: `tests/phase76-telegram-gestures.test.ts` (8/8 tests pass).
+  - Production Web Bundle: `npm run build` succeeds cleanly in 2.37s (7 release artifacts).
+  - Capacitor Android Sync: `npx cap sync android` completed in 0.17s.
+  - Native Android APK Build: `gradlew.bat assembleDebug` BUILD SUCCESSFUL in 21s (`app-debug.apk`, 7,457,129 bytes).
+
+## Previous Verified Phase: PHASE 75 — VOICE NOTE RUNTIME CRASH REPAIR & COMPONENT REF STABILIZATION
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — 5/5 VOICE TEST SUITES, 19/19 TESTS, ANDROID GRADLE ASSEMBLE SUCCESS, RELEASE BUILD SUCCESS)**
 - **Branch**: `main`
 - **VoiceNoteCard Scope & Ref Fix**:

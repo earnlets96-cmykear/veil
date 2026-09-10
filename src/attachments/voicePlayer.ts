@@ -430,6 +430,20 @@ export class VoicePlaybackManager {
       audio.onloadedmetadata = () => {
         if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
           this.currentDuration = audio.duration;
+        } else if (audio.duration === Infinity) {
+          if (safeDuration > 0) this.currentDuration = safeDuration;
+          if (typeof audio.addEventListener === 'function') {
+            const onDurationProbe = () => {
+              audio.removeEventListener('seeked', onDurationProbe);
+              if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+                this.currentDuration = audio.duration;
+              }
+              try { audio.currentTime = 0; } catch (_e) {}
+              applyStagedSeek();
+            };
+            audio.addEventListener('seeked', onDurationProbe);
+            try { audio.currentTime = 1e101; } catch (_e) {}
+          }
         }
 
         const dur = this.getDuration(safeDuration);

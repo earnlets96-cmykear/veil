@@ -57,7 +57,9 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const [localProgress, setLocalProgress] = useState(propProgressPercent);
   const [localCurrentTime, setLocalCurrentTime] = useState(propCurrentTime);
   const [localDuration, setLocalDuration] = useState(durationSeconds);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   const isScrubbingRef = useRef(false);
+  const lastHapticStepRef = useRef<number>(-1);
   const trackRef = useRef<HTMLDivElement>(null);
   const seekThrottleTimerRef = useRef<any>(null);
   const pendingSeekRef = useRef<{ percent: number; revision: number } | null>(null);
@@ -149,6 +151,15 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
       const targetTime = (percent / 100) * effectiveDuration;
       setLocalCurrentTime(targetTime);
 
+      // Light haptic tick on 5% intervals while scrubbing
+      const step = Math.floor(percent / 5);
+      if (step !== lastHapticStepRef.current) {
+        lastHapticStepRef.current = step;
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate(5); } catch (_e) {}
+        }
+      }
+
       if (commitImmediately) {
         if (seekThrottleTimerRef.current) {
           clearTimeout(seekThrottleTimerRef.current);
@@ -180,6 +191,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
     if (isUploading || isError) return;
     pointerActiveRef.current = true;
     isScrubbingRef.current = true;
+    setIsScrubbing(true);
     const target = e.currentTarget;
     try {
       target.setPointerCapture(e.pointerId);
@@ -197,6 +209,8 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
       upEvent.stopPropagation();
       upEvent.preventDefault();
       isScrubbingRef.current = false;
+      setIsScrubbing(false);
+      lastHapticStepRef.current = -1;
       handleSeekFromClientX(upEvent.clientX, true);
       try {
         target.releasePointerCapture(upEvent.pointerId);
@@ -225,6 +239,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
     e.stopPropagation();
     if (isUploading || isError) return;
     isScrubbingRef.current = true;
+    setIsScrubbing(true);
     if (e.touches && e.touches[0]) {
       handleSeekFromClientX(e.touches[0].clientX, false);
     }
@@ -243,6 +258,8 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
     if (pointerActiveRef.current) return;
     e.stopPropagation();
     isScrubbingRef.current = false;
+    setIsScrubbing(false);
+    lastHapticStepRef.current = -1;
     if (e.changedTouches && e.changedTouches[0]) {
       handleSeekFromClientX(e.changedTouches[0].clientX, true);
     }
@@ -390,6 +407,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
           onTouchEnd={handleTouchEndTrack}
           onTouchCancel={handleTouchEndTrack}
           style={{
+            position: 'relative',
             width: '100%',
             height: '32px',
             display: 'flex',
@@ -400,6 +418,32 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
             touchAction: 'none',
           }}
         >
+          {/* Floating Scrubbing Tooltip */}
+          {isScrubbing && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '-24px',
+                left: `${effectiveProgress}%`,
+                transform: 'translateX(-50%)',
+                background: 'var(--veil-bg-surface, rgba(15, 23, 42, 0.95))',
+                color: '#ffffff',
+                padding: '2px 6px',
+                borderRadius: '6px',
+                fontSize: '10px',
+                fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                zIndex: 10,
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+              }}
+            >
+              {formatDuration(effectiveCurrentTime)} / {formatDuration(effectiveDuration)}
+            </div>
+          )}
+
           {waveformBars.map((height, i) => {
             const barPercent = ((i + 0.5) / BAR_COUNT) * 100;
             const isFilled = barPercent <= effectiveProgress;

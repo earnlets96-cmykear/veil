@@ -1,25 +1,40 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 75 — VOICE NOTE RUNTIME CRASH REPAIR & COMPONENT REF STABILIZATION
-- **Status**: COMPLETE & PRODUCTION-VERIFIED (5/5 voice test suites passing, Android assembleDebug APK built successfully, release build verified)
+## Active Phase: PHASE 76 — WEBM SEEKABILITY CONTAINER & TELEGRAM-GRADE CHAT GESTURE SYSTEM
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all 386 test suites, 1202 tests; Android assembleDebug APK built successfully)
 - **Branch**: `main`
 
-### Phase 75 Tasks Completed:
-- [x] **VoiceNoteCard Scope & Ref Fix (`VoiceNoteCard.tsx`)**:
-  - Eliminated runtime `ReferenceError: pendingSeekPercentRef is not defined` crash when opening chats with voice notes.
-  - Consolidated all component refs (`isScrubbingRef`, `trackRef`, `seekThrottleTimerRef`, `pendingSeekRef`, `seekRevisionRef`, `pointerActiveRef`, `prevPropProgressRef`, `prevPropTimeRef`) at the top of `VoiceNoteCardComponent` prior to `useEffect` hooks.
-  - Corrected prop synchronization guard on line 95 to verify `pendingSeekRef.current === null`.
-- [x] **TypeScript Strict Parameter Compliance (`voicePlayer.ts`)**:
-  - Corrected `seekNative` invocation on line 788 to pass `targetId || undefined`, resolving TS2345 parameter type error.
-- [x] **Regression Test Suite (`tests/phase75-voicenote-runtime.test.tsx`)**:
-  - Implemented 4 regression tests verifying absence of orphan/undeclared identifiers in source, proper lexical ref ordering, render error resistance across diverse playback states, and simulated prop synchronization logic.
-- [x] **Build & Package Verification**:
-  - All 5 voice test suites passed (19 tests total).
-  - Production web bundle compiled in 2.35s (`npm run build`).
-  - Synced assets with Capacitor Android (`npx cap sync android`).
-  - Native Android debug APK assembled in 59s (`cd android && gradlew.bat assembleDebug`, 7,453,507 bytes).
+### Phase 76 Tasks Completed:
+- [x] **WebM Container Seekability & Cues Indexer (`webmFix.ts`, `voiceRecorder.ts`, `voicePlayer.ts`)**:
+  - Eliminated the root cause of audio seek reset to 0:00. Chromium `MediaRecorder` generates streaming WebM without `Duration` or `Cues` index tables. Android ExoPlayer's `MatroskaExtractor` marks non-cued files unseekable, resetting `seekTo` to 0, while Chrome evaluates `duration = Infinity`.
+  - Built zero-dependency EBML parser and indexer (`webmFix.ts`) that parses clusters, calculates exact cluster byte offsets and timestamps, sets `TimecodeScale` to 1ms, injects true `Duration` in the `Info` segment, and synthesizes a complete `Cues` seek table with `SeekHead`.
+  - Integrated seekable WebM transformation into `VoiceRecorder.stopRecording()` prior to encryption and wire dispatch.
+  - In `VoiceRecorder.downloadAndDecryptVoiceNote()` and cache retrieval, retroactively indexes unindexed WebM streams before generating blob URLs.
+  - Added Chromium `Infinity` duration probe fallback in `VoicePlaybackManager` (`voicePlayer.ts`).
+- [x] **Telegram Elastic Spring Swipe-to-Reply (`MessageBubble.tsx`)**:
+  - Implemented non-linear damping curve `-Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6)` mimicking Telegram mobile physics.
+  - Emergent reply circle icon scales from 0.4 to 1.0, rotates smoothly up to -25°, transitions to accent color, and triggers tactile haptic feedback (`navigator.vibrate(12)`) at the -45px activation threshold.
+  - Smooth spring rebound transition (`cubic-bezier(0.175, 0.885, 0.32, 1.275)`) focusing the composer reply bar on release.
+- [x] **Telegram Mic Hold-to-Record, Slide-to-Cancel & Slide-to-Lock (`MessageComposer.tsx`)**:
+  - Replaced basic record button with gesture-aware touch and mouse tracker:
+    - Hold > 600ms & release immediately dispatches voice message.
+    - Drag left (`dx < -70px`): reveals animated trash can icon, dynamic "Release to cancel" hint, and haptic feedback.
+    - Drag up (`dy < -60px`): locks into hands-free recording mode with animated lock pill and dedicated cancel/send actions.
+    - Live audio visualization: animated 4-bar soundwave visualizer and pulsing red indicator.
+- [x] **Waveform Scrubbing Tooltip & Haptic Ticks (`VoiceNoteCard.tsx`)**:
+  - Added floating timestamp tooltip (`0:14 / 0:42`) tracking the user's finger during active scrubbing.
+  - Emits subtle haptic tick (`navigator.vibrate(5)`) at every 5% progress increment scrubbed.
+- [x] **Chat Edge-Swipe Navigation (`ConversationView.tsx`)**:
+  - Enhanced gesture responsiveness to allow fluid dragging across up to 85% of screen width with tactile feedback upon completion.
+- [x] **Comprehensive Automated Verification & Production Build**:
+  - `tests/phase76-webm-seekability.test.ts` (4 tests) - **PASSED**.
+  - `tests/phase76-telegram-gestures.test.ts` (8 tests) - **PASSED**.
+  - Full regression suite: 386 test files, 1202 tests passed with 0 failures (`npx vitest run`).
+  - Production web bundle compiled (`npm run build`, 7 artifacts).
+  - Capacitor Android synchronized (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug`, 7,457,129 bytes).
 
-## Previous Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
+## Previous Phase: PHASE 75 — VOICE NOTE RUNTIME CRASH REPAIR & COMPONENT REF STABILIZATION
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (23/23 focused tests, Android Gradle compile passed, release build passed)
 - **Branch**: `main`
 

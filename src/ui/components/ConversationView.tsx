@@ -653,9 +653,10 @@ export const ConversationView: React.FC = () => {
 
     const touch = event.touches[0];
     const direction = document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr';
+    const edgeBoundary = Math.max(CHAT_BACK_EDGE_PX, 32);
     const startsAtEdge = direction === 'rtl'
-      ? touch.clientX >= window.innerWidth - CHAT_BACK_EDGE_PX
-      : touch.clientX <= CHAT_BACK_EDGE_PX;
+      ? touch.clientX >= window.innerWidth - edgeBoundary
+      : touch.clientX <= edgeBoundary;
     if (!startsAtEdge) return;
 
     chatBackTouchRef.current = { x: touch.clientX, y: touch.clientY, direction };
@@ -674,7 +675,8 @@ export const ConversationView: React.FC = () => {
     }
 
     event.preventDefault();
-    setChatBackOffset(Math.min(110, logicalDelta));
+    // Smooth responsive translation following finger
+    setChatBackOffset(Math.min(window.innerWidth * 0.85, logicalDelta));
   }, []);
 
   const finishChatBackSwipe = useCallback((event?: React.TouchEvent<HTMLDivElement>) => {
@@ -687,13 +689,20 @@ export const ConversationView: React.FC = () => {
 
     const deltaX = event.changedTouches[0].clientX - start.x;
     const deltaY = event.changedTouches[0].clientY - start.y;
-    if (shouldCompleteConversationBackSwipe({
+    const logicalDelta = start.direction === 'rtl' ? -deltaX : deltaX;
+
+    const thresholdMet = logicalDelta >= Math.min(100, window.innerWidth * 0.3) || shouldCompleteConversationBackSwipe({
       startX: start.x,
       viewportWidth: window.innerWidth,
       deltaX,
       deltaY,
       direction: start.direction,
-    })) {
+    });
+
+    if (thresholdMet) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(10); } catch (_e) {}
+      }
       selectConversation(null);
     }
     setChatBackOffset(0);

@@ -561,6 +561,7 @@ export const DeleteIcon: React.FC<IconProps> = ({ size = 20, className = '', col
   </svg>
 );
 
+
 export const LayersIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
   <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
     <polygon points="12 2 2 7 12 12 22 7 12 2" />
