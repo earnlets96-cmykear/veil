@@ -30,6 +30,8 @@ describe('Phase 40: In-App Media Picker & Multi-Select Bottom Sheet', () => {
     expect(html).toContain('Videos');
     expect(html).toContain('Files');
     expect(html).toContain('Camera');
+    expect(html).toContain('Recent');
+    expect(html).toContain('Browse recent');
     // Per-send privacy controls were removed in Phase 45
     // (moved to contact profile media permissions)
     expect(html).not.toContain('Per-Media Privacy Controls');

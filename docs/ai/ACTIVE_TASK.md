@@ -1,8 +1,33 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
-- **Status**: COMPLETE (focused verification and web production build passed)
+## Active Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (23/23 focused tests, Android Gradle compile passed, release build passed)
 - **Branch**: `main`
+
+### Phase 74 Tasks Completed:
+- [x] **Android MediaStore Bridge & Plugin (`VeilDeviceMediaPlugin.kt`, `NativeDeviceMediaBridge.ts`, `MainActivity.java`)**:
+  - Implemented granular Android 13+ image/video permission requests on demand; zero permission requested on app launch.
+  - Queried MediaStore for recent media thumbnails and metadata; reads item URI into memory only upon user tap.
+  - Handled scoped document picker (`ACTION_OPEN_DOCUMENT`) and gallery saving via MediaStore.
+  - Enforced repository codec security by eliminating browser `atob` and using audited `base64ToBytes`.
+- [x] **Recent Media Selection Sync & UI Polish (`MediaPickerModal.tsx`, `veil-components.css`)**:
+  - Resolved UX issue where removing a staged file failed to uncheck Recent grid items by maintaining bidirectional `fileToUriMapRef` and un-staging URIs on file removal.
+  - Enabled direct tap toggle on already-selected Recent items to unstage.
+  - Added support for pagination loading when `nextCursor` is present.
+  - Polished attachment sheet with media-type badges (`PHOTO`, `VIDEO`, `FILE`), file size labels, and dedicated CSS tokens.
+  - Replaced all Unicode symbol glyphs with accessible SVG iconography (`CheckIcon`, `PlayIcon`) adhering to Phase 44A audit.
+- [x] **Cooperative Yielding on Decryption Reassembly (`attachmentPipeline.ts`)**:
+  - Implemented cooperative yielding every 8 chunks (~512KB) in `AttachmentPipeline.decryptProgressive` using `scheduler.yield()` / `setTimeout(0)`, unblocking the browser UI thread during large media decryption without altering AEAD authentication or SHA-256 integrity checks.
+- [x] **Deferred Video Thumbnail Generation (`MediaImage.tsx`)**:
+  - Replaced eager video thumbnail generation with instant reuse of server/cached thumbnails when available (`thumbnailUrl` / `previewUrl`).
+  - Scheduled client-side video thumbnail extraction to idle time (`requestIdleCallback` / timer) when no preview exists, preventing chat timeline render freezes.
+- [x] **Verification & Test Coverage (`tests/phase74-media-interaction.test.tsx`, `tests/phase74-performance.test.ts`)**:
+  - Verified all 8 interaction requirements (zero launch permissions, on-demand prompt, no repetitive requests, document picker resilience, deferred reading, MediaStore save, zero broad storage access, selection unstage sync).
+  - Verified chunk yielding and thumbnail deferral logic with 100% deterministic test coverage.
+  - Compiled Android native Java/Kotlin debug sources with Gradle (`BUILD SUCCESSFUL`).
+  - Built web bundle and synced Capacitor assets (`npm run android:sync`).
+
+## Previous Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
 
 ### Phase 73 Tasks Completed:
 - [x] **Seek-completion voice playback (`src/attachments/voicePlayer.ts`)**:

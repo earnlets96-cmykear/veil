@@ -1,13 +1,31 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 74 — PONYTAIL AGENT PLUGIN INSTALLATION
-- **Status**: **VERIFIED & OPERATIONAL**
+## Current Verified Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — 23/23 FOCUSED TESTS, ANDROID GRADLE SUCCESS, RELEASE BUILD SUCCESS)**
 - **Branch**: `main`
-- **Installed Components**:
-  - `@dietrichgebert/ponytail` v4.9.0 deployed to workspace (`.agents/plugins/ponytail`) and global (`~/.gemini/config/plugins/ponytail`) customization roots.
-  - Skills verified: `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review`.
-  - Rules verified: `rules/ponytail.md` active.
-  - Manifest verified: `plugin.json` valid JSON matching Antigravity plugin manifest specification.
+- **Native Device Media & Permissions**:
+  - Android 13+ granular permission handling implemented in `VeilDeviceMediaPlugin.kt` and `NativeDeviceMediaBridge.ts`.
+  - Zero permission requested on app launch; prompt occurs strictly on explicit user action (Photos/Videos/Recent).
+  - MediaStore queries retrieve compact thumbnails without reading full payload; URI content is loaded into memory only upon user selection.
+  - Gallery saving routes through MediaStore `Pictures/VEIL` and `Movies/VEIL` without broad external storage permissions.
+  - Document picker remains fully functional even if media permissions are denied.
+- **Recent Media Selection Sync & UI Polish**:
+  - Resolved Recent grid selection checkmark bug: removing a staged file now unchecks and re-enables the item in the Recent grid via `fileToUriMapRef`.
+  - Direct toggle on already-selected grid items supported.
+  - Added support for pagination cursor loading.
+  - Added media-type badges (`PHOTO`, `VIDEO`, `FILE`), file-size labels, and dedicated CSS tokens in `veil-components.css`.
+  - Replaced all Unicode UI symbols with accessible SVG icons (`CheckIcon`, `PlayIcon`).
+- **Cooperative Yielding & UI Thread Protection**:
+  - `AttachmentPipeline.decryptProgressive` cooperatively yields to the browser event loop every 8 chunks (~512KB) using `scheduler.yield()` / `setTimeout(0)`, preventing UI freezes during large media decryption while strictly preserving AEAD authentication and SHA-256 integrity checks.
+- **Deferred Video Thumbnails**:
+  - `MediaImage.tsx` reuses existing server/cached thumbnails instantly (`thumbnailUrl` / `previewUrl`), completely bypassing redundant client-side video canvas extractions.
+  - Defers expensive video frame capture to idle time (`requestIdleCallback`) when no preview exists, keeping chat timeline scrolling silky smooth.
+- **Verification Deliverables**:
+  - 23 focused unit and integration tests passing (`phase74-media-interaction`, `phase74-performance`, `phase74-device-media-bridge`, `phase74-gallery-save`, `phase40-media-picker`, `phase41-codec-audit`, `phase44a-ui-layout-and-icons`).
+  - Native Android Gradle compilation: `gradlew.bat compileDebugSources` passed in 31s.
+  - Production web bundle & release manifest: `npm run build` succeeds cleanly in 1.98s (7 release artifacts).
+  - Capacitor Android Sync: `npx cap sync android` completed in 0.174s.
+  - Ponytail agent plugin (`@dietrichgebert/ponytail` v4.9.0) operational in workspace and global scopes.
 
 ## Previous Verified Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
 - **Status**: **FOCUSED VERIFICATION COMPLETE**

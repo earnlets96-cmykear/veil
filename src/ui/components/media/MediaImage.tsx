@@ -43,7 +43,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
     ? attachment.thumbnailUrl
     : (attachment.previewUrl && attachment.previewUrl.startsWith('data:'))
     ? attachment.previewUrl
-    : null;
+    : attachment.thumbnailUrl || null;
 
   // Blob URLs are trusted if in RAM cache, media state, or provided preview
   const activeBlobUrl = media?.blobUrl || null;
@@ -52,7 +52,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
   const [isLoading, setIsLoading] = useState(!media && !displayUrl);
   const [error, setError] = useState<string | null>(null);
-  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState<string | null>(null);
+  const [videoThumbnailUrl, setVideoThumbnailUrl] = useState<string | null>(() => durableThumbnail || null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const isMountedRef = useRef(true);
 
@@ -151,10 +151,13 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
   const createdThumbUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isVideoMedia || !displayUrl) return;
+    // Avoid eagerly extracting video thumbnails when an existing server/cached thumbnail exists
+    if (!isVideoMedia || !displayUrl || durableThumbnail || attachment.thumbnailUrl) return;
 
     let isCancelled = false;
-    (async () => {
+    let idleHandle: any = null;
+
+    const generate = async () => {
       try {
         let blobSource: Blob | null = null;
         if (media?.data) {
@@ -179,17 +182,35 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
       } catch (_e) {
         // Fallback gracefully to video tag or direct url
       }
-    })();
+    };
+
+    // Defer expensive client-side video thumbnail generation to idle time
+    if (typeof (window as any).requestIdleCallback === 'function') {
+      idleHandle = (window as any).requestIdleCallback(() => {
+        if (!isCancelled) void generate();
+      }, { timeout: 2000 });
+    } else {
+      idleHandle = setTimeout(() => {
+        if (!isCancelled) void generate();
+      }, 120);
+    }
 
     return () => {
       isCancelled = true;
+      if (idleHandle !== null) {
+        if (typeof (window as any).cancelIdleCallback === 'function') {
+          try { (window as any).cancelIdleCallback(idleHandle); } catch (_e) {}
+        } else {
+          clearTimeout(idleHandle);
+        }
+      }
       if (createdThumbUrlRef.current && createdThumbUrlRef.current.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) {
         try {
           URL.revokeObjectURL(createdThumbUrlRef.current);
         } catch (_e) {}
       }
     };
-  }, [isVideoMedia, displayUrl, media, attachment.mimeType]);
+  }, [isVideoMedia, displayUrl, media, attachment.mimeType, durableThumbnail, attachment.thumbnailUrl]);
 
   if (isLoading && !displayUrl) {
     return (

@@ -4,9 +4,24 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Phase 74] - 2026-09-10
+## [Phase 74] - 2026-09-11
 
-### Added
+### Added & Fixed
+- **Native Android MediaStore Integration (`VeilDeviceMediaPlugin.kt`, `NativeDeviceMediaBridge.ts`, `MainActivity.java`)**:
+  - Registered `VeilDeviceMediaPlugin` in `MainActivity.java` for Android 13+ granular permission checking on explicit user action only.
+  - MediaStore queries thumbnail previews and metadata; reading full URI payload is deferred until the user explicitly taps an item.
+  - Scoped document picker (`ACTION_OPEN_DOCUMENT`) and gallery saving via MediaStore `Pictures/VEIL` and `Movies/VEIL` without broad filesystem permissions.
+  - Replaced browser `atob` with audited `base64ToBytes` from `src/crypto/utils.ts` in compliance with repository codec rules.
+- **Recent Media Selection Sync & UI Polish (`MediaPickerModal.tsx`, `veil-components.css`)**:
+  - Fixed Recent grid checkmark desynchronization: un-staging a file now synchronously removes the URI from `stagedUris` via `fileToUriMapRef`.
+  - Allowed direct toggle on already-selected grid items to unstage.
+  - Added media-type badges (`PHOTO`, `VIDEO`, `FILE`), file size labels, and dedicated CSS tokens.
+  - Replaced Unicode symbol icons with accessible SVG iconography (`CheckIcon`, `PlayIcon`).
+- **Cooperative Yielding on Large Media Decryption (`attachmentPipeline.ts`)**:
+  - Implemented cooperative event loop yielding every 8 chunks (~512KB) in `AttachmentPipeline.decryptProgressive` using `scheduler.yield()` / `setTimeout(0)`, unblocking the browser main thread during large media decryption while maintaining exact AEAD authentication and SHA-256 integrity checks.
+- **Deferred Video Thumbnail Generation (`MediaImage.tsx`)**:
+  - Replaced eager video thumbnail generation with instant reuse of existing server/cached thumbnails (`thumbnailUrl` / `previewUrl`).
+  - Scheduled client-side video thumbnail canvas extraction to idle time (`requestIdleCallback`) when no preview exists.
 - **Ponytail Agent Plugin (`@dietrichgebert/ponytail` v4.9.0)**:
   - Installed lazy senior developer mode plugin to both workspace (`.agents/plugins/ponytail`) and global (`~/.gemini/config/plugins/ponytail`) customization directories.
   - Deployed 6 specialized on-demand skills: `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review`.

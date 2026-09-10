@@ -146,6 +146,26 @@ export class AttachmentPipeline {
     return decryptXChaCha20Poly1305(encryptionKey, nonce, ciphertext, aad);
   }
 
+  public static yieldHookForTesting?: () => void;
+  private static readonly YIELD_CHUNK_INTERVAL = 8;
+
+  /**
+   * Cooperative yield to the event loop so the UI thread remains responsive
+   * during intensive cryptographic chunk decryption.
+   */
+  private static async yieldToEventLoop(): Promise<void> {
+    if (this.yieldHookForTesting) {
+      try { this.yieldHookForTesting(); } catch (_e) {}
+    }
+    if (typeof (globalThis as any).scheduler !== 'undefined' && typeof (globalThis as any).scheduler.yield === 'function') {
+      try {
+        await (globalThis as any).scheduler.yield();
+        return;
+      } catch (_e) {}
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+
   /**
    * Decrypts chunks progressively, invoking onChunkReady as each chunk is decrypted,
    * returning the fully assembled buffer verified with SHA-256.
@@ -178,6 +198,11 @@ export class AttachmentPipeline {
         try {
           onPlayableChunk(i, slice, totalSize);
         } catch (_e) {}
+      }
+
+      // Cooperatively yield every YIELD_CHUNK_INTERVAL chunks to unblock UI thread
+      if ((i + 1) % this.YIELD_CHUNK_INTERVAL === 0 && i < sorted.length - 1) {
+        await this.yieldToEventLoop();
       }
     }
 

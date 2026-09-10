@@ -8,6 +8,7 @@
 import { bytesToBase64 } from '../../crypto/utils.ts';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
 
 export interface SaveFileOptions {
   filename: string;
@@ -25,6 +26,11 @@ export interface SaveFileResult {
 }
 
 export class FileSaver {
+  private static deviceMediaBridge = NativeDeviceMediaBridge.getInstance();
+
+  public static setDeviceMediaBridgeForTesting(bridge: NativeDeviceMediaBridge): void {
+    this.deviceMediaBridge = bridge;
+  }
   /**
    * Checks if running inside a native mobile container (Capacitor Android/iOS).
    */
@@ -198,13 +204,24 @@ export class FileSaver {
     const isImage = mimeType.startsWith('image/');
     const isVideo = mimeType.startsWith('video/');
 
-    if (!this.isNative()) {
+    if (!this.isNative() && !this.deviceMediaBridge.isNative()) {
       // On web, just download normally
       return this.saveWeb(filename, data, mimeType);
     }
 
     try {
       const base64Data = bytesToBase64(data);
+
+      // MediaStore owns Gallery visibility on modern Android. It is invoked only
+      // for this explicit Save action, never during startup or media selection.
+      if (this.deviceMediaBridge.isNative()) {
+        try {
+          const saved = await this.deviceMediaBridge.saveToGallery({ filename, mimeType, base64Data });
+          return { success: true, filename, location: saved.location, uri: saved.uri };
+        } catch (_mediaStoreError) {
+          // Preserve the existing user-driven share fallback below.
+        }
+      }
 
       // Request storage permissions
       try {
