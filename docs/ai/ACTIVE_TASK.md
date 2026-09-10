@@ -21,10 +21,17 @@
 - [x] **Deferred Video Thumbnail Generation (`MediaImage.tsx`)**:
   - Replaced eager video thumbnail generation with instant reuse of server/cached thumbnails when available (`thumbnailUrl` / `previewUrl`).
   - Scheduled client-side video thumbnail extraction to idle time (`requestIdleCallback` / timer) when no preview exists, preventing chat timeline render freezes.
-- [x] **Verification & Test Coverage (`tests/phase74-media-interaction.test.tsx`, `tests/phase74-performance.test.ts`)**:
-  - Verified all 8 interaction requirements (zero launch permissions, on-demand prompt, no repetitive requests, document picker resilience, deferred reading, MediaStore save, zero broad storage access, selection unstage sync).
-  - Verified chunk yielding and thumbnail deferral logic with 100% deterministic test coverage.
-  - Compiled Android native Java/Kotlin debug sources with Gradle (`BUILD SUCCESSFUL`).
+- [x] **Android ExoPlayer Voice Seek Race Repair & Authoritative Synchronization (`VeilNativeMediaPlugin.kt`, `NativeMediaBridge.ts`, `voicePlayer.ts`, `VoiceNoteCard.tsx`)**:
+  - Replaced racy startup sequence (`setMediaSource` -> `prepare` -> `seekTo` -> `play`) with ExoPlayer's atomic `setMediaSource(source, clampedStartMs)` + `prepare()` + `playWhenReady = true`, eliminating playback restart from zero.
+  - Implemented authoritative native seek resolution via ExoPlayer's `Player.Listener.onPositionDiscontinuity(reason = DISCONTINUITY_REASON_SEEK)` with immediate progress notification and 350ms fallback watchdog.
+  - Exported `NativeSeekResult` in `NativeMediaBridge.ts` providing confirmed native milliseconds to the JS playback layer.
+  - Added async `seekNative` reconciliation in `VoicePlaybackManager` (`voicePlayer.ts`) with `lastConfirmedNativeTime` tracking, restoring last confirmed position on seek failure.
+  - Implemented monotonic seek revisions (`seekRevisionRef`) and cancelled outstanding drag throttle on pointer/touch release in `VoiceNoteCard.tsx`, dispatching exactly one authoritative final seek.
+  - Deduplicated pointer, touch, and click handlers on Android WebView to prevent dual-gesture conflict.
+  - Added redacted diagnostic telemetry logging opaque short message ID hash, requested ms, before/after positions, duration, and state without sensitive tokens or URLs.
+- [x] **Verification & Test Coverage (`tests/phase74-voice-native-seek.test.ts`, `tests/phase74-media-interaction.test.tsx`, `tests/phase74-performance.test.ts`)**:
+  - Verified 22 test files / 52 tests passing (100% pass rate).
+  - Compiled native Android debug APK: `gradlew.bat assembleDebug` BUILD SUCCESSFUL in 20s.
   - Built web bundle and synced Capacitor assets (`npm run android:sync`).
 
 ## Previous Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK

@@ -43,6 +43,8 @@ export class VoicePlaybackManager {
   private nativeCurrentTime: number = 0;
   private nativeDuration: number = 0;
   private nativeIsPlaying: boolean = false;
+  private pendingNativeSeekRevision: number = 0;
+  private lastConfirmedNativeTime: number = 0;
 
   constructor() {
     this.isNative = NativeMediaBridge.getInstance().isSupported();
@@ -51,6 +53,7 @@ export class VoicePlaybackManager {
       bridge.onStateChange((e) => {
         this.nativeIsPlaying = e.isPlaying;
         this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
+        this.lastConfirmedNativeTime = this.nativeCurrentTime;
         if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
         const status: VoicePlaybackStatus =
           e.state === 'playing' ? 'playing' : e.state === 'paused' ? 'paused' : e.state === 'buffering' ? 'loading' : e.state === 'error' ? 'error' : 'idle';
@@ -62,6 +65,7 @@ export class VoicePlaybackManager {
 
       bridge.onProgress((e) => {
         this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
+        this.lastConfirmedNativeTime = this.nativeCurrentTime;
         if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
         const dur = this.getDuration();
         const cur = this.getCurrentTime();
@@ -307,7 +311,18 @@ export class VoicePlaybackManager {
         if (success) {
           this.currentStatus = 'playing';
           this.nativeIsPlaying = true;
-          if (staged) delete this.stagedSeekPercent[messageId];
+          this.nativeCurrentTime = startMs / 1000;
+          this.lastConfirmedNativeTime = this.nativeCurrentTime;
+          if (typeof staged === 'number') {
+            delete this.stagedSeekPercent[messageId];
+          }
+          const dur = this.getDuration(safeDuration);
+          const cur = this.nativeCurrentTime;
+          const pct = dur > 0 ? (cur / dur) * 100 : 0;
+          this.notifyListeners('playing', pct, cur, dur, messageId);
+          if (this.activeCallbacks?.onProgress) {
+            this.activeCallbacks.onProgress(pct, cur, dur);
+          }
           return;
         }
       } catch (_nativeErr) {
@@ -622,7 +637,10 @@ export class VoicePlaybackManager {
         if (typeof staged === 'number') {
           const dur = this.getDuration();
           const targetTime = (staged / 100) * dur;
-          NativeMediaBridge.getInstance().seekAudio(Math.round(targetTime * 1000));
+          const seekRes = await NativeMediaBridge.getInstance().seekAudio(Math.round(targetTime * 1000));
+          if (seekRes && seekRes.success) {
+            this.nativeCurrentTime = seekRes.currentPositionMs / 1000;
+          }
           delete this.stagedSeekPercent[this.currentPlayingId];
         }
         await NativeMediaBridge.getInstance().resumeAudio();
@@ -667,6 +685,70 @@ export class VoicePlaybackManager {
   }
 
   /**
+   * Dispatches authoritative native seek to ExoPlayer and reconciles confirmed position.
+   */
+  public async seekNative(
+    positionMs: number,
+    targetId?: string,
+    durationSeconds?: number,
+    previousTime?: number
+  ): Promise<void> {
+    const revision = ++this.pendingNativeSeekRevision;
+    const fallbackTime = typeof previousTime === 'number' ? previousTime : this.lastConfirmedNativeTime;
+    const dur = durationSeconds && durationSeconds > 0 ? durationSeconds : this.getDuration() || 1;
+
+    try {
+      const res = await NativeMediaBridge.getInstance().seekAudio(positionMs);
+      if (this.pendingNativeSeekRevision !== revision) return;
+
+      if (res && res.success) {
+        this.nativeCurrentTime = res.currentPositionMs / 1000;
+        this.lastConfirmedNativeTime = this.nativeCurrentTime;
+        const actualPct = dur > 0 ? (this.nativeCurrentTime / dur) * 100 : 0;
+        this.notifyListeners(
+          this.currentPlayingId === targetId ? this.currentStatus : 'idle',
+          actualPct,
+          this.nativeCurrentTime,
+          dur,
+          targetId || undefined
+        );
+        if (this.activeCallbacks?.onProgress) {
+          this.activeCallbacks.onProgress(actualPct, this.nativeCurrentTime, dur);
+        }
+      } else if (res && !res.superseded) {
+        this.nativeCurrentTime = fallbackTime;
+        this.lastConfirmedNativeTime = fallbackTime;
+        const fallbackPct = dur > 0 ? (fallbackTime / dur) * 100 : 0;
+        this.notifyListeners(
+          this.currentPlayingId === targetId ? this.currentStatus : 'idle',
+          fallbackPct,
+          fallbackTime,
+          dur,
+          targetId || undefined
+        );
+        if (this.activeCallbacks?.onProgress) {
+          this.activeCallbacks.onProgress(fallbackPct, fallbackTime, dur);
+        }
+      }
+    } catch (_err) {
+      if (this.pendingNativeSeekRevision !== revision) return;
+      this.nativeCurrentTime = fallbackTime;
+      this.lastConfirmedNativeTime = fallbackTime;
+      const fallbackPct = dur > 0 ? (fallbackTime / dur) * 100 : 0;
+      this.notifyListeners(
+        this.currentPlayingId === targetId ? this.currentStatus : 'idle',
+        fallbackPct,
+        fallbackTime,
+        dur,
+        targetId || undefined
+      );
+      if (this.activeCallbacks?.onProgress) {
+        this.activeCallbacks.onProgress(fallbackPct, fallbackTime, dur);
+      }
+    }
+  }
+
+  /**
    * Seeks playback position to a percentage (0 - 100).
    * Works whether audio is currently playing, paused, or staged before initial play.
    */
@@ -689,8 +771,8 @@ export class VoicePlaybackManager {
     let actualCurrentTime = targetTime;
 
     if (this.isNative) {
+      const prevTime = this.lastConfirmedNativeTime > 0 ? this.lastConfirmedNativeTime : this.nativeCurrentTime;
       this.nativeCurrentTime = targetTime;
-      NativeMediaBridge.getInstance().seekAudio(Math.round(targetTime * 1000));
       this.notifyListeners(
         this.currentPlayingId === targetId ? this.currentStatus : 'idle',
         clampedPercent,
@@ -700,6 +782,10 @@ export class VoicePlaybackManager {
       );
       if (this.activeCallbacks?.onProgress) {
         this.activeCallbacks.onProgress(clampedPercent, targetTime, duration);
+      }
+
+      if (this.currentPlayingId && (this.currentStatus === 'playing' || this.currentStatus === 'paused')) {
+        this.seekNative(Math.round(targetTime * 1000), targetId, duration, prevTime);
       }
       return;
     }

@@ -41,6 +41,24 @@ export interface PlaybackErrorEvent {
   messageId: string;
 }
 
+export interface PlaybackDiagnosticEvent {
+  event: string;
+  opaqueMessageId: string;
+  requestedMs: number;
+  beforeMs: number;
+  afterMs: number;
+  durationMs: number;
+  playbackState: number;
+}
+
+export interface NativeSeekResult {
+  success: boolean;
+  currentPositionMs: number;
+  durationMs: number;
+  messageId?: string;
+  superseded?: boolean;
+}
+
 export interface VeilNativeMediaPluginInterface {
   playAudio(options: {
     url: string;
@@ -53,11 +71,7 @@ export interface VeilNativeMediaPluginInterface {
 
   resumeAudio(): Promise<{ success: boolean }>;
 
-  seekAudio(options: { positionMs: number }): Promise<{
-    success: boolean;
-    currentPositionMs: number;
-    durationMs: number;
-  }>;
+  seekAudio(options: { positionMs: number }): Promise<NativeSeekResult>;
 
   stopAudio(): Promise<{ success: boolean }>;
 
@@ -88,6 +102,11 @@ export interface VeilNativeMediaPluginInterface {
   addListener(
     eventName: 'onPlaybackError',
     listenerFunc: (data: PlaybackErrorEvent) => void
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: 'onPlaybackDiagnostic',
+    listenerFunc: (data: PlaybackDiagnosticEvent) => void
   ): Promise<PluginListenerHandle>;
 }
 
@@ -148,13 +167,13 @@ export class NativeMediaBridge {
     }
   }
 
-  public async seekAudio(positionMs: number): Promise<boolean> {
-    if (!this.isNative) return false;
+  public async seekAudio(positionMs: number): Promise<NativeSeekResult | null> {
+    if (!this.isNative) return null;
     try {
-      await VeilNativeMedia.seekAudio({ positionMs: Math.round(positionMs) });
-      return true;
+      const res = await VeilNativeMedia.seekAudio({ positionMs: Math.round(positionMs) });
+      return res;
     } catch (_err) {
-      return false;
+      return null;
     }
   }
 

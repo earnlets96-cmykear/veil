@@ -20,11 +20,19 @@
 - **Deferred Video Thumbnails**:
   - `MediaImage.tsx` reuses existing server/cached thumbnails instantly (`thumbnailUrl` / `previewUrl`), completely bypassing redundant client-side video canvas extractions.
   - Defers expensive video frame capture to idle time (`requestIdleCallback`) when no preview exists, keeping chat timeline scrolling silky smooth.
+- **Android ExoPlayer Voice Seek Race Repair & Authoritative Synchronization**:
+  - Eliminated startup seek race by switching `VeilNativeMediaPlugin.kt` to ExoPlayer's atomic `setMediaSource(source, clampedStartMs)` + `prepare()` + `playWhenReady = true`.
+  - Authoritative seek synchronization via `onPositionDiscontinuity(reason = DISCONTINUITY_REASON_SEEK)` with immediate progress notification and 350ms safety watchdog.
+  - Exported `NativeSeekResult` in `NativeMediaBridge.ts` exposing confirmed milliseconds.
+  - Implemented async `seekNative` with `lastConfirmedNativeTime` tracking in `voicePlayer.ts`, ensuring seek error fallback safely preserves the last confirmed position.
+  - Implemented monotonic seek revisions (`seekRevisionRef`) and cancelled drag throttle timer on release in `VoiceNoteCard.tsx`, dispatching a single authoritative final seek.
+  - Deduplicated pointer and touch events on Android WebView to prevent double-firing gestures.
+  - Redacted diagnostic telemetry logging opaque short message ID hash without tokens or plaintexts.
 - **Verification Deliverables**:
-  - 23 focused unit and integration tests passing (`phase74-media-interaction`, `phase74-performance`, `phase74-device-media-bridge`, `phase74-gallery-save`, `phase40-media-picker`, `phase41-codec-audit`, `phase44a-ui-layout-and-icons`).
-  - Native Android Gradle compilation: `gradlew.bat compileDebugSources` passed in 31s.
-  - Production web bundle & release manifest: `npm run build` succeeds cleanly in 1.98s (7 release artifacts).
-  - Capacitor Android Sync: `npx cap sync android` completed in 0.174s.
+  - 52 tests passing across 22 test files (`phase74-voice-native-seek`, `phase74-media-interaction`, `phase74-performance`, `phase74-device-media-bridge`, `phase74-gallery-save`, `phase40-media-picker`, `phase41-codec-audit`, `phase44a-ui-layout-and-icons`, `phase57-real-voice-forensic`).
+  - Native Android Gradle assembleDebug: `gradlew.bat assembleDebug` passed in 20s (7.45 MB `app-debug.apk` generated).
+  - Production web bundle & release manifest: `npm run build` succeeds cleanly in 2.10s (7 release artifacts).
+  - Capacitor Android Sync: `npx cap sync android` completed in 0.172s.
   - Ponytail agent plugin (`@dietrichgebert/ponytail` v4.9.0) operational in workspace and global scopes.
 
 ## Previous Verified Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK

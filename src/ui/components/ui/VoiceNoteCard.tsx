@@ -123,10 +123,14 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const seekThrottleTimerRef = useRef<any>(null);
-  const pendingSeekPercentRef = useRef<number | null>(null);
+  const pendingSeekRef = useRef<{ percent: number; revision: number } | null>(null);
+  const seekRevisionRef = useRef<number>(0);
+  const pointerActiveRef = useRef<boolean>(false);
 
   const executeSeek = useCallback(
-    (percent: number) => {
+    (percent: number, revision: number) => {
+      // Ignore if a newer seek revision was already dispatched or committed
+      if (revision < seekRevisionRef.current) return;
       if (onSeek) {
         onSeek(percent);
       } else if (messageId) {
@@ -146,20 +150,23 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
       const targetTime = (percent / 100) * effectiveDuration;
       setLocalCurrentTime(targetTime);
 
-      pendingSeekPercentRef.current = percent;
-
       if (commitImmediately) {
         if (seekThrottleTimerRef.current) {
           clearTimeout(seekThrottleTimerRef.current);
           seekThrottleTimerRef.current = null;
         }
-        executeSeek(percent);
+        pendingSeekRef.current = null;
+        const currentRev = ++seekRevisionRef.current;
+        executeSeek(percent, currentRev);
       } else {
+        const currentRev = ++seekRevisionRef.current;
+        pendingSeekRef.current = { percent, revision: currentRev };
         if (!seekThrottleTimerRef.current) {
           seekThrottleTimerRef.current = setTimeout(() => {
             seekThrottleTimerRef.current = null;
-            if (pendingSeekPercentRef.current !== null) {
-              executeSeek(pendingSeekPercentRef.current);
+            if (pendingSeekRef.current) {
+              const { percent: p, revision: r } = pendingSeekRef.current;
+              executeSeek(p, r);
             }
           }, 80);
         }
@@ -172,6 +179,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
     e.stopPropagation();
     e.preventDefault();
     if (isUploading || isError) return;
+    pointerActiveRef.current = true;
     isScrubbingRef.current = true;
     const target = e.currentTarget;
     try {
@@ -200,6 +208,9 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerUp);
+      setTimeout(() => {
+        pointerActiveRef.current = false;
+      }, 150);
     };
 
     target.addEventListener('pointermove', handlePointerMove);
@@ -211,6 +222,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleTouchStartTrack = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (pointerActiveRef.current) return;
     e.stopPropagation();
     if (isUploading || isError) return;
     isScrubbingRef.current = true;
@@ -220,6 +232,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleTouchMoveTrack = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (pointerActiveRef.current) return;
     e.stopPropagation();
     if (!isScrubbingRef.current) return;
     if (e.touches && e.touches[0]) {
@@ -228,6 +241,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleTouchEndTrack = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (pointerActiveRef.current) return;
     e.stopPropagation();
     isScrubbingRef.current = false;
     if (e.changedTouches && e.changedTouches[0]) {
@@ -236,6 +250,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleClickTrack = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (pointerActiveRef.current || isScrubbingRef.current) return;
     e.stopPropagation();
     if (isUploading || isError) return;
     handleSeekFromClientX(e.clientX, true);

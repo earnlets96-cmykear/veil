@@ -22,6 +22,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Deferred Video Thumbnail Generation (`MediaImage.tsx`)**:
   - Replaced eager video thumbnail generation with instant reuse of existing server/cached thumbnails (`thumbnailUrl` / `previewUrl`).
   - Scheduled client-side video thumbnail canvas extraction to idle time (`requestIdleCallback`) when no preview exists.
+- **Android ExoPlayer Voice Seek Race Repair & Authoritative Synchronization (`VeilNativeMediaPlugin.kt`, `NativeMediaBridge.ts`, `voicePlayer.ts`, `VoiceNoteCard.tsx`)**:
+  - Replaced racy startup sequence (`setMediaSource` -> `prepare` -> `seekTo` -> `play`) with ExoPlayer's atomic `setMediaSource(source, clampedStartMs)` + `prepare()` + `playWhenReady = true`, eliminating playback restart from zero.
+  - Implemented authoritative native seek resolution via ExoPlayer's `Player.Listener.onPositionDiscontinuity(reason = DISCONTINUITY_REASON_SEEK)` with immediate progress notification and 350ms fallback watchdog.
+  - Exported `NativeSeekResult` in `NativeMediaBridge.ts` providing confirmed native milliseconds to the JS playback layer.
+  - Added async `seekNative` reconciliation in `VoicePlaybackManager` (`voicePlayer.ts`) with `lastConfirmedNativeTime` tracking, restoring last confirmed position on seek failure.
+  - Implemented monotonic seek revisions (`seekRevisionRef`) and cancelled outstanding drag throttle on pointer/touch release in `VoiceNoteCard.tsx`, dispatching exactly one authoritative final seek.
+  - Deduplicated pointer, touch, and click handlers on Android WebView to prevent dual-gesture conflict.
+  - Added redacted diagnostic telemetry logging opaque short message ID hash, requested ms, before/after positions, duration, and state without sensitive tokens or URLs.
 - **Ponytail Agent Plugin (`@dietrichgebert/ponytail` v4.9.0)**:
   - Installed lazy senior developer mode plugin to both workspace (`.agents/plugins/ponytail`) and global (`~/.gemini/config/plugins/ponytail`) customization directories.
   - Deployed 6 specialized on-demand skills: `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review`.

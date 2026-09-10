@@ -17,6 +17,7 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import java.security.MessageDigest
 
 @CapacitorPlugin(name = "VeilNativeMedia")
 class VeilNativeMediaPlugin : Plugin() {
@@ -25,8 +26,40 @@ class VeilNativeMediaPlugin : Plugin() {
     private var currentMessageId: String? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var progressRunnable: Runnable? = null
-    private var pendingSeekRunnable: Runnable? = null
+    private var pendingSeekCall: PluginCall? = null
+    private var pendingSeekTargetMs: Long = 0L
+    private var pendingSeekFallbackRunnable: Runnable? = null
     private var isReleased = false
+
+    private fun emitDiagnostic(
+        event: String,
+        msgId: String,
+        requestedMs: Long,
+        beforeMs: Long,
+        afterMs: Long,
+        durationMs: Long,
+        state: Int
+    ) {
+        val opaqueId = if (msgId.isNotEmpty()) {
+            try {
+                val digest = MessageDigest.getInstance("SHA-256").digest(msgId.toByteArray())
+                digest.take(4).joinToString("") { "%02x".format(it) }
+            } catch (_e: Exception) {
+                msgId.takeLast(6)
+            }
+        } else "none"
+
+        val diag = JSObject().apply {
+            put("event", event)
+            put("opaqueMessageId", opaqueId)
+            put("requestedMs", requestedMs)
+            put("beforeMs", beforeMs)
+            put("afterMs", afterMs)
+            put("durationMs", durationMs)
+            put("playbackState", state)
+        }
+        notifyListeners("onPlaybackDiagnostic", diag)
+    }
 
     private fun getOrCreatePlayer(): ExoPlayer {
         if (exoPlayer != null && !isReleased) {
@@ -45,6 +78,52 @@ class VeilNativeMediaPlugin : Plugin() {
         player.setHandleAudioBecomingNoisy(true)
 
         player.addListener(object : Player.Listener {
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                val dur = if (player.duration > 0) player.duration else 0L
+                val confirmedPos = newPosition.positionMs
+                val msgId = currentMessageId ?: ""
+
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                    pendingSeekFallbackRunnable?.let { mainHandler.removeCallbacks(it) }
+                    pendingSeekFallbackRunnable = null
+
+                    val target = pendingSeekTargetMs
+                    val call = pendingSeekCall
+                    pendingSeekCall = null
+
+                    if (call != null) {
+                        val ret = JSObject().apply {
+                            put("success", true)
+                            put("currentPositionMs", confirmedPos)
+                            put("durationMs", dur)
+                            put("messageId", msgId)
+                        }
+                        call.resolve(ret)
+                    }
+
+                    val progressData = JSObject().apply {
+                        put("currentPositionMs", confirmedPos)
+                        put("durationMs", dur)
+                        put("messageId", msgId)
+                    }
+                    notifyListeners("onPlaybackProgress", progressData)
+
+                    emitDiagnostic(
+                        event = "seekDiscontinuityConfirmed",
+                        msgId = msgId,
+                        requestedMs = target,
+                        beforeMs = oldPosition.positionMs,
+                        afterMs = confirmedPos,
+                        durationMs = dur,
+                        state = player.playbackState
+                    )
+                }
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val stateString = when (playbackState) {
                     Player.STATE_IDLE -> "idle"
@@ -153,9 +232,24 @@ class VeilNativeMediaPlugin : Plugin() {
         val authToken = call.getString("authToken")
         val messageId = call.getString("messageId")
         val startPositionMs = call.getDouble("startPositionMs")?.toLong() ?: call.getLong("startPositionMs") ?: 0L
+        val clampedStartMs = if (startPositionMs > 0L) startPositionMs else 0L
 
         mainHandler.post {
             try {
+                // Clear any pending seek from previous playback
+                pendingSeekFallbackRunnable?.let { mainHandler.removeCallbacks(it) }
+                pendingSeekFallbackRunnable = null
+                pendingSeekCall?.let { prevCall ->
+                    prevCall.resolve(JSObject().apply {
+                        put("success", false)
+                        put("superseded", true)
+                        put("currentPositionMs", clampedStartMs)
+                        put("durationMs", 0L)
+                        put("messageId", messageId ?: "")
+                    })
+                }
+                pendingSeekCall = null
+
                 val player = getOrCreatePlayer()
                 currentMessageId = messageId
 
@@ -171,16 +265,25 @@ class VeilNativeMediaPlugin : Plugin() {
                 val mediaItem = MediaItem.fromUri(url)
                 val mediaSource = mediaSourceFactory.createMediaSource(mediaItem)
 
-                player.setMediaSource(mediaSource)
+                // Atomic initial position attachment - avoids race where prepare() starts at 0 before seekTo()
+                player.setMediaSource(mediaSource, clampedStartMs)
                 player.prepare()
-                if (startPositionMs > 0L) {
-                    player.seekTo(startPositionMs)
-                }
-                player.play()
+                player.playWhenReady = true
+
+                emitDiagnostic(
+                    event = "playbackConfigured",
+                    msgId = messageId ?: "",
+                    requestedMs = clampedStartMs,
+                    beforeMs = 0L,
+                    afterMs = clampedStartMs,
+                    durationMs = 0L,
+                    state = player.playbackState
+                )
 
                 val ret = JSObject().apply {
                     put("success", true)
                     put("messageId", messageId ?: "")
+                    put("startPositionMs", clampedStartMs)
                 }
                 call.resolve(ret)
             } catch (e: Exception) {
@@ -217,24 +320,82 @@ class VeilNativeMediaPlugin : Plugin() {
             return
         }
 
-        pendingSeekRunnable?.let { mainHandler.removeCallbacks(it) }
-        pendingSeekRunnable = Runnable {
-            exoPlayer?.let { player ->
-                player.seekTo(positionMs)
-                val ret = JSObject().apply {
-                    put("success", true)
+        mainHandler.post {
+            val player = exoPlayer
+            if (player == null) {
+                call.reject("Player not initialized")
+                return@post
+            }
+
+            val rawDuration = player.duration
+            val maxValidPos = if (rawDuration > 250L) rawDuration - 250L else if (rawDuration > 0L) rawDuration else Long.MAX_VALUE
+            val clampedPositionMs = Math.max(0L, Math.min(positionMs, maxValidPos))
+            val msgId = currentMessageId ?: ""
+            val beforePos = player.currentPosition
+
+            // Cancel and supersede existing pending seek if active
+            pendingSeekFallbackRunnable?.let { mainHandler.removeCallbacks(it) }
+            pendingSeekFallbackRunnable = null
+            pendingSeekCall?.let { prevCall ->
+                val fallbackRet = JSObject().apply {
+                    put("success", false)
+                    put("superseded", true)
                     put("currentPositionMs", player.currentPosition)
-                    put("durationMs", if (player.duration > 0) player.duration else 0L)
+                    put("durationMs", if (rawDuration > 0) rawDuration else 0L)
+                    put("messageId", msgId)
                 }
-                call.resolve(ret)
-            } ?: call.reject("Player not initialized")
+                prevCall.resolve(fallbackRet)
+            }
+
+            pendingSeekCall = call
+            pendingSeekTargetMs = clampedPositionMs
+
+            // Fallback watchdog: if onPositionDiscontinuity doesn't fire within 350ms, resolve authoritatively
+            pendingSeekFallbackRunnable = Runnable {
+                pendingSeekCall?.let { pendingCall ->
+                    val curPos = player.currentPosition
+                    val dur = if (player.duration > 0) player.duration else 0L
+                    val ret = JSObject().apply {
+                        put("success", true)
+                        put("currentPositionMs", curPos)
+                        put("durationMs", dur)
+                        put("messageId", msgId)
+                    }
+                    pendingCall.resolve(ret)
+                    pendingSeekCall = null
+
+                    val progressData = JSObject().apply {
+                        put("currentPositionMs", curPos)
+                        put("durationMs", dur)
+                        put("messageId", msgId)
+                    }
+                    notifyListeners("onPlaybackProgress", progressData)
+
+                    emitDiagnostic(
+                        event = "seekWatchdogResolved",
+                        msgId = msgId,
+                        requestedMs = clampedPositionMs,
+                        beforeMs = beforePos,
+                        afterMs = curPos,
+                        durationMs = dur,
+                        state = player.playbackState
+                    )
+                }
+            }
+            mainHandler.postDelayed(pendingSeekFallbackRunnable!!, 350L)
+
+            player.seekTo(clampedPositionMs)
         }
-        mainHandler.post(pendingSeekRunnable!!)
     }
 
     @PluginMethod
     fun stopAudio(call: PluginCall) {
         mainHandler.post {
+            pendingSeekFallbackRunnable?.let { mainHandler.removeCallbacks(it) }
+            pendingSeekFallbackRunnable = null
+            pendingSeekCall = null
+            pendingSeekTargetMs = 0L
+
             stopProgressUpdates()
             exoPlayer?.stop()
             currentMessageId = null
@@ -259,6 +420,11 @@ class VeilNativeMediaPlugin : Plugin() {
     @PluginMethod
     fun releaseAudio(call: PluginCall) {
         mainHandler.post {
+            pendingSeekFallbackRunnable?.let { mainHandler.removeCallbacks(it) }
+            pendingSeekFallbackRunnable = null
+            pendingSeekCall = null
+            pendingSeekTargetMs = 0L
+
             stopProgressUpdates()
             exoPlayer?.release()
             exoPlayer = null
@@ -271,6 +437,10 @@ class VeilNativeMediaPlugin : Plugin() {
     override fun handleOnDestroy() {
         super.handleOnDestroy()
         mainHandler.post {
+            pendingSeekFallbackRunnable?.let { mainHandler.removeCallbacks(it) }
+            pendingSeekFallbackRunnable = null
+            pendingSeekCall = null
+
             stopProgressUpdates()
             exoPlayer?.release()
             exoPlayer = null
