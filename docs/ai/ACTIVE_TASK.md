@@ -1,6 +1,25 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
+## Active Phase: PHASE 75 — VOICE NOTE RUNTIME CRASH REPAIR & COMPONENT REF STABILIZATION
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (5/5 voice test suites passing, Android assembleDebug APK built successfully, release build verified)
+- **Branch**: `main`
+
+### Phase 75 Tasks Completed:
+- [x] **VoiceNoteCard Scope & Ref Fix (`VoiceNoteCard.tsx`)**:
+  - Eliminated runtime `ReferenceError: pendingSeekPercentRef is not defined` crash when opening chats with voice notes.
+  - Consolidated all component refs (`isScrubbingRef`, `trackRef`, `seekThrottleTimerRef`, `pendingSeekRef`, `seekRevisionRef`, `pointerActiveRef`, `prevPropProgressRef`, `prevPropTimeRef`) at the top of `VoiceNoteCardComponent` prior to `useEffect` hooks.
+  - Corrected prop synchronization guard on line 95 to verify `pendingSeekRef.current === null`.
+- [x] **TypeScript Strict Parameter Compliance (`voicePlayer.ts`)**:
+  - Corrected `seekNative` invocation on line 788 to pass `targetId || undefined`, resolving TS2345 parameter type error.
+- [x] **Regression Test Suite (`tests/phase75-voicenote-runtime.test.tsx`)**:
+  - Implemented 4 regression tests verifying absence of orphan/undeclared identifiers in source, proper lexical ref ordering, render error resistance across diverse playback states, and simulated prop synchronization logic.
+- [x] **Build & Package Verification**:
+  - All 5 voice test suites passed (19 tests total).
+  - Production web bundle compiled in 2.35s (`npm run build`).
+  - Synced assets with Capacitor Android (`npx cap sync android`).
+  - Native Android debug APK assembled in 59s (`cd android && gradlew.bat assembleDebug`, 7,453,507 bytes).
+
+## Previous Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (23/23 focused tests, Android Gradle compile passed, release build passed)
 - **Branch**: `main`
 

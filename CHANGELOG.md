@@ -2,6 +2,21 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase75-voicenote-ref-stabilization] - 2026-09-11
+
+### Voice Note Component Ref Stabilization & Runtime Crash Repair (Phase 75)
+- **VoiceNoteCard Scope & Ref Declaration Consolidation**:
+  - Eliminated runtime `ReferenceError: pendingSeekPercentRef is not defined` crash when opening chats with voice notes by replacing the orphan reference with `pendingSeekRef.current === null`.
+  - Consolidated all 8 internal component refs (`isScrubbingRef`, `trackRef`, `seekThrottleTimerRef`, `pendingSeekRef`, `seekRevisionRef`, `pointerActiveRef`, `prevPropProgressRef`, `prevPropTimeRef`) at the top of `VoiceNoteCardComponent` before hook execution, preventing TDZ/closure issues.
+- **Strict Parameter Typing in Voice Player**:
+  - Updated `seekNative` invocation on line 788 of `src/attachments/voicePlayer.ts` to pass `targetId || undefined`, satisfying strict TypeScript parameter checks.
+- **Automated Regression Coverage**:
+  - Added `tests/phase75-voicenote-runtime.test.tsx` verifying absence of undeclared identifiers in source, proper lexical ref ordering, and error-free rendering across varied playback states.
+- **Build & Package Artifacts**:
+  - Verified 19/19 passing tests across all 5 voice test suites.
+  - Recompiled web production bundle in 2.35s and synced Capacitor Android assets.
+  - Assembled native Android debug APK in 59s (`app-debug.apk`, 7.45 MB).
+
 ## [1.0.0-phase72-audio-seeking-and-playback-stabilization] - 2026-09-09
 
 ### Audio Seeking & Playback Runtime Forensic Stabilization (Phase 72)

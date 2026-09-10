@@ -59,6 +59,12 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const [localDuration, setLocalDuration] = useState(durationSeconds);
   const isScrubbingRef = useRef(false);
   const trackRef = useRef<HTMLDivElement>(null);
+  const seekThrottleTimerRef = useRef<any>(null);
+  const pendingSeekRef = useRef<{ percent: number; revision: number } | null>(null);
+  const seekRevisionRef = useRef<number>(0);
+  const pointerActiveRef = useRef<boolean>(false);
+  const prevPropProgressRef = useRef(propProgressPercent);
+  const prevPropTimeRef = useRef(propCurrentTime);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const SPEED_OPTIONS = [1, 1.5, 2];
 
@@ -84,15 +90,13 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   }, [messageId]);
 
   // Sync prop changes only when prop values genuinely change from parent
-  const prevPropProgressRef = useRef(propProgressPercent);
-  const prevPropTimeRef = useRef(propCurrentTime);
   useEffect(() => {
     const progressChanged = prevPropProgressRef.current !== propProgressPercent;
     const timeChanged = prevPropTimeRef.current !== propCurrentTime;
     prevPropProgressRef.current = propProgressPercent;
     prevPropTimeRef.current = propCurrentTime;
 
-    if (!isScrubbingRef.current && pendingSeekPercentRef.current === null && (progressChanged || timeChanged)) {
+    if (!isScrubbingRef.current && pendingSeekRef.current === null && (progressChanged || timeChanged)) {
       setLocalProgress(propProgressPercent);
       setLocalCurrentTime(propCurrentTime);
     }
@@ -121,11 +125,6 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const stopAllEvents = (e: React.SyntheticEvent) => {
     e.stopPropagation();
   };
-
-  const seekThrottleTimerRef = useRef<any>(null);
-  const pendingSeekRef = useRef<{ percent: number; revision: number } | null>(null);
-  const seekRevisionRef = useRef<number>(0);
-  const pointerActiveRef = useRef<boolean>(false);
 
   const executeSeek = useCallback(
     (percent: number, revision: number) => {

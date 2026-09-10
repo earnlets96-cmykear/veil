@@ -785,7 +785,7 @@ export class VoicePlaybackManager {
       }
 
       if (this.currentPlayingId && (this.currentStatus === 'playing' || this.currentStatus === 'paused')) {
-        this.seekNative(Math.round(targetTime * 1000), targetId, duration, prevTime);
+        this.seekNative(Math.round(targetTime * 1000), targetId || undefined, duration, prevTime);
       }
       return;
     }

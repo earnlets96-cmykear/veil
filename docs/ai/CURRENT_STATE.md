@@ -1,6 +1,22 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
+## Current Verified Phase: PHASE 75 — VOICE NOTE RUNTIME CRASH REPAIR & COMPONENT REF STABILIZATION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — 5/5 VOICE TEST SUITES, 19/19 TESTS, ANDROID GRADLE ASSEMBLE SUCCESS, RELEASE BUILD SUCCESS)**
+- **Branch**: `main`
+- **VoiceNoteCard Scope & Ref Fix**:
+  - Eliminated runtime `ReferenceError: pendingSeekPercentRef is not defined` crash that prevented chat views containing voice notes from opening.
+  - Replaced stale `pendingSeekPercentRef.current === null` guard with authoritative `pendingSeekRef.current === null`.
+  - Consolidated all 8 component refs (`isScrubbingRef`, `trackRef`, `seekThrottleTimerRef`, `pendingSeekRef`, `seekRevisionRef`, `pointerActiveRef`, `prevPropProgressRef`, `prevPropTimeRef`) at the top of `VoiceNoteCardComponent` prior to `useEffect` hooks, guaranteeing proper lexical ordering and preventing TDZ/closure issues.
+- **TypeScript Parameter Strictness**:
+  - In `voicePlayer.ts`, updated line 788 to invoke `this.seekNative` with `targetId || undefined`, completely satisfying TypeScript parameter compatibility without modifying runtime behavior.
+- **Verification Deliverables**:
+  - New dedicated regression test suite: `tests/phase75-voicenote-runtime.test.tsx` (4/4 tests pass).
+  - Voice test suites: 19/19 tests passing across 5 test suites (`phase75-voicenote-runtime`, `phase74-voice-native-seek`, `phase70-voice-seeking-swipe-media-ui`, `phase39-audio-seeking`, `phase37-voice-playback`).
+  - Production Web Bundle: `npm run build` succeeds cleanly in 2.35s (7 release artifacts).
+  - Capacitor Android Sync: `npx cap sync android` completed in 0.193s.
+  - Native Android APK Build: `gradlew.bat assembleDebug` BUILD SUCCESSFUL in 59s (`app-debug.apk`, 7,453,507 bytes).
+
+## Previous Verified Phase: PHASE 74 — NATIVE MEDIA ATTACHMENTS, RECENT SELECTION SYNC & PERFORMANCE OPTIMIZATION
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — 23/23 FOCUSED TESTS, ANDROID GRADLE SUCCESS, RELEASE BUILD SUCCESS)**
 - **Branch**: `main`
 - **Native Device Media & Permissions**:
