@@ -1,6 +1,15 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
+## Current Verified Phase: PHASE 74 — PONYTAIL AGENT PLUGIN INSTALLATION
+- **Status**: **VERIFIED & OPERATIONAL**
+- **Branch**: `main`
+- **Installed Components**:
+  - `@dietrichgebert/ponytail` v4.9.0 deployed to workspace (`.agents/plugins/ponytail`) and global (`~/.gemini/config/plugins/ponytail`) customization roots.
+  - Skills verified: `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review`.
+  - Rules verified: `rules/ponytail.md` active.
+  - Manifest verified: `plugin.json` valid JSON matching Antigravity plugin manifest specification.
+
+## Previous Verified Phase: PHASE 73 — MOBILE NAVIGATION GESTURES & SEEK-COMPLETION PLAYBACK
 - **Status**: **FOCUSED VERIFICATION COMPLETE**
 - **Branch**: `main`
 - **Audio playback**: staged web voice playback now waits for `canplay`, applies the requested position, waits for `seeked`, and only then invokes `play()`. Native playback continues to receive its start position through the existing Media3 bridge.

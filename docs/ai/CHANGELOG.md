@@ -4,6 +4,14 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 74] - 2026-09-10
+
+### Added
+- **Ponytail Agent Plugin (`@dietrichgebert/ponytail` v4.9.0)**:
+  - Installed lazy senior developer mode plugin to both workspace (`.agents/plugins/ponytail`) and global (`~/.gemini/config/plugins/ponytail`) customization directories.
+  - Deployed 6 specialized on-demand skills: `ponytail`, `ponytail-audit`, `ponytail-debt`, `ponytail-gain`, `ponytail-help`, `ponytail-review`.
+  - Added Ponytail rules (`rules/ponytail.md`) enforcing YAGNI, standard library first, native platform features first, and minimal-diff solutions.
+
 ## [Phase 73] - 2026-09-10
 
 ### Fixed & Added
