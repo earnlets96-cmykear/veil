@@ -7,11 +7,14 @@
 ### Phase 83 Tasks Completed:
 - [x] **Telegram Sticker Engine & Storage Service (`src/media/telegramStickerService.ts`)**:
   - Built `TelegramStickerService` with IndexedDB persistence (`veil_stickers_db`), memory fallback, and link parser supporting `t.me/addstickers/<pack>`, `tg://addstickers?set=<pack>`, `tg:addstickers?set=<pack>`, `telegram.me/addstickers/<pack>`, and bare identifiers.
-  - Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Telegram Animals`, `Reactions & Memes`) as SVG data URIs, enabling instant offline sticker usage on first launch.
+  - Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Cute Animals`, `Classic Memes`) as SVG data URIs, enabling instant offline sticker usage on first launch.
   - Implemented recent stickers caching with deduplication, FIFO limit (24), and localStorage + memory fallback.
   - Strictly encoded all sticker emojis via Unicode escape sequences (`\u{...}`) to ensure 100% compliance with the strict zero-literal-Unicode icon audit (`tests/phase44a-ui-layout-and-icons.test.tsx`).
+  - Added `getFeaturedPacks()` curated list for 1-tap installation of popular packs (*Cute Animals*, *Classic Memes*, *Spotty Dog*, *Hot Cherry*, *Pepe The Frog*, *Cat Vibes*).
+  - Integrated live scraper gateway (`https://stickers.wiki/telegram/<packName>/`) to resolve real Telegram WebP stickers without needing a bot token, with optional fallback to custom Telegram bot token or vector pack generator.
 - [x] **Dark Glass Add Sticker Pack Modal (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
   - Created dark glass modal (`backdrop-filter: blur(20px); background: rgba(22, 27, 34, 0.96)`) matching VEIL design tokens.
+  - Added popular Telegram pack 1-tap chips with instant preview loading and resolution.
   - Includes Telegram link input with instantaneous pack resolution, 8-sticker preview grid, and one-click pack installer.
 - [x] **Emoji Drawer Stickers Tab Integration (`src/ui/components/ui/EmojiDrawer.tsx`)**:
   - Added sticker pack carousel bar matching category bar aesthetics: recent icon button (`\u{1F552}`), pack thumbnail buttons with active accent highlighter, and `+ Add` button triggering `AddStickerPackModal`.
@@ -19,18 +22,20 @@
   - Unified drawer search to dynamically filter stickers across installed packs by emoji or keyword.
   - Integrated `onMouseDown={(e) => e.preventDefault()}` on all sticker grid and pack navigation buttons to suppress Android soft keyboard popups.
   - Hidden floating backspace button in stickers mode (active only in emoji mode).
-- [x] **Composer Sticker Dispatch (`src/ui/components/MessageComposer.tsx`)**:
-  - Implemented `handleSelectSticker`: converts sticker data URI or URL into a `.sticker.webp` file attachment with `isSticker: true`.
+- [x] **Composer Sticker Dispatch & MIME Types (`src/ui/components/MessageComposer.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Implemented `handleSelectSticker`: detects SVG data URIs vs WebP images, correctly setting MIME type (`image/svg+xml` or `image/webp`) and filename (`.sticker.svg` or `.sticker.webp`) with `isSticker: true`.
+  - In `AppState.tsx`, primed `MediaCache` with typed `DecryptedMedia` stubs for stickers so they render instantly without attachment card fallback.
   - Dispatches sticker through end-to-end encrypted Double Ratchet channel.
 - [x] **Frameless In-Chat Sticker Rendering (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
-  - Detected sticker messages (`msg.isSticker || msg.attachment?.name?.endsWith('.sticker.webp')`).
-  - Added `.veil-bubble-wrapper-sticker` class stripping standard colored bubble background, borders, and capsules.
-  - Created `.veil-sticker-bubble-container` rendering 180x180 transparent sticker floating directly on wallpaper with subtle drop-shadow and floating timestamp badge.
+  - Detected sticker messages (`msg.isSticker || isStickerAttachment(msg.attachment)`).
+  - Fixed `<AttachmentCard>` rendering bug by adding `!isSticker` to attachment card condition.
+  - Fixed bubble wrapper styling by applying `.veil-bubble-wrapper-sticker` to eliminate green background, border capsules, and box-shadow.
+  - Created `.veil-sticker-bubble-container` utilizing `<MediaImage>` with 180×180 contain geometry, subtle drop shadow, and floating translucent timestamp badge.
 - [x] **Test Suites & Verification**:
-  - Created dedicated test suite `tests/phase83-telegram-stickers.test.tsx` (12 tests passing).
-  - All test suites passing (39/39 in chat/UI regression suite, zero icon audit failures).
+  - Created and expanded test suite `tests/phase83-telegram-stickers.test.tsx` (16 tests passing).
+  - Full project test suite passing: 392 test files, 1250 tests passed, 0 failures.
   - Production web bundle compiled (`npm run build`).
-  - Capacitor Android synced and native debug APK compiled (`gradlew.bat assembleDebug`, 7.47 MB).
+  - Capacitor Android synced and native debug APK compiled (`gradlew.bat assembleDebug`, 7.48 MB).
 
 ## Previous Phase: PHASE 82 — CHAT UX, UNIVERSAL REACTIONS, AUDIO PLAYER & EMOJI DRAWER OVERHAUL
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero icon audit violations)

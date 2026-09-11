@@ -480,6 +480,20 @@ class TelegramStickerService {
   }
 
   /**
+   * Returns a list of curated popular Telegram sticker packs for 1-tap installation
+   */
+  public getFeaturedPacks(): Array<{ id: string; name: string; title: string; description: string }> {
+    return [
+      { id: 'animals', name: 'Animals', title: 'Cute Animals', description: 'Telegram Animals (68 stickers)' },
+      { id: 'memes', name: 'memes', title: 'Classic Memes', description: 'Popular reactions & memes (54 stickers)' },
+      { id: 'spotty', name: 'spotty', title: 'Spotty Dog', description: 'Classic vector mascot (24 stickers)' },
+      { id: 'hot_cherry', name: 'hot_cherry', title: 'Hot Cherry', description: 'Expressive cherry reactions' },
+      { id: 'pepe', name: 'pepe', title: 'Pepe The Frog', description: 'Classic Internet meme frog' },
+      { id: 'cat_vibes', name: 'cat_vibes', title: 'Cat Vibes', description: 'Cute playful cats' },
+    ];
+  }
+
+  /**
    * Fetches a Telegram sticker pack manifest
    */
   public async fetchTelegramPack(packInput: string): Promise<StickerPack> {
@@ -488,51 +502,101 @@ class TelegramStickerService {
       throw new Error('Invalid Telegram sticker link or pack name');
     }
 
-    // Check if it matches an existing pack
-    const existing = this.inMemoryPacks.get(packName.toLowerCase());
+    const lowerId = packName.toLowerCase();
+
+    // 1. Check built-in packs first
+    const builtIn = BUILT_IN_STICKER_PACKS.find((p) => p.id === lowerId || p.name.toLowerCase() === lowerId);
+    if (builtIn) {
+      return builtIn;
+    }
+
+    // 2. Check in-memory or installed cache
+    const existing = this.inMemoryPacks.get(lowerId);
     if (existing) {
       return existing;
     }
 
-    try {
-      const res = await fetch(`https://api.telegram.org/bot7000000000:AAFakePlaceholder/getStickerSet?name=${encodeURIComponent(packName)}`, {
-        signal: AbortSignal.timeout(6000),
-      }).catch(() => null);
+    // 3. Check custom Telegram bot token if configured
+    const botToken = (typeof window !== 'undefined' && localStorage.getItem('veil:telegram:bot_token')) || '';
+    if (botToken) {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/getStickerSet?name=${encodeURIComponent(packName)}`, {
+          signal: AbortSignal.timeout(8000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.result) {
+            const result = data.result;
+            const stickers: StickerItem[] = (result.stickers || []).slice(0, 100).map((s: any, idx: number) => ({
+              id: s.file_unique_id || s.file_id || `${lowerId}_${idx}`,
+              packId: lowerId,
+              emoji: s.emoji || '\u{2B50}',
+              url: `https://api.telegram.org/file/bot${botToken}/${s.file_path || s.file_id}`,
+              width: s.width || 512,
+              height: s.height || 512,
+            }));
 
-      if (res && res.ok) {
-        const data = await res.json();
-        if (data.ok && data.result) {
-          const result = data.result;
-          const stickers: StickerItem[] = (result.stickers || []).slice(0, 50).map((s: any, idx: number) => ({
-            id: s.file_id || `${packName}_${idx}`,
-            packId: packName,
-            emoji: s.emoji || '\u{2B50}',
-            url: `https://api.telegram.org/file/bot7000000000:AAFakePlaceholder/${s.file_path || s.file_id}`,
-            width: s.width || 512,
-            height: s.height || 512,
+            if (stickers.length > 0) {
+              return {
+                id: lowerId,
+                name: packName,
+                title: result.title || packName,
+                thumbnailUrl: stickers[0].url,
+                stickers,
+                installedAt: Date.now(),
+              };
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // 4. Live Scraper Gateway (stickers.wiki)
+    try {
+      const wikiRes = await fetch(`https://stickers.wiki/telegram/${encodeURIComponent(packName)}/`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (wikiRes.ok) {
+        const html = await wikiRes.text();
+        const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+        const rawTitle = titleMatch ? titleMatch[1] : '';
+        const title = rawTitle
+          .replace(/ - Sticker pack for Telegram.*/i, '')
+          .replace(/ - Stickers Wiki.*/i, '')
+          .trim() || packName.replace(/_/g, ' ');
+
+        const matches = Array.from(
+          html.matchAll(/https:\/\/assets\.stickers\.wiki\/img\/([a-f0-9]+)\.webp/g)
+        ).map((m) => m[0]);
+
+        const uniqueUrls = Array.from(new Set(matches));
+        if (uniqueUrls.length > 0) {
+          const stickers: StickerItem[] = uniqueUrls.slice(0, 80).map((url, idx) => ({
+            id: `${lowerId}_${idx}`,
+            packId: lowerId,
+            emoji: '\u{1F31F}',
+            url,
+            width: 512,
+            height: 512,
           }));
 
-          const pack: StickerPack = {
-            id: packName.toLowerCase(),
+          return {
+            id: lowerId,
             name: packName,
-            title: result.title || packName,
-            thumbnailUrl: stickers[0]?.url || '',
+            title: title || packName,
+            thumbnailUrl: stickers[0].url,
             stickers,
             installedAt: Date.now(),
           };
-
-          return pack;
         }
       }
-    } catch {
-      // Fall through to generated preview pack
-    }
+    } catch {}
 
-    // High-res vector pack synthesis based on packName so user can preview and install
+    // 5. Fallback vector pack generation for offline/custom names
     const generatedStickers: StickerItem[] = [
       {
-        id: `${packName}_1`,
-        packId: packName,
+        id: `${lowerId}_1`,
+        packId: lowerId,
         emoji: '\u{1F389}',
         width: 512,
         height: 512,
@@ -544,8 +608,8 @@ class TelegramStickerService {
         `),
       },
       {
-        id: `${packName}_2`,
-        packId: packName,
+        id: `${lowerId}_2`,
+        packId: lowerId,
         emoji: '\u{1F44D}',
         width: 512,
         height: 512,
@@ -557,8 +621,8 @@ class TelegramStickerService {
         `),
       },
       {
-        id: `${packName}_3`,
-        packId: packName,
+        id: `${lowerId}_3`,
+        packId: lowerId,
         emoji: '\u{2764}\u{FE0F}',
         width: 512,
         height: 512,
@@ -569,8 +633,8 @@ class TelegramStickerService {
         `),
       },
       {
-        id: `${packName}_4`,
-        packId: packName,
+        id: `${lowerId}_4`,
+        packId: lowerId,
         emoji: '\u{1F525}',
         width: 512,
         height: 512,
@@ -583,7 +647,7 @@ class TelegramStickerService {
     ];
 
     const fallbackPack: StickerPack = {
-      id: packName.toLowerCase(),
+      id: lowerId,
       name: packName,
       title: packName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
       thumbnailUrl: generatedStickers[0].url,

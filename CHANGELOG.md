@@ -7,11 +7,14 @@ All notable changes to the VEIL project are documented in this file.
 ### Telegram Sticker Packs & Frameless Chat UX (Phase 83)
 - **Telegram Sticker Engine & Storage Service (`src/media/telegramStickerService.ts`)**:
   - Built `TelegramStickerService` with IndexedDB persistence (`veil_stickers_db`), memory fallback, and link parser supporting `t.me/addstickers/<pack>`, `tg://addstickers?set=<pack>`, `tg:addstickers?set=<pack>`, `telegram.me/addstickers/<pack>`, and bare identifiers.
-  - Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Telegram Animals`, `Reactions & Memes`) as SVG data URIs for instant offline sticker usage.
+  - Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Cute Animals`, `Classic Memes`) as SVG data URIs for instant offline sticker usage.
+  - Added `getFeaturedPacks()` curated list for 1-tap installation of popular packs (*Cute Animals*, *Classic Memes*, *Spotty Dog*, *Hot Cherry*, *Pepe The Frog*, *Cat Vibes*).
+  - Integrated public live scraper gateway (`https://stickers.wiki/telegram/<packName>/`) to resolve real Telegram WebP stickers without requiring a bot token, with fallbacks to custom bot tokens and synthetic vector packs.
   - Implemented recent stickers caching with deduplication, FIFO limit (24), and localStorage + memory fallback.
   - Strictly formatted all sticker emojis via Unicode escape sequences (`\u{...}`) to ensure 100% compliance with `tests/phase44a-ui-layout-and-icons.test.tsx`.
 - **Dark Glass Add Sticker Pack Modal (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
   - Created dark glass modal (`backdrop-filter: blur(20px); background: rgba(22, 27, 34, 0.96)`) matching VEIL design tokens.
+  - Added popular Telegram pack 1-tap chips with instant preview loading and resolution.
   - Features Telegram link input, instantaneous pack resolution, 8-sticker preview grid, and one-click pack installer.
 - **Emoji Drawer Stickers Tab Integration (`src/ui/components/ui/EmojiDrawer.tsx`)**:
   - Added sticker pack carousel bar matching category bar aesthetics: recent icon button (`\u{1F552}`), pack thumbnail buttons with active accent highlighter, and `+ Add` button.
@@ -19,11 +22,14 @@ All notable changes to the VEIL project are documented in this file.
   - Search input dynamically filters stickers across installed packs by emoji or keyword.
   - Suppressed mobile soft keyboard popups via `onMouseDown={(e) => e.preventDefault()}` on all sticker grid and pack navigation buttons.
   - Hidden floating backspace button in stickers mode (active only in emoji mode).
-- **Composer Sticker Dispatch (`src/ui/components/MessageComposer.tsx`)**:
-  - Implemented `handleSelectSticker`: converts sticker data URI or URL into a `.sticker.webp` file attachment with `isSticker: true` sent via Double Ratchet.
+- **Composer Sticker Dispatch & MIME Accuracy (`src/ui/components/MessageComposer.tsx`, `src/ui/app/AppState.tsx`)**:
+  - Implemented `handleSelectSticker`: detects SVG data URIs vs WebP images, correctly setting MIME type (`image/svg+xml` or `image/webp`) and filename (`.sticker.svg` or `.sticker.webp`) with `isSticker: true`.
+  - In `AppState.tsx`, primed `MediaCache` with typed `DecryptedMedia` stubs for stickers so they render instantly without attachment card fallback.
+  - Dispatches sticker through end-to-end encrypted Double Ratchet channel.
 - **Frameless In-Chat Sticker Rendering (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Fixed `<AttachmentCard>` rendering bug by adding `!isSticker` to attachment card condition.
   - Stripped standard message bubble chrome using `.veil-bubble-wrapper-sticker` (`background: transparent; border: none; box-shadow: none; padding: 0`).
-  - Created `.veil-sticker-bubble-container` rendering 180x180 transparent sticker floating on wallpaper with subtle drop-shadow and floating timestamp badge.
+  - Created `.veil-sticker-bubble-container` utilizing `<MediaImage>` with 180×180 contain geometry, subtle drop-shadow, and floating translucent timestamp badge.
 
 ## [1.0.0-phase82-universal-reactions-and-chat-ux] - 2026-09-11
 

@@ -471,22 +471,11 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           {/* Frameless Telegram Sticker Display */}
           {!isGrouped && isSticker && msg.attachment && (
             <div className="veil-sticker-bubble-container" style={{ position: 'relative', display: 'inline-block' }}>
-              <img
-                src={msg.attachment.localPreviewUrl || msg.attachment.previewUrl || ''}
+              <MediaImage
+                attachment={msg.attachment}
+                onClick={handleMediaClick}
                 alt={msg.attachment.name || 'Sticker'}
                 className="veil-message-sticker-img"
-                loading="lazy"
-                onClick={handleMediaClick}
-                style={{
-                  width: '180px',
-                  height: '180px',
-                  maxWidth: '180px',
-                  maxHeight: '180px',
-                  objectFit: 'contain',
-                  cursor: 'pointer',
-                  display: 'block',
-                  filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.25))',
-                }}
               />
               <div
                 className="veil-media-meta-overlay"
@@ -593,7 +582,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           )}
 
           {/* Standard File Attachment Card */}
-          {!isGrouped && msg.attachment && !isMedia && !isAudioAttachment && (
+          {!isGrouped && msg.attachment && !isMedia && !isAudioAttachment && !isSticker && (
             <AttachmentCard
               name={msg.attachment.name}
               sizeBytes={msg.attachment.sizeBytes}
@@ -612,7 +601,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           )}
 
           {/* Caption for Audio or File Attachment if present */}
-          {!isGrouped && msg.attachment && (isAudioAttachment || !isMedia) && msg.text && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
+          {!isGrouped && msg.attachment && (isAudioAttachment || !isMedia) && !isSticker && msg.text && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
             <div className="veil-media-caption-text" style={{ padding: '4px 10px 6px' }}>
               {msg.text}
             </div>

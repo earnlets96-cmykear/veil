@@ -3587,20 +3587,46 @@
   margin: 2px 0;
 }
 
-.veil-message-sticker-img {
-  width: 180px;
-  height: 180px;
-  max-width: 180px;
-  max-height: 180px;
-  object-fit: contain;
+.veil-sticker-bubble-container .veil-media-thumbnail-img,
+.veil-message-sticker-img .veil-media-thumbnail-img,
+.veil-message-sticker-img img,
+img.veil-message-sticker-img {
+  width: 180px !important;
+  height: 180px !important;
+  max-width: 180px !important;
+  max-height: 180px !important;
+  object-fit: contain !important;
+  background: transparent !important;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35)) !important;
   cursor: pointer;
   display: block;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
   transition: transform 0.15s ease;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
+.veil-sticker-bubble-container .veil-media-thumbnail-img:hover,
 .veil-message-sticker-img:hover {
-  transform: scale(1.03);
+  transform: scale(1.04);
+}
+
+.veil-sticker-bubble-container .veil-media-thumbnail-container,
+.veil-sticker-bubble-container .veil-media-image-container,
+.veil-message-sticker-img {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: none !important;
+  overflow: visible !important;
+  width: 180px !important;
+  height: 180px !important;
+  max-width: 180px !important;
+  max-height: 180px !important;
+}
+
+.veil-sticker-bubble-container .veil-media-skeleton-pulse {
+  width: 180px;
+  height: 180px;
+  border-radius: 16px;
 }
 
 /* Add Telegram Sticker Pack Modal */

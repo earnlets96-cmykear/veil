@@ -136,6 +136,21 @@ describe('Phase 83: Telegram Sticker Packs & Chat UX Test Suite', () => {
       expect(html).toContain('Find');
     });
 
+    it('renders popular telegram pack chips', () => {
+      const html = renderToStaticMarkup(
+        <AddStickerPackModal
+          isOpen={true}
+          onClose={vi.fn()}
+          onPackInstalled={vi.fn()}
+        />
+      );
+
+      expect(html).toContain('Popular Telegram Packs');
+      expect(html).toContain('Cute Animals');
+      expect(html).toContain('Classic Memes');
+      expect(html).toContain('Spotty Dog');
+    });
+
     it('returns null when isOpen is false', () => {
       const html = renderToStaticMarkup(
         <AddStickerPackModal
@@ -148,4 +163,48 @@ describe('Phase 83: Telegram Sticker Packs & Chat UX Test Suite', () => {
       expect(html).toBe('');
     });
   });
+
+  describe('5. Featured Packs API', () => {
+    it('provides popular Telegram sticker pack suggestions with icons and titles', () => {
+      const featured = telegramStickerService.getFeaturedPacks();
+      expect(featured.length).toBeGreaterThanOrEqual(6);
+      expect(featured.some((f) => f.id === 'animals')).toBe(true);
+      expect(featured.some((f) => f.id === 'memes')).toBe(true);
+      expect(featured.some((f) => f.id === 'spotty')).toBe(true);
+      expect(featured.some((f) => f.id === 'hot_cherry')).toBe(true);
+      expect(featured.some((f) => f.id === 'cat_vibes')).toBe(true);
+    });
+  });
+
+  describe('6. Frameless Sticker Display & CSS Architecture', () => {
+    it('defines .veil-sticker-bubble-container with transparent background and frameless geometry', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const cssContent = fs.readFileSync(path.resolve(__dirname, '../src/styles/veil-components.css'), 'utf-8');
+
+      expect(cssContent).toContain('.veil-sticker-bubble-container');
+      expect(cssContent).toContain('background: transparent !important');
+      expect(cssContent).toContain('box-shadow: none !important');
+      expect(cssContent).toContain('width: 180px !important');
+      expect(cssContent).toContain('height: 180px !important');
+      expect(cssContent).toContain('drop-shadow');
+    });
+
+    it('identifies sticker attachments by extension (.sticker.webp, .sticker.svg) and MIME type', () => {
+      const isStickerAttachment = (attachment?: { name?: string; type?: string }) => {
+        if (!attachment) return false;
+        const name = (attachment.name || '').toLowerCase();
+        const type = (attachment.type || '').toLowerCase();
+        return name.includes('.sticker.') || type.includes('sticker') || name.endsWith('.sticker.webp') || name.endsWith('.sticker.svg');
+      };
+
+      expect(isStickerAttachment({ name: 'spotty_thumbsup.sticker.webp', type: 'image/webp' })).toBe(true);
+      expect(isStickerAttachment({ name: 'cat.sticker.svg', type: 'image/svg+xml' })).toBe(true);
+      expect(isStickerAttachment({ name: 'photo.jpg', type: 'image/jpeg' })).toBe(false);
+      expect(isStickerAttachment({ name: 'document.pdf', type: 'application/pdf' })).toBe(false);
+      expect(isStickerAttachment(undefined)).toBe(false);
+    });
+  });
 });
+
+

@@ -101,7 +101,7 @@ import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { randomBytes, bytesToBase64, bytesToHex } from '../../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha256.js';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
-import { MediaCache } from '../utils/mediaCache.ts';
+import { MediaCache, DecryptedMedia } from '../utils/mediaCache.ts';
 import { MediaLogger } from '../utils/mediaLogger.ts';
 import {
   LocalAttachmentPayload,
@@ -2603,11 +2603,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
         const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
         const effectiveMime = inferMediaMime(file);
+        const isSticker = Boolean(
+          (file as any).isSticker ||
+          (options as any)?.isSticker ||
+          file.name?.includes('.sticker.') ||
+          effectiveMime.includes('sticker')
+        );
         let initialPreviewUrl: string | undefined;
-        if (effectiveMime.startsWith('image/') || effectiveMime.startsWith('video/')) {
+        if (effectiveMime.startsWith('image/') || effectiveMime.startsWith('video/') || isSticker) {
           try {
             initialPreviewUrl = URL.createObjectURL(file);
           } catch (_e) {}
+        }
+        if (initialPreviewUrl) {
+          const decryptedStub: DecryptedMedia = {
+            id: attachmentId,
+            blobUrl: initialPreviewUrl,
+            data: new Uint8Array(0),
+            mimeType: effectiveMime,
+            name: file.name,
+            sizeBytes: file.size,
+          };
+          MediaCache.set(attachmentId, decryptedStub);
+          MediaCache.set(file.name, decryptedStub);
         }
         return {
           attachmentId,
@@ -2617,10 +2635,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           mimeType: effectiveMime,
           previewUrl: initialPreviewUrl,
           localPreviewUrl: initialPreviewUrl,
+          isSticker,
           state: idx < 2 ? ('UPLOADING' as const) : ('QUEUED' as const),
           allowSave,
           allowForward,
-        };
+        } as LocalAttachmentPayload;
       });
       const targetMailboxId = targetContact?.mailboxId || conversationId;
       const targetUsername =
@@ -2639,9 +2658,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ].filter(Boolean) as string[]);
 
       const firstMime = initialAttachments[0]?.mimeType || '';
+      const hasSticker = initialAttachments.some((a) => (a as any).isSticker);
       const summaryText =
         options?.caption?.trim() ||
-        (files.length === 1 && !firstMime.startsWith('image/') && !firstMime.startsWith('video/')
+        (files.length === 1 && !firstMime.startsWith('image/') && !firstMime.startsWith('video/') && !hasSticker
           ? `Attachment: ${files[0].name}`
           : '');
 
@@ -2656,6 +2676,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         status: 'UPLOADING',
         attachment: initialAttachments[0],
         attachments: initialAttachments,
+        isSticker: hasSticker,
         replyTo: activeReply,
         forwarded: options?.forwarded,
         forwardedFrom: options?.forwardedFrom,
@@ -2663,7 +2684,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           allowSave,
           allowForward,
         },
-      };
+      } as any;
 
       // 2. Instantly display in UI timeline (0ms lag, non-blocking composer)
       setMessages((prev) => {

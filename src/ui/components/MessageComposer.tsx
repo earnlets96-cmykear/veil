@@ -256,7 +256,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         setIsEmojiDrawerOpen(false);
         const res = await fetch(sticker.url);
         const blob = await res.blob();
-        const file = new File([blob], `${sticker.id}.sticker.webp`, { type: 'image/webp' });
+        const isSvg = sticker.url.startsWith('data:image/svg') || (blob.type && blob.type.includes('svg'));
+        const mimeType = isSvg ? 'image/svg+xml' : 'image/webp';
+        const ext = isSvg ? 'svg' : 'webp';
+        const file = new File([blob], `${sticker.id}.sticker.${ext}`, { type: mimeType });
         (file as any).isSticker = true;
         await sendAttachment(conversationId, file, { isSticker: true } as any);
       } catch (_err) {
