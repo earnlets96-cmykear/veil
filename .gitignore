@@ -49,3 +49,7 @@ scratch/
 # Android build cache
 android/.kotlin/
 android/.gradle/
+
+# Internal agent tooling artifacts
+.superpowers/
+
