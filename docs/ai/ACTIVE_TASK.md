@@ -1,14 +1,34 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 86 — SHARE MEDIA BOTTOM SHEET REDESIGN & INTEGRATED CAPTION INPUT
+## Active Phase: PHASE 86 — REAL DEVICE STORAGE MEDIA, NATIVE CAMERA, FILES TAB & DYNAMIC THEME ALIGNMENT
 - **Status**: COMPLETE & VERIFIED (100% test pass across 395 test files, Android debug APK compiled)
 - **Branch**: `main`
 
 ### Phase 86 Tasks Completed:
-- [x] **Bottom Sheet Shell & Design System Overhaul (`src/styles/veil-components.css`, `MediaPickerModal.tsx`)**:
-  - Transformed the modal into a native-feeling dark matte bottom sheet (`#18181b`, `border-radius: 28px 28px 0 0` on mobile, `28px` on desktop) with centered top pill drag handle (`width: 38px; height: 4px; border-radius: 9999px`).
-  - Added clean header with bold `Share Media` typography (`1.25rem`, `#ffffff`) and circular close button `(X)` (`width: 32px; height: 32px; border-radius: 50%`).
-  - Removed harsh dividing lines under header and above footer for a seamless dark card aesthetic.
+- [x] **Real Device Storage Media (`MediaPickerModal.tsx`, `NativeDeviceMediaBridge.ts`)**:
+  - Eliminated all fake/mock posters (`sampleMedia.ts` deleted).
+  - Gallery and Video tabs now query the actual local device media storage via `NativeDeviceMediaBridge.listRecentMedia`.
+  - Tapping `+` opens the sheet and triggers storage/media permissions automatically, loading real device items.
+  - If permission is denied, renders an in-sheet permission card with an "Allow Access" prompt.
+- [x] **Native Camera Hardware Capture (`VeilDeviceMediaPlugin.kt`, `AndroidManifest.xml`, `MediaPickerModal.tsx`)**:
+  - Added `android.permission.CAMERA` and optional camera feature declaration in `AndroidManifest.xml`.
+  - Implemented `@PluginMethod fun captureMedia` with `ACTION_IMAGE_CAPTURE`, FileProvider temporary photo creation, and fallback bitmap decoding.
+  - Tapping **Camera** directly launches native camera hardware.
+- [x] **Restructured Tab Order & Files Listing (`MediaPickerModal.tsx`, `VeilDeviceMediaPlugin.kt`)**:
+  - Removed `24h` tab.
+  - New tab order: **Gallery** -> **Camera** -> **Video** -> **Files**.
+  - **Video Tab**: Queries and displays device videos with duration/play badge.
+  - **Files Tab**: Queries device documents and downloads, presents an interactive list with document icon, filename, extension badge, size, and multi-select counters, plus a `+ Browse all files & documents` trigger for the system document picker.
+- [x] **Active App Theme Alignment (`src/styles/veil-components.css`)**:
+  - Replaced hardcoded purple `#a78bfa` with `var(--veil-accent-primary, #14b8a6)` and `var(--veil-text-on-accent, #ffffff)`.
+  - The Send button, selection border glow, numbered sequence badges, and caption focus outline now match the user's active theme.
+- [x] **Android Scoped Storage (API 29–34) Querying (`VeilDeviceMediaPlugin.kt`)**:
+  - Direct queries against `MediaStore.Images.Media.EXTERNAL_CONTENT_URI`, `MediaStore.Video.Media.EXTERNAL_CONTENT_URI`, and `MediaStore.Downloads.EXTERNAL_CONTENT_URI`.
+- [x] **Automated Tests & Regression Suite**:
+  - Updated `tests/phase86-share-media-redesign.test.tsx` (5/5 passing).
+  - 100% pass across Phase 40 (`tests/phase40-media-picker.test.tsx`), Phase 74 (`tests/phase74-media-interaction.test.tsx`), and Phase 44a zero-literal-Unicode audit (`tests/phase44a-ui-layout-and-icons.test.tsx`).
+  - Full repo test suite passed: 395 test files, 1269 tests passing (100% pass, 0 failures).
+  - Native Android debug APK assembled successfully (`BUILD SUCCESSFUL in 39s`).
 - [x] **Filter & Source Pills Row (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
   - High-contrast active **Gallery** pill in crisp white (`#ffffff`) with dark charcoal text/icon (`#111827`).
   - Dark rounded pills for **Camera**, **Files**, and **24h** with warm golden/amber timer icon (`#fbbf24`).

@@ -1,19 +1,20 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 86 — SHARE MEDIA BOTTOM SHEET REDESIGN & INTEGRATED CAPTION INPUT
+## Current Verified Phase: PHASE 86 — REAL DEVICE STORAGE MEDIA, NATIVE CAMERA, FILES TAB & DYNAMIC THEME ALIGNMENT
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 395 TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:
-  - **Sleek Bottom Sheet Modal Shell**: Replaced rectangular modal with a deep dark matte bottom sheet (`#18181b`, `border-radius: 28px 28px 0 0` on mobile, `28px` on desktop) with centered top pill handle (`width: 38px; height: 4px; border-radius: 9999px; background: rgba(255, 255, 255, 0.22)`). Header features bold `Share Media` typography (`1.25rem`, `#ffffff`) and circular close button `(X)` (`32px` diameter, `border-radius: 50%`) with no harsh dividers.
-  - **Filter & Source Pills Row**: High-contrast active **Gallery** pill in crisp white (`#ffffff`) with dark charcoal text/icon (`#111827`). Dark rounded pills for **Camera**, **Files**, and **24h** with warm golden/amber timer icon (`#fbbf24`).
-  - **Direct 3-Column Media Grid & Curated Demo Fallbacks**: 3-column media grid with 6 high-fidelity curated gallery scenes (Architect blueprints, Modern office, Workspace desk, Luxury villa, Night cityscape, Product design sketch) so the gallery is never an empty box on web, demo, or fresh device. Numbered purple badges (`#a78bfa`) with sequence counter (`1`, `2`) on selected items and translucent dark circular selector rings on unselected items. Converted sample items to genuine `File` objects via `sampleMediaToFile` for immediate Double Ratchet encrypted attachment delivery.
-  - **Adaptive Caption Writing Bar**: Smoothly appears right above the footer bar when 1 or more media items are selected. Dark glass styling (`background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px`) with placeholder `"Add a caption..."`. Dispatches with files to `onSend({ files, caption })` and collapses when selection is cleared.
-  - **Streamlined Footer**: Selection count on left ("{N} selected" in bold white when items picked, or "Select media" when 0). Right: Soft purple pill action button `Send (N) ▷` (`#a78bfa`) with paper airplane icon. Dismissal managed via circular top-right close button, backdrop click, or Escape key.
+  - **Real Device Storage Media Only**: Eliminated all synthetic mockup posters (`sampleMedia.ts` deleted). Media is queried directly from local device storage via `NativeDeviceMediaBridge`.
+  - **Storage Permission on Opening (`+`)**: Opening the attachment sheet automatically requests media/storage permissions and lists recent photos, videos, and files. If permission is denied, displays a clear in-sheet permission card with an "Allow Access" prompt.
+  - **Native Camera Hardware Capture**: Added `<uses-permission android:name="android.permission.CAMERA" />` and implemented native `@PluginMethod fun captureMedia` in `VeilDeviceMediaPlugin.kt`. Tapping the **Camera** tab directly launches the native device camera hardware.
+  - **Restructured Tab Order & Files Integration**: Removed `24h` tab. Configured tab order: **Gallery** -> **Camera** -> **Video** -> **Files**. The **Files Tab** lists recent device documents/downloads and includes `+ Browse all files & documents` to invoke system SAF document picker.
+  - **Active Theme Alignment**: Replaced hardcoded `#a78bfa` with dynamic theme tokens `var(--veil-accent-primary, #14b8a6) !important` and `var(--veil-text-on-accent, #ffffff) !important`. The Send button (`Send (N) ▷`), selection borders, numbered sequence counters, and caption focus outline now match the active theme.
+  - **Android Scoped Storage Optimization**: Direct queries against `MediaStore.Images.Media.EXTERNAL_CONTENT_URI`, `MediaStore.Video.Media.EXTERNAL_CONTENT_URI`, and `MediaStore.Downloads.EXTERNAL_CONTENT_URI` for full compatibility with Android 10–14.
 - **Verification Deliverables**:
   - Test suites passing: `tests/phase86-share-media-redesign.test.tsx` (5/5), `tests/phase40-media-picker.test.tsx` (2/2), `tests/phase74-media-interaction.test.tsx` (8/8), `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7), `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3).
   - Complete repository test suite: 395 test files, 1269 tests passing (100% pass, 0 failures).
-  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts.
-  - Native Android debug APK: `gradlew.bat assembleDebug` generated `android/app/build/outputs/apk/debug/app-debug.apk` successfully in 23s.
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.50s.
+  - Native Android debug APK: `gradlew.bat assembleDebug` generated `android/app/build/outputs/apk/debug/app-debug.apk` successfully in 39s.
 
 ## Previous Verified Phase: PHASE 85 — MESSAGE REACTIONS, 5 DEFAULT EMOJIS, EXPAND BUTTON & CONTEXT DISMISS
 - **Key Deliverables & Fixes**:

@@ -2,6 +2,34 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase86-real-device-media-and-theme] - 2026-09-12
+
+### Real Device Storage Media, Native Camera Hardware, Files Tab & Dynamic Theme Alignment (Phase 86)
+- **Real Device Storage Media Only (`MediaPickerModal.tsx`, `NativeDeviceMediaBridge.ts`)**:
+  - Completely removed all synthetic mockup posters (`sampleMedia.ts` deleted).
+  - Wired gallery and video grids strictly to device storage queried via `NativeDeviceMediaBridge`.
+  - When user opens attachment sheet (`+`), automatically requests media/storage permissions and queries recent photos/videos from device storage.
+  - If permissions are denied, presents an in-sheet permission card with an "Allow Access" action.
+- **Native Camera Hardware Capture (`VeilDeviceMediaPlugin.kt`, `AndroidManifest.xml`, `MediaPickerModal.tsx`)**:
+  - Added `<uses-permission android:name="android.permission.CAMERA" />` and optional camera feature declaration.
+  - Implemented `@PluginMethod fun captureMedia` in Kotlin with `ACTION_IMAGE_CAPTURE`, FileProvider output, and fallback bitmap decoding.
+  - Tapping **Camera** tab directly launches the native camera hardware to take photos and stage them for encryption and dispatch.
+- **Restructured Tab Order & Files Integration (`MediaPickerModal.tsx`, `VeilDeviceMediaPlugin.kt`)**:
+  - Removed `24h` tab.
+  - Replaced with **Video** tab (queries device videos) and swapped order with **Files**.
+  - New tab order: **Gallery** -> **Camera** -> **Video** -> **Files**.
+  - **Files Tab**: Queries device documents/downloads, displays interactive file list with document icon, filename, extension badge, size, and selection status, and includes `+ Browse all files & documents` for system SAF picker.
+- **Dynamic Theme Matching (`veil-components.css`, `MediaPickerModal.tsx`)**:
+  - Replaced hardcoded purple accents (`#a78bfa`) with dynamic theme tokens: `var(--veil-accent-primary, #14b8a6) !important` and `var(--veil-text-on-accent, #ffffff) !important`.
+  - Send button (`Send (N) ▷`), selection borders, numbered selection counters, and caption focus outline now match the active theme.
+- **Android Scoped Storage Optimization (`VeilDeviceMediaPlugin.kt`)**:
+  - Split `listRecentMedia` to query `MediaStore.Images.Media.EXTERNAL_CONTENT_URI` and `MediaStore.Video.Media.EXTERNAL_CONTENT_URI` directly under Android 10–14 granular permissions.
+  - Added query for `MediaStore.Downloads.EXTERNAL_CONTENT_URI` and non-media documents for the Files tab.
+- **Verification**:
+  - 100% test pass across `tests/phase86-share-media-redesign.test.tsx`, `tests/phase74-media-interaction.test.tsx`, `tests/phase40-media-picker.test.tsx`, and `tests/phase44a-ui-layout-and-icons.test.tsx`.
+  - Full repo test suite passed (395 test files, 1269 tests).
+  - Web production bundle built in 2.50s; Android native debug APK assembled with Gradle (`BUILD SUCCESSFUL in 39s`).
+
 ## [1.0.0-phase86-share-media-redesign] - 2026-09-12
 
 ### Share Media Bottom Sheet Redesign & Integrated Caption Input (Phase 86)

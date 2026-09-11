@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { base64ToBytes } from '../crypto/utils.ts';
 
 export type DeviceMediaPermissionStatus = 'granted' | 'limited' | 'denied' | 'prompt' | 'unavailable';
-export type DeviceMediaType = 'image' | 'video';
+export type DeviceMediaType = 'image' | 'video' | 'file';
 
 export interface DeviceMediaItem {
   uri: string;

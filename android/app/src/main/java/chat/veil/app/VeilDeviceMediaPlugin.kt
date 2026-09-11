@@ -30,9 +30,13 @@ import java.io.ByteArrayOutputStream
         Permission(alias = "recentMedia", strings = [Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO]),
         Permission(alias = "legacyRead", strings = [Manifest.permission.READ_EXTERNAL_STORAGE]),
         Permission(alias = "legacyWrite", strings = [Manifest.permission.WRITE_EXTERNAL_STORAGE]),
+        Permission(alias = "camera", strings = [Manifest.permission.CAMERA]),
     ],
 )
 class VeilDeviceMediaPlugin : Plugin() {
+
+    private var pendingCameraUri: Uri? = null
+    private var pendingCameraFile: java.io.File? = null
 
     @PluginMethod
     fun requestRecentMediaPermission(call: PluginCall) {
@@ -56,58 +60,214 @@ class VeilDeviceMediaPlugin : Plugin() {
     }
 
     @PluginMethod
-    fun listRecentMedia(call: PluginCall) {
-        val limit = (call.getInt("limit") ?: 60).coerceIn(1, 60)
-        val items = JSArray()
-        val projection = arrayOf(
-            MediaStore.Files.FileColumns._ID,
-            MediaStore.Files.FileColumns.DISPLAY_NAME,
-            MediaStore.Files.FileColumns.MIME_TYPE,
-            MediaStore.Files.FileColumns.SIZE,
-            MediaStore.Files.FileColumns.MEDIA_TYPE,
-            MediaStore.Files.FileColumns.DATE_ADDED,
-        )
-        val types = call.getArray("types")
-        val includeImage = types == null || types.toString().contains("image")
-        val includeVideo = types == null || types.toString().contains("video")
-        val mediaTypes = buildList {
-            if (includeImage) add(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString())
-            if (includeVideo) add(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString())
+    fun captureMedia(call: PluginCall) {
+        if (getPermissionState("camera") != PermissionState.GRANTED) {
+            requestPermissionForAlias("camera", call, "cameraPermissionCallback")
+            return
         }
-        if (mediaTypes.isEmpty()) {
-            call.resolve(JSObject().put("items", items))
+        launchCamera(call)
+    }
+
+    @PermissionCallback
+    private fun cameraPermissionCallback(call: PluginCall) {
+        if (getPermissionState("camera") == PermissionState.GRANTED) {
+            launchCamera(call)
+        } else {
+            call.reject("Camera permission was denied")
+        }
+    }
+
+    private fun launchCamera(call: PluginCall) {
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        try {
+            val photoFile = java.io.File.createTempFile("cam_", ".jpg", context.cacheDir)
+            val photoUri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            pendingCameraFile = photoFile
+            pendingCameraUri = photoUri
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivityForResult(call, intent, "captureMediaResult")
+        } catch (_: Exception) {
+            try {
+                startActivityForResult(call, intent, "captureMediaResult")
+            } catch (err: Exception) {
+                call.reject("Unable to launch camera", err)
+            }
+        }
+    }
+
+    @ActivityCallback
+    private fun captureMediaResult(call: PluginCall, result: ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK) {
+            pendingCameraFile?.delete()
+            pendingCameraFile = null
+            pendingCameraUri = null
+            call.resolve(JSObject().put("items", JSArray()))
             return
         }
 
-        val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (${mediaTypes.joinToString(",")})"
-        val cursor = context.contentResolver.query(
-            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL),
-            projection,
-            selection,
-            null,
-            "${MediaStore.Files.FileColumns.DATE_ADDED} DESC",
-        )
-        cursor?.use {
-            val idColumn = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
-            val nameColumn = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
-            val mimeColumn = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MIME_TYPE)
-            val sizeColumn = it.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
-            var count = 0
-            while (it.moveToNext() && count < limit) {
-                val id = it.getLong(idColumn)
-                val mime = it.getString(mimeColumn) ?: "application/octet-stream"
-                val base = if (mime.startsWith("video/")) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                val item = JSObject()
-                item.put("uri", Uri.withAppendedPath(base, id.toString()).toString())
-                item.put("name", it.getString(nameColumn) ?: "media")
-                item.put("mimeType", mime)
-                item.put("sizeBytes", it.getLong(sizeColumn))
-                thumbnailFor(Uri.withAppendedPath(base, id.toString()))?.let { thumbnail ->
-                    item.put("thumbnailDataUrl", thumbnail)
-                }
-                items.put(item)
-                count += 1
+        val uri = pendingCameraUri
+        val file = pendingCameraFile
+        val items = JSArray()
+
+        if (file != null && file.exists() && file.length() > 0 && uri != null) {
+            val item = JSObject().apply {
+                put("uri", uri.toString())
+                put("name", file.name)
+                put("mimeType", "image/jpeg")
+                put("sizeBytes", file.length())
+                thumbnailFor(uri)?.let { put("thumbnailDataUrl", it) }
             }
+            items.put(item)
+        } else {
+            val bitmap = result.data?.extras?.get("data") as? Bitmap
+            if (bitmap != null) {
+                try {
+                    val fallbackFile = java.io.File.createTempFile("cam_capture_", ".jpg", context.cacheDir)
+                    val fos = java.io.FileOutputStream(fallbackFile)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 90, fos)
+                    fos.flush()
+                    fos.close()
+                    val fallbackUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        fallbackFile
+                    )
+                    val item = JSObject().apply {
+                        put("uri", fallbackUri.toString())
+                        put("name", fallbackFile.name)
+                        put("mimeType", "image/jpeg")
+                        put("sizeBytes", fallbackFile.length())
+                        val out = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 65, out)
+                        put("thumbnailDataUrl", "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP))
+                    }
+                    items.put(item)
+                } catch (_: Exception) {}
+            }
+        }
+        pendingCameraFile = null
+        pendingCameraUri = null
+        call.resolve(JSObject().put("items", items))
+    }
+
+    private data class MediaRow(
+        val uri: String,
+        val name: String,
+        val mimeType: String,
+        val sizeBytes: Long,
+        val dateAdded: Long,
+        val thumbnailDataUrl: String? = null
+    )
+
+    @PluginMethod
+    fun listRecentMedia(call: PluginCall) {
+        val limit = (call.getInt("limit") ?: 60).coerceIn(1, 60)
+        val types = call.getArray("types")
+        val typesStr = types?.toString() ?: ""
+        val includeImage = types == null || typesStr.contains("image")
+        val includeVideo = types == null || typesStr.contains("video")
+        val includeFile = types != null && typesStr.contains("file")
+
+        val rows = mutableListOf<MediaRow>()
+
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.MIME_TYPE,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_ADDED,
+        )
+
+        fun queryUri(contentUri: Uri, mimePrefix: String? = null, maxCount: Int = limit) {
+            try {
+                val selection = if (mimePrefix != null) "${MediaStore.MediaColumns.MIME_TYPE} LIKE ?" else null
+                val selectionArgs = if (mimePrefix != null) arrayOf("$mimePrefix%") else null
+                val cursor = context.contentResolver.query(
+                    contentUri,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                )
+                cursor?.use {
+                    val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                    val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val mimeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+                    val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                    val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+                    var c = 0
+                    while (it.moveToNext() && c < maxCount) {
+                        val id = it.getLong(idCol)
+                        val name = it.getString(nameCol) ?: "media"
+                        val mime = it.getString(mimeCol) ?: "application/octet-stream"
+                        val size = it.getLong(sizeCol)
+                        val dateAdded = it.getLong(dateCol)
+                        val itemUri = Uri.withAppendedPath(contentUri, id.toString())
+                        val thumb = if (mime.startsWith("image/") || mime.startsWith("video/")) thumbnailFor(itemUri) else null
+                        rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, thumb))
+                        c++
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (includeImage) {
+            queryUri(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image")
+        }
+        if (includeVideo) {
+            queryUri(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video")
+        }
+        if (includeFile) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                queryUri(MediaStore.Downloads.EXTERNAL_CONTENT_URI)
+            }
+            try {
+                val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                val cursor = context.contentResolver.query(
+                    filesUri,
+                    projection,
+                    "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ${MediaStore.Files.FileColumns.MEDIA_TYPE_NONE}",
+                    null,
+                    "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                )
+                cursor?.use {
+                    val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                    val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val mimeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+                    val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                    val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+                    var c = 0
+                    while (it.moveToNext() && c < limit) {
+                        val id = it.getLong(idCol)
+                        val name = it.getString(nameCol) ?: "file"
+                        val mime = it.getString(mimeCol) ?: "application/octet-stream"
+                        val size = it.getLong(sizeCol)
+                        val dateAdded = it.getLong(dateCol)
+                        val itemUri = Uri.withAppendedPath(filesUri, id.toString())
+                        rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, null))
+                        c++
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // Sort descending by dateAdded and limit
+        val sorted = rows.distinctBy { it.uri }.sortedByDescending { it.dateAdded }.take(limit)
+        val items = JSArray()
+        for (row in sorted) {
+            val item = JSObject().apply {
+                put("uri", row.uri)
+                put("name", row.name)
+                put("mimeType", row.mimeType)
+                put("sizeBytes", row.sizeBytes)
+                row.thumbnailDataUrl?.let { put("thumbnailDataUrl", it) }
+            }
+            items.put(item)
         }
         call.resolve(JSObject().put("items", items))
     }
