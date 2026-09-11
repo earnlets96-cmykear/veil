@@ -1,10 +1,36 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 85 — MESSAGE REACTIONS, 5 DEFAULT EMOJIS, EXPAND BUTTON & CONTEXT DISMISS
-- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript clean, Android debug APK compilation in progress)
+## Active Phase: PHASE 86 — SHARE MEDIA BOTTOM SHEET REDESIGN & INTEGRATED CAPTION INPUT
+- **Status**: COMPLETE & VERIFIED (100% test pass across 395 test files, Android debug APK compiled)
 - **Branch**: `main`
 
-### Phase 85 Tasks Completed:
+### Phase 86 Tasks Completed:
+- [x] **Bottom Sheet Shell & Design System Overhaul (`src/styles/veil-components.css`, `MediaPickerModal.tsx`)**:
+  - Transformed the modal into a native-feeling dark matte bottom sheet (`#18181b`, `border-radius: 28px 28px 0 0` on mobile, `28px` on desktop) with centered top pill drag handle (`width: 38px; height: 4px; border-radius: 9999px`).
+  - Added clean header with bold `Share Media` typography (`1.25rem`, `#ffffff`) and circular close button `(X)` (`width: 32px; height: 32px; border-radius: 50%`).
+  - Removed harsh dividing lines under header and above footer for a seamless dark card aesthetic.
+- [x] **Filter & Source Pills Row (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - High-contrast active **Gallery** pill in crisp white (`#ffffff`) with dark charcoal text/icon (`#111827`).
+  - Dark rounded pills for **Camera**, **Files**, and **24h** with warm golden/amber timer icon (`#fbbf24`).
+- [x] **Direct 3-Column Media Grid & Curated Demo Fallbacks (`src/ui/components/media/sampleMedia.ts`, `MediaPickerModal.tsx`)**:
+  - Created 6 high-fidelity curated gallery scenes (Architect blueprints, Modern office, Workspace desk, Luxury villa, Night cityscape, Product design sketch) so the gallery is never an empty box on web, demo, or fresh device.
+  - Numbered purple badges (`#a78bfa`) with sequence numbers (`1`, `2`) on selected items and translucent dark circular selector rings on unselected items.
+  - Converted sample items to genuine `File` objects via `sampleMediaToFile` for immediate Double Ratchet encrypted attachment delivery.
+- [x] **Adaptive Caption Writing Bar (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - Smoothly appears right above the footer bar when 1 or more media items are selected.
+  - Dark glass styling (`background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px`) with placeholder `"Add a caption..."`.
+  - Dispatches with files to `onSend({ files, caption })` and collapses when selection is cleared.
+- [x] **Streamlined Footer (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - Left: Dynamic selection count ("{N} selected" in bold white when items picked, or "Select media" when 0).
+  - Right: Soft purple pill action button `Send (N) ▷` (`#a78bfa`) with paper airplane icon.
+  - Dismissal managed via circular top-right close button, backdrop click, or Escape key.
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase86-share-media-redesign.test.tsx` (5/5 passing).
+  - Verified 100% pass across Phase 40 (`tests/phase40-media-picker.test.tsx`), Phase 74 (`tests/phase74-media-interaction.test.tsx`), Phase 85 (`tests/phase85-message-reactions-and-context-dismiss.test.tsx`), and Phase 44a zero-literal-Unicode icon audit (`tests/phase44a-ui-layout-and-icons.test.tsx`).
+  - Full repo test suite passed: 395 test files, 1269 tests passing (100% pass, 0 failures).
+  - Native Android debug APK assembled successfully (`BUILD SUCCESSFUL in 23s`).
+
+## Previous Phase: PHASE 85 — MESSAGE REACTIONS, 5 DEFAULT EMOJIS, EXPAND BUTTON & CONTEXT DISMISS
 - [x] **Stacking Context & Floating Reactions Pill Z-Index**:
   - Fixed `.veil-floating-reactions-pill` z-index to `1052` (`calc(var(--veil-z-popover, 1050) + 2)`).
   - Previously had `zIndex: 1002`, causing the full-screen `.veil-context-backdrop` (z-index `1049`) to sit on top of the reactions pill, capturing all clicks and dismissing the popup without toggling the reaction or triggering the expand button.

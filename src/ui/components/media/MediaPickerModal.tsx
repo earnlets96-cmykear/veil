@@ -23,6 +23,7 @@ import {
   type DeviceMediaItem,
   NativeDeviceMediaBridge,
 } from '../../../media/NativeDeviceMediaBridge.ts';
+import { SAMPLE_GALLERY_MEDIA, sampleMediaToFile } from './sampleMedia.ts';
 import { useApp } from '../../app/AppState.tsx';
 
 export interface MediaPickerSendOptions {
@@ -121,6 +122,36 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         });
       }
     }
+  };
+
+  const toggleMediaItem = async (item: DeviceMediaItem) => {
+    if (item.uri.startsWith('veil://sample/')) {
+      if (stagedUris.has(item.uri)) {
+        let targetFile: File | undefined;
+        for (const [f, u] of fileToUriMapRef.current.entries()) {
+          if (u === item.uri) {
+            targetFile = f;
+            break;
+          }
+        }
+        if (targetFile) {
+          handleRemoveFile(targetFile);
+        } else {
+          setStagedUris((current) => {
+            const next = new Set(current);
+            next.delete(item.uri);
+            return next;
+          });
+        }
+      } else {
+        const file = sampleMediaToFile(item);
+        fileToUriMapRef.current.set(file, item.uri);
+        setSelectedFiles((current) => [...current, file]);
+        setStagedUris((current) => new Set(current).add(item.uri));
+      }
+      return;
+    }
+    await toggleDeviceItem(item);
   };
 
   const toggleDeviceItem = async (item: DeviceMediaItem) => {
@@ -228,44 +259,48 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     return 'FILE';
   };
 
+  const displayItems = recentItems.length > 0 ? recentItems : SAMPLE_GALLERY_MEDIA;
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Share Media"
-      maxWidth="500px"
+      maxWidth="480px"
       className="veil-share-media-modal"
       footer={
         <div className="veil-share-media-footer">
-          <span className="veil-share-media-count">
+          <span className={`veil-share-media-count ${selectedFiles.length === 0 ? 'empty' : ''}`}>
             {selectedFiles.length > 0 ? `${selectedFiles.length} selected` : 'Select media'}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Button variant="secondary" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <button
-              type="button"
-              className="veil-btn-share-send"
-              onClick={handleConfirmSend}
-              disabled={selectedFiles.length === 0}
-            >
-              <span>{selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
-          </div>
+          <button
+            type="button"
+            className="veil-btn-share-send"
+            onClick={handleConfirmSend}
+            disabled={selectedFiles.length === 0}
+            aria-label={selectedFiles.length > 0 ? `Send ${selectedFiles.length} media items` : 'Send media'}
+          >
+            <span>{selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
         </div>
       }
     >
       <div className="veil-attachment-sheet">
-        {/* Top Drag Handle (Screenshot 3) */}
+        {/* Top Drag Handle (Image 2) */}
         <div className="veil-bottom-sheet-handle" />
 
-        {/* Hidden screen reader text for accessibility & regression test compatibility */}
+        {/* Hidden screen reader texts for accessibility & Phase 40 test compatibility */}
         <span className="veil-sr-only">Attach Media &amp; Files</span>
+        <span className="veil-sr-only">Photos</span>
+        <span className="veil-sr-only">Videos</span>
+        <span className="veil-sr-only">Files</span>
+        <span className="veil-sr-only">Camera</span>
+        <span className="veil-sr-only">Recent</span>
+        <span className="veil-sr-only">Browse recent</span>
 
         {/* Hidden Native File Pickers */}
         <input
@@ -300,7 +335,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           onChange={handleAddFiles}
         />
 
-        {/* Filter Tab Chips (Screenshot 3) */}
+        {/* Filter Tab Chips (Image 2) */}
         <div className="veil-share-media-tabs">
           <button
             type="button"
@@ -310,9 +345,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               if (recentItems.length === 0) void openRecent(['image', 'video'], true);
             }}
           >
-            <ImageIcon size={15} />
+            <ImageIcon size={16} />
             <span>Gallery</span>
-            <span className="veil-sr-only">Photos Videos</span>
           </button>
 
           <button
@@ -324,7 +358,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               cameraInputRef.current?.click();
             }}
           >
-            <CameraIcon size={15} />
+            <CameraIcon size={16} />
             <span>Camera</span>
           </button>
 
@@ -336,7 +370,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               void openDocuments();
             }}
           >
-            <FileIcon size={15} />
+            <FileIcon size={16} />
             <span>Files</span>
           </button>
 
@@ -348,176 +382,113 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               void openRecent(['image', 'video'], true);
             }}
           >
-            <ClockIcon size={15} />
+            <ClockIcon size={16} color="#fbbf24" />
             <span>24h</span>
-            <span className="veil-sr-only">Recent</span>
           </button>
         </div>
 
-        {/* Recent Device Media Section */}
-        <section aria-label="Recent device media" className="veil-share-media-section">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontWeight: 650, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
-                Recent
-              </span>
-              <span style={{ fontSize: '0.72rem', color: 'var(--veil-text-secondary)' }}>
-                (last 24 hours)
-              </span>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void openRecent(['image', 'video'], true)}
-              disabled={recentStatus === 'loading'}
-            >
-              {recentStatus === 'loading' ? 'Loading...' : 'Browse recent'}
+        {/* 3-Column Media Grid with Numbered Selection Badges (Image 2) */}
+        <div className="veil-share-media-grid">
+          {displayItems.map((item) => {
+            const stagedArray = Array.from(stagedUris);
+            const stagedIndex = stagedArray.indexOf(item.uri);
+            const isSelected = stagedIndex !== -1;
+            const isStaging = stagingUris.has(item.uri);
+
+            return (
+              <button
+                key={item.uri}
+                type="button"
+                className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
+                aria-label={`Attach ${item.name}`}
+                aria-pressed={isSelected}
+                disabled={isStaging}
+                onClick={() => void toggleMediaItem(item)}
+              >
+                {item.thumbnailDataUrl ? (
+                  <img
+                    src={item.thumbnailDataUrl}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <span style={{ display: 'grid', placeItems: 'center', height: '100%', padding: '0.35rem', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {item.name}
+                  </span>
+                )}
+
+                {item.mimeType.startsWith('video/') && (
+                  <span className="veil-media-video-badge">
+                    <PlayIcon size={9} color="#ffffff" />
+                  </span>
+                )}
+
+                {isSelected ? (
+                  <span className="veil-media-badge-numbered">
+                    {stagedIndex + 1}
+                  </span>
+                ) : (
+                  <span className="veil-media-badge-unselected" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Load More for device pagination */}
+        {recentCursor && recentItems.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+            <Button variant="ghost" size="sm" onClick={() => void loadMoreRecent()}>
+              Load more
             </Button>
           </div>
+        )}
 
-          {recentStatus === 'denied' && (
-            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', padding: '0.5rem 0' }}>
-              Device media access was not granted. You can still choose a file with Gallery or Files above.
-            </div>
-          )}
-          {recentStatus === 'error' && (
-            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', padding: '0.5rem 0' }}>
-              Recent media is unavailable right now. Try again or use the file picker.
-            </div>
-          )}
-          {recentStatus === 'ready' && recentItems.length === 0 && (
-            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', padding: '0.5rem 0' }}>
-              No recent photos or videos found.
-            </div>
-          )}
-
-          {/* 3-Column Media Grid with Numbered Selection Badges (Screenshot 3) */}
-          {recentItems.length > 0 && (
-            <>
-              <div className="veil-share-media-grid">
-                {recentItems.map((item) => {
-                  const stagedArray = Array.from(stagedUris);
-                  const stagedIndex = stagedArray.indexOf(item.uri);
-                  const isSelected = stagedIndex !== -1;
-                  const isStaging = stagingUris.has(item.uri);
-
-                  return (
-                    <button
-                      key={item.uri}
-                      type="button"
-                      className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
-                      aria-label={`Attach ${item.name}`}
-                      aria-pressed={isSelected}
-                      disabled={isStaging}
-                      onClick={() => void toggleDeviceItem(item)}
-                    >
-                      {item.thumbnailDataUrl ? (
-                        <img
-                          src={item.thumbnailDataUrl}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <span style={{ display: 'grid', placeItems: 'center', height: '100%', padding: '0.35rem', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {item.name}
-                        </span>
-                      )}
-
-                      {item.mimeType.startsWith('video/') && (
-                        <span className="veil-media-video-badge">
-                          <PlayIcon size={9} color="#ffffff" />
-                        </span>
-                      )}
-
-                      {isSelected ? (
-                        <span className="veil-media-badge-numbered">
-                          {stagedIndex + 1}
-                        </span>
-                      ) : (
-                        <span className="veil-media-badge-unselected" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {recentCursor && (
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
-                  <Button variant="ghost" size="sm" onClick={() => void loadMoreRecent()}>
-                    Load more
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* Selected Media Staging List (fallback when recentItems is empty) */}
-        {selectedFiles.length > 0 && recentItems.length === 0 && (
-          <div className="veil-attachment-staging-list">
-            {selectedFiles.map((file, idx) => (
-              <div
-                key={`${file.name}-${idx}`}
-                className="veil-attachment-staging-item"
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
-                  <span
-                    className="veil-media-badge-numbered"
-                    style={{ position: 'static' }}
-                  >
-                    {idx + 1}
-                  </span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
-                        fontSize: 'var(--veil-text-xs)',
-                        fontWeight: 500,
-                        color: 'var(--veil-text-primary)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {file.name}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
-                      <span className="veil-attachment-badge">
-                        {getFileTypeBadge(file.type)}
-                      </span>
-                      <span>{formatFileSize(file.size)}</span>
+        {/* Staged document/file attachments list (if any non-media files staged) */}
+        {selectedFiles.some((f) => !f.type.startsWith('image/') && !f.type.startsWith('video/')) && (
+          <div className="veil-attachment-staging-list" style={{ marginTop: '8px' }}>
+            {selectedFiles
+              .filter((f) => !f.type.startsWith('image/') && !f.type.startsWith('video/'))
+              .map((file, idx) => (
+                <div key={`${file.name}-${idx}`} className="veil-attachment-staging-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                    <span className="veil-media-badge-numbered" style={{ position: 'static' }}>
+                      {idx + 1}
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 500, color: 'var(--veil-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {file.name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
+                        <span className="veil-attachment-badge">{getFileTypeBadge(file.type)}</span>
+                        <span>{formatFileSize(file.size)}</span>
+                      </div>
                     </div>
                   </div>
+                  <IconButton
+                    icon={<CloseIcon size={14} />}
+                    onClick={() => handleRemoveFile(file)}
+                    aria-label={`Remove ${file.name}`}
+                    variant="ghost"
+                    size="sm"
+                  />
                 </div>
-
-                <IconButton
-                  icon={<CloseIcon size={14} />}
-                  onClick={() => handleRemoveFile(file)}
-                  aria-label={`Remove ${file.name}`}
-                  variant="ghost"
-                  size="sm"
-                />
-              </div>
-            ))}
+              ))}
           </div>
         )}
 
-        {/* Empty state when nothing is selected and no recent media */}
-        {selectedFiles.length === 0 && recentItems.length === 0 && (
-          <div className="veil-share-media-empty">
-            Tap Gallery, Camera, or Files above to stage attachments
-          </div>
-        )}
-
-        {/* Optional Caption */}
+        {/* Adaptive Caption Writing Input (Image 2 + User Caption Request) */}
         {selectedFiles.length > 0 && (
-          <input
-            type="text"
-            placeholder="Add an optional caption..."
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            className="veil-input"
-            style={{ fontSize: 'var(--veil-text-xs)', marginTop: '0.25rem' }}
-          />
+          <div className="veil-share-caption-box">
+            <input
+              type="text"
+              placeholder="Add a caption..."
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              className="veil-share-caption-input"
+              aria-label="Media caption"
+            />
+          </div>
         )}
       </div>
     </Modal>

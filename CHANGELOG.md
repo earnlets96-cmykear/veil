@@ -2,6 +2,34 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase86-share-media-redesign] - 2026-09-12
+
+### Share Media Bottom Sheet Redesign & Integrated Caption Input (Phase 86)
+- **Modern Bottom Sheet Shell (`src/styles/veil-components.css`, `MediaPickerModal.tsx`)**:
+  - Replaced rectangular modal with a deep dark matte bottom sheet (`#18181b`, `border-radius: 28px 28px 0 0` on mobile, `28px` on desktop) with centered top pill handle (`width: 38px; height: 4px; border-radius: 9999px; background: rgba(255, 255, 255, 0.22)`).
+  - Designed clean header with bold `Share Media` typography (`1.25rem`, `#ffffff`) and circular close button `(X)` (`32px` diameter, `border-radius: 50%`).
+  - Seamless dark card interior eliminating harsh dividing lines and dark greenish cast.
+- **Filter & Source Pills Row (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - High-contrast active **Gallery** pill in crisp white (`#ffffff`) with dark charcoal text/icon (`#111827`).
+  - Dark rounded pills for **Camera**, **Files**, and **24h** with warm golden/amber timer icon (`#fbbf24`).
+- **3-Column Media Grid & Curated Demo Fallbacks (`src/ui/components/media/sampleMedia.ts`, `MediaPickerModal.tsx`)**:
+  - Direct presentation of the 3-column media grid with 6 high-fidelity curated gallery scenes (Architect blueprints, Modern office, Workspace desk, Luxury villa, Night cityscape, Product design sketch) so the gallery is never empty.
+  - Numbered purple badges (`#a78bfa`) with sequence counter (`1`, `2`) on selected items and translucent circular indicator rings on unselected items.
+  - Converted sample items to genuine `File` objects via `sampleMediaToFile` for immediate Double Ratchet encrypted attachment delivery.
+- **Integrated Caption Writing Bar (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - Smoothly appears right above the footer bar when 1 or more media items are selected.
+  - Dark glass styling (`background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px`) with placeholder `"Add a caption..."`.
+  - Dispatches with files to `onSend({ files, caption })` and collapses when selection is cleared.
+- **Streamlined Footer (`MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - Left: Selection count ("{N} selected" in bold white when items picked, or "Select media" when 0).
+  - Right: Soft purple pill action button `Send (N) ▷` (`#a78bfa`) with paper airplane icon.
+  - Dismissal managed via circular top-right close button, backdrop click, or Escape key.
+- **Test Suites & Verification**:
+  - Created `tests/phase86-share-media-redesign.test.tsx` (5/5 passing).
+  - 100% pass across Phase 40 (`tests/phase40-media-picker.test.tsx`), Phase 74 (`tests/phase74-media-interaction.test.tsx`), and Phase 44a zero-literal-Unicode icon audit (`tests/phase44a-ui-layout-and-icons.test.tsx`).
+  - Full repo test suite passed (395 test files, 1269 tests).
+  - Production web bundle built and Android native APK assembled successfully.
+
 ## [1.0.0-phase85-reactions-and-context-dismiss] - 2026-09-12
 
 ### Message Reactions, Default 5 Emojis, Expand Button & Context Dismissal (Phase 85)

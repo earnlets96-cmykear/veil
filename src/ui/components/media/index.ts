@@ -9,3 +9,4 @@ export * from './MediaImage.tsx';
 export * from './GroupedMediaGrid.tsx';
 export * from './MediaPickerModal.tsx';
 export * from './MediaInfoModal.tsx';
+export * from './sampleMedia.ts';
