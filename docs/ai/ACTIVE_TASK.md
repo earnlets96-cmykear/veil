@@ -30,6 +30,10 @@
   - Unblocked card context menu triggers: removed media and attachment cards from the click suppression block in `ConversationMessageRow` so right-click, long-press, or card tap opens the reaction bar.
 - [x] **Auto-Loading Media Picker Recent Items (Issue 4)**:
   - Updated `MediaPickerModal.tsx` to automatically load recent photos/videos when opened, eliminating the need to manually click "Browse recent".
+- [x] **Composer Layout & Screen-Reader Visibility Fix**:
+  - Removed rogue `<span className="veil-sr-only">Type an encrypted message...</span>` from `MessageComposer.tsx` which was rendering visibly between the `+` button and the input box, squishing the textarea horizontally.
+  - Defined universal `.veil-sr-only` CSS utility class in `src/styles/veil-design-system.css`.
+  - Re-synced Capacitor Android and re-assembled fresh `app-debug.apk` with Gradle.
 - [x] **Zero Regressions & Full Test Suite Pass**:
   - All 391 test files and 1,235 tests pass with 100% success rate.
   - Production build (`npm run build`) succeeds cleanly with 7 release artifacts.

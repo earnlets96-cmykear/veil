@@ -25,6 +25,10 @@ All notable changes to the VEIL project are documented in this file.
   - Removed media/attachment cards from click suppression so right-click, long-press, and card tap open the reaction bar.
 - **Auto-Loading Media Picker Recent Items (`src/ui/components/media/MediaPickerModal.tsx`)**:
   - Automatically loads recent media when modal opens without requiring manual click.
+- **Composer Layout & Screen-Reader Visibility Fix (`src/ui/components/MessageComposer.tsx`, `src/styles/veil-design-system.css`)**:
+  - Removed rogue inline `.veil-sr-only` text node that was rendered visibly and squeezed the input box horizontally.
+  - Defined universal `.veil-sr-only` CSS class (`position: absolute; width: 1px; clip: rect(0, 0, 0, 0);`) in design system.
+  - Retained accessible `aria-label="Type an encrypted message..."` directly on the `<textarea>` to preserve 100% test compatibility and full screen-reader accessibility.
 
 ## [1.0.0-phase81-strict-typecheck-and-compilation-safety] - 2026-09-11
 

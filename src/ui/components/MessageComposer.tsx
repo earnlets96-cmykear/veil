@@ -626,7 +626,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             </button>
 
             {/* Auto-expanding textarea */}
-            <span className="veil-sr-only">Type an encrypted message...</span>
             <textarea
               ref={textareaRef}
               className="veil-composer-input"
