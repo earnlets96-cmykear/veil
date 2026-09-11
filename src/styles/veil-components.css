@@ -3461,4 +3461,307 @@
   border-color: var(--veil-accent-primary, #14b8a6) !important;
 }
 
+/* ============================================================================
+   TELEGRAM STICKER SYSTEM & DRAWER STYLES
+   ============================================================================ */
+
+.veil-sticker-pack-bar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 12px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  flex-shrink: 0 !important;
+}
+
+.veil-sticker-pack-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.veil-sticker-pack-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  border-radius: 10px !important;
+  padding: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.veil-sticker-pack-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.veil-sticker-pack-btn.active {
+  background: var(--veil-accent-primary, #14b8a6) !important;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.35) !important;
+}
+
+.veil-sticker-pack-thumb {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+}
+
+.veil-sticker-add-pill-btn {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border-radius: 10px !important;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22) !important;
+  background: transparent !important;
+  color: var(--veil-text-secondary, #94a3b8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.veil-sticker-add-pill-btn:hover {
+  border-color: var(--veil-accent-primary, #14b8a6) !important;
+  color: var(--veil-accent-primary, #14b8a6) !important;
+  background: rgba(20, 184, 166, 0.1) !important;
+}
+
+.veil-sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 8px 14px 24px 14px;
+}
+
+.veil-sticker-cell {
+  aspect-ratio: 1 / 1;
+  background: transparent;
+  border: none;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
+}
+
+.veil-sticker-cell:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  transform: scale(1.08);
+}
+
+.veil-sticker-cell:active {
+  transform: scale(0.95);
+}
+
+.veil-sticker-cell img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Frameless Chat Bubble for Stickers */
+.veil-bubble-wrapper-sticker {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.veil-sticker-bubble-container {
+  display: inline-block;
+  position: relative;
+  margin: 2px 0;
+}
+
+.veil-message-sticker-img {
+  width: 180px;
+  height: 180px;
+  max-width: 180px;
+  max-height: 180px;
+  object-fit: contain;
+  cursor: pointer;
+  display: block;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  transition: transform 0.15s ease;
+}
+
+.veil-message-sticker-img:hover {
+  transform: scale(1.03);
+}
+
+/* Add Telegram Sticker Pack Modal */
+.veil-add-sticker-modal {
+  background: rgba(22, 27, 34, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  width: 92%;
+  max-width: 440px;
+  padding: 20px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: veilFadeScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.veil-add-sticker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.veil-add-sticker-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--veil-text-primary, #ffffff);
+}
+
+.veil-add-sticker-subtitle {
+  margin: 4px 0 0 0;
+  font-size: 0.8rem;
+  color: var(--veil-text-secondary, #94a3b8);
+  line-height: 1.35;
+}
+
+.veil-add-sticker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.veil-add-sticker-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.veil-add-sticker-input {
+  flex: 1;
+  background: rgba(13, 17, 23, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--veil-text-primary, #ffffff);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.veil-add-sticker-input:focus {
+  border-color: var(--veil-accent-primary, #14b8a6);
+}
+
+.veil-add-sticker-resolve-btn {
+  background: var(--veil-accent-primary, #14b8a6);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.veil-add-sticker-resolve-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.veil-add-sticker-error {
+  font-size: 0.78rem;
+  color: var(--veil-color-danger, #ef4444);
+  padding: 2px 4px;
+}
+
+.veil-add-sticker-preview {
+  background: rgba(13, 17, 23, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.veil-add-sticker-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.veil-add-sticker-preview-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--veil-text-primary, #ffffff);
+}
+
+.veil-add-sticker-preview-count {
+  font-size: 0.78rem;
+  color: var(--veil-text-secondary, #94a3b8);
+}
+
+.veil-add-sticker-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.veil-add-sticker-preview-cell {
+  aspect-ratio: 1 / 1;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.veil-add-sticker-preview-cell img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.veil-add-sticker-install-btn {
+  background: var(--veil-accent-primary, #14b8a6);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 11px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.veil-add-sticker-install-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+
 

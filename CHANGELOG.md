@@ -2,6 +2,29 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase83-telegram-stickers-and-frameless-chat] - 2026-09-11
+
+### Telegram Sticker Packs & Frameless Chat UX (Phase 83)
+- **Telegram Sticker Engine & Storage Service (`src/media/telegramStickerService.ts`)**:
+  - Built `TelegramStickerService` with IndexedDB persistence (`veil_stickers_db`), memory fallback, and link parser supporting `t.me/addstickers/<pack>`, `tg://addstickers?set=<pack>`, `tg:addstickers?set=<pack>`, `telegram.me/addstickers/<pack>`, and bare identifiers.
+  - Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Telegram Animals`, `Reactions & Memes`) as SVG data URIs for instant offline sticker usage.
+  - Implemented recent stickers caching with deduplication, FIFO limit (24), and localStorage + memory fallback.
+  - Strictly formatted all sticker emojis via Unicode escape sequences (`\u{...}`) to ensure 100% compliance with `tests/phase44a-ui-layout-and-icons.test.tsx`.
+- **Dark Glass Add Sticker Pack Modal (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
+  - Created dark glass modal (`backdrop-filter: blur(20px); background: rgba(22, 27, 34, 0.96)`) matching VEIL design tokens.
+  - Features Telegram link input, instantaneous pack resolution, 8-sticker preview grid, and one-click pack installer.
+- **Emoji Drawer Stickers Tab Integration (`src/ui/components/ui/EmojiDrawer.tsx`)**:
+  - Added sticker pack carousel bar matching category bar aesthetics: recent icon button (`\u{1F552}`), pack thumbnail buttons with active accent highlighter, and `+ Add` button.
+  - Added 4-column responsive sticker grid (`.veil-sticker-grid`) with smooth hover scales and active bounce animations.
+  - Search input dynamically filters stickers across installed packs by emoji or keyword.
+  - Suppressed mobile soft keyboard popups via `onMouseDown={(e) => e.preventDefault()}` on all sticker grid and pack navigation buttons.
+  - Hidden floating backspace button in stickers mode (active only in emoji mode).
+- **Composer Sticker Dispatch (`src/ui/components/MessageComposer.tsx`)**:
+  - Implemented `handleSelectSticker`: converts sticker data URI or URL into a `.sticker.webp` file attachment with `isSticker: true` sent via Double Ratchet.
+- **Frameless In-Chat Sticker Rendering (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Stripped standard message bubble chrome using `.veil-bubble-wrapper-sticker` (`background: transparent; border: none; box-shadow: none; padding: 0`).
+  - Created `.veil-sticker-bubble-container` rendering 180x180 transparent sticker floating on wallpaper with subtle drop-shadow and floating timestamp badge.
+
 ## [1.0.0-phase82-universal-reactions-and-chat-ux] - 2026-09-11
 
 ### Chat UX, Universal Reactions, Audio Player & Emoji Drawer Overhaul (Phase 82)

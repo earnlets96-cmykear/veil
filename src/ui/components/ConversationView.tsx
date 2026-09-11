@@ -174,14 +174,22 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
       msg.attachment.name?.endsWith('.aac'))
   );
 
+  const isSticker = Boolean(
+    (msg as any).isSticker ||
+    (msg.attachment as any)?.isSticker ||
+    msg.attachment?.name?.endsWith('.sticker.webp') ||
+    msg.attachment?.mimeType?.includes('sticker')
+  );
+
   const isMedia =
     msg.attachment &&
     !isAudioAttachment &&
+    !isSticker &&
     (msg.attachment.mimeType?.startsWith('image/') ||
       msg.attachment.mimeType?.startsWith('video/'));
   const isGrouped = Boolean(msg.attachments && msg.attachments.length > 1);
 
-  const hasMediaOrFileCard = isMedia || isGrouped || isAudioAttachment || Boolean(msg.attachment) || Boolean(msg.voice);
+  const hasMediaOrFileCard = isMedia || isSticker || isGrouped || isAudioAttachment || Boolean(msg.attachment) || Boolean(msg.voice);
 
   const hasVisibleTextBubble = Boolean(
     msg.text &&
@@ -392,7 +400,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
         )}
 
         <div
-          className={`veil-bubble-wrapper ${isSelected ? 'selected' : ''}`}
+          className={`veil-bubble-wrapper ${isSticker ? 'veil-bubble-wrapper-sticker' : ''} ${isSelected ? 'selected' : ''}`}
           style={{
             transform: !hasVisibleTextBubble ? `translateX(${swipeOffset}px)` : undefined,
             transition: !hasVisibleTextBubble && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
@@ -450,6 +458,52 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               )}
               <div className="veil-media-meta-overlay">
                 <span className="veil-media-time">
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                {msg.isOutgoing && <MessageStatus status={msg.status} uploadProgress={effectiveUploadPercent} />}
+              </div>
+            </div>
+          )}
+
+          {/* Frameless Telegram Sticker Display */}
+          {!isGrouped && isSticker && msg.attachment && (
+            <div className="veil-sticker-bubble-container" style={{ position: 'relative', display: 'inline-block' }}>
+              <img
+                src={msg.attachment.localPreviewUrl || msg.attachment.previewUrl || ''}
+                alt={msg.attachment.name || 'Sticker'}
+                className="veil-message-sticker-img"
+                loading="lazy"
+                onClick={handleMediaClick}
+                style={{
+                  width: '180px',
+                  height: '180px',
+                  maxWidth: '180px',
+                  maxHeight: '180px',
+                  objectFit: 'contain',
+                  cursor: 'pointer',
+                  display: 'block',
+                  filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.25))',
+                }}
+              />
+              <div
+                className="veil-media-meta-overlay"
+                style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  right: '4px',
+                  background: 'rgba(0,0,0,0.4)',
+                  backdropFilter: 'blur(8px)',
+                  borderRadius: '10px',
+                  padding: '2px 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <span className="veil-media-time" style={{ fontSize: '0.68rem', color: '#ffffff' }}>
                   {new Date(msg.timestamp).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',

@@ -12,12 +12,20 @@
  * - Zero virtual-keyboard focus jumping
  */
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { SearchIcon, CloseIcon } from '../icons/index.ts';
+import {
+  telegramStickerService,
+  StickerPack,
+  StickerItem,
+  BUILT_IN_STICKER_PACKS,
+} from '../../../media/telegramStickerService.ts';
+import { AddStickerPackModal } from '../stickers/AddStickerPackModal.tsx';
 
 export interface EmojiDrawerProps {
   isOpen: boolean;
   onSelectEmoji: (emoji: string) => void;
+  onSelectSticker?: (sticker: StickerItem) => void;
   onBackspace: () => void;
   onClose?: () => void;
 }
@@ -215,13 +223,33 @@ const EMOJI_KEYWORD_MAP: Record<string, string[]> = {
 export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
   isOpen,
   onSelectEmoji,
+  onSelectSticker,
   onBackspace,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'emoji' | 'stickers' | 'gifs'>('emoji');
   const [activeCategoryId, setActiveCategoryId] = useState('smileys');
   const [searchQuery, setSearchQuery] = useState('');
+  const [packs, setPacks] = useState<StickerPack[]>(BUILT_IN_STICKER_PACKS);
+  const [activePackId, setActivePackId] = useState<string>('spotty');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Load installed sticker packs from IndexedDB
+  useEffect(() => {
+    if (isOpen) {
+      telegramStickerService.getInstalledPacks().then((installed: StickerPack[]) => {
+        if (installed && installed.length > 0) {
+          setPacks(installed);
+        }
+      });
+    }
+  }, [isOpen]);
+
+  // Retrieve recent stickers
+  const recentStickers = useMemo(() => {
+    return telegramStickerService.getRecentStickers();
+  }, [isOpen, activePackId]);
 
   // Retrieve recent emojis from localStorage
   const frequentEmojis = useMemo(() => {
@@ -275,6 +303,46 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
     [onSelectEmoji]
   );
 
+  // Sticker filter logic
+  const filteredStickers = useMemo(() => {
+    if (activeTab !== 'stickers') return [];
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) {
+      if (activePackId === 'recent') {
+        return recentStickers;
+      }
+      const activePack = packs.find((p) => p.id === activePackId) || packs[0];
+      return activePack ? activePack.stickers : [];
+    }
+    // Search across all installed packs by emoji keyword or pack name
+    const matches: StickerItem[] = [];
+    for (const p of packs) {
+      for (const stk of p.stickers) {
+        if (stk.emoji) {
+          const kws = EMOJI_KEYWORD_MAP[stk.emoji] || [];
+          if (
+            kws.some((kw) => kw.includes(q)) ||
+            p.name.toLowerCase().includes(q) ||
+            p.title.toLowerCase().includes(q)
+          ) {
+            matches.push(stk);
+          }
+        }
+      }
+    }
+    return matches;
+  }, [activeTab, searchQuery, activePackId, packs, recentStickers]);
+
+  const handleStickerClick = useCallback(
+    (stk: StickerItem) => {
+      telegramStickerService.recordRecentSticker(stk);
+      if (onSelectSticker) {
+        onSelectSticker(stk);
+      }
+    },
+    [onSelectSticker]
+  );
+
   const scrollToCategory = (catId: string) => {
     setActiveCategoryId(catId);
     if (!scrollContainerRef.current) return;
@@ -309,7 +377,7 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
           <input
             type="text"
             className="veil-emoji-search-input"
-            placeholder="Search emojis..."
+            placeholder={activeTab === 'stickers' ? 'Search stickers...' : 'Search emojis...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label="Search emojis"
@@ -358,7 +426,7 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
         </div>
       </div>
 
-      {/* Category Icons Row with Active Highlighter */}
+      {/* Category Icons Row with Active Highlighter (Emoji) */}
       {activeTab === 'emoji' && !searchQuery && (
         <div className="veil-emoji-category-bar" role="tablist" aria-label="Emoji categories">
           <button
@@ -386,7 +454,57 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
         </div>
       )}
 
-      {/* Main Emoji Grid Content */}
+      {/* Sticker Pack Icons Row with Active Highlighter (Stickers) */}
+      {activeTab === 'stickers' && !searchQuery && (
+        <div className="veil-emoji-category-bar veil-sticker-pack-bar" role="tablist" aria-label="Sticker packs">
+          <button
+            type="button"
+            className={`veil-emoji-category-icon-btn ${activePackId === 'recent' ? 'active' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setActivePackId('recent')}
+            title="Recent Stickers"
+            aria-label="Recent Stickers"
+          >
+            <span>{'\u{1F552}'}</span>
+          </button>
+
+          {packs.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`veil-emoji-category-icon-btn veil-sticker-pack-btn ${activePackId === p.id ? 'active' : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setActivePackId(p.id)}
+              title={p.title}
+              aria-label={p.title}
+            >
+              {p.thumbnailUrl ? (
+                <img
+                  src={p.thumbnailUrl}
+                  alt={p.title}
+                  className="veil-sticker-pack-thumb"
+                  loading="lazy"
+                />
+              ) : (
+                <span>{'\u{2B50}'}</span>
+              )}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="veil-emoji-category-icon-btn veil-sticker-add-pill-btn"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setIsAddModalOpen(true)}
+            title="Add Telegram Sticker Pack"
+            aria-label="Add Telegram Sticker Pack"
+          >
+            <span style={{ fontSize: '1.2rem', fontWeight: 300, lineHeight: 1 }}>+</span>
+          </button>
+        </div>
+      )}
+
+      {/* Main Grid Content */}
       <div ref={scrollContainerRef} className="veil-emoji-scroll-area">
         {activeTab === 'emoji' ? (
           <>
@@ -432,43 +550,88 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
               </div>
             ))}
           </>
+        ) : activeTab === 'stickers' ? (
+          <div className="veil-sticker-content-section">
+            <div className="veil-emoji-section-header">
+              {searchQuery
+                ? `STICKER SEARCH ("${searchQuery}")`
+                : activePackId === 'recent'
+                ? 'RECENT STICKERS'
+                : (packs.find((p) => p.id === activePackId)?.title || 'STICKERS').toUpperCase()}
+            </div>
+            {filteredStickers.length === 0 ? (
+              <div className="veil-emoji-empty-tab" style={{ padding: '30px 16px', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--veil-text-secondary, #94a3b8)' }}>
+                  No matching stickers found
+                </span>
+              </div>
+            ) : (
+              <div className="veil-sticker-grid">
+                {filteredStickers.map((stk: StickerItem) => (
+                  <button
+                    key={stk.id}
+                    type="button"
+                    className="veil-sticker-cell"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleStickerClick(stk)}
+                    title={stk.emoji || 'Sticker'}
+                    aria-label={`Sticker ${stk.emoji || ''}`}
+                  >
+                    <img src={stk.url} alt={stk.emoji} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="veil-emoji-empty-tab" style={{ padding: '30px 16px', textAlign: 'center' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--veil-text-secondary, #94a3b8)' }}>
-              {activeTab === 'stickers' ? 'Stickers library coming soon' : 'GIFs library coming soon'}
+              GIFs library coming soon
             </span>
           </div>
         )}
       </div>
 
-      {/* Floating Bottom-Right Backspace Action Button */}
-      <button
-        type="button"
-        className="veil-emoji-backspace-floating"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          onBackspace();
-        }}
-        title="Delete character"
-        aria-label="Delete character"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {/* Floating Bottom-Right Backspace Action Button (active only in emoji mode) */}
+      {activeTab === 'emoji' && (
+        <button
+          type="button"
+          className="veil-emoji-backspace-floating"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onBackspace();
+          }}
+          title="Delete character"
+          aria-label="Delete character"
         >
-          <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-          <line x1="18" y1="9" x2="12" y2="15" />
-          <line x1="12" y1="9" x2="18" y2="15" />
-        </svg>
-      </button>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+            <line x1="18" y1="9" x2="12" y2="15" />
+            <line x1="12" y1="9" x2="18" y2="15" />
+          </svg>
+        </button>
+      )}
+
+      {/* Add Telegram Sticker Pack Modal */}
+      <AddStickerPackModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onPackInstalled={(newPack) => {
+          setPacks((prev) => [...prev.filter((p) => p.id !== newPack.id), newPack]);
+          setActivePackId(newPack.id);
+        }}
+      />
     </div>
   );
 };

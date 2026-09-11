@@ -7,10 +7,11 @@
  * contextual Android permission handling, and 100% SVG vector iconography.
  */
 
-import React, { useState, useRef, KeyboardEvent } from 'react';
+import React, { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import { useApp, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
+import { StickerItem } from '../../media/telegramStickerService.ts';
 import {
   SendIcon,
   PaperclipIcon,
@@ -247,6 +248,23 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       return prev.slice(0, -1);
     });
   };
+
+  // Sticker selection handler (Double Ratchet E2EE dispatch)
+  const handleSelectSticker = useCallback(
+    async (sticker: StickerItem) => {
+      try {
+        setIsEmojiDrawerOpen(false);
+        const res = await fetch(sticker.url);
+        const blob = await res.blob();
+        const file = new File([blob], `${sticker.id}.sticker.webp`, { type: 'image/webp' });
+        (file as any).isSticker = true;
+        await sendAttachment(conversationId, file, { isSticker: true } as any);
+      } catch (_err) {
+        // preserve
+      }
+    },
+    [conversationId, sendAttachment]
+  );
 
   // Voice recording controls with runtime permission management
   const startRecordingFlow = async () => {
@@ -727,6 +745,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       <EmojiDrawer
         isOpen={isEmojiDrawerOpen}
         onSelectEmoji={handleInsertEmoji}
+        onSelectSticker={handleSelectSticker}
         onBackspace={handleEmojiBackspace}
         onClose={() => setIsEmojiDrawerOpen(false)}
       />

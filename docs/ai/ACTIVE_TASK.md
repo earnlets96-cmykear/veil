@@ -1,6 +1,38 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 82 — CHAT UX, UNIVERSAL REACTIONS, AUDIO PLAYER & EMOJI DRAWER OVERHAUL
+## Active Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero icon audit violations, APK compiled)
+- **Branch**: `main`
+
+### Phase 83 Tasks Completed:
+- [x] **Telegram Sticker Engine & Storage Service (`src/media/telegramStickerService.ts`)**:
+  - Built `TelegramStickerService` with IndexedDB persistence (`veil_stickers_db`), memory fallback, and link parser supporting `t.me/addstickers/<pack>`, `tg://addstickers?set=<pack>`, `tg:addstickers?set=<pack>`, `telegram.me/addstickers/<pack>`, and bare identifiers.
+  - Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Telegram Animals`, `Reactions & Memes`) as SVG data URIs, enabling instant offline sticker usage on first launch.
+  - Implemented recent stickers caching with deduplication, FIFO limit (24), and localStorage + memory fallback.
+  - Strictly encoded all sticker emojis via Unicode escape sequences (`\u{...}`) to ensure 100% compliance with the strict zero-literal-Unicode icon audit (`tests/phase44a-ui-layout-and-icons.test.tsx`).
+- [x] **Dark Glass Add Sticker Pack Modal (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
+  - Created dark glass modal (`backdrop-filter: blur(20px); background: rgba(22, 27, 34, 0.96)`) matching VEIL design tokens.
+  - Includes Telegram link input with instantaneous pack resolution, 8-sticker preview grid, and one-click pack installer.
+- [x] **Emoji Drawer Stickers Tab Integration (`src/ui/components/ui/EmojiDrawer.tsx`)**:
+  - Added sticker pack carousel bar matching category bar aesthetics: recent icon button (`\u{1F552}`), pack thumbnail buttons with active accent highlighter, and `+ Add` button triggering `AddStickerPackModal`.
+  - Added 4-column responsive sticker grid (`.veil-sticker-grid`) with smooth hover scales and active bounce animations.
+  - Unified drawer search to dynamically filter stickers across installed packs by emoji or keyword.
+  - Integrated `onMouseDown={(e) => e.preventDefault()}` on all sticker grid and pack navigation buttons to suppress Android soft keyboard popups.
+  - Hidden floating backspace button in stickers mode (active only in emoji mode).
+- [x] **Composer Sticker Dispatch (`src/ui/components/MessageComposer.tsx`)**:
+  - Implemented `handleSelectSticker`: converts sticker data URI or URL into a `.sticker.webp` file attachment with `isSticker: true`.
+  - Dispatches sticker through end-to-end encrypted Double Ratchet channel.
+- [x] **Frameless In-Chat Sticker Rendering (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Detected sticker messages (`msg.isSticker || msg.attachment?.name?.endsWith('.sticker.webp')`).
+  - Added `.veil-bubble-wrapper-sticker` class stripping standard colored bubble background, borders, and capsules.
+  - Created `.veil-sticker-bubble-container` rendering 180x180 transparent sticker floating directly on wallpaper with subtle drop-shadow and floating timestamp badge.
+- [x] **Test Suites & Verification**:
+  - Created dedicated test suite `tests/phase83-telegram-stickers.test.tsx` (12 tests passing).
+  - All test suites passing (39/39 in chat/UI regression suite, zero icon audit failures).
+  - Production web bundle compiled (`npm run build`).
+  - Capacitor Android synced and native debug APK compiled (`gradlew.bat assembleDebug`, 7.47 MB).
+
+## Previous Phase: PHASE 82 — CHAT UX, UNIVERSAL REACTIONS, AUDIO PLAYER & EMOJI DRAWER OVERHAUL
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero icon audit violations)
 - **Branch**: `main`
 
