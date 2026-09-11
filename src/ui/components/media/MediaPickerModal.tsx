@@ -69,7 +69,9 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   };
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      void openRecent(['image', 'video'], false);
+    } else {
       setRecentStatus('idle');
       setRecentItems([]);
       setRecentCursor(undefined);
@@ -144,12 +146,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
   };
 
-  const openRecent = async (types: Array<'image' | 'video'> = ['image', 'video']) => {
+  const openRecent = async (types: Array<'image' | 'video'> = ['image', 'video'], triggerFallbackDialog = true) => {
     if (!deviceMedia.isNative()) {
-      notifyPickerLaunch();
-      if (types.length === 1 && types[0] === 'image') photoInputRef.current?.click();
-      else if (types.length === 1 && types[0] === 'video') videoInputRef.current?.click();
-      else fileInputRef.current?.click();
+      if (triggerFallbackDialog) {
+        notifyPickerLaunch();
+        if (types.length === 1 && types[0] === 'image') photoInputRef.current?.click();
+        else if (types.length === 1 && types[0] === 'video') videoInputRef.current?.click();
+        else fileInputRef.current?.click();
+      }
       return;
     }
 
@@ -303,7 +307,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             className={`veil-share-tab-btn ${activeTab === 'gallery' ? 'active' : ''}`}
             onClick={() => {
               setActiveTab('gallery');
-              if (recentItems.length === 0) void openRecent(['image', 'video']);
+              if (recentItems.length === 0) void openRecent(['image', 'video'], true);
             }}
           >
             <ImageIcon size={15} />
@@ -341,7 +345,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             className={`veil-share-tab-btn ${activeTab === 'recent' ? 'active' : ''}`}
             onClick={() => {
               setActiveTab('recent');
-              void openRecent(['image', 'video']);
+              void openRecent(['image', 'video'], true);
             }}
           >
             <ClockIcon size={15} />
@@ -364,7 +368,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void openRecent(['image', 'video'])}
+              onClick={() => void openRecent(['image', 'video'], true)}
               disabled={recentStatus === 'loading'}
             >
               {recentStatus === 'loading' ? 'Loading...' : 'Browse recent'}

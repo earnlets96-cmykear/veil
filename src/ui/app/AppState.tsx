@@ -211,8 +211,8 @@ export interface AppContextType {
   selectConversation: (id: string | null) => void;
   setReplyTarget: (msg: UIMessage | null) => void;
   sendMessage: (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
-  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
-  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
+  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }) => Promise<void>;
+  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }) => Promise<void>;
   sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
@@ -2563,7 +2563,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       files: File[],
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }
     ) => {
       if (!activeSession || files.length === 0) return;
 
@@ -2640,9 +2640,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const firstMime = initialAttachments[0]?.mimeType || '';
       const summaryText =
-        files.length === 1 && !firstMime.startsWith('image/') && !firstMime.startsWith('video/')
+        options?.caption?.trim() ||
+        (files.length === 1 && !firstMime.startsWith('image/') && !firstMime.startsWith('video/')
           ? `Attachment: ${files[0].name}`
-          : '';
+          : '');
 
       const pendingMsg: UIMessage = {
         id: msgId,
@@ -3087,7 +3088,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       file: File,
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }
     ) => {
       return sendAttachments(conversationId, [file], options);
     },

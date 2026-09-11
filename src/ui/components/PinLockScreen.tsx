@@ -123,7 +123,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
     ['1', '2', '3'],
     ['4', '5', '6'],
     ['7', '8', '9'],
-    ['enter', '0', 'backspace'],
+    ['backspace', '0', 'enter'],
   ];
 
   return (

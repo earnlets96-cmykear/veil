@@ -2,6 +2,30 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase82-universal-reactions-and-chat-ux] - 2026-09-11
+
+### Chat UX, Universal Reactions, Audio Player & Emoji Drawer Overhaul (Phase 82)
+- **Swapped OK/Enter and Backspace on PIN Lock Keypad (`src/ui/components/PinLockScreen.tsx`, `src/ui/components/AppLockSetupModal.tsx`)**:
+  - Reordered bottom keypad row from `['enter', '0', 'backspace']` to `['backspace', '0', 'enter']` to align with standard mobile PIN interfaces.
+- **Swipe-up to Lock Indication & Recording Actions (`src/ui/components/MessageComposer.tsx`, `src/styles/veil-design-system.css`, `src/styles/veil-components.css`)**:
+  - Added bouncing SVG chevron to lock pill and set `.veil-composer` overflow to `visible` to prevent clipping.
+  - Dynamically switched active recording mic button to `<SendIcon size={18} color="#ffffff" />`.
+- **In-Line Music / Audio Player Card (`src/ui/components/ui/AudioPlayerCard.tsx`, `src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Created inline audio player for `.mp3`, `.m4a`, `audio/*` with play/pause, seek scrubber, metadata, and download button.
+  - Placed before generic file attachment card rendering.
+- **Slide-up Emoji Drawer (`src/ui/components/ui/EmojiDrawer.tsx`, `src/ui/components/MessageComposer.tsx`, `src/styles/veil-components.css`)**:
+  - Built sliding bottom emoji drawer with search, segmented control (`Emoji / Stickers / GIFs`), category bar, frequently used section, latest Unicode emojis, and floating backspace.
+  - All emojis formatted with Unicode escape sequences to ensure zero violations in the strict UI iconography security audit.
+  - Repaired smiley button in composer to toggle drawer rather than opening media picker.
+- **Telegram-Style Media Captions (`src/ui/app/AppState.tsx`, `src/ui/components/MessageComposer.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Attached media captions directly to attachment messages (`msg.text`) without dispatching separate text messages.
+  - Rendered captions inside `.veil-media-bubble-container` beneath media content.
+- **Universal Floating Reactions for Non-Text Media (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Added `.veil-floating-reaction-badge` for images, videos, audio cards, and documents.
+  - Removed media/attachment cards from click suppression so right-click, long-press, and card tap open the reaction bar.
+- **Auto-Loading Media Picker Recent Items (`src/ui/components/media/MediaPickerModal.tsx`)**:
+  - Automatically loads recent media when modal opens without requiring manual click.
+
 ## [1.0.0-phase81-strict-typecheck-and-compilation-safety] - 2026-09-11
 
 ### Strict Typecheck & Compilation Safety Hardening (Phase 81)

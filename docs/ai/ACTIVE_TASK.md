@@ -1,6 +1,40 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 81 — STRICT TYPECHECK & COMPILATION SAFETY HARDENING (UNDEFINED IDENTIFIER PREVENTION)
+## Active Phase: PHASE 82 — CHAT UX, UNIVERSAL REACTIONS, AUDIO PLAYER & EMOJI DRAWER OVERHAUL
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero icon audit violations)
+- **Branch**: `main`
+
+### Phase 82 Tasks Completed:
+- [x] **Swapped OK and Backspace Buttons on Lock Screens (Issue 6)**:
+  - Swapped positions of Backspace and Enter/OK on the keypad (`PinLockScreen.tsx` & `AppLockSetupModal.tsx`) so Backspace sits bottom-left and Enter/OK sits bottom-right: `['backspace', '0', 'enter']`.
+  - Fully verified with `tests/phase62-applock-privacy-auth.test.tsx` and `tests/phase63-deep-repair.test.tsx`.
+- [x] **Swipe-up to Lock Indication & Dynamic Send Icon on Recording (Issue 7)**:
+  - Added bouncing SVG chevron arrow to `.veil-recording-lock-pill`.
+  - Switched `.veil-composer` overflow to `visible` so the lock pill is not clipped.
+  - Dynamically switched active recording mic button to `<SendIcon size={18} color="#ffffff" />`.
+- [x] **In-Line Music / Audio Player Card (Issue 8)**:
+  - Implemented dedicated `<AudioPlayerCard />` component (`src/ui/components/ui/AudioPlayerCard.tsx`) for `audio/*`, `.mp3`, `.m4a`, `.wav`, `.ogg`, `.flac`, `.aac`.
+  - Provides inline play/pause circular button, scrubbable progress bar, track title, time/duration, and download button.
+  - Integrates with `VoicePlayer.stop()` to pause conflicting voice notes.
+- [x] **Slide-Up Emoji Drawer (Issue 3)**:
+  - Built `<EmojiDrawer />` (`src/ui/components/ui/EmojiDrawer.tsx`) sliding up under composer.
+  - Features top drag handle, search input, segmented control (`Emoji / Stickers / GIFs`), category navigation bar, `FREQUENTLY USED` section + latest Unicode emojis, and floating backspace button.
+  - Uses Unicode escape sequences to comply 100% with the strict zero-literal-Unicode icon audit (`phase44a`).
+  - Corrected smiley button in `MessageComposer.tsx` to toggle the emoji drawer instead of opening media picker.
+- [x] **Telegram-Style Media Captioning (Issue 5)**:
+  - Updated `sendAttachments` and `sendAttachment` in `src/ui/app/AppState.tsx` to accept `options.caption` and store it as `msg.text` on the media message.
+  - Removed duplicate `sendMessage` calls in `MessageComposer.tsx` so captions are attached directly to the media message rather than sent as a separate bubble.
+  - Rendered captions in `ConversationView.tsx` within `.veil-media-bubble-container` beneath media items.
+- [x] **Universal Floating Reactions for Non-Text Cards (Issues 1 & 2)**:
+  - Added `.veil-floating-reaction-badge` to `ConversationView.tsx` to render floating reaction pills on images, videos, audio player cards, and file attachments.
+  - Unblocked card context menu triggers: removed media and attachment cards from the click suppression block in `ConversationMessageRow` so right-click, long-press, or card tap opens the reaction bar.
+- [x] **Auto-Loading Media Picker Recent Items (Issue 4)**:
+  - Updated `MediaPickerModal.tsx` to automatically load recent photos/videos when opened, eliminating the need to manually click "Browse recent".
+- [x] **Zero Regressions & Full Test Suite Pass**:
+  - All 391 test files and 1,235 tests pass with 100% success rate.
+  - Production build (`npm run build`) succeeds cleanly with 7 release artifacts.
+
+## Previous Phase: PHASE 81 — STRICT TYPECHECK & COMPILATION SAFETY HARDENING (UNDEFINED IDENTIFIER PREVENTION)
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero runtime undefined errors)
 - **Branch**: `main`
 

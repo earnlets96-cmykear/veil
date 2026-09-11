@@ -33,6 +33,7 @@ import {
   IconButton,
   EmptyState,
   AttachmentCard,
+  AudioPlayerCard,
   VoiceNoteCard,
   MessageBubble,
   ReplyPreview,
@@ -162,13 +163,29 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const isAudioAttachment = Boolean(
+    msg.attachment &&
+    (msg.attachment.mimeType?.startsWith('audio/') ||
+      msg.attachment.name?.endsWith('.mp3') ||
+      msg.attachment.name?.endsWith('.m4a') ||
+      msg.attachment.name?.endsWith('.wav') ||
+      msg.attachment.name?.endsWith('.ogg') ||
+      msg.attachment.name?.endsWith('.flac') ||
+      msg.attachment.name?.endsWith('.aac'))
+  );
+
   const isMedia =
     msg.attachment &&
+    !isAudioAttachment &&
     (msg.attachment.mimeType?.startsWith('image/') ||
       msg.attachment.mimeType?.startsWith('video/'));
   const isGrouped = Boolean(msg.attachments && msg.attachments.length > 1);
+
+  const hasMediaOrFileCard = isMedia || isGrouped || isAudioAttachment || Boolean(msg.attachment) || Boolean(msg.voice);
+
   const hasVisibleTextBubble = Boolean(
     msg.text &&
+    !hasMediaOrFileCard &&
     !msg.text.startsWith('Attachment:') &&
     !msg.text.includes('Attachment:') &&
     msg.text !== 'Voice Message'
@@ -196,7 +213,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('.veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"]')) {
+    if (target?.closest('button, input, textarea, a, [data-no-swipe="true"]')) {
       return;
     }
     if (e.touches && e.touches.length === 1) {
@@ -295,7 +312,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           }
           const target = e.target as HTMLElement | null;
           const isInteractive = target?.closest(
-            'button, a, input, textarea, select, [role="button"], [role="checkbox"], .veil-waveform-container, .veil-voicenote-card, .veil-reactions-bar, .veil-reaction-chip, .veil-msg-checkbox, .veil-media-bubble-container, .veil-attachment-card'
+            'button, a, input, textarea, select, [role="checkbox"], .veil-reactions-bar, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox'
           );
           if (!isInteractive && (!window.getSelection || window.getSelection()?.toString().length === 0)) {
             onContextMenu(e, msg);
@@ -426,6 +443,11 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                 attachments={msg.attachments}
                 onOpenItem={handleGroupedMedia}
               />
+              {msg.text && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
+                <div className="veil-media-caption-text">
+                  {msg.text}
+                </div>
+              )}
               <div className="veil-media-meta-overlay">
                 <span className="veil-media-time">
                   {new Date(msg.timestamp).toLocaleTimeString([], {
@@ -447,6 +469,11 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                 onClick={handleMediaClick}
                 alt={msg.attachment.name}
               />
+              {msg.text && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
+                <div className="veil-media-caption-text">
+                  {msg.text}
+                </div>
+              )}
               {(isCurrentlyDownloading || msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING') && (
                 <div
                   className="veil-media-download-progress-overlay"
@@ -489,8 +516,30 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
             </div>
           )}
 
+          {/* Dedicated In-Line Music / Audio Player Card */}
+          {!isGrouped && msg.attachment && isAudioAttachment && (
+            <AudioPlayerCard
+              messageId={msg.id}
+              name={msg.attachment.name}
+              sizeBytes={msg.attachment.sizeBytes}
+              mimeType={msg.attachment.mimeType}
+              blobUrl={msg.attachment.previewUrl || msg.attachment.localPreviewUrl}
+              isOutgoing={msg.isOutgoing}
+              status={
+                isCurrentlyDownloading
+                  ? 'downloading'
+                  : msg.status === 'UPLOADING' || (msg.attachment.state as any)?.toLowerCase() === 'uploading'
+                  ? 'uploading'
+                  : (msg.attachment.state as any)?.toLowerCase() || 'ready'
+              }
+              progressPercent={isCurrentlyDownloading ? dlPercent : effectiveUploadPercent}
+              loadedBytes={isCurrentlyDownloading ? dlLoaded : effectiveUploadLoaded}
+              onDownload={handleDownload}
+            />
+          )}
+
           {/* Standard File Attachment Card */}
-          {!isGrouped && msg.attachment && !isMedia && (
+          {!isGrouped && msg.attachment && !isMedia && !isAudioAttachment && (
             <AttachmentCard
               name={msg.attachment.name}
               sizeBytes={msg.attachment.sizeBytes}
@@ -506,6 +555,13 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               loadedBytes={isCurrentlyDownloading ? dlLoaded : effectiveUploadLoaded}
               onDownload={handleDownload}
             />
+          )}
+
+          {/* Caption for Audio or File Attachment if present */}
+          {!isGrouped && msg.attachment && (isAudioAttachment || !isMedia) && msg.text && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
+            <div className="veil-media-caption-text" style={{ padding: '4px 10px 6px' }}>
+              {msg.text}
+            </div>
           )}
 
           {/* Voice Note Card */}
@@ -568,8 +624,28 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               edited={msg.edited}
               onReactionClick={onReactionClick ? handleReactionAction : undefined}
               onContextMenu={handleContextMenuAction}
-              onLongPress={handleLongPress}
             />
+          )}
+
+          {/* Universal Reactions Badge for Non-Text Cards (Screenshot 2 / floating reaction pill) */}
+          {!hasVisibleTextBubble && (msg as any).reactions && (msg as any).reactions.length > 0 && (
+            <div className="veil-floating-reaction-badge" role="group" aria-label="Reactions">
+              {((msg as any).reactions as Array<{ emoji: string; count: number; userReacted?: boolean }>).map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`veil-reaction-pill ${r.userReacted ? 'user-reacted' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReactionClick?.(msg, r.emoji);
+                  }}
+                  aria-label={`Reaction ${r.emoji} count ${r.count}`}
+                >
+                  <span className="veil-reaction-emoji">{r.emoji}</span>
+                  <span className="veil-reaction-count">{r.count}</span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
         {isSelectionMode && msg.isOutgoing && (

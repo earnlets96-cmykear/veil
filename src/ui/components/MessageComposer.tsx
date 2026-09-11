@@ -10,7 +10,7 @@
 import React, { useState, useRef, KeyboardEvent } from 'react';
 import { useApp, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
-import { Button, IconButton, ReplyPreview, Spinner, useToast } from './ui/index.ts';
+import { Button, IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
 import {
   SendIcon,
   PaperclipIcon,
@@ -68,6 +68,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [isEmojiDrawerOpen, setIsEmojiDrawerOpen] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isPermissionPermanent, setIsPermissionPermanent] = useState(false);
 
@@ -141,37 +142,90 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Confirm sending staged files (non-blocking)
+  // Confirm sending staged files (Telegram-style single message with caption)
   const handleConfirmSendFiles = async (filesToSend: File[], caption?: string) => {
     setStagedFiles(null);
     try {
+      const trimmedCaption = caption?.trim() || undefined;
       if (filesToSend.length === 1) {
-        sendAttachment(conversationId, filesToSend[0]);
+        sendAttachment(conversationId, filesToSend[0], { caption: trimmedCaption });
       } else if (filesToSend.length > 1) {
-        sendAttachments(conversationId, filesToSend);
-      }
-      if (caption && caption.trim()) {
-        await sendMessage(conversationId, caption.trim());
+        sendAttachments(conversationId, filesToSend, { caption: trimmedCaption });
       }
     } catch (_err) {
       // Background queue preserves messages
     }
   };
 
-  // Handle send from In-App Media Picker
+  // Handle send from In-App Media Picker (Telegram-style single message with caption)
   const handleMediaPickerSend = async (options: MediaPickerSendOptions) => {
     try {
+      const trimmedCaption = options.caption?.trim() || undefined;
       if (options.files.length === 1) {
-        sendAttachment(conversationId, options.files[0]);
+        sendAttachment(conversationId, options.files[0], { caption: trimmedCaption });
       } else if (options.files.length > 1) {
-        sendAttachments(conversationId, options.files);
-      }
-      if (options.caption && options.caption.trim()) {
-        await sendMessage(conversationId, options.caption.trim());
+        sendAttachments(conversationId, options.files, { caption: trimmedCaption });
       }
     } catch (_err) {
       // Background queue preserves messages
     }
+  };
+
+  // Emoji insertion and backspace handlers
+  const handleInsertEmoji = (emoji: string) => {
+    setText((prev) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return prev + emoji;
+      const start = textarea.selectionStart ?? prev.length;
+      const end = textarea.selectionEnd ?? prev.length;
+      const nextText = prev.slice(0, start) + emoji + prev.slice(end);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const newPos = start + emoji.length;
+          textareaRef.current.setSelectionRange(newPos, newPos);
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+        }
+      }, 0);
+      return nextText;
+    });
+  };
+
+  const handleEmojiBackspace = () => {
+    setText((prev) => {
+      if (!prev) return '';
+      const textarea = textareaRef.current;
+      const start = textarea?.selectionStart ?? prev.length;
+      const end = textarea?.selectionEnd ?? prev.length;
+      if (start !== end) {
+        return prev.slice(0, start) + prev.slice(end);
+      }
+      if (start === 0) return prev;
+      const chars = Array.from(prev);
+      let runningLength = 0;
+      let deleteIdx = -1;
+      for (let i = 0; i < chars.length; i++) {
+        runningLength += chars[i].length;
+        if (runningLength >= start) {
+          deleteIdx = i;
+          break;
+        }
+      }
+      if (deleteIdx >= 0) {
+        chars.splice(deleteIdx, 1);
+        const nextText = chars.join('');
+        const newPos = Math.max(0, start - (prev.length - nextText.length));
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.setSelectionRange(newPos, newPos);
+          }
+        }, 0);
+        return nextText;
+      }
+      return prev.slice(0, -1);
+    });
   };
 
   // Voice recording controls with runtime permission management
@@ -514,7 +568,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                 >
                   <LockIcon size={12} color="var(--veil-accent-primary, #14b8a6)" />
                   <span>Slide up to lock</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg className="veil-lock-arrow-bounce" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="18 15 12 9 6 15" />
                   </svg>
                 </div>
@@ -552,7 +606,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                   onClick={handleSendVoice}
                   aria-label="Send Voice Recording"
                 >
-                  <MicIcon size={20} color="#ffffff" />
+                  <SendIcon size={18} color="#ffffff" />
                 </button>
               )}
             </div>
@@ -572,24 +626,25 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             </button>
 
             {/* Auto-expanding textarea */}
+            <span className="veil-sr-only">Type an encrypted message...</span>
             <textarea
               ref={textareaRef}
               className="veil-composer-input"
-              placeholder="Type an encrypted message..."
+              placeholder="Message..."
               value={text}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}
               rows={1}
-              aria-label="Message Input Field"
+              aria-label="Type an encrypted message..."
             />
 
             {/* Inline emoji smiley button */}
             <button
               type="button"
-              className="veil-composer-emoji-btn"
-              onClick={() => setIsMediaPickerOpen(true)}
-              aria-label="Add media or emoji"
-              title="Add media or emoji"
+              className={`veil-composer-emoji-btn ${isEmojiDrawerOpen ? 'veil-composer-emoji-btn-active' : ''}`}
+              onClick={() => setIsEmojiDrawerOpen((prev) => !prev)}
+              aria-label="Toggle emoji picker"
+              title="Toggle emoji picker"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -633,6 +688,14 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
           </>
         )}
       </div>
+
+      {/* Slide-up Emoji Drawer */}
+      <EmojiDrawer
+        isOpen={isEmojiDrawerOpen}
+        onSelectEmoji={handleInsertEmoji}
+        onBackspace={handleEmojiBackspace}
+        onClose={() => setIsEmojiDrawerOpen(false)}
+      />
     </div>
   );
 };
