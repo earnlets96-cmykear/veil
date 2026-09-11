@@ -95,6 +95,9 @@ interface ConversationMessageRowProps {
   downloadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
   downloadPercent?: number;
   downloadLoadedBytes?: number;
+  uploadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
+  uploadPercent?: number;
+  uploadLoadedBytes?: number;
   playbackProgress?: Record<string, number>;
   playbackCurrentTime?: Record<string, number>;
   currentPlaybackProgress?: number;
@@ -131,6 +134,9 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   downloadProgress,
   downloadPercent,
   downloadLoadedBytes,
+  uploadProgress,
+  uploadPercent,
+  uploadLoadedBytes,
   playbackProgress,
   playbackCurrentTime,
   currentPlaybackProgress,
@@ -173,6 +179,19 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const currentTime = currentPlaybackTime ?? (playbackCurrentTime ? playbackCurrentTime[msg.id] || 0 : 0);
   const dlPercent = downloadPercent ?? (downloadProgress ? downloadProgress[msg.id]?.percent : undefined);
   const dlLoaded = downloadLoadedBytes ?? (downloadProgress ? downloadProgress[msg.id]?.loaded : undefined);
+
+  const effectiveUploadPercent =
+    uploadPercent ??
+    (uploadProgress ? uploadProgress[msg.id]?.percent : undefined) ??
+    (msg.attachment?.attachmentId && uploadProgress ? uploadProgress[msg.attachment.attachmentId]?.percent : undefined) ??
+    (msg.attachment?.objectId && uploadProgress ? uploadProgress[msg.attachment.objectId]?.percent : undefined) ??
+    msg.uploadProgress;
+
+  const effectiveUploadLoaded =
+    uploadLoadedBytes ??
+    (uploadProgress ? uploadProgress[msg.id]?.loaded : undefined) ??
+    (msg.attachment?.attachmentId && uploadProgress ? uploadProgress[msg.attachment.attachmentId]?.loaded : undefined) ??
+    (msg.attachment?.objectId && uploadProgress ? uploadProgress[msg.attachment.objectId]?.loaded : undefined);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches && e.touches.length === 1) {
@@ -401,7 +420,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                     minute: '2-digit',
                   })}
                 </span>
-                {msg.isOutgoing && <MessageStatus status={msg.status} />}
+                {msg.isOutgoing && <MessageStatus status={msg.status} uploadProgress={effectiveUploadPercent} />}
               </div>
             </div>
           )}
@@ -436,11 +455,11 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                     size={52}
                     percent={
                       isCurrentlyDownloading
-                        ? dlPercent ?? 15
-                        : 50
+                        ? (dlPercent ?? 0)
+                        : (effectiveUploadPercent ?? 0)
                     }
                     totalBytes={msg.attachment.sizeBytes}
-                    loadedBytes={isCurrentlyDownloading ? dlLoaded : undefined}
+                    loadedBytes={isCurrentlyDownloading ? dlLoaded : effectiveUploadLoaded}
                     variant={msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING' ? 'upload' : 'download'}
                   />
                 </div>
@@ -452,7 +471,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                     minute: '2-digit',
                   })}
                 </span>
-                {msg.isOutgoing && <MessageStatus status={msg.status} />}
+                {msg.isOutgoing && <MessageStatus status={msg.status} uploadProgress={effectiveUploadPercent} />}
               </div>
             </div>
           )}
@@ -470,8 +489,8 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                   ? 'uploading'
                   : (msg.attachment.state as any)?.toLowerCase() || 'ready'
               }
-              progressPercent={dlPercent}
-              loadedBytes={dlLoaded}
+              progressPercent={isCurrentlyDownloading ? dlPercent : effectiveUploadPercent}
+              loadedBytes={isCurrentlyDownloading ? dlLoaded : effectiveUploadLoaded}
               onDownload={handleDownload}
             />
           )}
@@ -513,6 +532,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               text={msg.text}
               timestamp={msg.timestamp}
               status={msg.status}
+              uploadProgress={effectiveUploadPercent}
               replyTo={
                 msg.replyTo
                   ? {
@@ -552,6 +572,7 @@ export const ConversationView: React.FC = () => {
     conversations,
     contacts,
     messages,
+    uploadProgress,
     myProfile,
     sendMessage,
     sendAttachment,
@@ -899,12 +920,22 @@ export const ConversationView: React.FC = () => {
       return;
     }
 
-    const totalBytes = msg.attachment?.sizeBytes || (msg.voice ? 64 * 1024 : 0);
+    const totalBytes = msg.attachment?.sizeBytes || (msg.voice ? msg.voice.sizeBytes || 64 * 1024 : 0);
     setDownloadingAttachmentId(msg.id);
     setDownloadProgress((prev) => ({
       ...prev,
-      [msg.id]: { percent: 15, loaded: Math.round(totalBytes * 0.15), total: totalBytes },
+      [msg.id]: { percent: 0, loaded: 0, total: totalBytes },
     }));
+
+    const onDownloadProgress = (loaded: number, total: number) => {
+      const effectiveTotal = total > 0 ? total : totalBytes;
+      const percent = effectiveTotal > 0 ? Math.min(100, Math.round((loaded / effectiveTotal) * 100)) : 0;
+      setDownloadProgress((prev) => ({
+        ...prev,
+        [msg.id]: { percent, loaded, total: effectiveTotal },
+      }));
+    };
+
     try {
       let data: Uint8Array | null = null;
       let filename = msg.attachment?.name || `file_${msg.id.slice(0, 8)}`;
@@ -923,11 +954,7 @@ export const ConversationView: React.FC = () => {
           if (!cloudClient.getSessionToken()) {
             await ensureCloudSession(activeSession);
           }
-          setDownloadProgress((prev) => ({
-            ...prev,
-            [msg.id]: { percent: 50, loaded: Math.round(totalBytes * 0.5), total: totalBytes },
-          }));
-          const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice);
+          const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice, onDownloadProgress);
           const res = await fetch(blobUrl);
           const buf = await res.arrayBuffer();
           data = new Uint8Array(buf);
@@ -940,11 +967,7 @@ export const ConversationView: React.FC = () => {
           if (!cloudClient.getSessionToken()) {
             await ensureCloudSession(activeSession);
           }
-          setDownloadProgress((prev) => ({
-            ...prev,
-            [msg.id]: { percent: 45, loaded: Math.round(totalBytes * 0.45), total: totalBytes },
-          }));
-          cached = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
+          cached = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient, onDownloadProgress);
         }
 
         if (cached && cached.data) {
@@ -955,7 +978,7 @@ export const ConversationView: React.FC = () => {
       if (data) {
         setDownloadProgress((prev) => ({
           ...prev,
-          [msg.id]: { percent: 85, loaded: Math.round(totalBytes * 0.85), total: totalBytes },
+          [msg.id]: { percent: 100, loaded: totalBytes, total: totalBytes },
         }));
         // Use gallery save for images/videos, regular save for other files
         const isGalleryMedia = mimeType.startsWith('image/') || mimeType.startsWith('video/');
@@ -1602,6 +1625,18 @@ export const ConversationView: React.FC = () => {
                 downloadProgress={downloadProgress}
                 downloadPercent={downloadProgress?.[msg.id]?.percent}
                 downloadLoadedBytes={downloadProgress?.[msg.id]?.loaded}
+                uploadProgress={uploadProgress}
+                uploadPercent={
+                  uploadProgress?.[msg.id]?.percent ??
+                  (msg.attachment?.attachmentId ? uploadProgress?.[msg.attachment.attachmentId]?.percent : undefined) ??
+                  (msg.attachment?.objectId ? uploadProgress?.[msg.attachment.objectId]?.percent : undefined) ??
+                  msg.uploadProgress
+                }
+                uploadLoadedBytes={
+                  uploadProgress?.[msg.id]?.loaded ??
+                  (msg.attachment?.attachmentId ? uploadProgress?.[msg.attachment.attachmentId]?.loaded : undefined) ??
+                  (msg.attachment?.objectId ? uploadProgress?.[msg.attachment.objectId]?.loaded : undefined)
+                }
                 playbackProgress={playbackProgress}
                 playbackCurrentTime={playbackCurrentTime}
                 playingAudioId={playingAudioId}

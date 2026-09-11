@@ -1,6 +1,42 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 77 — ZERO-ERROR EBML CUES INDEXING & NATIVE AUDIO RESILIENCE
+## Active Phase: PHASE 78 — REAL-TIME BYTE-DRIVEN PROGRESS TRACKING & FUNCTIONAL PROGRESS CIRCLES
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across test suites; Android assembleDebug APK built successfully)
+- **Branch**: `main`
+
+### Phase 78 Tasks Completed:
+- [x] **Eliminated Fake Progress Circle Overlays & Arbitrary Step Hardcoding**:
+  - Removed hardcoded `: 50` and `: 15` fallbacks in `ConversationView.tsx` and fake simulated download progression (15% -> 45% -> 85%).
+  - Removed `?? (isUploading ? 50 : 25)` fallback in `AttachmentCard.tsx`.
+- [x] **Real-Time Byte-Level Upload Progress (`cloudClient.ts`)**:
+  - Implemented `onProgress?: (loaded: number, total: number) => void` in `CloudClient.uploadAttachment` using `XMLHttpRequest.upload.onprogress` with fallback to `fetch`.
+  - Calculates true `(event.loaded, event.total)` bytes transferred over the network in real-time.
+- [x] **Chunk-by-Chunk Streaming Download Progress (`cloudClient.ts`, `mediaCache.ts`)**:
+  - Implemented `onProgress?: (loaded: number, total: number) => void` in `CloudClient.downloadAttachment` using `ReadableStream` reader (`res.body.getReader()`).
+  - Pipes progressive byte arrival into `MediaCache.getOrFetch` and `VoiceRecorder.downloadAndDecryptVoiceNote`.
+- [x] **AppState Real-Time Upload State Pipeline (`AppState.tsx`)**:
+  - Added `uploadProgress: Record<string, { percent: number; loaded: number; total: number }>` to `AppContextType` and `AppProvider`.
+  - In `uploadWorker` and `sendVoiceMessage`, passed `onProgress` updating `uploadProgress` state and `msg.uploadProgress` in real-time.
+- [x] **VoiceNoteCard Perimeter Progress Ring (`VoiceNoteCard.tsx`)**:
+  - Wrapped 36px play/pause button in a 44x44px container with an SVG circular progress ring (`cx="22" cy="22" r="20" strokeWidth="2.5"`).
+  - Smoothly sweeps clockwise matching playback progress and user scrubbing in real-time.
+- [x] **MessageStatus Real Upload Ring (`MessageBubble.tsx`, `ConversationView.tsx`)**:
+  - Passed real `effectiveUploadPercent` to `<MessageStatus status={msg.status} uploadProgress={effectiveUploadPercent} />`.
+  - Renders the circular SVG ring on outgoing messages during uploads.
+- [x] **Comprehensive Automated Verification & Production Build**:
+  - New test suite: `tests/phase78-functional-progress-circle.test.tsx` (8/8 tests passing):
+    - Validates upload `onProgress` byte callback.
+    - Validates streaming chunk `onProgress` byte callback.
+    - Validates `MediaCache.getOrFetch` and `VoiceRecorder` pipeline progress forwarding.
+    - Validates `AttachmentCard` true progress without fake fallback.
+    - Validates `VoiceNoteCard` perimeter SVG progress ring calculation.
+    - Validates `MessageStatus` upload SVG ring rendering.
+  - Regression suites passed (18/18 voice/seeking/forensics tests passing).
+  - Production web bundle compiled (`npm run build`).
+  - Capacitor Android synchronized (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 25s).
+
+## Previous Phase: PHASE 77 — ZERO-ERROR EBML CUES INDEXING & NATIVE AUDIO RESILIENCE
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, 1208+ tests; Android assembleDebug APK built successfully)
 - **Branch**: `main`
 

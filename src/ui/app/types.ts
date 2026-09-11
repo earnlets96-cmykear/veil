@@ -96,6 +96,7 @@ export interface UIMessage {
   forwardedFrom?: string;
   edited?: boolean;
   editedAt?: number;
+  uploadProgress?: number;
 }
 
 export interface ReplyReference {

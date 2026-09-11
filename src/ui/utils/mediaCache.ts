@@ -133,7 +133,8 @@ class MediaCacheManager {
   public async getOrFetch(
     attachment: AttachmentPayload,
     session: SpaceSession | null,
-    cloudClient: CloudClient
+    cloudClient: CloudClient,
+    onProgress?: (loaded: number, total: number) => void
   ): Promise<DecryptedMedia> {
     const candidateKeys = [
       attachment.objectId,
@@ -187,7 +188,7 @@ class MediaCacheManager {
 
         const downloadAndDecrypt = async (): Promise<DecryptedMedia> => {
           RuntimeDiagnostics.download('downloadStarted', { objectId, attachmentId: attachment.attachmentId });
-          const rawCiphertext = await cloudClient.downloadAttachment(objectId);
+          const rawCiphertext = await cloudClient.downloadAttachment(objectId, onProgress);
           RuntimeDiagnostics.download('downloadCompleted', { objectId, bytes: rawCiphertext.length });
 
           let plaintextBytes: Uint8Array;

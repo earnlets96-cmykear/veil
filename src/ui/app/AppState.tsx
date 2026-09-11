@@ -174,6 +174,7 @@ export interface AppContextType {
   config: AppConfig;
   replyTarget: UIMessage | null;
   recoveryPasswordChangeRequired: boolean;
+  uploadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
 
   privacySettings: UserPrivacySettings;
   updatePrivacySettings: (settings: Partial<UserPrivacySettings>) => Promise<void>;
@@ -293,6 +294,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [recoveryPasswordChangeRequired, setRecoveryPasswordChangeRequired] = useState(false);
   const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, { percent: number; loaded: number; total: number }>>({});
   const [isAppLocked, setIsAppLocked] = useState<boolean>(() => spacePinManager.isAppLockEnabled());
   const lastBackgroundTimeRef = useRef<number | null>(null);
   const isFilePickerActiveRef = useRef<boolean>(false);
@@ -2792,9 +2794,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   createParams.recipientIdentityId = recipientIdentityId;
                 }
 
+                const onProgress = (loaded: number, total: number) => {
+                  const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+                  setUploadProgress((prev) => ({
+                    ...prev,
+                    [currentAtt.attachmentId]: { percent, loaded, total },
+                    [objectId]: { percent, loaded, total },
+                  }));
+                  setMessages((prev) => {
+                    const list = prev[conversationId];
+                    if (!list) return prev;
+                    let touched = false;
+                    const nextList = list.map((m) => {
+                      if (
+                        m.attachment?.attachmentId === currentAtt.attachmentId ||
+                        m.attachments?.some((a) => a.attachmentId === currentAtt.attachmentId)
+                      ) {
+                        touched = true;
+                        return { ...m, uploadProgress: percent };
+                      }
+                      return m;
+                    });
+                    return touched ? { ...prev, [conversationId]: nextList } : prev;
+                  });
+                };
+
                 const createRes = await cloudClient.createAttachment(createParams);
                 objectId = createRes.attachment.objectId;
-                await cloudClient.uploadAttachment(objectId, fileBytes);
+                await cloudClient.uploadAttachment(objectId, fileBytes, onProgress);
               };
 
               const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);
@@ -2827,6 +2854,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   throw uploadErr;
                 }
               }
+
+              setUploadProgress((prev) => {
+                const next = { ...prev };
+                delete next[currentAtt.attachmentId];
+                delete next[objectId];
+                return next;
+              });
 
               RuntimeDiagnostics.upload('uploadCompleted', {
                 attachmentId: currentAtt.attachmentId,
@@ -2883,6 +2917,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
               updateTimeline(activeAttachments, 'UPLOADING');
             } catch (err: any) {
+              setUploadProgress((prev) => {
+                const next = { ...prev };
+                delete next[currentAtt.attachmentId];
+                return next;
+              });
               hasAnyError = true;
               activeAttachments[idx] = {
                 ...currentAtt,
@@ -3143,6 +3182,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const targetConv = conversations.find((c) => c.id === conversationId);
           const isGroup = conversationId.startsWith('grp_') || targetConv?.type === 'group';
 
+          const onVoiceProgress = (loaded: number, total: number) => {
+            const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+            setUploadProgress((prev) => ({
+              ...prev,
+              [msgId]: { percent, loaded, total },
+            }));
+            setMessages((prev) => {
+              const list = prev[conversationId];
+              if (!list) return prev;
+              const nextList = list.map((m) => {
+                if (m.id === msgId) {
+                  return { ...m, uploadProgress: percent };
+                }
+                return m;
+              });
+              return { ...prev, [conversationId]: nextList };
+            });
+          };
+
           const voiceMeta = await VoiceRecorder.uploadVoiceNote(
             activeSession,
             cloudClient,
@@ -3156,8 +3214,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               allowedAccounts: recipientAccountId ? [recipientAccountId] : undefined,
               groupId: isGroup ? conversationId : undefined,
               conversationId,
-            }
+            },
+            onVoiceProgress
           );
+
+          setUploadProgress((prev) => {
+            const next = { ...prev };
+            delete next[msgId];
+            if (voiceMeta?.objectId) delete next[voiceMeta.objectId];
+            return next;
+          });
 
           let voiceDeliveryStatus: DeliveryStatus = 'SENT_TO_RELAY';
 
@@ -3263,6 +3329,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return updated;
           });
         } catch (voiceErr) {
+          setUploadProgress((prev) => {
+            const next = { ...prev };
+            delete next[msgId];
+            return next;
+          });
           if (typeof console !== 'undefined' && console.warn) {
             console.warn('[VEIL-VOICE] Background voice upload failed:', voiceErr);
           }
@@ -4519,6 +4590,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       config: appConfig,
       replyTarget,
       recoveryPasswordChangeRequired,
+      uploadProgress,
       isAppLocked,
       setAppLocked: setIsAppLocked,
       unlockWithPin,
@@ -4613,6 +4685,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       appConfig,
       replyTarget,
       recoveryPasswordChangeRequired,
+      uploadProgress,
       isAppLocked,
       setIsAppLocked,
       unlockWithPin,

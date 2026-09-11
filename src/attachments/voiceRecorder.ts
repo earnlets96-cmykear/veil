@@ -180,7 +180,8 @@ export class VoiceRecorder {
       allowedAccounts?: string[];
       groupId?: string;
       conversationId?: string;
-    }
+    },
+    onProgress?: (loaded: number, total: number) => void
   ): Promise<VoiceRecordingMetadata> {
     let audioBytes = rawAudioBytes;
     if (mimeType.includes('webm') && !hasValidWebmIndex(audioBytes)) {
@@ -213,7 +214,7 @@ export class VoiceRecorder {
       encryptedMetadata: JSON.stringify(metadataPayload),
     });
 
-    await cloudClient.uploadAttachment(attachment.objectId, audioBytes);
+    await cloudClient.uploadAttachment(attachment.objectId, audioBytes, onProgress);
 
     return {
       durationSeconds,
@@ -243,9 +244,10 @@ export class VoiceRecorder {
       allowedAccounts?: string[];
       groupId?: string;
       conversationId?: string;
-    }
+    },
+    onProgress?: (loaded: number, total: number) => void
   ): Promise<VoiceRecordingMetadata> {
-    return this.uploadVoiceNote(session, cloudClient, rawAudioBytes, durationSeconds, mimeType, recipientAuth);
+    return this.uploadVoiceNote(session, cloudClient, rawAudioBytes, durationSeconds, mimeType, recipientAuth, onProgress);
   }
 
   /**
@@ -254,7 +256,8 @@ export class VoiceRecorder {
   public static async downloadAndDecryptVoiceNote(
     session: SpaceSession,
     cloudClient: CloudClient,
-    meta: VoiceRecordingMetadata
+    meta: VoiceRecordingMetadata,
+    onProgress?: (loaded: number, total: number) => void
   ): Promise<string> {
     try {
       const { MediaCache } = await import('../ui/utils/mediaCache.ts');
@@ -266,7 +269,7 @@ export class VoiceRecorder {
         sizeBytes: meta.sizeBytes,
         encryptionKeyBase64: meta.encryptionKeyBase64,
       };
-      const cached = await MediaCache.getOrFetch(attachmentPayload, session, cloudClient);
+      const cached = await MediaCache.getOrFetch(attachmentPayload, session, cloudClient, onProgress);
       if (cached && cached.data) {
         let audioData = cached.data;
         if ((cached.mimeType?.includes('webm') || meta.mimeType?.includes('webm')) && !hasValidWebmIndex(audioData)) {
@@ -283,7 +286,7 @@ export class VoiceRecorder {
     } catch (_cacheErr) {}
 
     // Fallback: direct download from cloud client
-    const rawBytes = await cloudClient.downloadAttachment(meta.objectId);
+    const rawBytes = await cloudClient.downloadAttachment(meta.objectId, onProgress);
 
     if (!meta.encryptionKeyBase64) {
       let finalBytes = rawBytes;

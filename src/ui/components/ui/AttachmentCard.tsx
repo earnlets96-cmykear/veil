@@ -114,7 +114,7 @@ const AttachmentCardComponent: React.FC<AttachmentCardProps> = ({
         {isTransferring ? (
           <ProgressCircle
             size={36}
-            percent={progressPercent ?? (isUploading ? 50 : 25)}
+            percent={progressPercent ?? 0}
             totalBytes={sizeBytes}
             loadedBytes={loadedBytes}
             variant={isUploading ? 'upload' : 'download'}

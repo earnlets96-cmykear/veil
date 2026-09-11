@@ -312,87 +312,148 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
         position: 'relative',
       }}
     >
-      {/* Play/Pause/Retry Button */}
-      {isError ? (
-        <button
-          type="button"
-          className="veil-voicenote-play-btn veil-voicenote-retry-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (onRetry) onRetry();
-            else if (onPlayToggle) onPlayToggle();
-          }}
-          onPointerDown={stopAllEvents}
-          onTouchStart={stopAllEvents}
-          aria-label="Retry audio note"
-          title="Retry audio note"
-          style={{
-            width: '42px',
-            height: '42px',
-            minWidth: '42px',
-            backgroundColor: 'var(--veil-danger, #ef4444)',
-            color: '#ffffff',
-            borderRadius: '50%',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            cursor: 'pointer',
-            flexShrink: 0,
-            transition: 'transform 0.15s ease',
-          }}
-        >
-          <RefreshCwIcon size={16} color="#ffffff" />
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="veil-voicenote-play-btn"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (onPlayToggle) {
-              onPlayToggle();
-            } else if (messageId) {
-              if (isPlaying) {
-                VoicePlayer.pause();
-              } else if (isPaused) {
-                VoicePlayer.resume();
+      {/* Play/Pause/Retry Button Container with Perimeter Progress Ring */}
+      <div
+        className="veil-voicenote-btn-container"
+        style={{
+          position: 'relative',
+          width: '44px',
+          height: '44px',
+          minWidth: '44px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {/* SVG Progress Ring */}
+        {!isError && (
+          <svg
+            width="44"
+            height="44"
+            viewBox="0 0 44 44"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '44px',
+              height: '44px',
+              pointerEvents: 'none',
+              transform: 'rotate(-90deg)',
+              zIndex: 2,
+            }}
+          >
+            {/* Background track circle */}
+            <circle
+              cx="22"
+              cy="22"
+              r="20"
+              stroke="var(--veil-accent-primary, #14b8a6)"
+              strokeOpacity="0.2"
+              strokeWidth="2.5"
+              fill="none"
+            />
+            {/* Active progress circle */}
+            <circle
+              cx="22"
+              cy="22"
+              r="20"
+              stroke="var(--veil-accent-primary, #14b8a6)"
+              strokeWidth="2.5"
+              strokeDasharray={2 * Math.PI * 20}
+              strokeDashoffset={2 * Math.PI * 20 * (1 - (effectiveProgress / 100))}
+              strokeLinecap="round"
+              fill="none"
+              style={{
+                transition: isScrubbing ? 'none' : 'stroke-dashoffset 0.1s linear',
+              }}
+            />
+          </svg>
+        )}
+
+        {isError ? (
+          <button
+            type="button"
+            className="veil-voicenote-play-btn veil-voicenote-retry-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onRetry) onRetry();
+              else if (onPlayToggle) onPlayToggle();
+            }}
+            onPointerDown={stopAllEvents}
+            onTouchStart={stopAllEvents}
+            aria-label="Retry audio note"
+            title="Retry audio note"
+            style={{
+              width: '36px',
+              height: '36px',
+              minWidth: '36px',
+              backgroundColor: 'var(--veil-danger, #ef4444)',
+              color: '#ffffff',
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'transform 0.15s ease',
+              zIndex: 1,
+            }}
+          >
+            <RefreshCwIcon size={16} color="#ffffff" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="veil-voicenote-play-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onPlayToggle) {
+                onPlayToggle();
+              } else if (messageId) {
+                if (isPlaying) {
+                  VoicePlayer.pause();
+                } else if (isPaused) {
+                  VoicePlayer.resume();
+                }
               }
-            }
-          }}
-          onPointerDown={stopAllEvents}
-          onTouchStart={stopAllEvents}
-          disabled={isLoading || isUploading}
-          aria-label={isUploading ? 'Uploading audio...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
-          title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
-          style={{
-            width: '42px',
-            height: '42px',
-            minWidth: '42px',
-            backgroundColor: 'var(--veil-accent-primary, #14b8a6)',
-            color: '#ffffff',
-            borderRadius: '50%',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
-            flexShrink: 0,
-            transition: 'transform 0.15s ease, background-color 0.15s ease',
-            animation: isLoading ? 'veilPulse 1.4s infinite' : undefined,
-          }}
-        >
-          {isUploading || isLoading ? (
-            <Spinner size="sm" aria-label="Loading audio..." />
-          ) : isPlaying ? (
-            <PauseIcon size={18} color="#ffffff" />
-          ) : (
-            <PlayIcon size={18} color="#ffffff" />
-          )}
-        </button>
-      )}
+            }}
+            onPointerDown={stopAllEvents}
+            onTouchStart={stopAllEvents}
+            disabled={isLoading || isUploading}
+            aria-label={isUploading ? 'Uploading audio...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
+            title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
+            style={{
+              width: '36px',
+              height: '36px',
+              minWidth: '36px',
+              backgroundColor: 'var(--veil-accent-primary, #14b8a6)',
+              color: '#ffffff',
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              cursor: isLoading || isUploading ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+              transition: 'transform 0.15s ease, background-color 0.15s ease',
+              animation: isLoading ? 'veilPulse 1.4s infinite' : undefined,
+              zIndex: 1,
+            }}
+          >
+            {isUploading || isLoading ? (
+              <Spinner size="sm" aria-label="Loading audio..." />
+            ) : isPlaying ? (
+              <PauseIcon size={16} color="#ffffff" />
+            ) : (
+              <PlayIcon size={16} color="#ffffff" style={{ marginLeft: '1px' }} />
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Waveform + Timer */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>

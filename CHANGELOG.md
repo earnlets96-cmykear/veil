@@ -2,6 +2,33 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase78-functional-progress-circles-and-byte-tracking] - 2026-09-11
+
+### Real-Time Byte-Driven Progress Tracking & Functional Progress Circles (Phase 78)
+- **Eliminated Fake Progress Circle Overlays**:
+  - Removed hardcoded `: 50` and `: 15` fallbacks in `src/ui/components/ConversationView.tsx` and artificial step progression (15% -> 45% -> 85%).
+  - Removed `?? (isUploading ? 50 : 25)` fallback in `src/ui/components/ui/AttachmentCard.tsx`.
+- **True Network Byte-Level Upload Tracking (`src/network/cloudClient.ts`)**:
+  - Wired `onProgress?: (loaded: number, total: number) => void` in `CloudClient.uploadAttachment` using `XMLHttpRequest.upload.onprogress` with fallback to `fetch`.
+  - Accurately tracks actual network bytes sent over the wire.
+- **Streaming Chunk-by-Chunk Download Tracking (`src/network/cloudClient.ts`, `src/ui/utils/mediaCache.ts`)**:
+  - Added stream reading (`res.body.getReader()`) in `CloudClient.downloadAttachment` with `onProgress` callbacks.
+  - Forwarded through `MediaCache.getOrFetch` and `VoiceRecorder.downloadAndDecryptVoiceNote` for true byte-level download rings.
+- **Dynamic Upload Progress Pipeline (`src/ui/app/AppState.tsx`)**:
+  - Added `uploadProgress` state in `AppProvider` and exposed in `AppContextType`.
+  - Live updates from `uploadWorker` and `sendVoiceMessage` dispatch real-time percentages to `ConversationView` and message status badges.
+- **Perimeter SVG Circular Progress Ring (`src/ui/components/ui/VoiceNoteCard.tsx`)**:
+  - Wrapped play/pause button in a 44x44px container with an SVG circular progress ring (`cx="22" cy="22" r="20" strokeWidth="2.5"`).
+  - Dynamically calculates `strokeDashoffset` from `effectiveProgress` (0% to 100%), sweeping clockwise in sync with audio playback and scrub position.
+- **MessageStatus Circular Upload Ring (`src/ui/components/ui/MessageBubble.tsx`, `src/ui/components/ConversationView.tsx`)**:
+  - Passed real `effectiveUploadPercent` to `<MessageStatus status={msg.status} uploadProgress={effectiveUploadPercent} />`.
+- **Automated Verification & Artifacts**:
+  - New test suite: `tests/phase78-functional-progress-circle.test.tsx` (8/8 tests pass).
+  - Voice regression suites pass (18/18 tests pass).
+  - Production web bundle compiled (`npm run build`, 7 artifacts).
+  - Synced with Capacitor Android (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug`, BUILD SUCCESSFUL in 25s).
+
 ## [1.0.0-phase77-zero-error-ebml-seeking-and-audio-resilience] - 2026-09-11
 
 ### EBML Zero-Error Seek Pointer Precision & Native Audio Resilience (Phase 77)

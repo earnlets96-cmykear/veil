@@ -44,6 +44,7 @@ export interface MessageBubbleProps {
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
   edited?: boolean;
+  uploadProgress?: number;
   className?: string;
 }
 
@@ -59,6 +60,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   timestamp,
   status,
   deliveryStatus,
+  uploadProgress,
   replyTo,
   onReplyClick,
   onReplyTrigger,
@@ -420,7 +422,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
                 </span>
               )}
               <MessageTimestamp timestamp={timestamp} />
-              {isOutgoing && <MessageStatus status={effectiveStatus} />}
+              {isOutgoing && <MessageStatus status={effectiveStatus} uploadProgress={uploadProgress} />}
             </div>
           </div>
         </div>
