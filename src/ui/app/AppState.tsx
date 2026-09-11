@@ -18,6 +18,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { base64ToBytes } from '../../crypto/utils.ts';
 import { spacePinManager } from '../../privacy/pinManager.ts';
 import { themeManager } from '../utils/themeManager.ts';
+import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
 
 export function resolveReplyReference(
   target: UIMessage | null,
@@ -1526,6 +1527,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       markFilePickerInactive();
     };
 
+    const unbindBridgeListeners = NativeDeviceMediaBridge.setPickerListeners(
+      markFilePickerActive,
+      markFilePickerInactive
+    );
+
     if (typeof document !== 'undefined') {
       document.addEventListener('click', handleFileInputClick, true);
       document.addEventListener('change', handleFileInputChange, true);
@@ -1597,6 +1603,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     return () => {
+      unbindBridgeListeners();
       if (typeof document !== 'undefined') {
         document.removeEventListener('click', handleFileInputClick, true);
         document.removeEventListener('change', handleFileInputChange, true);

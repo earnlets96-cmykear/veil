@@ -87,6 +87,26 @@ export class NativeDeviceMediaBridge {
    * The bytes remain in memory so the existing encrypted attachment pipeline is
    * still the only path that prepares a relay upload.
    */
+  private static onPickerActiveCallback?: () => void;
+  private static onPickerInactiveCallback?: () => void;
+
+  public static setPickerListeners(onActive: () => void, onInactive: () => void): () => void {
+    NativeDeviceMediaBridge.onPickerActiveCallback = onActive;
+    NativeDeviceMediaBridge.onPickerInactiveCallback = onInactive;
+    return () => {
+      NativeDeviceMediaBridge.onPickerActiveCallback = undefined;
+      NativeDeviceMediaBridge.onPickerInactiveCallback = undefined;
+    };
+  }
+
+  public static notifyPickerActive(active: boolean): void {
+    if (active) {
+      NativeDeviceMediaBridge.onPickerActiveCallback?.();
+    } else {
+      NativeDeviceMediaBridge.onPickerInactiveCallback?.();
+    }
+  }
+
   public async fileFromUri(uri: string): Promise<File> {
     const media = await this.readMedia(uri);
     const bytes = base64ToBytes(media.base64Data);
@@ -95,14 +115,24 @@ export class NativeDeviceMediaBridge {
 
   public async pickDocuments(): Promise<DeviceMediaItem[]> {
     if (!this.isNative()) return [];
-    const pick = this.adapter?.pickDocuments || NativeDeviceMedia.pickDocuments;
-    return (await pick()).items || [];
+    NativeDeviceMediaBridge.notifyPickerActive(true);
+    try {
+      const pick = this.adapter?.pickDocuments || NativeDeviceMedia.pickDocuments;
+      return (await pick()).items || [];
+    } finally {
+      NativeDeviceMediaBridge.notifyPickerActive(false);
+    }
   }
 
   public async captureMedia(): Promise<DeviceMediaItem[]> {
     if (!this.isNative()) return [];
-    const capture = this.adapter?.captureMedia || NativeDeviceMedia.captureMedia;
-    return (await capture()).items || [];
+    NativeDeviceMediaBridge.notifyPickerActive(true);
+    try {
+      const capture = this.adapter?.captureMedia || NativeDeviceMedia.captureMedia;
+      return (await capture()).items || [];
+    } finally {
+      NativeDeviceMediaBridge.notifyPickerActive(false);
+    }
   }
 
   public async saveToGallery(options: { filename: string; mimeType: string; base64Data: string }): Promise<{ uri: string; location: string }> {

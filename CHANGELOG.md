@@ -2,6 +2,32 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase79-filepicker-seeking-and-bubble-highlight] - 2026-09-11
+
+### File Picker Session Protection, Waveform Seeking Isolation & Refined Bubble Highlight (Phase 79)
+- **Android File Picker Session Protection (`src/media/NativeDeviceMediaBridge.ts`, `src/ui/app/AppState.tsx`, `src/ui/components/media/MediaPickerModal.tsx`)**:
+  - Eliminated auto-lock and app restart caused by external Android document/media picker transitions (`Intent.ACTION_OPEN_DOCUMENT`).
+  - Added static picker lifecycle listeners in `NativeDeviceMediaBridge` (`setPickerListeners`, `notifyPickerActive`).
+  - Connected `NativeDeviceMediaBridge` directly to `AppState`'s `markFilePickerActive` and `markFilePickerInactive`, holding active lock exemptions while system pickers are displayed.
+  - Wired `notifyPickerLaunch` into `MediaPickerModal` for documents, photos, videos, and camera actions.
+  - Added defensive fallback to `Intent.ACTION_GET_CONTENT` in `VeilDeviceMediaPlugin.kt`.
+- **Waveform Seeking Swipe Isolation & Visual Upgrade (`src/ui/components/ui/VoiceNoteCard.tsx`, `src/ui/components/ConversationView.tsx`, `src/ui/components/ui/MessageBubble.tsx`)**:
+  - Fixed touch event leakage: moved `e.stopPropagation()` and `e.preventDefault()` to the top of all track touch handlers in `VoiceNoteCard.tsx`, preventing horizontal scrub movement from triggering swipe-to-reply.
+  - Added `data-no-swipe="true"` on the waveform track container and voice note card.
+  - Added gesture guards in `ConversationView.tsx` and `MessageBubble.tsx` to ignore touch events originating from waveforms and voice note cards.
+  - Redesigned waveform with pill-capped bars (`border-radius: 9999px`), enhanced contrast between played and unplayed bars, and added an interactive tactile playhead needle (`.veil-waveform-playhead`) at `effectiveProgress%` that illuminates and expands during scrubbing.
+- **Bubble Highlight Border (`src/styles/veil-components.css`, `src/ui/components/ConversationView.tsx`)**:
+  - Eliminated the sharp rectangular box outline caused by targeting `.veil-bubble-wrapper` in `.veil-context-active-message`.
+  - Targeted bubble elements directly (`.veil-message-bubble`, `.veil-media-bubble-container`, `.veil-voicenote-card`, `.veil-attachment-card`).
+  - Reduced border shadow thickness from 2px to 1.5px (`box-shadow: 0 0 0 1.5px var(--veil-accent-primary, #14b8a6), 0 4px 16px rgba(0, 0, 0, 0.25) !important`), perfectly adhering to the bubble's rounded corners (`border-radius: 18px` / `16px` / `14px`).
+  - Updated `@keyframes veilHighlightPulse` and `.veil-message-selected` to follow the bubble's rounded curvature without full-width row rectangular flashes.
+- **Automated Verification & Artifacts**:
+  - New test suite: `tests/phase79-filepicker-seeking-highlight.test.tsx` (5/5 tests pass).
+  - Regression test suites pass (19/19 tests pass).
+  - Production web bundle compiled (`npm run build`, 7 artifacts).
+  - Synced with Capacitor Android (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug`, BUILD SUCCESSFUL in 1m 14s).
+
 ## [1.0.0-phase78-functional-progress-circles-and-byte-tracking] - 2026-09-11
 
 ### Real-Time Byte-Driven Progress Tracking & Functional Progress Circles (Phase 78)

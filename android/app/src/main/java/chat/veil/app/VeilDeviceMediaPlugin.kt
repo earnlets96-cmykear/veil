@@ -146,7 +146,20 @@ class VeilDeviceMediaPlugin : Plugin() {
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
-        startActivityForResult(call, intent, "documentPickerResult")
+        try {
+            startActivityForResult(call, intent, "documentPickerResult")
+        } catch (_: Exception) {
+            try {
+                val fallback = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                }
+                startActivityForResult(call, fallback, "documentPickerResult")
+            } catch (fallbackError: Exception) {
+                call.reject("No document picker available on this device", fallbackError)
+            }
+        }
     }
 
     @ActivityCallback

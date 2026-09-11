@@ -661,18 +661,35 @@
 }
 
 .veil-message-selected {
-  outline: 2px solid var(--veil-accent-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1.5px var(--veil-accent-primary) !important;
   background-color: var(--veil-accent-primary-subtle) !important;
-  border-radius: var(--veil-radius-md);
 }
 
 @keyframes veilHighlightPulse {
-  0% { background-color: var(--veil-accent-primary-subtle); transform: scale(1.02); }
-  50% { background-color: rgba(99, 102, 241, 0.4); }
-  100% { background-color: transparent; transform: scale(1); }
+  0% {
+    box-shadow: 0 0 0 2px var(--veil-accent-primary, #14b8a6), 0 0 16px rgba(20, 184, 166, 0.45);
+    transform: scale(1.015);
+  }
+  50% {
+    box-shadow: 0 0 0 1.5px var(--veil-accent-primary, #14b8a6), 0 0 10px rgba(20, 184, 166, 0.3);
+  }
+  100% {
+    box-shadow: none;
+    transform: scale(1);
+  }
 }
 
-.veil-message-highlight {
+.veil-msg-row.veil-message-highlight {
+  animation: none !important;
+  background-color: transparent !important;
+}
+
+.veil-message-highlight .veil-message-bubble,
+.veil-message-highlight .veil-media-bubble-container,
+.veil-message-highlight .veil-voicenote-card,
+.veil-message-highlight .veil-attachment-card,
+.veil-message-bubble.veil-message-highlight {
   animation: veilHighlightPulse 1.4s ease-out;
 }
 
@@ -803,9 +820,11 @@
 }
 
 .veil-context-active-message .veil-message-bubble,
-.veil-context-active-message .veil-bubble-wrapper {
-  box-shadow: 0 0 0 2px var(--veil-accent-primary, #14b8a6), 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-  transition: box-shadow 0.15s ease;
+.veil-context-active-message .veil-media-bubble-container,
+.veil-context-active-message .veil-voicenote-card,
+.veil-context-active-message .veil-attachment-card {
+  box-shadow: 0 0 0 1.5px var(--veil-accent-primary, #14b8a6), 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+  transition: box-shadow 0.18s ease-out;
 }
 
 .veil-scroll-bottom-btn {

@@ -92,6 +92,10 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   const hasTriggeredHapticRef = useRef(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('.veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"]')) {
+      return;
+    }
     if (e.touches && e.touches.length === 1) {
       touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
@@ -104,6 +108,10 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('.veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"]')) {
+      return;
+    }
     if (!touchStartRef.current || !e.touches || e.touches.length !== 1) return;
 
     const deltaX = e.touches[0].clientX - touchStartRef.current.x;

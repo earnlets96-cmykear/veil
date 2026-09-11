@@ -1,6 +1,32 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 78 — REAL-TIME BYTE-DRIVEN PROGRESS TRACKING & FUNCTIONAL PROGRESS CIRCLES
+## Current Verified Phase: PHASE 79 — FILE PICKER SESSION PROTECTION, WAVEFORM SEEKING ISOLATION & BUBBLE HIGHLIGHT
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL TESTS PASS, ANDROID GRADLE ASSEMBLE SUCCESS, RELEASE BUILD SUCCESS)**
+- **Branch**: `main`
+- **Android File Picker Session Protection**:
+  - Eliminated auto-lock and app restart caused by external Android document/media picker transitions (`Intent.ACTION_OPEN_DOCUMENT`).
+  - Added static picker lifecycle listeners in `NativeDeviceMediaBridge` (`setPickerListeners`, `notifyPickerActive`).
+  - Connected `NativeDeviceMediaBridge` directly to `AppState`'s `markFilePickerActive` and `markFilePickerInactive`, holding active lock exemptions while system pickers are displayed.
+  - Wired `notifyPickerLaunch` into `MediaPickerModal` for documents, photos, videos, and camera actions.
+  - Added defensive fallback to `Intent.ACTION_GET_CONTENT` in `VeilDeviceMediaPlugin.kt`.
+- **Waveform Seeking Swipe Isolation & Visual Upgrade**:
+  - Fixed touch event leakage: moved `e.stopPropagation()` and `e.preventDefault()` to the top of all track touch handlers in `VoiceNoteCard.tsx`, preventing horizontal scrub movement from triggering swipe-to-reply.
+  - Added `data-no-swipe="true"` on the waveform track container and voice note card.
+  - Added gesture guards in `ConversationView.tsx` and `MessageBubble.tsx` to ignore touch events originating from waveforms and voice note cards.
+  - Redesigned waveform with pill-capped bars (`border-radius: 9999px`), enhanced contrast between played and unplayed bars, and added an interactive tactile playhead needle (`.veil-waveform-playhead`) at `effectiveProgress%` that illuminates and expands during scrubbing.
+- **Bubble Highlight Border (Refined 1.5px & Rounded)**:
+  - Eliminated the sharp rectangular box outline caused by targeting `.veil-bubble-wrapper` in `.veil-context-active-message`.
+  - Targeted bubble elements directly (`.veil-message-bubble`, `.veil-media-bubble-container`, `.veil-voicenote-card`, `.veil-attachment-card`).
+  - Reduced border shadow thickness from 2px to 1.5px (`box-shadow: 0 0 0 1.5px var(--veil-accent-primary, #14b8a6), 0 4px 16px rgba(0, 0, 0, 0.25) !important`), perfectly adhering to the bubble's rounded corners (`border-radius: 18px` / `16px` / `14px`).
+  - Updated `@keyframes veilHighlightPulse` and `.veil-message-selected` to follow the bubble's rounded curvature without full-width row rectangular flashes.
+- **Verification Deliverables**:
+  - New Test Suite: `tests/phase79-filepicker-seeking-highlight.test.tsx` (5/5 tests pass).
+  - Regression Test Suites: `tests/phase70-voice-seeking-swipe-media-ui.test.tsx` (4/4 pass), `tests/phase31-advanced-messaging.test.tsx` (7/7 pass), `tests/phase78-functional-progress-circle.test.tsx` (8/8 pass), `tests/phase40-media-picker.test.tsx` (2/2 pass), `tests/phase74-media-interaction.test.tsx` (8/8 pass).
+  - Production Web Bundle: `npm run build` succeeds cleanly (7 release artifacts).
+  - Capacitor Android Sync: `npx cap sync android` completed in 0.283s.
+  - Native Android APK Build: `gradlew.bat assembleDebug` BUILD SUCCESSFUL in 1m 14s.
+
+## Previous Verified Phase: PHASE 78 — REAL-TIME BYTE-DRIVEN PROGRESS TRACKING & FUNCTIONAL PROGRESS CIRCLES
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — TESTS PASS, ANDROID GRADLE ASSEMBLE SUCCESS, RELEASE BUILD SUCCESS)**
 - **Branch**: `main`
 - **Real-Time Byte-Level Network Progress Tracking**:

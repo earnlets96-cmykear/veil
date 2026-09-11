@@ -22,6 +22,7 @@ import {
   type DeviceMediaItem,
   NativeDeviceMediaBridge,
 } from '../../../media/NativeDeviceMediaBridge.ts';
+import { useApp } from '../../app/AppState.tsx';
 
 export interface MediaPickerSendOptions {
   files: File[];
@@ -54,6 +55,17 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileToUriMapRef = useRef<Map<File, string>>(new Map());
   const deviceMedia = NativeDeviceMediaBridge.getInstance();
+
+  let markFilePickerActive: (() => void) | undefined;
+  try {
+    const app = useApp();
+    markFilePickerActive = app.markFilePickerActive;
+  } catch (_e) {}
+
+  const notifyPickerLaunch = () => {
+    markFilePickerActive?.();
+    NativeDeviceMediaBridge.notifyPickerActive(true);
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -133,6 +145,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
 
   const openRecent = async (types: Array<'image' | 'video'> = ['image', 'video']) => {
     if (!deviceMedia.isNative()) {
+      notifyPickerLaunch();
       if (types.length === 1 && types[0] === 'image') photoInputRef.current?.click();
       else if (types.length === 1 && types[0] === 'video') videoInputRef.current?.click();
       else fileInputRef.current?.click();
@@ -173,6 +186,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   };
 
   const openDocuments = async () => {
+    notifyPickerLaunch();
     if (!deviceMedia.isNative()) {
       fileInputRef.current?.click();
       return;
@@ -180,6 +194,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     try {
       await stageDeviceItems(await deviceMedia.pickDocuments());
     } catch (_error) {
+      notifyPickerLaunch();
       fileInputRef.current?.click();
     }
   };
@@ -307,7 +322,10 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           <button
             type="button"
             className="veil-attachment-action-btn"
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={() => {
+              notifyPickerLaunch();
+              cameraInputRef.current?.click();
+            }}
           >
             <CameraIcon size={22} color="var(--veil-accent-primary)" />
             <span>Camera</span>

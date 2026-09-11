@@ -235,8 +235,8 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleTouchStartTrack = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (pointerActiveRef.current) return;
     e.stopPropagation();
+    try { e.preventDefault(); } catch (_e) {}
     if (isUploading || isError) return;
     isScrubbingRef.current = true;
     setIsScrubbing(true);
@@ -246,8 +246,8 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleTouchMoveTrack = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (pointerActiveRef.current) return;
     e.stopPropagation();
+    try { e.preventDefault(); } catch (_e) {}
     if (!isScrubbingRef.current) return;
     if (e.touches && e.touches[0]) {
       handleSeekFromClientX(e.touches[0].clientX, false);
@@ -255,8 +255,8 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   };
 
   const handleTouchEndTrack = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (pointerActiveRef.current) return;
     e.stopPropagation();
+    try { e.preventDefault(); } catch (_e) {}
     isScrubbingRef.current = false;
     setIsScrubbing(false);
     lastHapticStepRef.current = -1;
@@ -295,6 +295,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   return (
     <div
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
+      data-no-swipe="true"
       role="region"
       aria-label={`${isOutgoing ? 'Sent' : 'Received'} Audio message voice note`}
       style={{
@@ -461,6 +462,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
         <div
           ref={trackRef}
           className="veil-waveform-container"
+          data-no-swipe="true"
           onPointerDown={handlePointerDown}
           onClick={handleClickTrack}
           onTouchStart={handleTouchStartTrack}
@@ -470,7 +472,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
           style={{
             position: 'relative',
             width: '100%',
-            height: '32px',
+            height: '34px',
             display: 'flex',
             alignItems: 'center',
             gap: '1.5px',
@@ -484,21 +486,21 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
             <div
               style={{
                 position: 'absolute',
-                top: '-24px',
+                top: '-26px',
                 left: `${effectiveProgress}%`,
                 transform: 'translateX(-50%)',
                 background: 'var(--veil-bg-surface, rgba(15, 23, 42, 0.95))',
                 color: '#ffffff',
-                padding: '2px 6px',
+                padding: '2px 8px',
                 borderRadius: '6px',
-                fontSize: '10px',
+                fontSize: '11px',
                 fontWeight: 600,
                 fontVariantNumeric: 'tabular-nums',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
                 pointerEvents: 'none',
                 whiteSpace: 'nowrap',
                 zIndex: 10,
-                border: '1px solid rgba(255, 255, 255, 0.15)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
               }}
             >
               {formatDuration(effectiveCurrentTime)} / {formatDuration(effectiveDuration)}
@@ -516,21 +518,42 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
                 className={`veil-waveform-bar ${isFilled && isActive ? 'active' : ''}`.trim()}
                 style={{
                   flex: '1 1 0',
-                  height: `${height * 100}%`,
-                  minWidth: '2px',
-                  borderRadius: '1.5px',
+                  height: `${Math.max(14, height * 100)}%`,
+                  minWidth: '2.5px',
+                  borderRadius: '9999px',
                   backgroundColor: isFilled && isActive
                     ? 'var(--veil-accent-primary, #14b8a6)'
                     : isFilled
                     ? 'var(--veil-accent-primary-hover, #0d9488)'
                     : isOutgoing
-                    ? 'rgba(255, 255, 255, 0.3)'
-                    : 'rgba(255, 255, 255, 0.18)',
+                    ? 'rgba(255, 255, 255, 0.35)'
+                    : 'rgba(148, 163, 184, 0.45)',
                   transition: isScrubbingRef.current ? 'none' : 'background-color 0.12s ease',
                 }}
               />
             );
           })}
+
+          {/* Tactile Playhead / Scrubber Needle */}
+          <div
+            className="veil-waveform-playhead"
+            style={{
+              position: 'absolute',
+              left: `${effectiveProgress}%`,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: isScrubbing ? '8px' : '4px',
+              height: isScrubbing ? '24px' : '18px',
+              borderRadius: '9999px',
+              backgroundColor: 'var(--veil-accent-primary, #14b8a6)',
+              boxShadow: isScrubbing
+                ? '0 0 10px var(--veil-accent-primary, #14b8a6), 0 0 2px #ffffff'
+                : '0 0 4px rgba(20, 184, 166, 0.7)',
+              pointerEvents: 'none',
+              transition: isScrubbing ? 'transform 0.1s ease, width 0.15s ease, height 0.15s ease' : 'left 0.08s linear',
+              zIndex: 5,
+            }}
+          />
         </div>
 
         {/* Timer Row */}

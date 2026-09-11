@@ -188,7 +188,9 @@ class MediaCacheManager {
 
         const downloadAndDecrypt = async (): Promise<DecryptedMedia> => {
           RuntimeDiagnostics.download('downloadStarted', { objectId, attachmentId: attachment.attachmentId });
-          const rawCiphertext = await cloudClient.downloadAttachment(objectId, onProgress);
+          const rawCiphertext = onProgress
+            ? await cloudClient.downloadAttachment(objectId, onProgress)
+            : await cloudClient.downloadAttachment(objectId);
           RuntimeDiagnostics.download('downloadCompleted', { objectId, bytes: rawCiphertext.length });
 
           let plaintextBytes: Uint8Array;
