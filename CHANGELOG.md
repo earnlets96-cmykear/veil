@@ -2,6 +2,31 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase84-mobile-keyboard-viewport] - 2026-09-11
+
+### Mobile Keyboard Insets, Viewport Resizing & Text Box Anchoring (Phase 84)
+- **Android Manifest Soft Input Configuration (`android/app/src/main/AndroidManifest.xml`)**:
+  - Explicitly configured `android:windowSoftInputMode="adjustResize"` on `MainActivity`.
+  - Replaces default `adjustPan` behavior under the full-screen splash/NoActionBar theme, forcing the native Android WebView container to physically resize when the soft keyboard appears rather than panning the window and submerging the bottom island.
+- **Viewport Meta Interactive Widget Mode (`index.html`)**:
+  - Updated HTML viewport tag with `interactive-widget=resizes-content` (`<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />`).
+  - Ensures modern Chromium and Android WebViews adapt CSS dynamic viewport units and layout containers directly to the visible viewport instead of leaving a floating layout viewport.
+- **Visual Viewport Synchronization Hook (`src/ui/hooks/useVisualViewport.ts`)**:
+  - Built real-time `useVisualViewport` hook tracking `window.visualViewport` dimensions, resize, and scroll events.
+  - Dynamically computes and assigns CSS custom properties `--veil-visual-viewport-height` and `--veil-keyboard-height` onto `document.documentElement`.
+  - Automatically sets `data-keyboard-open="true"` on `document.body` when keyboard height exceeds 100px.
+  - Actively clamps and resets `window.scrollTo(0, 0)` on scroll events to prevent mobile WebViews from panning the page document.
+- **Conversation Auto-Scroll & Viewport Integration (`src/ui/components/ConversationView.tsx`, `src/ui/App.tsx`)**:
+  - Mounted `useVisualViewport()` at top-level `App.tsx` and within `ConversationView.tsx`.
+  - Added an auto-scroll effect targeting `timelineEndRef` with a slight 80ms timeout to smoothly glide the conversation to the latest message whenever the on-screen keyboard expands.
+- **Mobile CSS Layout & Overscroll Containment (`src/styles/veil-design-system.css`)**:
+  - Added explicit `.veil-composer-container` rules with `flex-shrink: 0`, preventing flexbox from collapsing the input area when height shrinks.
+  - Set `overscroll-behavior: none` on `body` and `overscroll-behavior-y: contain` on `.veil-timeline` to isolate scrolling strictly to message history.
+  - In mobile media queries (`max-width: 768px`), pinned `.veil-app-layout` and conversation view to `height: var(--veil-visual-viewport-height, 100dvh) !important` with `top: 0; bottom: auto`, keeping the composer pinned directly above the keyboard with zero overlap or clipping.
+  - Streamlined `.veil-composer` padding when keyboard is open (`padding-bottom: 6px !important`).
+- **Automated Test Suite & Regression Guard (`tests/phase84-mobile-keyboard-viewport.test.tsx`)**:
+  - Added 7 comprehensive unit tests verifying viewport hook dimension tracking, `--veil-visual-viewport-height` and `--veil-keyboard-height` CSS variable assignment, body `data-keyboard-open` attribute toggling, window scroll lock enforcement, composer flex-shrink resistance, timeline overscroll containment, and manifest `adjustResize` presence.
+
 ## [1.0.0-phase83-telegram-stickers-and-frameless-chat] - 2026-09-11
 
 ### Telegram Sticker Packs & Frameless Chat UX (Phase 83)

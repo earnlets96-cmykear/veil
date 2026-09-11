@@ -23,6 +23,7 @@ import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
 import type { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/types.ts';
 import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
+import { useVisualViewport } from '../hooks/useVisualViewport.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
 import { CHAT_BACK_EDGE_PX, shouldCompleteConversationBackSwipe } from '../utils/mobileGesturePhysics.ts';
@@ -745,6 +746,9 @@ export const ConversationView: React.FC = () => {
   const unreadRef = useRef<HTMLDivElement>(null);
   const chatBackTouchRef = useRef<{ x: number; y: number; direction: 'ltr' | 'rtl' } | null>(null);
 
+  // Dynamic Visual Viewport & Keyboard State
+  const { isKeyboardOpen, visualViewportHeight } = useVisualViewport();
+
   // Search & Navigation State
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isSearchingInChat, setIsSearchingInChat] = useState(false);
@@ -952,6 +956,16 @@ export const ConversationView: React.FC = () => {
       timelineEndRef.current.scrollIntoView({ behavior: scrollBehavior });
     }
   }, [activeChatId, activeMessages.length, firstUnreadIndex]);
+
+  // Keep latest message visible above keyboard when keyboard opens or visual viewport shrinks
+  useEffect(() => {
+    if (isKeyboardOpen && timelineEndRef.current) {
+      const timer = setTimeout(() => {
+        timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isKeyboardOpen, visualViewportHeight]);
 
   // Auto-clear unread messages counter and dispatch read receipts when active
   useEffect(() => {

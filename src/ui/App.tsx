@@ -21,8 +21,12 @@ import { AccountsAndSpacesModal } from './components/AccountsAndSpacesModal.tsx'
 import { ShieldIcon, CloseIcon } from './components/icons/index.ts';
 import { spacePinManager } from '../privacy/pinManager.ts';
 import { themeManager } from './utils/themeManager.ts';
+import { useVisualViewport } from './hooks/useVisualViewport.ts';
 
 export const App: React.FC = () => {
+  // Bind visual viewport dimensions and keyboard insets to root CSS
+  useVisualViewport();
+
   const {
     activeSession,
     activeChatId,

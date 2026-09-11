@@ -1,8 +1,20 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
-- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 392 TEST SUITES PASS, ZERO ICON AUDIT ERRORS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
+## Current Verified Phase: PHASE 84 — MOBILE KEYBOARD INSET, VIEWPORT ANCHORING & SCROLL LOCK
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
 - **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Native Android WindowSoftInputMode AdjustResize**: Configured `android:windowSoftInputMode="adjustResize"` on `MainActivity` in `android/app/src/main/AndroidManifest.xml` so the Android WindowManager physically resizes the WebView instead of panning the Activity window or pushing the composer under the keyboard.
+  - **Interactive Widget Viewport Meta**: Added `interactive-widget=resizes-content` to `<meta name="viewport" ...>` in `index.html` ensuring modern Chromium and Android WebViews dynamically contract layout height above the keyboard.
+  - **Visual Viewport Runtime & Scroll Lock Hook**: Implemented `useVisualViewport` (`src/ui/hooks/useVisualViewport.ts`) listening to `window.visualViewport` resize/scroll, publishing `--veil-visual-viewport-height` and `--veil-keyboard-height`, setting `[data-keyboard-open="true"]`, and enforcing page scroll lock (`window.scrollTo(0, 0)`).
+  - **Conversation Timeline Auto-Scroll**: Integrated auto-scroll in `ConversationView.tsx` so the message list smoothly scrolls to the latest message whenever the keyboard opens.
+  - **CSS Flex Anchoring & Scroll Containment**: Styled `.veil-composer-container` with `flex-shrink: 0`, anchored mobile `.veil-app-layout` and `.veil-conversation-view` to `var(--veil-visual-viewport-height, 100dvh)`, and added `overscroll-behavior-y: contain;` to `.veil-timeline`.
+- **Verification Deliverables**:
+  - Test suites passing: `tests/phase84-mobile-keyboard-viewport.test.tsx` (7/7), `tests/phase37-android-layout.test.ts` (9/9), `tests/phase83-telegram-stickers.test.tsx` (16/16), `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19), `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts.
+  - Native Android debug APK: `gradlew.bat assembleDebug` generated `android/app/build/outputs/apk/debug/app-debug.apk` (7.48 MB).
+
+## Previous Verified Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
 - **Key Deliverables & Fixes**:
   - **Telegram Sticker Engine & Storage Service**: Built `TelegramStickerService` (`src/media/telegramStickerService.ts`) with IndexedDB (`veil_stickers_db`) and memory fallback, link parser supporting `t.me/addstickers/<pack>`, `tg://addstickers?set=<pack>`, `tg:addstickers?set=<pack>`, `telegram.me/addstickers/<pack>`, and bare identifiers.
   - **Offline Vector Starter Packs**: Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Cute Animals`, `Classic Memes`) as SVG data URIs, enabling instant offline sticker usage on first launch.

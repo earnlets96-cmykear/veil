@@ -1,8 +1,34 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
-- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero icon audit violations, APK compiled)
+## Active Phase: PHASE 84 — MOBILE KEYBOARD INSET, VIEWPORT ANCHORING & SCROLL LOCK
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across test suites, TypeScript release build success, APK compiled)
 - **Branch**: `main`
+
+### Phase 84 Tasks Completed:
+- [x] **Native Android Manifest AdjustResize (`android/app/src/main/AndroidManifest.xml`)**:
+  - Configured `android:windowSoftInputMode="adjustResize"` on `MainActivity`.
+  - Android WindowManager now physically resizes the WebView above the virtual keyboard instead of panning the screen or pushing the composer under the keyboard.
+- [x] **Viewport Meta Interactive Widget Mode (`index.html`)**:
+  - Added `interactive-widget=resizes-content` to `<meta name="viewport" ...>` so modern Chromium and Android WebViews dynamically contract layout height above the keyboard.
+- [x] **Visual Viewport Runtime & Scroll Lock Hook (`src/ui/hooks/useVisualViewport.ts`)**:
+  - Tracks `window.visualViewport` dimensions and offset with pixel precision.
+  - Exposes `--veil-visual-viewport-height` and `--veil-keyboard-height` CSS custom properties on `:root`.
+  - Tags `document.body` with `[data-keyboard-open="true"]` when the virtual keyboard is active.
+  - Enforces page-level scroll lock: intercepts window scroll events and immediately forces `window.scrollTo(0, 0)` to guarantee the page never scrolls.
+- [x] **ConversationView Timeline Auto-Scroll (`src/ui/components/ConversationView.tsx`)**:
+  - Integrated `useVisualViewport` to automatically scroll `.veil-timeline` to bottom whenever the keyboard opens or textarea focuses, keeping messages visible right above the composer.
+- [x] **CSS Flex Hierarchy & Timeline Containment (`src/styles/veil-design-system.css`)**:
+  - Styled `.veil-composer-container` with `flex-shrink: 0; width: 100%; position: relative; z-index: var(--veil-z-header);`.
+  - Anchored mobile `.veil-app-layout` and `.veil-conversation-view` to `height: var(--veil-visual-viewport-height, 100dvh) !important;` with `top: 0; left: 0; right: 0; bottom: auto;`.
+  - Added `overscroll-behavior: none;` to `body` and `overscroll-behavior-y: contain;` to `.veil-timeline` to prevent nested scroll chaining.
+  - Eliminated dead safe-area padding when keyboard is active via `body[data-keyboard-open="true"] .veil-composer { padding-bottom: 6px !important; }`.
+- [x] **Test Suites & Verification**:
+  - Created `tests/phase84-mobile-keyboard-viewport.test.tsx` (7/7 passing).
+  - Verified `tests/phase37-android-layout.test.ts` (9/9 passing).
+  - Compiled production bundle (`npm run build`).
+  - Synced Capacitor and compiled native Android APK (`gradlew.bat assembleDebug`, 7.48 MB).
+
+## Previous Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
 
 ### Phase 83 Tasks Completed:
 - [x] **Telegram Sticker Engine & Storage Service (`src/media/telegramStickerService.ts`)**:
