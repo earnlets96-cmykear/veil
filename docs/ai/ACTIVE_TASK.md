@@ -1,34 +1,38 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 84 — MOBILE KEYBOARD INSET, VIEWPORT ANCHORING & SCROLL LOCK
-- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across test suites, TypeScript release build success, APK compiled)
+## Active Phase: PHASE 85 — MESSAGE REACTIONS, 5 DEFAULT EMOJIS, EXPAND BUTTON & CONTEXT DISMISS
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript clean, Android debug APK compilation in progress)
 - **Branch**: `main`
 
-### Phase 84 Tasks Completed:
-- [x] **Native Android Manifest AdjustResize (`android/app/src/main/AndroidManifest.xml`)**:
-  - Configured `android:windowSoftInputMode="adjustResize"` on `MainActivity`.
-  - Android WindowManager now physically resizes the WebView above the virtual keyboard instead of panning the screen or pushing the composer under the keyboard.
-- [x] **Viewport Meta Interactive Widget Mode (`index.html`)**:
-  - Added `interactive-widget=resizes-content` to `<meta name="viewport" ...>` so modern Chromium and Android WebViews dynamically contract layout height above the keyboard.
-- [x] **Visual Viewport Runtime & Scroll Lock Hook (`src/ui/hooks/useVisualViewport.ts`)**:
-  - Tracks `window.visualViewport` dimensions and offset with pixel precision.
-  - Exposes `--veil-visual-viewport-height` and `--veil-keyboard-height` CSS custom properties on `:root`.
-  - Tags `document.body` with `[data-keyboard-open="true"]` when the virtual keyboard is active.
-  - Enforces page-level scroll lock: intercepts window scroll events and immediately forces `window.scrollTo(0, 0)` to guarantee the page never scrolls.
-- [x] **ConversationView Timeline Auto-Scroll (`src/ui/components/ConversationView.tsx`)**:
-  - Integrated `useVisualViewport` to automatically scroll `.veil-timeline` to bottom whenever the keyboard opens or textarea focuses, keeping messages visible right above the composer.
-- [x] **CSS Flex Hierarchy & Timeline Containment (`src/styles/veil-design-system.css`)**:
-  - Styled `.veil-composer-container` with `flex-shrink: 0; width: 100%; position: relative; z-index: var(--veil-z-header);`.
-  - Anchored mobile `.veil-app-layout` and `.veil-conversation-view` to `height: var(--veil-visual-viewport-height, 100dvh) !important;` with `top: 0; left: 0; right: 0; bottom: auto;`.
-  - Added `overscroll-behavior: none;` to `body` and `overscroll-behavior-y: contain;` to `.veil-timeline` to prevent nested scroll chaining.
-  - Eliminated dead safe-area padding when keyboard is active via `body[data-keyboard-open="true"] .veil-composer { padding-bottom: 6px !important; }`.
-- [x] **Test Suites & Verification**:
-  - Created `tests/phase84-mobile-keyboard-viewport.test.tsx` (7/7 passing).
-  - Verified `tests/phase37-android-layout.test.ts` (9/9 passing).
-  - Compiled production bundle (`npm run build`).
-  - Synced Capacitor and compiled native Android APK (`gradlew.bat assembleDebug`, 7.48 MB).
+### Phase 85 Tasks Completed:
+- [x] **Stacking Context & Floating Reactions Pill Z-Index**:
+  - Fixed `.veil-floating-reactions-pill` z-index to `1052` (`calc(var(--veil-z-popover, 1050) + 2)`).
+  - Previously had `zIndex: 1002`, causing the full-screen `.veil-context-backdrop` (z-index `1049`) to sit on top of the reactions pill, capturing all clicks and dismissing the popup without toggling the reaction or triggering the expand button.
+  - Added `onPointerDown={(e) => e.stopPropagation()}` and `onTouchStart={(e) => e.stopPropagation()}` on the pill to prevent bubbling to backdrop.
+- [x] **Initial 5 Default Reaction Emojis (`ConversationView.tsx`)**:
+  - Reordered and configured `DEFAULT_REACTION_EMOJIS` so the initial top 5 emojis are:
+    1. `\u{1F44D}` (👍 Thumbs Up)
+    2. `\u2764\uFE0F` (❤️ Red Heart)
+    3. `\u{1F602}` (😂 Tears of Joy)
+    4. `\u{1F62E}` (😮 Open Mouth / Surprised)
+    5. `\u{1F622}` (😢 Crying)
+  - Combined `recentEmojis` with defaults and sliced to exactly 5 (`.slice(0, 5)`), ensuring exactly 5 emojis are always displayed initially and dynamically.
+- [x] **Emoji Expand Button Fix (`+`)**:
+  - Preserved `contextMenu.message` in `emojiTargetMessage` before setting `isEmojiPickerOpen(true)`.
+  - Added `e.stopPropagation()` on expand button so it smoothly opens `EmojiPickerModal` and dismisses the context menu without losing target message context.
+- [x] **Outside Touch, Pointer & Scroll Dismissal**:
+  - Enhanced `.veil-context-backdrop` with `onTouchStart`, `onPointerDown`, and `onClick` handlers.
+  - In `veil-components.css`, configured `.veil-context-backdrop` with `background: rgba(0, 0, 0, 0.001); pointer-events: auto; touch-action: none; cursor: pointer;`.
+  - Added active `useEffect` listener on `window` for `touchstart`, `scroll`, and `resize` when `contextMenu.isOpen` is true, immediately dismissing the popup if touch/scroll occurs outside the context menu or reactions pill.
+- [x] **Reactions Rendering on Messages, Media & Files**:
+  - Fixed `.veil-floating-reaction-badge` in `veil-components.css` with `align-self: flex-end` for outgoing and `align-self: flex-start` for incoming bubbles, with `z-index: 10`.
+  - Added `color: var(--veil-text-primary, #e6edf3) !important` to `.veil-reaction-pill`.
+  - Enabled click toggling on rendered reaction pills for both text messages (`MessageBubble.tsx`) and non-text media/file cards (`ConversationView.tsx`).
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7 tests passed).
+  - Verified `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19 passed), `tests/phase69-chat-ux-enhancements.test.tsx` (10/10 passed), and `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passed).
 
-## Previous Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
+## Previous Phase: PHASE 84 — MOBILE KEYBOARD INSET, VIEWPORT ANCHORING & SCROLL LOCK
 
 ### Phase 83 Tasks Completed:
 - [x] **Telegram Sticker Engine & Storage Service (`src/media/telegramStickerService.ts`)**:

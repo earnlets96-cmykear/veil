@@ -711,8 +711,11 @@
   right: 0;
   bottom: 0;
   z-index: calc(var(--veil-z-popover, 1050) - 1);
-  background: transparent;
-  cursor: default;
+  background: rgba(0, 0, 0, 0.001);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .veil-context-menu {
@@ -1814,6 +1817,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: calc(var(--veil-z-popover, 1050) + 2);
   animation: veilFadeScaleIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
@@ -3426,15 +3430,17 @@
   margin-top: -6px;
   margin-bottom: 2px;
   padding: 0 4px;
-  z-index: 2;
+  z-index: 10;
   position: relative;
 }
 
 .veil-msg-row.outgoing .veil-floating-reaction-badge {
+  align-self: flex-end;
   justify-content: flex-end;
 }
 
 .veil-msg-row.incoming .veil-floating-reaction-badge {
+  align-self: flex-start;
   justify-content: flex-start;
 }
 
@@ -3446,6 +3452,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   padding: 3px 8px !important;
   border-radius: 9999px !important;
+  color: var(--veil-text-primary, #e6edf3) !important;
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 

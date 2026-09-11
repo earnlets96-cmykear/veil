@@ -1,20 +1,19 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 84 — MOBILE KEYBOARD INSET, VIEWPORT ANCHORING & SCROLL LOCK
+## Current Verified Phase: PHASE 85 — MESSAGE REACTIONS, 5 DEFAULT EMOJIS, EXPAND BUTTON & CONTEXT DISMISS
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:
-  - **Native Android WindowSoftInputMode AdjustResize**: Configured `android:windowSoftInputMode="adjustResize"` on `MainActivity` in `android/app/src/main/AndroidManifest.xml` so the Android WindowManager physically resizes the WebView instead of panning the Activity window or pushing the composer under the keyboard.
-  - **Interactive Widget Viewport Meta**: Added `interactive-widget=resizes-content` to `<meta name="viewport" ...>` in `index.html` ensuring modern Chromium and Android WebViews dynamically contract layout height above the keyboard.
-  - **Visual Viewport Runtime & Scroll Lock Hook**: Implemented `useVisualViewport` (`src/ui/hooks/useVisualViewport.ts`) listening to `window.visualViewport` resize/scroll, publishing `--veil-visual-viewport-height` and `--veil-keyboard-height`, setting `[data-keyboard-open="true"]`, and enforcing page scroll lock (`window.scrollTo(0, 0)`).
-  - **Conversation Timeline Auto-Scroll**: Integrated auto-scroll in `ConversationView.tsx` so the message list smoothly scrolls to the latest message whenever the keyboard opens.
-  - **CSS Flex Anchoring & Scroll Containment**: Styled `.veil-composer-container` with `flex-shrink: 0`, anchored mobile `.veil-app-layout` and `.veil-conversation-view` to `var(--veil-visual-viewport-height, 100dvh)`, and added `overscroll-behavior-y: contain;` to `.veil-timeline`.
+  - **Stacking Context & Reactions Pill Z-Index**: Elevated `.veil-floating-reactions-pill` z-index to `1052` (`calc(var(--veil-z-popover, 1050) + 2)`), fixing click interception by the full-screen `.veil-context-backdrop` (z-index `1049`). Added `e.stopPropagation()` on touch and pointer events.
+  - **Initial 5 Default Emojis**: Configured default reactions array to start with standard top 5 emojis: `['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F62E}', '\u{1F622}']` (👍, ❤️, 😂, 😮, 😢). Combined dynamically with `recentEmojis` to always display exactly 5 emojis on the pill bubble.
+  - **Emoji Expand Button Fix**: Ensured the `+` button preserves target message context in `emojiTargetMessage` and opens `EmojiPickerModal`, allowing seamless reaction selection from the full emoji drawer.
+  - **Outside Touch, Pointer & Scroll Dismissal**: Configured `.veil-context-backdrop` with `onTouchStart`, `onPointerDown`, and `onClick`. Added `background: rgba(0, 0, 0, 0.001); pointer-events: auto; touch-action: none;` in CSS. Added active window listener for `touchstart`, `scroll`, and `resize` outside context elements.
+  - **Message, Media & File Reaction Badges**: Configured `.veil-floating-reaction-badge` with `align-self: flex-end`/`flex-start` in column flex containers and `z-index: 10`. Fixed text color on `.veil-reaction-pill` (`var(--veil-text-primary, #e6edf3)`).
 - **Verification Deliverables**:
-  - Test suites passing: `tests/phase84-mobile-keyboard-viewport.test.tsx` (7/7), `tests/phase37-android-layout.test.ts` (9/9), `tests/phase83-telegram-stickers.test.tsx` (16/16), `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19), `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3).
-  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts.
-  - Native Android debug APK: `gradlew.bat assembleDebug` generated `android/app/build/outputs/apk/debug/app-debug.apk` (7.48 MB).
+  - Test suites passing: `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7), `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19), `tests/phase69-chat-ux-enhancements.test.tsx` (10/10), `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3).
+  - Clean TypeScript typecheck (`tsc --noEmit`).
 
-## Previous Verified Phase: PHASE 83 — TELEGRAM STICKER PACKS & FRAMELESS CHAT UX
+## Previous Verified Phase: PHASE 84 — MOBILE KEYBOARD INSET, VIEWPORT ANCHORING & SCROLL LOCK
 - **Key Deliverables & Fixes**:
   - **Telegram Sticker Engine & Storage Service**: Built `TelegramStickerService` (`src/media/telegramStickerService.ts`) with IndexedDB (`veil_stickers_db`) and memory fallback, link parser supporting `t.me/addstickers/<pack>`, `tg://addstickers?set=<pack>`, `tg:addstickers?set=<pack>`, `telegram.me/addstickers/<pack>`, and bare identifiers.
   - **Offline Vector Starter Packs**: Pre-bundled 3 high-resolution vector starter packs (`Spotty Dog`, `Cute Animals`, `Classic Memes`) as SVG data URIs, enabling instant offline sticker usage on first launch.

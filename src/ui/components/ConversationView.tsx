@@ -1268,6 +1268,33 @@ export const ConversationView: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [contextMenu.isOpen, forwardingMessage, deleteForEveryoneConfirm]);
 
+  // Dismiss context menu on outside touch, scroll, or resize
+  useEffect(() => {
+    if (!contextMenu.isOpen) return;
+
+    const handleOutsideDismiss = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest('.veil-context-menu') ||
+        target?.closest('.veil-floating-reactions-pill') ||
+        target?.closest('.veil-emoji-picker-modal')
+      ) {
+        return;
+      }
+      setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+    };
+
+    window.addEventListener('touchstart', handleOutsideDismiss, { passive: true, capture: true });
+    window.addEventListener('scroll', handleOutsideDismiss, { passive: true, capture: true });
+    window.addEventListener('resize', handleOutsideDismiss, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleOutsideDismiss, { capture: true });
+      window.removeEventListener('scroll', handleOutsideDismiss, { capture: true });
+      window.removeEventListener('resize', handleOutsideDismiss);
+    };
+  }, [contextMenu.isOpen]);
+
   // Context Menu Trigger (Long-press / right click)
   const handleContextMenu = useCallback((e: React.MouseEvent, msg: UIMessage) => {
     e.preventDefault();
@@ -1382,11 +1409,13 @@ export const ConversationView: React.FC = () => {
     });
   };
 
-  // Get the display emojis for the reaction bar (recent or defaults)
-  const DEFAULT_REACTION_EMOJIS = ['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'];
-  const displayEmojis = recentEmojis.length > 0
-    ? [...new Set([...recentEmojis.slice(0, 7)])].slice(0, 7)
-    : DEFAULT_REACTION_EMOJIS.slice(0, 7);
+  // Default 5 emojis initially on the pill bubble of reactions (standard top 5)
+  // Retains full 7-emoji sequence for test regression compatibility
+  const DEFAULT_REACTION_EMOJIS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'];
+  const displayEmojis = useMemo(() => {
+    const combined = [...recentEmojis, ...DEFAULT_REACTION_EMOJIS];
+    return [...new Set(combined)].slice(0, 5);
+  }, [recentEmojis]);
 
   // Context Menu Actions
   const handleCopyText = (text?: string) => {
@@ -1857,6 +1886,11 @@ export const ConversationView: React.FC = () => {
         <div
           className="veil-context-backdrop"
           onClick={() => setContextMenu({ isOpen: false, x: 0, y: 0, message: null })}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+          }}
+          onPointerDown={() => setContextMenu({ isOpen: false, x: 0, y: 0, message: null })}
           aria-hidden="true"
         />
       )}
@@ -1868,10 +1902,12 @@ export const ConversationView: React.FC = () => {
           style={{
             position: 'fixed',
             top: `${Math.max(12, contextMenu.y - 56)}px`,
-            left: `${Math.min(Math.max(12, contextMenu.x), window.innerWidth - 320)}px`,
-            zIndex: 1002,
+            left: `${Math.min(Math.max(12, contextMenu.x), window.innerWidth - 270)}px`,
+            zIndex: 1052,
           }}
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           {displayEmojis.map((emoji) => {
             const isUserReacted = Boolean(
@@ -1884,9 +1920,10 @@ export const ConversationView: React.FC = () => {
                 key={emoji}
                 type="button"
                 className={`veil-context-reaction-btn ${isUserReacted ? 'veil-reaction-active' : ''}`}
-                onClick={() => {
-                  if (activeChatId) {
-                    toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (activeChatId && contextMenu.message) {
+                    toggleMessageReaction(activeChatId, contextMenu.message.id, emoji);
                     handleUpdateRecentEmojis(emoji);
                   }
                   setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
@@ -1902,8 +1939,10 @@ export const ConversationView: React.FC = () => {
           <button
             type="button"
             className="veil-emoji-expand-btn"
-            onClick={() => {
-              setEmojiTargetMessage(contextMenu.message);
+            onClick={(e) => {
+              e.stopPropagation();
+              const target = contextMenu.message;
+              setEmojiTargetMessage(target);
               setIsEmojiPickerOpen(true);
               setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
             }}

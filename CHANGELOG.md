@@ -2,6 +2,30 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase85-reactions-and-context-dismiss] - 2026-09-12
+
+### Message Reactions, Default 5 Emojis, Expand Button & Context Dismissal (Phase 85)
+- **Stacking Context & Reactions Pill Z-Index Fix (`ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Elevated `.veil-floating-reactions-pill` z-index to `1052` (`calc(var(--veil-z-popover, 1050) + 2)`).
+  - Fixed issue where the full-screen `.veil-context-backdrop` (z-index `1049`) sat on top of the reaction pill (previously `1002`), swallowing all clicks/taps and dismissing the menu without triggering reactions or opening the emoji drawer.
+  - Added `onPointerDown={(e) => e.stopPropagation()}` and `onTouchStart={(e) => e.stopPropagation()}` to prevent event bubbling.
+- **Initial 5 Default Reaction Emojis (`ConversationView.tsx`)**:
+  - Configured default reaction emojis array to begin with the standard 5 emojis: `['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F62E}', '\u{1F622}']` (👍, ❤️, 😂, 😮, 😢).
+  - Sliced combined recent and default emojis to exactly 5 (`.slice(0, 5)`), ensuring exactly 5 emojis are always displayed initially on the pill bubble.
+- **Emoji Expand Button Fix (`+`) (`ConversationView.tsx`)**:
+  - Preserved `contextMenu.message` in `emojiTargetMessage` upon clicking `+` so that selecting an emoji from `EmojiPickerModal` accurately applies the reaction to the target message.
+  - Added `e.stopPropagation()` to ensure clean transition into the full categorized emoji picker modal.
+- **Outside Touch, Pointer & Scroll Dismissal (`ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Configured `.veil-context-backdrop` with `onTouchStart`, `onPointerDown`, and `onClick` handlers.
+  - In CSS, added `background: rgba(0, 0, 0, 0.001); pointer-events: auto; touch-action: none; cursor: pointer;` to ensure mobile WebViews reliably register taps.
+  - Registered active `window` listener capturing `touchstart`, `scroll`, and `resize` events outside context elements to immediately dismiss the context popup.
+- **Reactions Display on Messages, Media & Files (`src/styles/veil-components.css`)**:
+  - Fixed `.veil-floating-reaction-badge` with `align-self: flex-end` (outgoing) and `align-self: flex-start` (incoming) in column flex containers, with `z-index: 10`.
+  - Added high-contrast text color `color: var(--veil-text-primary, #e6edf3) !important` to `.veil-reaction-pill`.
+- **Test Suites & Icon Security Audit**:
+  - Created `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7 passing).
+  - Verified 100% pass across `tests/phase68-chat-bubbles-and-context-menu.test.tsx`, `tests/phase69-chat-ux-enhancements.test.tsx`, and `tests/phase44a-ui-layout-and-icons.test.tsx` with zero icon audit errors.
+
 ## [1.0.0-phase84-mobile-keyboard-viewport] - 2026-09-11
 
 ### Mobile Keyboard Insets, Viewport Resizing & Text Box Anchoring (Phase 84)
