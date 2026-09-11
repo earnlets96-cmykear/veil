@@ -418,9 +418,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         </div>
       )}
 
-      {/* Quoted Message Reply Banner */}
+      {/* Quoted Message Reply Banner (Screenshot 2 floating banner) */}
       {replyTarget && !editingMessage && (
         <ReplyPreview
+          className="veil-composer-reply-banner"
           replyTo={{
             ...resolveReplyReference(replyTarget, selfName, peerName)!,
             thumbnailUrl:
@@ -445,185 +446,133 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         />
 
         {isRecording ? (
-          /* Live Voice Recording Controls with Telegram Gestures */
+          /* Live Voice Recording Controls (Screenshot 4) */
           <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              width: '100%',
-              gap: '0.75rem',
-              minHeight: '44px',
-              position: 'relative',
-              overflow: 'visible',
-            }}
+            className="veil-recording-pill"
             onTouchMove={handleMicTouchMove}
             onMouseMove={handleMicTouchMove}
             onTouchEnd={handleMicTouchEnd}
             onMouseUp={handleMicTouchEnd}
           >
-            {/* Timer & Pulsing Red Indicator with Soundwave Bars */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
-              <span
-                style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--veil-danger, #ef4444)',
-                  boxShadow: '0 0 8px var(--veil-danger, #ef4444)',
-                  animation: 'veilPulse 1.2s infinite',
-                }}
-              />
-              <span style={{ fontWeight: 600, fontSize: 'var(--veil-text-sm, 14px)', color: 'var(--veil-text-primary)' }}>
+            {/* Trash button to cancel */}
+            <button
+              type="button"
+              className="veil-recording-trash-btn"
+              onClick={handleCancelVoice}
+              aria-label="Cancel recording"
+            >
+              <TrashIcon size={18} color="var(--veil-text-secondary, #94a3b8)" />
+            </button>
+
+            {/* Timer & Pulsing Red Indicator */}
+            <div className="veil-recording-timer-group">
+              <span className="veil-recording-dot" />
+              <span className="veil-recording-timer-text">
                 {formatTimer(recordSeconds)}
               </span>
-
-              {/* Soundwave animation bars */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '14px', marginLeft: '4px' }}>
-                <span style={{ width: '3px', height: '8px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
-                <span style={{ width: '3px', height: '14px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
-                <span style={{ width: '3px', height: '6px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
-                <span style={{ width: '3px', height: '12px', backgroundColor: 'var(--veil-danger, #ef4444)', borderRadius: '2px' }} />
-              </div>
             </div>
 
-            {/* Middle: Slide to Cancel Hint (when dragging/holding and not locked) */}
+            {/* Dynamic Soundwave animation bars */}
+            <div className="veil-recording-soundwave">
+              <span className="veil-soundwave-bar bar-1" />
+              <span className="veil-soundwave-bar bar-2" />
+              <span className="veil-soundwave-bar bar-3" />
+              <span className="veil-soundwave-bar bar-4" />
+              <span className="veil-soundwave-bar bar-5" />
+              <span className="veil-soundwave-bar bar-6" />
+              <span className="veil-soundwave-bar bar-7" />
+              <span className="veil-soundwave-bar bar-8" />
+            </div>
+
+            {/* Cancel slide hint */}
             {!isLocked ? (
               <div
+                className="veil-recording-cancel-hint"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  color: isCancelling ? 'var(--veil-danger, #ef4444)' : 'var(--veil-text-muted, #94a3b8)',
-                  fontSize: '13px',
-                  fontWeight: 500,
                   transform: `translateX(${dragOffset.x * 0.4}px)`,
-                  transition: isCancelling ? 'all 0.15s ease' : 'none',
-                  userSelect: 'none',
+                  color: isCancelling ? 'var(--veil-danger, #ef4444)' : 'var(--veil-text-secondary, #94a3b8)',
                 }}
               >
-                <TrashIcon
-                  size={16}
-                  color={isCancelling ? 'var(--veil-danger, #ef4444)' : 'currentColor'}
-                  style={{
-                    transform: isCancelling ? 'scale(1.25) rotate(-10deg)' : 'scale(1)',
-                    transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                  }}
-                />
-                <span>{isCancelling ? 'Release to cancel' : '‹ Slide to cancel'}</span>
+                <span>{isCancelling ? 'Release to cancel' : '‹ Cancel'}</span>
               </div>
             ) : (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  color: 'var(--veil-accent-primary, #14b8a6)',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                }}
-              >
-                <LockIcon size={14} />
-                <span>Hands-free locked</span>
+              <div className="veil-recording-locked-hint">
+                <LockIcon size={13} />
+                <span>Locked</span>
               </div>
             )}
 
-            {/* Right Side Controls */}
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {/* Right Side Mic / Actions */}
+            <div className="veil-recording-mic-wrapper">
+              {!isLocked && (
+                <div
+                  className="veil-recording-lock-pill"
+                  style={{
+                    transform: `translateX(-50%) translateY(${dragOffset.y * 0.4}px)`,
+                    opacity: dragOffset.y < -10 ? 1 : 0.85,
+                  }}
+                >
+                  <LockIcon size={12} color="var(--veil-accent-primary, #14b8a6)" />
+                  <span>Slide up to lock ↑</span>
+                </div>
+              )}
+
               {isLocked ? (
-                <>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={handleCancelVoice}
                     aria-label="Cancel Voice Recording"
-                    style={{ color: 'var(--veil-danger, #ef4444)' }}
+                    style={{ color: 'var(--veil-danger, #ef4444)', padding: '4px 8px' }}
                   >
-                    <TrashIcon size={16} />
-                    <span>Cancel</span>
+                    <TrashIcon size={15} />
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
+                  <button
+                    type="button"
+                    className="veil-btn-composer-send"
                     onClick={handleSendVoice}
                     disabled={isSending}
                     aria-label="Send Voice Message"
                   >
-                    {isSending ? <Spinner size="xs" /> : <SendIcon size={16} />}
-                    <span>Send</span>
-                  </Button>
-                </>
-              ) : (
-                /* Active Dragging / Hold Mic Indicator */
-                <div style={{ position: 'relative' }}>
-                  {/* Floating Lock indicator pill emerging above mic */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-38px',
-                      left: '50%',
-                      transform: `translateX(-50%) translateY(${dragOffset.y * 0.4}px)`,
-                      background: 'var(--veil-bg-surface, #1e293b)',
-                      borderRadius: '14px',
-                      padding: '3px 7px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      opacity: dragOffset.y < -10 ? 1 : 0.7,
-                      fontSize: '9px',
-                      color: 'var(--veil-text-secondary, #cbd5e1)',
-                      pointerEvents: 'none',
-                      transition: 'opacity 0.2s ease',
-                    }}
-                  >
-                    <LockIcon size={12} color="var(--veil-accent-primary, #14b8a6)" />
-                    <span style={{ fontSize: '8px', lineHeight: 1 }}>^</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="veil-btn-composer-send"
-                    style={{
-                      background: 'var(--veil-danger, #ef4444)',
-                      transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.08)`,
-                      transition: dragOffset.x === 0 && dragOffset.y === 0 ? 'transform 0.2s ease' : 'none',
-                      boxShadow: '0 0 12px rgba(239, 68, 68, 0.4)',
-                    }}
-                    onClick={handleSendVoice}
-                    aria-label="Send Voice Recording"
-                  >
-                    <MicIcon size={20} color="#ffffff" />
+                    {isSending ? <Spinner size="xs" /> : <SendIcon size={16} color="#ffffff" />}
                   </button>
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  className="veil-btn-composer-send veil-btn-composer-recording-active"
+                  style={{
+                    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.06)`,
+                    transition: dragOffset.x === 0 && dragOffset.y === 0 ? 'transform 0.2s ease' : 'none',
+                  }}
+                  onClick={handleSendVoice}
+                  aria-label="Send Voice Recording"
+                >
+                  <MicIcon size={20} color="#ffffff" />
+                </button>
               )}
             </div>
           </div>
         ) : (
-          /* Standard Message & Attachment Controls */
+          /* Standard Message & Attachment Controls (Screenshot 2 & 5) */
           <>
-            <IconButton
-              icon={<PaperclipIcon size={20} />}
-              variant="ghost"
+            {/* Plus button to open media / files */}
+            <button
+              type="button"
+              className="veil-composer-plus-btn"
               onClick={() => setIsMediaPickerOpen(true)}
               aria-label="Attach Encrypted File"
-              title="Attach Encrypted File"
-            />
+              title="Attach File or Media"
+            >
+              <span style={{ fontSize: '20px', fontWeight: 300, lineHeight: 1 }}>+</span>
+            </button>
 
-            <IconButton
-              icon={<MicIcon size={20} />}
-              variant="ghost"
-              onClick={handleStartVoice}
-              onTouchStart={handleMicTouchStart}
-              onMouseDown={handleMicTouchStart}
-              aria-label="Record Voice Note"
-              title="Hold to record, slide left to cancel, slide up to lock"
-            />
-
+            {/* Auto-expanding textarea */}
             <textarea
               ref={textareaRef}
               className="veil-composer-input"
-              placeholder="Type an encrypted message..."
+              placeholder="Message..."
               value={text}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}
@@ -631,17 +580,53 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               aria-label="Message Input Field"
             />
 
+            {/* Inline emoji smiley button */}
             <button
               type="button"
-              className="veil-btn-composer-send"
-              onClick={handleSend}
-              disabled={!text.trim()}
-              aria-label={editingMessage ? 'Confirm Edit' : 'Send Message'}
-              title={editingMessage ? 'Confirm Edit' : 'Send Message'}
-              style={editingMessage ? { background: 'var(--veil-accent-primary, #14b8a6)' } : undefined}
+              className="veil-composer-emoji-btn"
+              onClick={() => setIsMediaPickerOpen(true)}
+              aria-label="Add media or emoji"
+              title="Add media or emoji"
             >
-              {editingMessage ? <CheckIcon size={18} color="#ffffff" /> : <SendIcon size={18} color="#ffffff" />}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" />
+                <line x1="15" y1="9" x2="15.01" y2="9" />
+              </svg>
             </button>
+
+            {/* Dynamic Send / Mic Action Button */}
+            {text.trim() || editingMessage ? (
+              <button
+                type="button"
+                className="veil-btn-composer-send"
+                onClick={handleSend}
+                aria-label={editingMessage ? 'Confirm Edit' : 'Send Message'}
+                title={editingMessage ? 'Confirm Edit' : 'Send Message'}
+              >
+                {editingMessage ? (
+                  <CheckIcon size={18} color="#ffffff" />
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="veil-btn-composer-send veil-btn-composer-mic"
+                onClick={handleStartVoice}
+                onTouchStart={handleMicTouchStart}
+                onMouseDown={handleMicTouchStart}
+                aria-label="Record Voice Note"
+                title="Hold to record, slide left to cancel, slide up to lock"
+              >
+                <MicIcon size={20} color="#ffffff" />
+              </button>
+            )}
           </>
         )}
       </div>

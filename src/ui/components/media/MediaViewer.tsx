@@ -96,9 +96,21 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
     if (isPlaying) {
       controlsTimeoutRef.current = setTimeout(() => {
         setControlsVisible(false);
-      }, 3000);
+      }, 2500);
     }
   }, [isPlaying]);
+
+  const toggleControls = useCallback(() => {
+    if (controlsVisible) {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
+      }
+      setControlsVisible(false);
+    } else {
+      resetControlsTimeout();
+    }
+  }, [controlsVisible, resetControlsTimeout]);
 
   useEffect(() => {
     resetControlsTimeout();
@@ -525,146 +537,148 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
                 onMouseMove={resetControlsTimeout}
                 onTouchStart={resetControlsTimeout}
               >
-                <video
-                  ref={videoRef}
-                  src={currentBlobUrl}
-                  className="veil-media-viewer-video"
-                  playsInline
-                  onClick={() => {
-                    if (suppressMediaClickRef.current) {
-                      suppressMediaClickRef.current = false;
-                      return;
-                    }
-                    togglePlay();
-                    resetControlsTimeout();
-                  }}
-                  onLoadedMetadata={(e) => {
-                    const dur = (e.target as HTMLVideoElement).duration;
-                    if (Number.isFinite(dur) && dur > 0) {
-                      setVideoDuration(dur);
-                    }
-                    setIsVideoLoading(false);
-                    RuntimeDiagnostics.video('metadataLoaded', {
-                      duration: dur,
-                      objectId: currentKey,
-                    });
-                  }}
-                  onCanPlay={() => {
-                    setIsVideoLoading(false);
-                    RuntimeDiagnostics.video('canPlay', { objectId: currentKey });
-                  }}
-                  onWaiting={() => setIsVideoLoading(true)}
-                  onPlaying={() => {
-                    setIsPlaying(true);
-                    setIsVideoLoading(false);
-                    RuntimeDiagnostics.video('playing', { objectId: currentKey });
-                  }}
-                  onPause={() => setIsPlaying(false)}
-                  onTimeUpdate={(e) => {
-                    const target = e.target as HTMLVideoElement;
-                    setVideoProgress(target.currentTime);
-                    if (Number.isFinite(target.duration) && target.duration > 0) {
-                      setVideoDuration(target.duration);
-                    }
-                  }}
-                  onEnded={() => {
-                    setIsPlaying(false);
-                    setVideoProgress(0);
-                    RuntimeDiagnostics.video('ended', { objectId: currentKey });
-                  }}
-                  onError={() => {
-                    setIsVideoLoading(false);
-                    setMediaErrors((prev) => ({ ...prev, [currentKey]: 'Video playback failed' }));
-                    RuntimeDiagnostics.video('error', {
-                      objectId: currentKey,
-                      error: 'Video playback failed',
-                    });
-                  }}
-                />
-
-                {/* Bottom gradient scrim for controls legibility */}
-                <div
-                  className={`veil-media-viewer-scrim ${areControlsVisible ? 'visible' : ''}`}
-                  aria-hidden="true"
-                />
-
-                {/* Floating Sleek Glass Play/Pause Button Overlay in Center */}
-                {!isPlaying && !isVideoLoading && (
-                  <button
-                    type="button"
-                    className="veil-media-viewer-play-overlay"
+                <div className="veil-media-viewer-video-viewport">
+                  <video
+                    ref={videoRef}
+                    src={currentBlobUrl}
+                    className="veil-media-viewer-video"
+                    playsInline
                     onClick={() => {
+                      if (suppressMediaClickRef.current) {
+                        suppressMediaClickRef.current = false;
+                        return;
+                      }
+                      toggleControls();
+                    }}
+                    onDoubleClick={() => {
                       togglePlay();
                       resetControlsTimeout();
                     }}
-                    aria-label="Play video"
-                  >
-                    <PlayIcon size={32} color="#ffffff" />
-                  </button>
-                )}
-
-                {isVideoLoading && (
-                  <div className="veil-media-viewer-loading-overlay">
-                    <Spinner size="md" />
-                  </div>
-                )}
-
-                {/* Custom Integrated Frosted Glass Video Controls HUD */}
-                <div
-                  className={`veil-media-viewer-video-controls ${!areControlsVisible ? 'hidden' : ''}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    className="veil-media-viewer-hud-play"
-                    onClick={() => {
-                      togglePlay();
-                      resetControlsTimeout();
+                    onLoadedMetadata={(e) => {
+                      const dur = (e.target as HTMLVideoElement).duration;
+                      if (Number.isFinite(dur) && dur > 0) {
+                        setVideoDuration(dur);
+                      }
+                      setIsVideoLoading(false);
+                      RuntimeDiagnostics.video('metadataLoaded', {
+                        duration: dur,
+                        objectId: currentKey,
+                      });
                     }}
-                    aria-label={isPlaying ? 'Pause video' : 'Play video'}
-                  >
-                    {isPlaying ? <PauseIcon size={16} color="#ffffff" /> : <PlayIcon size={16} color="#ffffff" />}
-                  </button>
+                    onCanPlay={() => {
+                      setIsVideoLoading(false);
+                      RuntimeDiagnostics.video('canPlay', { objectId: currentKey });
+                    }}
+                    onWaiting={() => setIsVideoLoading(true)}
+                    onPlaying={() => {
+                      setIsPlaying(true);
+                      setIsVideoLoading(false);
+                      RuntimeDiagnostics.video('playing', { objectId: currentKey });
+                    }}
+                    onPause={() => setIsPlaying(false)}
+                    onTimeUpdate={(e) => {
+                      const target = e.target as HTMLVideoElement;
+                      setVideoProgress(target.currentTime);
+                      if (Number.isFinite(target.duration) && target.duration > 0) {
+                        setVideoDuration(target.duration);
+                      }
+                    }}
+                    onEnded={() => {
+                      setIsPlaying(false);
+                      setVideoProgress(0);
+                      RuntimeDiagnostics.video('ended', { objectId: currentKey });
+                    }}
+                    onError={() => {
+                      setIsVideoLoading(false);
+                      setMediaErrors((prev) => ({ ...prev, [currentKey]: 'Video playback failed' }));
+                      RuntimeDiagnostics.video('error', {
+                        objectId: currentKey,
+                        error: 'Video playback failed',
+                      });
+                    }}
+                  />
 
-                  <div className="veil-media-viewer-progress-wrapper">
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      value={videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0}
-                      onChange={(e) => handleVideoSeek(parseFloat(e.target.value))}
-                      className="veil-media-viewer-seek"
-                      aria-label="Video scrubber"
-                      style={{
-                        background: `linear-gradient(to right, var(--veil-accent-primary, #14b8a6) 0%, var(--veil-accent-primary, #14b8a6) ${
-                          videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0
-                        }%, rgba(255, 255, 255, 0.2) ${
-                          videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0
-                        }%, rgba(255, 255, 255, 0.2) 100%)`,
+                  {/* Floating Sleek Glass Play/Pause Button Overlay in Center */}
+                  {!isPlaying && !isVideoLoading && (
+                    <button
+                      type="button"
+                      className="veil-media-viewer-play-overlay"
+                      onClick={() => {
+                        togglePlay();
+                        resetControlsTimeout();
                       }}
+                      aria-label="Play video"
+                    >
+                      <PlayIcon size={32} color="#ffffff" />
+                    </button>
+                  )}
+
+                  {isVideoLoading && (
+                    <div className="veil-media-viewer-loading-overlay">
+                      <Spinner size="md" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Lower Controls Bar Tray (Positioned below the video display) */}
+                <div className="veil-media-viewer-video-controls-tray">
+                  <div className={`veil-media-viewer-scrim ${!areControlsVisible ? 'hidden' : ''}`} />
+                  <div
+                    className={`veil-media-viewer-video-controls ${!areControlsVisible ? 'hidden' : ''}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="veil-media-viewer-hud-play"
+                      onClick={() => {
+                        togglePlay();
+                        resetControlsTimeout();
+                      }}
+                      aria-label={isPlaying ? 'Pause video' : 'Play video'}
+                    >
+                      {isPlaying ? <PauseIcon size={16} color="#ffffff" /> : <PlayIcon size={16} color="#ffffff" />}
+                    </button>
+
+                    <div className="veil-media-viewer-progress-wrapper">
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0}
+                        onChange={(e) => handleVideoSeek(parseFloat(e.target.value))}
+                        className="veil-media-viewer-seek"
+                        aria-label="Video scrubber"
+                        style={{
+                          background: `linear-gradient(to right, var(--veil-accent-primary, #14b8a6) 0%, var(--veil-accent-primary, #14b8a6) ${
+                            videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0
+                          }%, rgba(255, 255, 255, 0.2) ${
+                            videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0
+                          }%, rgba(255, 255, 255, 0.2) 100%)`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="veil-media-viewer-time">
+                      {formatTime(videoProgress)} / {formatTime(videoDuration)}
+                    </div>
+
+                    <IconButton
+                      icon={isMuted ? <VolumeXIcon size={16} /> : <VolumeIcon size={16} />}
+                      onClick={toggleMute}
+                      aria-label={isMuted ? 'Unmute' : 'Mute'}
+                      variant="ghost"
+                      size="sm"
+                    />
+
+                    <IconButton
+                      icon={<MaximizeIcon size={16} />}
+                      onClick={toggleFullscreen}
+                      aria-label="Fullscreen"
+                      variant="ghost"
+                      size="sm"
                     />
                   </div>
-
-                  <div className="veil-media-viewer-time">
-                    {formatTime(videoProgress)} / {formatTime(videoDuration)}
-                  </div>
-
-                  <IconButton
-                    icon={isMuted ? <VolumeXIcon size={16} /> : <VolumeIcon size={16} />}
-                    onClick={toggleMute}
-                    aria-label={isMuted ? 'Unmute' : 'Mute'}
-                    variant="ghost"
-                    size="sm"
-                  />
-
-                  <IconButton
-                    icon={<MaximizeIcon size={16} />}
-                    onClick={toggleFullscreen}
-                    aria-label="Fullscreen"
-                    variant="ghost"
-                    size="sm"
-                  />
                 </div>
               </div>
             )}

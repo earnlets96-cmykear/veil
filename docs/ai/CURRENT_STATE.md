@@ -1,8 +1,33 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 79 — FILE PICKER SESSION PROTECTION, WAVEFORM SEEKING ISOLATION & BUBBLE HIGHLIGHT
-- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL TESTS PASS, ANDROID GRADLE ASSEMBLE SUCCESS, RELEASE BUILD SUCCESS)**
+## Current Verified Phase: PHASE 80 — MODERN MESSENGER UX & DISAPPEARING VIDEO CONTROLS OVERHAUL
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL TESTS PASS, RELEASE BUILD SUCCESS, CAPACITOR SYNC SUCCESS)**
 - **Branch**: `main`
+- **Video Player Controls Repositioning & Disappearing Controls**:
+  - Separated video controls from the picture frame into a lower controls tray (`.veil-media-viewer-video-controls-tray`) positioned beneath the video viewport (`.veil-media-viewer-video-viewport`).
+  - Added single tap gesture on video to toggle controls visibility, double tap to toggle play/pause, and 2.5s auto-hide timeout during playback.
+  - Implemented smooth translateY and opacity fade transitions for controls hide/show.
+- **Modern Message Selection Mode**:
+  - Rebuilt top selection header with close button, message count badge, contact context, and `Select all` / `Deselect all` toggle button.
+  - Added circular selection check indicators (`○` unselected, `✔` selected) on message margins (left margin for incoming messages, right margin for outgoing messages).
+  - Added floating bottom action dock with Forward, Copy, Star, and Delete (X) actions replacing the composer.
+- **Floating Reply Banner & Modern Composer**:
+  - Created floating reply preview banner docked directly above the composer with curved reply arrow `↰ Replying to [Sender]`, snippet, and dismiss button.
+  - Added left circular `+` button, auto-expanding textarea (dynamically grows with content height up to 140px), inline emoji button `☺`, and dynamic send/mic button (accent Mic button when empty, accent upward arrow `↑` when text entered).
+- **Streamlined Voice Recording Pill**:
+  - Integrated circular trash button, red pulsing recording dot with mono timer, animated soundwave bars, `< Cancel` slide indicator, circular mic button, and floating `🔒 Slide up to lock ↑` tooltip pill.
+- **Floating Reactions Pill**:
+  - Extracted reactions into an independent `.veil-floating-reactions-pill` floating directly above the message bubble (`❤️ 👍 🔥 😂 😮 👏 | +`).
+- **Share Media Bottom Sheet**:
+  - Added top drag handle, "Share Media" title, filter tab chips (`Gallery`, `Camera`, `Files`, `24h`), 3-column media grid with top-right numbered badges (`1`, `2`) on selected items and translucent circle rings on unselected items, and bottom bar with `X selected` text and `Send (X) ➢` pill button.
+- **VEIL Design Token Compliance**:
+  - Strictly aligned all colors with VEIL design tokens (`var(--veil-accent-primary)`, `var(--veil-bg-surface-elevated)`), zero external screenshot colors copied.
+- **Verification Deliverables**:
+  - Test suites passing: `tests/phase40-media-picker.test.tsx`, `tests/phase74-media-interaction.test.tsx`, `tests/phase70-voice-seeking-swipe-media-ui.test.tsx`, `tests/phase31-advanced-messaging.test.tsx`.
+  - Production web bundle compiled (`npm run build`, 7 release artifacts).
+  - Capacitor Android assets synchronized (`npx cap sync android`).
+
+## Previous Verified Phase: PHASE 79 — FILE PICKER SESSION PROTECTION, WAVEFORM SEEKING ISOLATION & BUBBLE HIGHLIGHT
 - **Android File Picker Session Protection**:
   - Eliminated auto-lock and app restart caused by external Android document/media picker transitions (`Intent.ACTION_OPEN_DOCUMENT`).
   - Added static picker lifecycle listeners in `NativeDeviceMediaBridge` (`setPickerListeners`, `notifyPickerActive`).

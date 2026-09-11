@@ -104,8 +104,9 @@ export const ReplyPreview: React.FC<ReplyPreviewProps> = ({
       )}
 
       <div className="veil-reply-content" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-        <div className="veil-reply-sender" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {effectiveSender}
+        <div className="veil-reply-sender" style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <ReplyIcon size={12} style={{ transform: 'scaleX(-1)', flexShrink: 0 }} />
+          <span>Replying to {effectiveSender}</span>
         </div>
         <div className="veil-reply-snippet" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {getPreviewSnippet()}

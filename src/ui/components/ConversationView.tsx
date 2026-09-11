@@ -64,6 +64,7 @@ import {
   PhoneIcon,
   EditIcon,
   ChevronRightIcon,
+  StarIcon,
 } from './icons/index.ts';
 import {
   MediaViewer,
@@ -307,14 +308,18 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
         onTouchCancel={!hasVisibleTextBubble ? handleTouchEnd : undefined}
         style={{ position: 'relative' }}
       >
-        {isSelectionMode && (
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => onToggleSelect(msg.id)}
-            className="veil-msg-checkbox"
-            aria-label="Select message"
-          />
+        {isSelectionMode && !msg.isOutgoing && (
+          <button
+            type="button"
+            className={`veil-selection-checkbox veil-selection-left ${isSelected ? 'selected' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect(msg.id);
+            }}
+            aria-label={isSelected ? 'Deselect message' : 'Select message'}
+          >
+            {isSelected && <CheckIcon size={12} color="#ffffff" />}
+          </button>
         )}
 
         {/* Visual Swipe-to-reply icon indicator for non-text bubbles */}
@@ -567,6 +572,19 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
             />
           )}
         </div>
+        {isSelectionMode && msg.isOutgoing && (
+          <button
+            type="button"
+            className={`veil-selection-checkbox veil-selection-right ${isSelected ? 'selected' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect(msg.id);
+            }}
+            aria-label={isSelected ? 'Deselect message' : 'Select message'}
+          >
+            {isSelected && <CheckIcon size={12} color="#ffffff" />}
+          </button>
+        )}
       </div>
     </React.Fragment>
   );
@@ -1338,6 +1356,27 @@ export const ConversationView: React.FC = () => {
     setSelectedMessageIds(new Set());
   };
 
+  const handleSelectAll = () => {
+    if (selectedMessageIds.size === activeMessages.length && activeMessages.length > 0) {
+      setSelectedMessageIds(new Set());
+    } else {
+      setSelectedMessageIds(new Set(activeMessages.map((m) => m.id)));
+    }
+  };
+
+  const handleBatchForward = () => {
+    const firstSelected = activeMessages.find((m) => selectedMessageIds.has(m.id));
+    if (firstSelected) {
+      setForwardingMessage(firstSelected);
+    }
+  };
+
+  const handleBatchStar = () => {
+    showToast({ type: 'success', message: `Starred ${selectedMessageIds.size} message(s)` });
+    setIsSelectionMode(false);
+    setSelectedMessageIds(new Set());
+  };
+
   // Close context menu on outside click
   useEffect(() => {
     const handleGlobalClick = () => {
@@ -1380,7 +1419,7 @@ export const ConversationView: React.FC = () => {
       {/* Top Header Bar */}
       {isSelectionMode ? (
         <div className="veil-chat-header veil-selection-header" role="toolbar">
-          <div className="veil-selection-info">
+          <div className="veil-selection-header-left">
             <IconButton
               icon={<CloseIcon size={20} />}
               onClick={() => {
@@ -1390,26 +1429,36 @@ export const ConversationView: React.FC = () => {
               aria-label="Cancel selection"
               variant="ghost"
             />
-            <span className="veil-selection-count">
-              {selectedMessageIds.size} selected
-            </span>
+            <div className="veil-selection-header-title-group">
+              <div className="veil-selection-title-row">
+                <span className="veil-selection-count-text">
+                  {selectedMessageIds.size} selected
+                </span>
+                <span className="veil-selection-badge">Messages</span>
+              </div>
+              <div className="veil-selection-subtitle">
+                with {conversationName || 'Contact'}
+              </div>
+            </div>
           </div>
 
-          <div className="veil-selection-actions">
+          <div className="veil-selection-header-right">
             <IconButton
-              icon={<CopyIcon size={18} />}
-              onClick={handleBatchCopy}
+              icon={<StarIcon size={19} />}
+              onClick={handleBatchStar}
               disabled={selectedMessageIds.size === 0}
-              aria-label="Copy selected messages"
+              aria-label="Star selected messages"
               variant="ghost"
             />
-            <IconButton
-              icon={<TrashIcon size={18} />}
-              onClick={handleBatchDelete}
-              disabled={selectedMessageIds.size === 0}
-              aria-label="Delete selected messages"
-              variant="danger"
-            />
+            <button
+              type="button"
+              className="veil-selection-select-all-btn"
+              onClick={handleSelectAll}
+            >
+              {selectedMessageIds.size === activeMessages.length && activeMessages.length > 0
+                ? 'Deselect all'
+                : 'Select all'}
+            </button>
           </div>
         </div>
       ) : (
@@ -1679,57 +1728,74 @@ export const ConversationView: React.FC = () => {
         />
       )}
 
-      {/* Floating Context Menu */}
+      {/* Floating Reactions Pill (Rendered directly above the message / context menu) */}
+      {contextMenu.isOpen && contextMenu.message && (
+        <div
+          className="veil-floating-reactions-pill"
+          style={{
+            position: 'fixed',
+            top: `${Math.max(12, contextMenu.y - 56)}px`,
+            left: `${Math.min(Math.max(12, contextMenu.x), window.innerWidth - 320)}px`,
+            zIndex: 1002,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {displayEmojis.map((emoji) => {
+            const isUserReacted = Boolean(
+              (contextMenu.message as any)?.reactions?.some(
+                (r: any) => r.emoji === emoji && r.userReacted
+              )
+            );
+            return (
+              <button
+                key={emoji}
+                type="button"
+                className={`veil-context-reaction-btn ${isUserReacted ? 'veil-reaction-active' : ''}`}
+                onClick={() => {
+                  if (activeChatId) {
+                    toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
+                    handleUpdateRecentEmojis(emoji);
+                  }
+                  setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                }}
+                aria-label={`React with ${emoji}`}
+              >
+                {emoji}
+              </button>
+            );
+          })}
+          <div className="veil-reactions-divider" />
+          {/* Plus icon button for full emoji picker */}
+          <button
+            type="button"
+            className="veil-emoji-expand-btn"
+            onClick={() => {
+              setEmojiTargetMessage(contextMenu.message);
+              setIsEmojiPickerOpen(true);
+              setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+            }}
+            aria-label="More emojis"
+            title="More emojis"
+          >
+            <span style={{ fontSize: '18px', fontWeight: 400, lineHeight: 1 }}>+</span>
+          </button>
+        </div>
+      )}
+
+      {/* Floating Context Menu Actions Card */}
       {contextMenu.isOpen && contextMenu.message && (
         <div
           ref={contextMenuRef}
           className="veil-context-menu"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px`, maxHeight: 'calc(100vh - 24px)', overflowY: 'auto' }}
+          style={{
+            top: `${Math.min(Math.max(68, contextMenu.y + 6), window.innerHeight - 300)}px`,
+            left: `${Math.min(Math.max(12, contextMenu.x), window.innerWidth - 240)}px`,
+            maxHeight: 'calc(100vh - 80px)',
+            overflowY: 'auto',
+          }}
           onClick={(e) => e.stopPropagation()}
           role="menu"
         >
-          {/* Smart Reaction Quick Bar */}
-          <div className="veil-context-reactions-bar">
-            {displayEmojis.map((emoji) => {
-              const isUserReacted = Boolean(
-                (contextMenu.message as any)?.reactions?.some(
-                  (r: any) => r.emoji === emoji && r.userReacted
-                )
-              );
-              return (
-                <button
-                  key={emoji}
-                  type="button"
-                  className={`veil-context-reaction-btn ${isUserReacted ? 'veil-reaction-active' : ''}`}
-                  onClick={() => {
-                    if (activeChatId) {
-                      toggleMessageReaction(activeChatId, contextMenu.message!.id, emoji);
-                      handleUpdateRecentEmojis(emoji);
-                    }
-                    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-                  }}
-                  aria-label={`React with ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              );
-            })}
-            {/* Expand button for full emoji picker */}
-            <button
-              type="button"
-              className="veil-emoji-expand-btn"
-              onClick={() => {
-                setEmojiTargetMessage(contextMenu.message);
-                setIsEmojiPickerOpen(true);
-                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-              }}
-              aria-label="More emojis"
-              title="More emojis"
-            >
-              <ChevronRightIcon size={16} />
-            </button>
-          </div>
-
           <button
             type="button"
             className="veil-context-item"
@@ -2109,13 +2175,61 @@ export const ConversationView: React.FC = () => {
         </div>
       )}
 
-      {/* Message Composer */}
-      <MessageComposer
-        conversationId={activeChatId}
-        editingMessage={editingMessage}
-        onCancelEdit={handleCancelEdit}
-        onConfirmEdit={handleConfirmEdit}
-      />
+      {/* Selection Mode Bottom Action Dock Bar */}
+      {isSelectionMode ? (
+        <div className="veil-selection-bottom-dock" role="toolbar" aria-label="Selection actions">
+          <button
+            type="button"
+            className="veil-selection-dock-btn"
+            onClick={handleBatchForward}
+            disabled={selectedMessageIds.size === 0}
+            aria-label="Forward selected messages"
+          >
+            <ShareIcon size={20} />
+            <span>Forward</span>
+          </button>
+
+          <button
+            type="button"
+            className="veil-selection-dock-btn"
+            onClick={handleBatchCopy}
+            disabled={selectedMessageIds.size === 0}
+            aria-label="Copy selected messages"
+          >
+            <CopyIcon size={20} />
+            <span>Copy</span>
+          </button>
+
+          <button
+            type="button"
+            className="veil-selection-dock-btn"
+            onClick={handleBatchStar}
+            disabled={selectedMessageIds.size === 0}
+            aria-label="Star selected messages"
+          >
+            <StarIcon size={20} />
+            <span>Star</span>
+          </button>
+
+          <button
+            type="button"
+            className="veil-selection-dock-btn veil-selection-dock-delete"
+            onClick={handleBatchDelete}
+            disabled={selectedMessageIds.size === 0}
+            aria-label="Delete selected messages"
+          >
+            <TrashIcon size={18} />
+            <span>Delete ({selectedMessageIds.size})</span>
+          </button>
+        </div>
+      ) : (
+        <MessageComposer
+          conversationId={activeChatId}
+          editingMessage={editingMessage}
+          onCancelEdit={handleCancelEdit}
+          onConfirmEdit={handleConfirmEdit}
+        />
+      )}
 
       {/* Fullscreen Media Viewer Modal */}
       {viewerItem && (

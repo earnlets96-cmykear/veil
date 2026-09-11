@@ -602,3 +602,10 @@ export const DatabaseSlashIcon: React.FC<IconProps> = ({ size = 20, className = 
     <path d="M3 12A9 3 0 0 0 21 12" />
   </svg>
 );
+
+export const StarIcon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, fill = 'none', ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} fill={fill} className={`veil-icon ${className}`.trim()} {...props}>
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
+

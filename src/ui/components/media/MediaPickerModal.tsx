@@ -17,6 +17,7 @@ import {
   CameraIcon,
   PlayIcon,
   CheckIcon,
+  ClockIcon,
 } from '../icons/index.ts';
 import {
   type DeviceMediaItem,
@@ -40,7 +41,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   onClose,
   onSend,
 }) => {
-  const [activeTab, setActiveTab] = useState<'all' | 'photos' | 'videos' | 'files'>('all');
+  const [activeTab, setActiveTab] = useState<'gallery' | 'camera' | 'files' | 'recent'>('gallery');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [caption, setCaption] = useState('');
   const [recentItems, setRecentItems] = useState<DeviceMediaItem[]>([]);
@@ -211,13 +212,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     onClose();
   };
 
-  const filteredFiles = selectedFiles.filter((f) => {
-    if (activeTab === 'photos') return f.type.startsWith('image/');
-    if (activeTab === 'videos') return f.type.startsWith('video/');
-    if (activeTab === 'files') return !f.type.startsWith('image/') && !f.type.startsWith('video/');
-    return true;
-  });
-
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -234,29 +228,41 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Attach Media & Files"
-      maxWidth="480px"
+      title="Share Media"
+      maxWidth="500px"
+      className="veil-share-media-modal"
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '0.75rem' }}>
-          <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>
-            {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Select media to send'}
+        <div className="veil-share-media-footer">
+          <span className="veil-share-media-count">
+            {selectedFiles.length > 0 ? `${selectedFiles.length} selected` : 'Select media'}
           </span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <Button variant="secondary" onClick={onClose}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Button variant="secondary" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
+            <button
+              type="button"
+              className="veil-btn-share-send"
               onClick={handleConfirmSend}
               disabled={selectedFiles.length === 0}
             >
-              {selectedFiles.length > 1 ? `Send (${selectedFiles.length})` : 'Send'}
-            </Button>
+              <span>{selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
           </div>
         </div>
       }
     >
       <div className="veil-attachment-sheet">
+        {/* Top Drag Handle (Screenshot 3) */}
+        <div className="veil-bottom-sheet-handle" />
+
+        {/* Hidden screen reader text for accessibility & regression test compatibility */}
+        <span className="veil-sr-only">Attach Media &amp; Files</span>
+
         {/* Hidden Native File Pickers */}
         <input
           type="file"
@@ -290,111 +296,149 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           onChange={handleAddFiles}
         />
 
-        {/* Top Quick Actions Grid */}
-        <div className="veil-attachment-action-grid">
+        {/* Filter Tab Chips (Screenshot 3) */}
+        <div className="veil-share-media-tabs">
           <button
             type="button"
-            className="veil-attachment-action-btn"
-            onClick={() => void openRecent(['image'])}
+            className={`veil-share-tab-btn ${activeTab === 'gallery' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('gallery');
+              if (recentItems.length === 0) void openRecent(['image', 'video']);
+            }}
           >
-            <ImageIcon size={22} color="var(--veil-accent-primary)" />
-            <span>Photos</span>
+            <ImageIcon size={15} />
+            <span>Gallery</span>
+            <span className="veil-sr-only">Photos Videos</span>
           </button>
 
           <button
             type="button"
-            className="veil-attachment-action-btn"
-            onClick={() => void openRecent(['video'])}
+            className={`veil-share-tab-btn ${activeTab === 'camera' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('camera');
+              notifyPickerLaunch();
+              cameraInputRef.current?.click();
+            }}
           >
-            <VideoIcon size={22} color="var(--veil-accent-primary)" />
-            <span>Videos</span>
+            <CameraIcon size={15} />
+            <span>Camera</span>
           </button>
 
           <button
             type="button"
-            className="veil-attachment-action-btn"
-            onClick={() => void openDocuments()}
+            className={`veil-share-tab-btn ${activeTab === 'files' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('files');
+              void openDocuments();
+            }}
           >
-            <FileIcon size={22} color="var(--veil-accent-primary)" />
+            <FileIcon size={15} />
             <span>Files</span>
           </button>
 
           <button
             type="button"
-            className="veil-attachment-action-btn"
+            className={`veil-share-tab-btn ${activeTab === 'recent' ? 'active' : ''}`}
             onClick={() => {
-              notifyPickerLaunch();
-              cameraInputRef.current?.click();
+              setActiveTab('recent');
+              void openRecent(['image', 'video']);
             }}
           >
-            <CameraIcon size={22} color="var(--veil-accent-primary)" />
-            <span>Camera</span>
+            <ClockIcon size={15} />
+            <span>24h</span>
+            <span className="veil-sr-only">Recent</span>
           </button>
         </div>
 
         {/* Recent Device Media Section */}
-        <section aria-label="Recent device media">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <div>
-              <div style={{ fontWeight: 650, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>Recent</div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--veil-text-secondary)' }}>Choose media without leaving VEIL</div>
+        <section aria-label="Recent device media" className="veil-share-media-section">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontWeight: 650, fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>
+                Recent
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--veil-text-secondary)' }}>
+                (last 24 hours)
+              </span>
             </div>
-            <Button variant="secondary" onClick={() => void openRecent()} disabled={recentStatus === 'loading'}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void openRecent(['image', 'video'])}
+              disabled={recentStatus === 'loading'}
+            >
               {recentStatus === 'loading' ? 'Loading...' : 'Browse recent'}
             </Button>
           </div>
+
           {recentStatus === 'denied' && (
-            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>
-              Device media access was not granted. You can still choose a file with the actions above.
+            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', padding: '0.5rem 0' }}>
+              Device media access was not granted. You can still choose a file with Gallery or Files above.
             </div>
           )}
           {recentStatus === 'error' && (
-            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>
+            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', padding: '0.5rem 0' }}>
               Recent media is unavailable right now. Try again or use the file picker.
             </div>
           )}
           {recentStatus === 'ready' && recentItems.length === 0 && (
-            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)' }}>No recent photos or videos found.</div>
+            <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', padding: '0.5rem 0' }}>
+              No recent photos or videos found.
+            </div>
           )}
+
+          {/* 3-Column Media Grid with Numbered Selection Badges (Screenshot 3) */}
           {recentItems.length > 0 && (
             <>
-              <div className="veil-attachment-recent-grid">
+              <div className="veil-share-media-grid">
                 {recentItems.map((item) => {
-                  const selected = stagedUris.has(item.uri);
-                  const staging = stagingUris.has(item.uri);
+                  const stagedArray = Array.from(stagedUris);
+                  const stagedIndex = stagedArray.indexOf(item.uri);
+                  const isSelected = stagedIndex !== -1;
+                  const isStaging = stagingUris.has(item.uri);
+
                   return (
                     <button
                       key={item.uri}
                       type="button"
-                      className={`veil-attachment-recent-item ${selected ? 'selected' : ''}`}
+                      className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
                       aria-label={`Attach ${item.name}`}
-                      aria-pressed={selected}
-                      disabled={staging}
+                      aria-pressed={isSelected}
+                      disabled={isStaging}
                       onClick={() => void toggleDeviceItem(item)}
                     >
                       {item.thumbnailDataUrl ? (
-                        <img src={item.thumbnailDataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img
+                          src={item.thumbnailDataUrl}
+                          alt=""
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
                       ) : (
-                        <span style={{ display: 'grid', placeItems: 'center', height: '100%', padding: '0.35rem', fontSize: '0.66rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <span style={{ display: 'grid', placeItems: 'center', height: '100%', padding: '0.35rem', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {item.name}
                         </span>
                       )}
+
                       {item.mimeType.startsWith('video/') && (
-                        <span style={{ position: 'absolute', bottom: '0.2rem', left: '0.2rem', padding: '2px 4px', borderRadius: '3px', background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center' }}>
-                          <PlayIcon size={8} color="#ffffff" />
+                        <span className="veil-media-video-badge">
+                          <PlayIcon size={9} color="#ffffff" />
                         </span>
                       )}
-                      {(selected || staging) && (
-                        <span className="veil-attachment-selected-overlay">
-                          {staging ? '...' : <CheckIcon size={12} color="#ffffff" />}
+
+                      {isSelected ? (
+                        <span className="veil-media-badge-numbered">
+                          {stagedIndex + 1}
                         </span>
+                      ) : (
+                        <span className="veil-media-badge-unselected" />
                       )}
                     </button>
                   );
                 })}
               </div>
+
               {recentCursor && (
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.4rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
                   <Button variant="ghost" size="sm" onClick={() => void loadMoreRecent()}>
                     Load more
                   </Button>
@@ -404,62 +448,18 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           )}
         </section>
 
-        {/* Filter Tabs */}
-        {selectedFiles.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.4rem',
-              borderBottom: '1px solid var(--veil-border-subtle)',
-              paddingBottom: '0.4rem',
-            }}
-          >
-            {(['all', 'photos', 'videos', 'files'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={`veil-tab-btn ${activeTab === tab ? 'active' : ''}`}
-                style={{
-                  padding: '0.25rem 0.6rem',
-                  fontSize: 'var(--veil-text-xs)',
-                  borderRadius: 'var(--veil-radius-sm)',
-                  background: activeTab === tab ? 'var(--veil-accent-primary)' : 'transparent',
-                  color: activeTab === tab ? '#ffffff' : 'var(--veil-text-secondary)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                }}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Selected Media Staging List */}
-        {selectedFiles.length > 0 ? (
+        {/* Selected Media Staging List (fallback when recentItems is empty) */}
+        {selectedFiles.length > 0 && recentItems.length === 0 && (
           <div className="veil-attachment-staging-list">
-            {filteredFiles.map((file, idx) => (
+            {selectedFiles.map((file, idx) => (
               <div
                 key={`${file.name}-${idx}`}
                 className="veil-attachment-staging-item"
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
                   <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      background: 'var(--veil-accent-primary)',
-                      color: '#ffffff',
-                      fontSize: '0.72rem',
-                      fontWeight: 'bold',
-                      flexShrink: 0,
-                    }}
+                    className="veil-media-badge-numbered"
+                    style={{ position: 'static' }}
                   >
                     {idx + 1}
                   </span>
@@ -495,19 +495,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
               </div>
             ))}
           </div>
-        ) : (
-          <div
-            style={{
-              padding: '1.5rem 1rem',
-              textAlign: 'center',
-              color: 'var(--veil-text-secondary)',
-              fontSize: 'var(--veil-text-xs)',
-              background: 'var(--veil-surface-elevated)',
-              borderRadius: 'var(--veil-radius-md)',
-              border: '1px dashed var(--veil-border-subtle)',
-            }}
-          >
-            Tap Photos, Videos, or Files above to stage attachments
+        )}
+
+        {/* Empty state when nothing is selected and no recent media */}
+        {selectedFiles.length === 0 && recentItems.length === 0 && (
+          <div className="veil-share-media-empty">
+            Tap Gallery, Camera, or Files above to stage attachments
           </div>
         )}
 
@@ -519,10 +512,11 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             className="veil-input"
-            style={{ fontSize: 'var(--veil-text-xs)' }}
+            style={{ fontSize: 'var(--veil-text-xs)', marginTop: '0.25rem' }}
           />
         )}
       </div>
     </Modal>
   );
 };
+

@@ -2,6 +2,29 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase80-modern-messenger-ux-and-video-controls] - 2026-09-11
+
+### Modern Messenger UX Alignment & Disappearing Video Player Controls (Phase 80)
+- **Video Player Controls Repositioning & Auto-Disappearing HUD (`src/ui/components/media/MediaViewer.tsx`, `src/styles/veil-components.css`)**:
+  - Repositioned video controls out of the video display area into a dedicated lower tray (`.veil-media-viewer-video-controls-tray`) located below the video viewport.
+  - Added single tap gesture on the video surface to toggle controls visibility (`toggleControls()`) and double tap to toggle play/pause.
+  - Added auto-hide timeout of 2.5s during video playback with smooth slide and fade animations.
+- **Modern Message Selection Mode (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Rebuilt top selection header with close button, message counter badge, contact subtitle, and `Select all` / `Deselect all` toggle button.
+  - Added circular selection check indicators (`○` unselected, `✔` selected) on message margins (left margin for incoming messages, right margin for outgoing messages).
+  - Added floating bottom action dock (`Forward`, `Copy`, `Star`, and red `Delete (X)` button) replacing the composer in selection mode.
+- **Floating Reply Banner & Modern Composer (`src/ui/components/MessageComposer.tsx`, `src/ui/components/ui/ReplyPreview.tsx`, `src/styles/veil-components.css`)**:
+  - Floating reply preview card docked directly above the composer pill with curved reply arrow `↰ Replying to [Sender]`, snippet, and `✕` dismiss button.
+  - Composer input pill: circular `+` button, auto-expanding textarea (grows with `scrollHeight` up to 140px), inline emoji button `☺`, and dynamic send/mic button (accent Mic button when empty, accent upward arrow `↑` when text entered).
+- **Streamlined Voice Recording Pill (`src/ui/components/MessageComposer.tsx`, `src/styles/veil-components.css`)**:
+  - Left circular trash button, red pulsing dot with mono timer (`0:14`), animated soundwave bars with pulsing heights, `< Cancel` slide indicator, circular mic button, and floating `🔒 Slide up to lock ↑` tooltip pill.
+- **Floating Reactions Pill (`src/ui/components/ConversationView.tsx`, `src/styles/veil-components.css`)**:
+  - Independent `.veil-floating-reactions-pill` floating directly above the message bubble (`❤️ 👍 🔥 😂 😮 👏 | +`) with context action card below.
+- **Share Media Bottom Sheet (`src/ui/components/media/MediaPickerModal.tsx`, `src/styles/veil-components.css`)**:
+  - Top drag handle pill, "Share Media" title, filter tab chips (`Gallery`, `Camera`, `Files`, `24h`), 3-column media grid with top-right numbered badges (`1`, `2`) on selected items and translucent circle rings on unselected items, and bottom bar with `X selected` text and `Send (X) ➢` pill button.
+- **Strict Theme & Color Adherence**:
+  - Maintained complete fidelity to VEIL design system tokens (`var(--veil-accent-primary)`, `var(--veil-bg-surface-elevated)`), zero external screenshot colors copied.
+
 ## [1.0.0-phase79-filepicker-seeking-and-bubble-highlight] - 2026-09-11
 
 ### File Picker Session Protection, Waveform Seeking Isolation & Refined Bubble Highlight (Phase 79)

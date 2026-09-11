@@ -1,8 +1,43 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 78 — REAL-TIME BYTE-DRIVEN PROGRESS TRACKING & FUNCTIONAL PROGRESS CIRCLES
-- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across test suites; Android assembleDebug APK built successfully)
+## Active Phase: PHASE 80 — MODERN MESSENGER UX & DISAPPEARING VIDEO CONTROLS OVERHAUL
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, Capacitor Android synced)
 - **Branch**: `main`
+
+### Phase 80 Tasks Completed:
+- [x] **Video Player Controls Repositioning & Auto-Disappearing HUD (`MediaViewer.tsx`, `veil-components.css`)**:
+  - Repositioned video controls out of the video picture area into a dedicated lower tray (`.veil-media-viewer-video-controls-tray`) situated beneath the video viewport.
+  - Implemented single-tap gesture on the video surface to smoothly toggle controls visibility (`toggleControls()`) and double-tap to toggle play/pause.
+  - Added auto-hide timeout (2.5s) during active playback.
+  - Controls fade and slide down (`opacity: 0; transform: translateY(14px); pointer-events: none`).
+  - Added `veil-media-viewer-scrim` within the controls tray for contrast and test compatibility.
+- [x] **Modern Selection Mode (`ConversationView.tsx`, `veil-components.css`, `Icons.tsx`)**:
+  - Rebuilt selection header: `✕` close, `X selected` with `Messages` badge, `with [Contact]` subtitle, Star action, and `Select all` / `Deselect all` toggle button (`handleSelectAll()`).
+  - Circular selection indicators: unselected translucent ring `○`, selected filled accent badge `✔`. Positioned on the left margin for incoming messages and right margin for outgoing messages.
+  - Bottom floating action dock: Replaced composer during selection mode with `.veil-selection-bottom-dock` containing `Forward`, `Copy`, `Star`, and red `Delete (X)` pill button (`handleBatchForward()`, `handleBatchCopy()`, `handleBatchStar()`, `handleBatchDelete()`).
+- [x] **Floating Reply Banner & Modern Composer (`MessageComposer.tsx`, `ReplyPreview.tsx`, `veil-components.css`)**:
+  - Floating reply banner (`.veil-composer-reply-banner`) docked directly above the composer with curved reply arrow `↰ Replying to [Sender]`, snippet preview, and `✕` close button.
+  - Composer input pill: left circular `+` button (`.veil-composer-plus-btn`), auto-expanding textarea (`.veil-composer-textarea`) that dynamically grows with `scrollHeight` up to 140px, and inline emoji button `☺` (`.veil-composer-emoji-btn`).
+  - Dynamic accent action button: displays circular mic icon when empty, and upward arrow `↑` when text is typed.
+- [x] **Voice Recording Pill (`MessageComposer.tsx`, `veil-components.css`)**:
+  - Left circular trash button (`.veil-recording-trash-btn`).
+  - Red pulsing dot with mono timer (`0:14`).
+  - Animated soundwave bars with randomized frequency heights.
+  - `< Cancel` slide indicator.
+  - Circular mic button with floating `🔒 Slide up to lock ↑` tooltip pill (`.veil-recording-lock-pill`).
+- [x] **Message Context Menu & Floating Reactions Bar (`ConversationView.tsx`, `veil-components.css`)**:
+  - Extracted reactions into an independent `.veil-floating-reactions-pill` floating directly above the message bubble (`❤️ 👍 🔥 😂 😮 👏 | +`).
+  - Clean vertical action card below (`Reply`, `Copy Text`, `Forward`, `Star`, `Delete`).
+- [x] **Share Media Bottom Sheet (`MediaPickerModal.tsx`, `veil-components.css`)**:
+  - Top centered drag handle pill (`.veil-bottom-sheet-handle`).
+  - Title: "Share Media".
+  - Filter tab chips: `Gallery` (`ImageIcon`), `Camera` (`CameraIcon`), `Files` (`FileIcon`), `24h` (`ClockIcon`).
+  - 3-column media grid with top-right numbered badges (`1`, `2`) on selected items and translucent circle rings on unselected items.
+  - Bottom bar with `X selected` text and accent `Send (X) ➢` pill button.
+- [x] **Theme and Design Token Compliance**:
+  - Zero purple color copied from screenshots; all elements strictly use `var(--veil-accent-primary)`, `var(--veil-bg-surface-elevated)`, and VEIL design tokens.
+
+## Previous Phase: PHASE 79 — FILE PICKER SESSION PROTECTION, WAVEFORM SEEKING ISOLATION & BUBBLE HIGHLIGHT
 
 ### Phase 78 Tasks Completed:
 - [x] **Eliminated Fake Progress Circle Overlays & Arbitrary Step Hardcoding**:

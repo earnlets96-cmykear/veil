@@ -1083,20 +1083,33 @@
 
 .veil-media-viewer-video-container {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 94vw;
+  max-height: 90vh;
+  position: relative;
+  border-radius: var(--veil-radius-md);
+  background: transparent;
+  gap: 12px;
+}
+
+.veil-media-viewer-video-viewport {
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
   max-width: 92vw;
-  max-height: 85vh;
-  position: relative;
-  overflow: hidden;
+  max-height: 74vh;
   border-radius: var(--veil-radius-md);
+  overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
   background: #000;
 }
 
 .veil-media-viewer-video {
   max-width: 92vw;
-  max-height: 82vh;
+  max-height: 74vh;
   width: auto;
   height: auto;
   display: block;
@@ -1157,25 +1170,33 @@
   transform: translate(-50%, -50%) scale(0.95);
 }
 
-/* Overlaid Integrated Video Controls Bar */
+/* Lower Controls Bar Tray (positioned lower than the video display) */
+.veil-media-viewer-video-controls-tray {
+  width: 100%;
+  max-width: 580px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+  min-height: 48px;
+}
+
+/* Integrated Video Controls Bar */
 .veil-media-viewer-video-controls {
-  position: absolute;
-  bottom: 16px;
-  left: 14px;
-  right: 14px;
-  max-width: 560px;
+  position: relative;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   align-items: center;
   gap: var(--veil-space-2, 8px);
-  padding: 6px 12px;
-  background: rgba(15, 23, 42, 0.82);
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 28px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
-  z-index: 10;
   transition: opacity 0.25s ease, transform 0.25s ease;
   user-select: none;
 }
@@ -1183,7 +1204,7 @@
 .veil-media-viewer-video-controls.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(8px);
+  transform: translateY(14px);
 }
 
 /* HUD Mini Play Button */
@@ -1608,27 +1629,200 @@
   border-top: 1px solid var(--veil-border);
 }
 
-/* Selection Mode Bar */
-.veil-selection-bar {
+/* Selection Mode Bar & Header */
+.veil-selection-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--veil-space-2) var(--veil-space-4);
-  background: var(--veil-accent-primary-subtle);
-  border-bottom: 1px solid var(--veil-accent-primary);
+  padding: 8px 16px;
+  background: var(--veil-bg-surface-elevated, #161b22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 56px;
+  box-sizing: border-box;
   animation: veil-fade-in 0.15s ease-out;
 }
 
-.veil-selection-count {
-  font-size: var(--veil-text-sm);
-  font-weight: 600;
-  color: var(--veil-accent-primary);
-}
-
-.veil-selection-actions {
+.veil-selection-header-left {
   display: flex;
   align-items: center;
-  gap: var(--veil-space-2);
+  gap: 12px;
+}
+
+.veil-selection-header-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.veil-selection-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.veil-selection-count-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--veil-text-primary, #ffffff);
+}
+
+.veil-selection-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--veil-text-secondary, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  line-height: 1.2;
+}
+
+.veil-selection-subtitle {
+  font-size: 0.75rem;
+  color: var(--veil-text-secondary, rgba(255, 255, 255, 0.6));
+  margin-top: 1px;
+}
+
+.veil-selection-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.veil-selection-select-all-btn {
+  background: none;
+  border: none;
+  color: var(--veil-accent-primary, #14b8a6);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.veil-selection-select-all-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Circular Selection Checkbox (Screenshot 1) */
+.veil-selection-checkbox {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.25);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  z-index: 4;
+}
+
+.veil-selection-checkbox.selected {
+  border-color: var(--veil-accent-primary, #14b8a6);
+  background: var(--veil-accent-primary, #14b8a6);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.45);
+}
+
+.veil-selection-left {
+  margin-right: 10px;
+  align-self: center;
+}
+
+.veil-selection-right {
+  margin-left: 10px;
+  align-self: center;
+}
+
+/* Selection Mode Bottom Action Dock Bar (Screenshot 1) */
+.veil-selection-bottom-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 8px 16px;
+  margin: 0 16px 12px 16px;
+  background: var(--veil-bg-surface-elevated, #161b22);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  animation: veilFadeScaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 15;
+}
+
+.veil-selection-dock-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--veil-text-secondary, rgba(255, 255, 255, 0.75));
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 12px;
+  transition: all 0.15s ease;
+}
+
+.veil-selection-dock-btn:hover:not(:disabled) {
+  color: var(--veil-text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.veil-selection-dock-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.veil-selection-dock-delete {
+  flex-direction: row;
+  gap: 6px;
+  background: rgba(239, 68, 68, 0.88);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+}
+
+.veil-selection-dock-delete:hover:not(:disabled) {
+  background: var(--veil-danger, #ef4444);
+  color: #ffffff;
+  transform: scale(1.02);
+}
+
+/* Floating Reactions Pill (Screenshot 5) */
+.veil-floating-reactions-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--veil-bg-surface-elevated, #161b22);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  animation: veilFadeScaleIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.veil-reactions-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 2px;
 }
 
 .veil-msg-selectable {
@@ -2440,4 +2634,391 @@
   border-radius: var(--veil-radius-sm, 6px);
   border: 1px solid var(--veil-border-subtle, rgba(255, 255, 255, 0.08));
 }
+
+/* Floating Reply Banner (Screenshot 2) */
+.veil-composer-reply-banner {
+  margin: 0 12px 8px 12px !important;
+  border-radius: 16px !important;
+  background: var(--veil-bg-surface-elevated, #161b22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-left: 3.5px solid var(--veil-accent-primary, #14b8a6) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  padding: 8px 12px !important;
+  animation: veilFadeScaleIn 0.15s ease-out;
+}
+
+/* Modern Composer Pill Controls (Screenshot 2 & 5) */
+.veil-composer-plus-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--veil-text-primary, #ffffff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.veil-composer-plus-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}
+
+.veil-composer-emoji-btn {
+  background: none;
+  border: none;
+  color: var(--veil-text-secondary, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3px;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.veil-composer-emoji-btn:hover {
+  color: var(--veil-text-primary, #ffffff);
+}
+
+.veil-btn-composer-mic {
+  background: var(--veil-accent-primary, #14b8a6) !important;
+}
+
+/* Voice Recording Pill (Screenshot 4) */
+.veil-recording-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 6px;
+  background: var(--veil-bg-surface-elevated, #161b22);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  position: relative;
+  overflow: visible;
+  gap: 8px;
+}
+
+.veil-recording-trash-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.veil-recording-trash-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--veil-danger, #ef4444);
+}
+
+.veil-recording-timer-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.veil-recording-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--veil-danger, #ef4444);
+  box-shadow: 0 0 8px var(--veil-danger, #ef4444);
+  animation: veilPulse 1.2s infinite;
+}
+
+.veil-recording-timer-text {
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-family: var(--veil-font-mono, monospace);
+  color: var(--veil-text-primary, #ffffff);
+}
+
+.veil-recording-soundwave {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 18px;
+  flex: 1;
+  justify-content: center;
+  max-width: 120px;
+}
+
+.veil-soundwave-bar {
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--veil-accent-primary, #14b8a6);
+  animation: veilWaveformPulse 0.9s ease-in-out infinite alternate;
+}
+
+.veil-soundwave-bar.bar-1 { height: 6px; animation-delay: 0.05s; }
+.veil-soundwave-bar.bar-2 { height: 14px; animation-delay: 0.15s; }
+.veil-soundwave-bar.bar-3 { height: 18px; animation-delay: 0.25s; }
+.veil-soundwave-bar.bar-4 { height: 10px; animation-delay: 0.35s; }
+.veil-soundwave-bar.bar-5 { height: 16px; animation-delay: 0.1s; }
+.veil-soundwave-bar.bar-6 { height: 8px; animation-delay: 0.3s; }
+.veil-soundwave-bar.bar-7 { height: 14px; animation-delay: 0.2s; }
+.veil-soundwave-bar.bar-8 { height: 6px; animation-delay: 0.4s; }
+
+@keyframes veilWaveformPulse {
+  0% { transform: scaleY(0.4); opacity: 0.6; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+.veil-recording-cancel-hint {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--veil-text-secondary, rgba(255, 255, 255, 0.6));
+  user-select: none;
+  white-space: nowrap;
+}
+
+.veil-recording-locked-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--veil-accent-primary, #14b8a6);
+}
+
+.veil-recording-mic-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.veil-recording-lock-pill {
+  position: absolute;
+  top: -42px;
+  left: 50%;
+  background: var(--veil-bg-surface-elevated, #161b22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 4px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--veil-text-secondary, #cbd5e1);
+  white-space: nowrap;
+  pointer-events: none;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  z-index: 10;
+}
+
+.veil-btn-composer-recording-active {
+  background: var(--veil-accent-primary, #14b8a6) !important;
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.5) !important;
+}
+
+/* --- Share Media Bottom Sheet (Screenshot 3) --- */
+.veil-share-media-modal {
+  border-radius: 20px !important;
+}
+
+.veil-bottom-sheet-handle {
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: -4px auto 10px auto;
+  flex-shrink: 0;
+}
+
+.veil-share-media-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  scrollbar-width: none;
+}
+
+.veil-share-media-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.veil-share-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--veil-text-secondary, #94a3b8);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.veil-share-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--veil-text-primary, #ffffff);
+}
+
+.veil-share-tab-btn.active {
+  background: var(--veil-accent-primary, #14b8a6);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.35);
+}
+
+.veil-share-media-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.veil-share-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-height: 270px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.veil-share-media-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--veil-surface-elevated, rgba(255, 255, 255, 0.05));
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.veil-share-media-cell:hover {
+  transform: scale(1.02);
+}
+
+.veil-share-media-cell.selected {
+  border-color: var(--veil-accent-primary, #14b8a6);
+}
+
+.veil-media-video-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+
+.veil-media-badge-numbered {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--veil-accent-primary, #14b8a6);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  z-index: 2;
+  animation: veilScaleIn 0.15s ease-out;
+}
+
+.veil-media-badge-unselected {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.veil-share-media-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--veil-text-secondary, #94a3b8);
+  font-size: var(--veil-text-xs);
+  background: var(--veil-surface-elevated, rgba(255, 255, 255, 0.04));
+  border-radius: var(--veil-radius-md, 10px);
+  border: 1px dashed var(--veil-border-subtle, rgba(255, 255, 255, 0.1));
+}
+
+.veil-share-media-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.veil-share-media-count {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--veil-text-secondary, #94a3b8);
+}
+
+.veil-btn-share-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 18px;
+  border-radius: 9999px;
+  background: var(--veil-accent-primary, #14b8a6);
+  color: #ffffff;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.35);
+}
+
+.veil-btn-share-send:hover:not(:disabled) {
+  opacity: 0.94;
+  transform: scale(1.02);
+}
+
+.veil-btn-share-send:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.veil-btn-share-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 
