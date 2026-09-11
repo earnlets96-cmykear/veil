@@ -16,7 +16,7 @@ import { randomBytes, bytesToBase64, base64ToBytes, bytesToHex } from '../crypto
 import { sha256 } from '@noble/hashes/sha256.js';
 import type { CloudClient } from '../network/cloudClient.ts';
 import type { SpaceSession } from '../spaces/session.ts';
-import { makeWebmSeekable, makeWebmSeekableSync, hasWebmCues } from './webmFix.ts';
+import { makeWebmSeekable, makeWebmSeekableSync, hasWebmCues, hasValidWebmIndex } from './webmFix.ts';
 
 export interface VoiceRecordingMetadata {
   durationSeconds: number;
@@ -183,7 +183,7 @@ export class VoiceRecorder {
     }
   ): Promise<VoiceRecordingMetadata> {
     let audioBytes = rawAudioBytes;
-    if (mimeType.includes('webm') && !hasWebmCues(audioBytes)) {
+    if (mimeType.includes('webm') && !hasValidWebmIndex(audioBytes)) {
       try {
         audioBytes = makeWebmSeekableSync(audioBytes, durationSeconds * 1000);
       } catch (_e) {}
@@ -269,7 +269,7 @@ export class VoiceRecorder {
       const cached = await MediaCache.getOrFetch(attachmentPayload, session, cloudClient);
       if (cached && cached.data) {
         let audioData = cached.data;
-        if ((cached.mimeType?.includes('webm') || meta.mimeType?.includes('webm')) && !hasWebmCues(audioData)) {
+        if ((cached.mimeType?.includes('webm') || meta.mimeType?.includes('webm')) && !hasValidWebmIndex(audioData)) {
           try {
             audioData = makeWebmSeekableSync(audioData, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
           } catch (_e) {}
@@ -287,7 +287,7 @@ export class VoiceRecorder {
 
     if (!meta.encryptionKeyBase64) {
       let finalBytes = rawBytes;
-      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasWebmCues(finalBytes)) {
+      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasValidWebmIndex(finalBytes)) {
         try {
           finalBytes = makeWebmSeekableSync(finalBytes, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
         } catch (_e) {}
@@ -310,7 +310,7 @@ export class VoiceRecorder {
           plaintextBytes = rawBytes;
         }
       }
-      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasWebmCues(plaintextBytes)) {
+      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasValidWebmIndex(plaintextBytes)) {
         try {
           plaintextBytes = makeWebmSeekableSync(plaintextBytes, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
         } catch (_e) {}
@@ -319,7 +319,7 @@ export class VoiceRecorder {
       return URL.createObjectURL(blob);
     } catch (_err) {
       let finalBytes = rawBytes;
-      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasWebmCues(finalBytes)) {
+      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasValidWebmIndex(finalBytes)) {
         try {
           finalBytes = makeWebmSeekableSync(finalBytes, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
         } catch (_e) {}

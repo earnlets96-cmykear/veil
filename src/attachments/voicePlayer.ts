@@ -45,55 +45,102 @@ export class VoicePlaybackManager {
   private nativeIsPlaying: boolean = false;
   private pendingNativeSeekRevision: number = 0;
   private lastConfirmedNativeTime: number = 0;
+  private lastPlayContext: {
+    session: SpaceSession;
+    cloudClient: CloudClient;
+    meta: VoiceRecordingMetadata;
+    messageId: string;
+    callbacks?: VoicePlaybackCallbacks;
+  } | null = null;
+
+  private nativeBridgeInitialized: boolean = false;
 
   constructor() {
     this.isNative = NativeMediaBridge.getInstance().isSupported();
     if (this.isNative) {
-      const bridge = NativeMediaBridge.getInstance();
-      bridge.onStateChange((e) => {
-        this.nativeIsPlaying = e.isPlaying;
-        this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
-        this.lastConfirmedNativeTime = this.nativeCurrentTime;
-        if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
-        const status: VoicePlaybackStatus =
-          e.state === 'playing' ? 'playing' : e.state === 'paused' ? 'paused' : e.state === 'buffering' ? 'loading' : e.state === 'error' ? 'error' : 'idle';
-        const dur = this.getDuration();
-        const cur = this.getCurrentTime();
-        const pct = dur > 0 ? (cur / dur) * 100 : 0;
-        this.notifyListeners(status, pct, cur, dur);
-      });
-
-      bridge.onProgress((e) => {
-        this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
-        this.lastConfirmedNativeTime = this.nativeCurrentTime;
-        if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
-        const dur = this.getDuration();
-        const cur = this.getCurrentTime();
-        const pct = dur > 0 ? (cur / dur) * 100 : 0;
-        this.notifyListeners(this.currentStatus, pct, cur, dur);
-        if (this.activeCallbacks?.onProgress) {
-          this.activeCallbacks.onProgress(pct, cur, dur);
-        }
-      });
-
-      bridge.onEnded((e) => {
-        this.nativeIsPlaying = false;
-        this.nativeCurrentTime = 0;
-        const dur = this.getDuration();
-        this.notifyListeners('idle', 0, 0, dur);
-        this.stop();
-        if (this.activeCallbacks?.onEnded) this.activeCallbacks.onEnded();
-      });
-
-      bridge.onError((e) => {
-        this.nativeIsPlaying = false;
-        this.currentStatus = 'error';
-        this.notifyListeners('error', 0, 0, this.getDuration());
-        if (this.activeCallbacks?.onError) {
-          this.activeCallbacks.onError(new Error(e.message || 'Playback error'));
-        }
-      });
+      this.setupNativeBridge();
     }
+  }
+
+  public setupNativeBridge(): void {
+    if (this.nativeBridgeInitialized) return;
+    this.nativeBridgeInitialized = true;
+    const bridge = NativeMediaBridge.getInstance();
+    bridge.onStateChange((e) => {
+      this.nativeIsPlaying = e.isPlaying;
+      this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
+      this.lastConfirmedNativeTime = this.nativeCurrentTime;
+      if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
+      const status: VoicePlaybackStatus =
+        e.state === 'playing' ? 'playing' : e.state === 'paused' ? 'paused' : e.state === 'buffering' ? 'loading' : e.state === 'error' ? 'error' : 'idle';
+      const dur = this.getDuration();
+      const cur = this.getCurrentTime();
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      this.notifyListeners(status, pct, cur, dur);
+    });
+
+    bridge.onProgress((e) => {
+      this.nativeCurrentTime = (e.currentPositionMs || 0) / 1000;
+      this.lastConfirmedNativeTime = this.nativeCurrentTime;
+      if (e.durationMs > 0) this.nativeDuration = e.durationMs / 1000;
+      const dur = this.getDuration();
+      const cur = this.getCurrentTime();
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      this.notifyListeners(this.currentStatus, pct, cur, dur);
+      if (this.activeCallbacks?.onProgress) {
+        this.activeCallbacks.onProgress(pct, cur, dur);
+      }
+    });
+
+    bridge.onEnded((e) => {
+      this.nativeIsPlaying = false;
+      this.nativeCurrentTime = 0;
+      const dur = this.getDuration();
+      this.notifyListeners('idle', 0, 0, dur);
+      this.stop();
+      if (this.activeCallbacks?.onEnded) this.activeCallbacks.onEnded();
+    });
+
+    bridge.onError(async (e) => {
+      this.nativeIsPlaying = false;
+
+      // Transparent fallback: if native player fails on a voice note, seamlessly recover via web audio
+      if (this.lastPlayContext && this.currentPlayingId === this.lastPlayContext.messageId) {
+        const ctx = this.lastPlayContext;
+        const fallbackTime = this.nativeCurrentTime || this.lastConfirmedNativeTime || 0;
+        RuntimeDiagnostics.audio('nativeFallbackToWeb', {
+          messageId: ctx.messageId,
+          error: e.message,
+          targetTime: fallbackTime,
+        });
+
+        try {
+          await NativeMediaBridge.getInstance().stopAudio();
+        } catch (_e) {}
+
+        const stagedPct = ctx.meta.durationSeconds && ctx.meta.durationSeconds > 0
+          ? (fallbackTime / ctx.meta.durationSeconds) * 100
+          : 0;
+        if (stagedPct > 0) {
+          this.stagedSeekPercent[ctx.messageId] = stagedPct;
+        }
+
+        const wasNative = this.isNative;
+        this.isNative = false;
+        try {
+          await this.playVoiceNote(ctx.session, ctx.cloudClient, ctx.meta, ctx.messageId, ctx.callbacks);
+          return;
+        } catch (_fallbackErr) {
+          this.isNative = wasNative;
+        }
+      }
+
+      this.currentStatus = 'error';
+      this.notifyListeners('error', 0, 0, this.getDuration());
+      if (this.activeCallbacks?.onError) {
+        this.activeCallbacks.onError(new Error(e.message || 'Playback error'));
+      }
+    });
   }
 
   public getPlayingId(): string | null {
@@ -232,6 +279,7 @@ export class VoicePlaybackManager {
     callbacks: VoicePlaybackCallbacks = {}
   ): Promise<void> {
     this.activeCallbacks = callbacks;
+    this.lastPlayContext = { session, cloudClient, meta, messageId, callbacks };
     const safeDuration = meta.durationSeconds && isFinite(meta.durationSeconds) ? meta.durationSeconds : 0;
     this.currentDuration = safeDuration;
     if (safeDuration > 0 && messageId) {
@@ -296,6 +344,7 @@ export class VoicePlaybackManager {
     this.notifyListeners('loading', 0, 0, safeDuration);
 
     if (this.isNative) {
+      this.setupNativeBridge();
       try {
         const streamUrl = `${cloudClient.getBaseUrl()}/v1/cloud/attachments/download-raw/${encodeURIComponent(meta.objectId)}`;
         const token = cloudClient.getSessionToken() || undefined;
@@ -874,6 +923,7 @@ export class VoicePlaybackManager {
     this.currentPlayingId = null;
     this.currentStatus = 'idle';
     this.activeCallbacks = null;
+    this.lastPlayContext = null;
     this.currentDuration = 0;
 
     if (previousId) {

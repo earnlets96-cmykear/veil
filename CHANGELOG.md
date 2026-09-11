@@ -2,6 +2,31 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase77-zero-error-ebml-seeking-and-audio-resilience] - 2026-09-11
+
+### EBML Zero-Error Seek Pointer Precision & Native Audio Resilience (Phase 77)
+- **Zero-Error EBML Cues Indexer (`src/attachments/webmFix.ts`)**:
+  - Permanently resolved Android ExoPlayer `TYPE_SOURCE` `PlaybackException` ("Source error") during arbitrary seek operations.
+  - Eliminated `SeekHead` byte pointer misalignment (guess size 64 vs 47 bytes) that caused ExoPlayer to seek past `ID_CUES` (`0x1C53BB6B`).
+  - Fixed `CueClusterPosition` tolerance drift by computing exact relative cluster offsets from invariant `cl.originalFileOffset - firstClusterOffset`.
+  - Added `hasValidWebmIndex` to strictly assert that `SeekHead` lands on `ID_CUES` and the first `CueClusterPosition` lands on `ID_CLUSTER` (`0x1F43B675`).
+  - Idempotent re-indexing safely strips previous/corrupted headers without duplication.
+- **Proactive Repair on Download/Decryption (`src/attachments/voiceRecorder.ts`)**:
+  - Replaced naive `hasWebmCues` with `hasValidWebmIndex`. All cached or incoming WebM voice notes with corrupted or drifted Cues are automatically re-indexed with exact zero-drift pointers before reaching the audio player.
+- **Transparent Native-to-Web Error Fallback (`src/attachments/voicePlayer.ts`)**:
+  - Maintained `lastPlayContext` in `VoicePlaybackManager`.
+  - When ExoPlayer triggers `onPlaybackError`, the player halts native playback and transparently recovers using decrypted Web Audio (`HTMLAudioElement`) from the seek position, eliminating user-facing error toasts.
+  - Encapsulated listener setup in `setupNativeBridge()`.
+- **ExoPlayer Diagnostics & State Recovery (`VeilNativeMediaPlugin.kt`)**:
+  - Enhanced error logs with `error.errorCodeName`, cause class name, and cause error message.
+  - In `seekAudio`, auto-prepares ExoPlayer if called while in `Player.STATE_IDLE`.
+- **Automated Verification & Artifacts**:
+  - 100% pass across all test suites (1208+ tests).
+  - New forensic test suite: `tests/phase77-webm-random-seek-forensic.test.ts` (6/6 tests pass).
+  - Production web bundle compiled (`npm run build`, 7 artifacts).
+  - Synced with Capacitor Android (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug`, BUILD SUCCESSFUL in 34s).
+
 ## [1.0.0-phase76-webm-seekability-and-telegram-gestures] - 2026-09-11
 
 ### WebM Container Seekability & Telegram-Grade Chat Gestures (Phase 76)

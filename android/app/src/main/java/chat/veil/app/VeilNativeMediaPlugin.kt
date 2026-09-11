@@ -179,10 +179,17 @@ class VeilNativeMediaPlugin : Plugin() {
 
             override fun onPlayerError(error: PlaybackException) {
                 stopProgressUpdates()
+                val causeMsg = error.cause?.localizedMessage ?: error.cause?.message ?: ""
+                val fullMsg = if (causeMsg.isNotEmpty() && causeMsg != error.localizedMessage) {
+                    "${error.localizedMessage ?: "Playback error"}: $causeMsg"
+                } else {
+                    error.localizedMessage ?: "Playback error"
+                }
                 val data = JSObject().apply {
                     put("state", "error")
                     put("errorCode", error.errorCodeName)
-                    put("message", error.localizedMessage ?: "Playback error")
+                    put("message", fullMsg)
+                    put("cause", error.cause?.javaClass?.simpleName ?: "")
                     put("messageId", currentMessageId ?: "")
                 }
                 notifyListeners("onPlaybackError", data)
@@ -325,6 +332,10 @@ class VeilNativeMediaPlugin : Plugin() {
             if (player == null) {
                 call.reject("Player not initialized")
                 return@post
+            }
+
+            if (player.playbackState == Player.STATE_IDLE) {
+                player.prepare()
             }
 
             val rawDuration = player.duration

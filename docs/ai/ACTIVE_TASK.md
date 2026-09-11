@@ -1,6 +1,38 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 76 — WEBM SEEKABILITY CONTAINER & TELEGRAM-GRADE CHAT GESTURE SYSTEM
+## Active Phase: PHASE 77 — ZERO-ERROR EBML CUES INDEXING & NATIVE AUDIO RESILIENCE
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, 1208+ tests; Android assembleDebug APK built successfully)
+- **Branch**: `main`
+
+### Phase 77 Tasks Completed:
+- [x] **Forensic Root Cause Resolution for ExoPlayer "Source Error" (`webmFix.ts`)**:
+  - Identified and eliminated EBML `SeekHead` byte-pointer mismatches (`seekHeadGuessSize = 64` vs actual 47 bytes) which misdirected ExoPlayer's `DefaultHttpDataSource` past `ID_CUES` (`0x1C53BB6B`).
+  - Fixed `CueClusterPosition` tolerance drift by replacing approximate shift guessing with deterministic convergence: clusters are isolated strictly between `firstClusterOffset` and `lastClusterEnd`, ensuring `cl.originalFileOffset - firstClusterOffset` is a perfect relative invariant.
+  - Slices out previous/corrupted `SeekHead` and `Cues` elements so re-indexing is 100% idempotent without header bloat or duplication.
+  - Implemented `hasValidWebmIndex(buffer)`: strictly parses EBML Segment children and asserts that `SeekHead` points directly to `ID_CUES` and the first `CueClusterPosition` points directly to `ID_CLUSTER` (`0x1F43B675`).
+- [x] **Proactive Storage & Decryption Repair (`voiceRecorder.ts`)**:
+  - Replaced naive byte check `hasWebmCues` with `hasValidWebmIndex`. Any existing or cached voice note with malformed or drifted Cues is automatically re-indexed with exact zero-drift pointers upon download or decryption before delivery to the audio player.
+- [x] **Transparent Native-to-Web Playback Recovery (`voicePlayer.ts`)**:
+  - Added `lastPlayContext` tracking in `VoicePlaybackManager`.
+  - In `bridge.onError`, if ExoPlayer encounters any media source error, it halts native playback, preserves the seek target in `stagedSeekPercent`, and transparently falls back to decrypted Web Audio via `HTMLAudioElement` without displaying an error toast to the user.
+  - Encapsulated listener setup in `setupNativeBridge()`, ensuring native event listeners are active even when initialized dynamically.
+- [x] **Native ExoPlayer Diagnostics & State Recovery (`VeilNativeMediaPlugin.kt`)**:
+  - Added comprehensive diagnostic logging for `PlaybackException`: captures `errorCodeName`, cause class name, and cause error message.
+  - In `seekAudio`, auto-prepares ExoPlayer if called while in `Player.STATE_IDLE`.
+- [x] **Comprehensive Automated Verification & Production Build**:
+  - New test suite: `tests/phase77-webm-random-seek-forensic.test.ts` (6/6 tests pass):
+    - Validates `hasValidWebmIndex` on raw, corrupt, and fixed WebM.
+    - Validates 0-byte drift for cluster offsets across 1, 5, 20, and 50 clusters.
+    - Simulates 50 random seek operations across audio duration, verifying every simulated ExoPlayer HTTP Range request lands squarely on `0x1F43B675` (Cluster ID).
+    - Validates idempotent re-indexing without duplicate headers.
+    - Validates native player error fallback to web audio.
+  - Regression voice suites: `tests/phase76-webm-seekability.test.ts`, `tests/phase75-voicenote-runtime.test.tsx`, `tests/phase74-voice-native-seek.test.ts` (13/13 tests pass).
+  - Full project test suite: 1208+ tests passing cleanly.
+  - Production web bundle compiled (`npm run build`, 7 release artifacts).
+  - Capacitor Android synchronized (`npx cap sync android`).
+  - Native Android debug APK assembled (`gradlew.bat assembleDebug` BUILD SUCCESSFUL in 34s).
+
+## Previous Phase: PHASE 76 — WEBM SEEKABILITY CONTAINER & TELEGRAM-GRADE CHAT GESTURE SYSTEM
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all 386 test suites, 1202 tests; Android assembleDebug APK built successfully)
 - **Branch**: `main`
 

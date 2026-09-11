@@ -185,24 +185,135 @@ function concatBuffers(arrays: Uint8Array[]): Uint8Array {
 }
 
 /**
- * Scans a WebM buffer and inspects if it already contains a valid Cues table.
+ * Scans a WebM buffer and strictly verifies if it contains an authoritative,
+ * seekable Cues index and valid SeekHead pointers.
+ *
+ * Checks that:
+ * 1. An EBML Header and Segment are present.
+ * 2. SeekHead exists and its Cues pointer lands precisely on ID_CUES (0x1C53BB6B).
+ * 3. Cues exists and its first CueClusterPosition lands precisely on ID_CLUSTER (0x1F43B675).
  */
-export function hasWebmCues(buffer: Uint8Array): boolean {
-  for (let i = 0; i < buffer.length - 4; i++) {
-    if (
-      buffer[i] === 0x1c &&
-      buffer[i + 1] === 0x53 &&
-      buffer[i + 2] === 0xbb &&
-      buffer[i + 3] === 0x6b
-    ) {
-      return true;
+export function hasValidWebmIndex(buffer: Uint8Array): boolean {
+  if (buffer.length < 64) return false;
+  const ebmlId = readElementId(buffer, 0);
+  if (!ebmlId || ebmlId.id !== ID_EBML) return false;
+  const ebmlLen = readVint(buffer, ebmlId.length);
+  if (!ebmlLen) return false;
+  const ebmlTotal = ebmlId.length + ebmlLen.length + ebmlLen.value;
+  if (ebmlTotal >= buffer.length) return false;
+
+  const segId = readElementId(buffer, ebmlTotal);
+  if (!segId || segId.id !== ID_SEGMENT) return false;
+  const segLen = readVint(buffer, ebmlTotal + segId.length);
+  if (!segLen) return false;
+  const segStart = ebmlTotal + segId.length + segLen.length;
+
+  // Read first child inside Segment: must be SeekHead
+  const shId = readElementId(buffer, segStart);
+  if (!shId || shId.id !== ID_SEEKHEAD) return false;
+  const shLen = readVint(buffer, segStart + shId.length);
+  if (!shLen) return false;
+  const shPayload = buffer.subarray(segStart + shId.length + shLen.length, segStart + shId.length + shLen.length + shLen.value);
+
+  // Parse Seek entries in SeekHead
+  let shOffset = 0;
+  let cuesSeekPos = -1;
+  while (shOffset < shPayload.length) {
+    const sId = readElementId(shPayload, shOffset);
+    if (!sId || sId.id !== ID_SEEK) break;
+    const sLen = readVint(shPayload, shOffset + sId.length);
+    if (!sLen) break;
+    const sPayload = shPayload.subarray(shOffset + sId.length + sLen.length, shOffset + sId.length + sLen.length + sLen.value);
+    let subOffset = 0;
+    let targetId = 0;
+    let targetPos = -1;
+    while (subOffset < sPayload.length) {
+      const subId = readElementId(sPayload, subOffset);
+      if (!subId) break;
+      const subLen = readVint(sPayload, subOffset + subId.length);
+      if (!subLen) break;
+      const subValBytes = sPayload.subarray(subOffset + subId.length + subLen.length, subOffset + subId.length + subLen.length + subLen.value);
+      if (subId.id === ID_SEEK_ID) {
+        let tid = 0;
+        for (const b of subValBytes) tid = (tid << 8) | b;
+        targetId = tid >>> 0;
+      } else if (subId.id === ID_SEEK_POSITION) {
+        let tpos = 0;
+        for (const b of subValBytes) tpos = (tpos << 8) | b;
+        targetPos = tpos;
+      }
+      subOffset += subId.length + subLen.length + subLen.value;
     }
+    if (targetId === ID_CUES) cuesSeekPos = targetPos;
+    shOffset += sId.length + sLen.length + sLen.value;
   }
-  return false;
+
+  if (cuesSeekPos === -1) return false;
+
+  // Validate that cuesSeekPos actually lands on ID_CUES
+  const cuesFilePos = segStart + cuesSeekPos;
+  const foundCuesId = readElementId(buffer, cuesFilePos);
+  if (!foundCuesId || foundCuesId.id !== ID_CUES) return false;
+
+  // Read first CuePoint in Cues
+  const cuesLen = readVint(buffer, cuesFilePos + foundCuesId.length);
+  if (!cuesLen) return false;
+  const cuesPayload = buffer.subarray(cuesFilePos + foundCuesId.length + cuesLen.length, cuesFilePos + foundCuesId.length + cuesLen.length + cuesLen.value);
+  const cpId = readElementId(cuesPayload, 0);
+  if (!cpId || cpId.id !== ID_CUE_POINT) return false;
+  const cpLen = readVint(cuesPayload, cpId.length);
+  if (!cpLen) return false;
+  const cpPayload = cuesPayload.subarray(cpId.length + cpLen.length, cpId.length + cpLen.length + cpLen.value);
+
+  // Find CueClusterPosition in CuePoint
+  let cpOffset = 0;
+  let firstClusterPos = -1;
+  while (cpOffset < cpPayload.length) {
+    const elId = readElementId(cpPayload, cpOffset);
+    if (!elId) break;
+    const elLen = readVint(cpPayload, cpOffset + elId.length);
+    if (!elLen) break;
+    if (elId.id === ID_CUE_TRACK_POSITIONS) {
+      const ctpPayload = cpPayload.subarray(cpOffset + elId.length + elLen.length, cpOffset + elId.length + elLen.length + elLen.value);
+      let ctpOffset = 0;
+      while (ctpOffset < ctpPayload.length) {
+        const subId = readElementId(ctpPayload, ctpOffset);
+        if (!subId) break;
+        const subLen = readVint(ctpPayload, ctpOffset + subId.length);
+        if (!subLen) break;
+        if (subId.id === ID_CUE_CLUSTER_POSITION) {
+          const valBytes = ctpPayload.subarray(ctpOffset + subId.length + subLen.length, ctpOffset + subId.length + subLen.length + subLen.value);
+          let val = 0;
+          for (const b of valBytes) val = (val << 8) | b;
+          firstClusterPos = val;
+          break;
+        }
+        ctpOffset += subId.length + subLen.length + subLen.value;
+      }
+    }
+    cpOffset += elId.length + elLen.length + elLen.value;
+  }
+
+  if (firstClusterPos === -1) return false;
+
+  // Validate that firstClusterPos lands EXACTLY on ID_CLUSTER
+  const clusterFilePos = segStart + firstClusterPos;
+  const foundClusterId = readElementId(buffer, clusterFilePos);
+  if (!foundClusterId || foundClusterId.id !== ID_CLUSTER) return false;
+
+  return true;
 }
 
 /**
- * Makes a WebM buffer seekable by injecting Duration, Cues index, and SeekHead.
+ * Backward-compatible helper checking for valid Cues index.
+ */
+export function hasWebmCues(buffer: Uint8Array): boolean {
+  return hasValidWebmIndex(buffer);
+}
+
+/**
+ * Makes a WebM buffer seekable by injecting Duration, Cues index, and SeekHead
+ * with mathematically deterministic zero-error pointer precision.
  */
 export function makeWebmSeekableSync(buffer: Uint8Array, durationMsFallback?: number): Uint8Array {
   // If buffer is too small or not EBML, return as is
@@ -228,12 +339,14 @@ export function makeWebmSeekableSync(buffer: Uint8Array, durationMsFallback?: nu
   const segmentContentStartPos = ebmlTotalLen + segmentId.length + segmentLen.length;
 
   // 3. Scan Segment children: Info, Tracks, and all Clusters
+  // We ignore any existing/corrupted SeekHead or Cues in the input buffer
   let offset = segmentContentStartPos;
   let infoBuffer: Uint8Array | null = null;
   let tracksBuffer: Uint8Array | null = null;
-  let firstClusterOffset: number = -1;
+  let firstClusterOffset = -1;
+  let lastClusterEnd = -1;
 
-  const clusters: ClusterEntry[] = [];
+  const clusters: { timecodeMs: number; originalFileOffset: number }[] = [];
   let maxTimecode = 0;
 
   while (offset < buffer.length) {
@@ -255,6 +368,7 @@ export function makeWebmSeekableSync(buffer: Uint8Array, durationMsFallback?: nu
       if (firstClusterOffset === -1) {
         firstClusterOffset = offset;
       }
+      lastClusterEnd = offset + headerLen + contentLen;
 
       // Read Timecode inside cluster
       let clusterTimecode = 0;
@@ -279,7 +393,7 @@ export function makeWebmSeekableSync(buffer: Uint8Array, durationMsFallback?: nu
 
       clusters.push({
         timecodeMs: clusterTimecode,
-        offset: offset - segmentContentStartPos,
+        originalFileOffset: offset,
       });
     }
 
@@ -323,64 +437,65 @@ export function makeWebmSeekableSync(buffer: Uint8Array, durationMsFallback?: nu
   // Re-wrap Tracks
   const tracksElement = tracksBuffer ? wrapElement(ID_TRACKS, tracksBuffer) : new Uint8Array(0);
 
-  // 5. Construct Cues and SeekHead iteratively to resolve exact cluster offsets
-  // Pre-cluster data before shift: clusters start at `firstClusterOffset`
-  const clustersData = buffer.subarray(firstClusterOffset);
+  // Clusters payload slice: contains strictly cluster data
+  const clustersData = buffer.subarray(firstClusterOffset, lastClusterEnd !== -1 ? lastClusterEnd : buffer.length);
   const ebmlHeader = buffer.subarray(0, ebmlTotalLen);
 
-  // Initial estimate of Cues
-  let newMetadataSize = 0;
+  // 5. Construct Cues and SeekHead with 0-byte mathematical precision
+  // Layout in new segment:
+  // [SeekHead] -> [newInfoElement] -> [tracksElement] -> [finalCues] -> [clustersData]
+  //
+  // Where cluster0 starts at:
+  // cluster0Pos = finalSeekHead.length + newInfoElement.length + tracksElement.length + finalCues.length
+  // And cluster i starts at:
+  // clusterIPos = cluster0Pos + (cl.originalFileOffset - firstClusterOffset)
+  let cluster0Pos = 512; // Initial seed
   let finalSeekHead: Uint8Array = new Uint8Array(0);
   let finalCues: Uint8Array = new Uint8Array(0);
 
-  // Iterative convergence to account for variable-length VINT cluster offsets
-  let estimatedShift = 512; // Initial guess for header growth
-  for (let iter = 0; iter < 4; iter++) {
+  for (let iter = 0; iter < 10; iter++) {
+    // 5a. Build Cues table using current cluster0Pos
     const cuePoints: Uint8Array[] = [];
     for (const cl of clusters) {
-      const shiftedClusterOffset = cl.offset + estimatedShift;
+      const clusterPos = cluster0Pos + (cl.originalFileOffset - firstClusterOffset);
       const cueTimeEl = wrapElement(ID_CUE_TIME, encodeUInt(cl.timecodeMs));
       const cueTrackEl = wrapElement(ID_CUE_TRACK, encodeUInt(1));
-      const cuePosEl = wrapElement(ID_CUE_CLUSTER_POSITION, encodeUInt(shiftedClusterOffset));
+      const cuePosEl = wrapElement(ID_CUE_CLUSTER_POSITION, encodeUInt(clusterPos));
       const cueTrackPositionsEl = wrapElement(ID_CUE_TRACK_POSITIONS, concatBuffers([cueTrackEl, cuePosEl]));
       const cuePointEl = wrapElement(ID_CUE_POINT, concatBuffers([cueTimeEl, cueTrackPositionsEl]));
       cuePoints.push(cuePointEl);
     }
-    const cuesPayload = concatBuffers(cuePoints);
-    finalCues = wrapElement(ID_CUES, cuesPayload);
+    finalCues = wrapElement(ID_CUES, concatBuffers(cuePoints));
 
-    // SeekHead entries: Info, Tracks, Cues
-    // SeekPosition is offset from segmentContentStartPos
-    // Layout: [SeekHead] -> [Info] -> [Tracks] -> [Cues] -> [Clusters]
-    // Estimate SeekHead size first (~64 bytes)
-    const seekHeadGuessSize = 64;
-    const infoOffset = seekHeadGuessSize;
-    const tracksOffset = infoOffset + newInfoElement.length;
-    const cuesOffset = tracksOffset + tracksElement.length;
+    // 5b. Build SeekHead with exact offsets
+    let seekHeadLen = 47;
+    for (let sIter = 0; sIter < 5; sIter++) {
+      const infoOffset = seekHeadLen;
+      const tracksOffset = infoOffset + newInfoElement.length;
+      const cuesOffset = tracksOffset + tracksElement.length;
 
-    const buildSeekEntry = (targetId: number, targetPos: number) => {
-      const seekIdEl = wrapElement(ID_SEEK_ID, encodeId(targetId));
-      const seekPosEl = wrapElement(ID_SEEK_POSITION, encodeUInt(targetPos));
-      return wrapElement(ID_SEEK, concatBuffers([seekIdEl, seekPosEl]));
-    };
+      const buildSeekEntry = (targetId: number, targetPos: number) => {
+        const seekIdEl = wrapElement(ID_SEEK_ID, encodeId(targetId));
+        const seekPosEl = wrapElement(ID_SEEK_POSITION, encodeUInt(targetPos));
+        return wrapElement(ID_SEEK, concatBuffers([seekIdEl, seekPosEl]));
+      };
 
-    const seekEntries = [
-      buildSeekEntry(ID_INFO, infoOffset),
-      buildSeekEntry(ID_TRACKS, tracksOffset),
-      buildSeekEntry(ID_CUES, cuesOffset),
-    ];
-    finalSeekHead = wrapElement(ID_SEEKHEAD, concatBuffers(seekEntries));
-
-    // Calculate actual new metadata size
-    const actualMetadataSize = finalSeekHead.length + newInfoElement.length + tracksElement.length + finalCues.length;
-    const originalMetadataSize = firstClusterOffset - segmentContentStartPos;
-    const actualShift = actualMetadataSize - originalMetadataSize;
-
-    if (Math.abs(actualShift - estimatedShift) <= 2) {
-      estimatedShift = actualShift;
-      break;
+      const seekEntries = [
+        buildSeekEntry(ID_INFO, infoOffset),
+        buildSeekEntry(ID_TRACKS, tracksOffset),
+        buildSeekEntry(ID_CUES, cuesOffset),
+      ];
+      finalSeekHead = wrapElement(ID_SEEKHEAD, concatBuffers(seekEntries));
+      if (finalSeekHead.length === seekHeadLen) break;
+      seekHeadLen = finalSeekHead.length;
     }
-    estimatedShift = actualShift;
+
+    // 5c. Check convergence
+    const actualCluster0Pos = finalSeekHead.length + newInfoElement.length + tracksElement.length + finalCues.length;
+    if (actualCluster0Pos === cluster0Pos) {
+      break; // Exact 0-byte match!
+    }
+    cluster0Pos = actualCluster0Pos;
   }
 
   // 6. Assemble the seekable WebM file
@@ -414,3 +529,4 @@ export async function makeWebmSeekable(blob: Blob, durationMsFallback?: number):
     return blob;
   }
 }
+
