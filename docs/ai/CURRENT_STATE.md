@@ -12,6 +12,7 @@
   - **Universal Reactions**: Added floating reaction pills to images, videos, audio, and documents. Unblocked card context menu triggers.
   - **Media Picker**: Automatically loads recent media on opening without requiring manual click.
   - **Composer Input Fix & SR-Only Utility**: Removed rogue inline text node that caused horizontal squeezing of the input field in BlueStacks/mobile WebView; defined proper `.veil-sr-only` CSS utility.
+  - **Floating Island Composer & Embedded Emoji**: Removed solid rectangular composer container making it see-through; embedded emoji button inside the message box pill; styled Plus, Input Box, and Send/Mic buttons as independent floating islands.
 - **Verification Deliverables**:
   - Test suites passing: `tests/phase82-universal-reactions-and-chat-ux.test.tsx` (5/5), `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3), `tests/phase81-reply-preview-and-icon-safety.test.tsx` (8/8), `tests/phase37-mobile-layout.test.tsx` (2/2), `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19), `tests/phase62-applock-privacy-auth.test.tsx` (10/10), `tests/phase63-deep-repair.test.tsx` (10/10).
   - Complete test suite: 391 test files, 1,235 tests passing (100% pass).

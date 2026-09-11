@@ -29,6 +29,10 @@ All notable changes to the VEIL project are documented in this file.
   - Removed rogue inline `.veil-sr-only` text node that was rendered visibly and squeezed the input box horizontally.
   - Defined universal `.veil-sr-only` CSS class (`position: absolute; width: 1px; clip: rect(0, 0, 0, 0);`) in design system.
   - Retained accessible `aria-label="Type an encrypted message..."` directly on the `<textarea>` to preserve 100% test compatibility and full screen-reader accessibility.
+- **Floating Island Composer & Embedded Emoji Button (`src/ui/components/MessageComposer.tsx`, `src/styles/veil-design-system.css`, `src/styles/veil-components.css`)**:
+  - Removed solid rectangular background container (`background: transparent !important; border-top: none !important;`) so chat wallpaper flows behind composer controls.
+  - Formed 3 distinct floating islands: circular Plus island, center Message Box island capsule (`.veil-composer-input-island`), and circular Send/Mic island with blur backdrop, soft shadows, and subtle borders.
+  - Embedded the emoji button directly inside the message box pill at the right end for a unified messenger aesthetic.
 
 ## [1.0.0-phase81-strict-typecheck-and-compilation-safety] - 2026-09-11
 

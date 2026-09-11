@@ -2647,27 +2647,31 @@
   animation: veilFadeScaleIn 0.15s ease-out;
 }
 
-/* Modern Composer Pill Controls (Screenshot 2 & 5) */
+/* Modern Floating Composer Island Controls */
 .veil-composer-plus-btn {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
+  background: var(--veil-bg-surface-elevated, #161b22);
+  border: 1px solid var(--veil-border-subtle, rgba(255, 255, 255, 0.08));
   color: var(--veil-text-primary, #ffffff);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   margin-bottom: 2px;
-  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
   flex-shrink: 0;
 }
 
 .veil-composer-plus-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.16);
   transform: scale(1.05);
 }
 
@@ -2680,13 +2684,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 3px;
-  transition: color 0.15s ease;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  transition: color 0.15s ease, transform 0.15s ease;
   flex-shrink: 0;
 }
 
 .veil-composer-emoji-btn:hover {
   color: var(--veil-text-primary, #ffffff);
+  transform: scale(1.08);
 }
 
 .veil-btn-composer-mic {

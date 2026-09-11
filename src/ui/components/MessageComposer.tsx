@@ -625,33 +625,36 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               <span style={{ fontSize: '20px', fontWeight: 300, lineHeight: 1 }}>+</span>
             </button>
 
-            {/* Auto-expanding textarea */}
-            <textarea
-              ref={textareaRef}
-              className="veil-composer-input"
-              placeholder="Message..."
-              value={text}
-              onChange={handleTextChange}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              aria-label="Type an encrypted message..."
-            />
+            {/* Center Message Box Island (contains textarea and inline emoji button) */}
+            <div className="veil-composer-input-island">
+              {/* Auto-expanding textarea */}
+              <textarea
+                ref={textareaRef}
+                className="veil-composer-input"
+                placeholder="Message..."
+                value={text}
+                onChange={handleTextChange}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                aria-label="Type an encrypted message..."
+              />
 
-            {/* Inline emoji smiley button */}
-            <button
-              type="button"
-              className={`veil-composer-emoji-btn ${isEmojiDrawerOpen ? 'veil-composer-emoji-btn-active' : ''}`}
-              onClick={() => setIsEmojiDrawerOpen((prev) => !prev)}
-              aria-label="Toggle emoji picker"
-              title="Toggle emoji picker"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                <line x1="9" y1="9" x2="9.01" y2="9" />
-                <line x1="15" y1="9" x2="15.01" y2="9" />
-              </svg>
-            </button>
+              {/* Inline emoji smiley button inside the message box */}
+              <button
+                type="button"
+                className={`veil-composer-emoji-btn ${isEmojiDrawerOpen ? 'veil-composer-emoji-btn-active' : ''}`}
+                onClick={() => setIsEmojiDrawerOpen((prev) => !prev)}
+                aria-label="Toggle emoji picker"
+                title="Toggle emoji picker"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                  <line x1="9" y1="9" x2="9.01" y2="9" />
+                  <line x1="15" y1="9" x2="15.01" y2="9" />
+                </svg>
+              </button>
+            </div>
 
             {/* Dynamic Send / Mic Action Button */}
             {text.trim() || editingMessage ? (

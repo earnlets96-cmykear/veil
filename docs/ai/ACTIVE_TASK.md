@@ -34,6 +34,10 @@
   - Removed rogue `<span className="veil-sr-only">Type an encrypted message...</span>` from `MessageComposer.tsx` which was rendering visibly between the `+` button and the input box, squishing the textarea horizontally.
   - Defined universal `.veil-sr-only` CSS utility class in `src/styles/veil-design-system.css`.
   - Re-synced Capacitor Android and re-assembled fresh `app-debug.apk` with Gradle.
+- [x] **Floating Island Composer & Embedded Emoji Button**:
+  - Made `.veil-composer` completely see-through (`background: transparent; border-top: none;`).
+  - Embedded the emoji toggle button directly inside the message input pill capsule (`.veil-composer-input-island`).
+  - Styled Plus (`+`), Input Box, and Send/Mic controls as floating islands with blur backdrop and soft shadow.
 - [x] **Zero Regressions & Full Test Suite Pass**:
   - All 391 test files and 1,235 tests pass with 100% success rate.
   - Production build (`npm run build`) succeeds cleanly with 7 release artifacts.
