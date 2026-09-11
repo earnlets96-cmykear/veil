@@ -6,7 +6,8 @@
   "description": "VEIL: Privacy-First Messenger with Multi-Space Cryptographic Architecture",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/release-build.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build && node scripts/release-build.mjs",
     "build:release": "node scripts/release-build.mjs",
     "verify:release": "npm test && npm run build && node scripts/release-build.mjs",
     "preview": "vite preview",
@@ -18,7 +19,7 @@
     "android:sync": "npm run build && npx cap sync android",
     "android:open": "npx cap open android",
     "android:build": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug",
-    "test": "vitest run",
+    "test": "tsc --noEmit && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -28,6 +28,7 @@ import { RuntimeDiagnostics } from '../debug/runtimeDiagnostics.ts';
 import { spacePinManager } from '../privacy/pinManager.ts';
 import { createSignedProfile } from '../identity/profile.ts';
 import { PrekeyManager } from '../ratchet/prekeys.ts';
+import type { PrekeyBundle } from '../ratchet/types.ts';
 import type { NetworkManager } from '../network/networkManager.ts';
 import type { DirectoryClient } from '../network/directoryClient.ts';
 
@@ -270,16 +271,18 @@ export class AccountManager {
       spaceHeader.accountId = accountId;
       await this.vault.saveEnvelopeToStorage(spaceHeader, this.storageAdapter);
 
-      // Generate prekeys for tempSession if prekeyManager is available
-      let prekeyBundle = undefined;
-      if (effectivePrekeyMgr) {
-        try {
-          if (!effectivePrekeyMgr.getSignedPrekeyPublic(tempSession)) {
-            effectivePrekeyMgr.generateSignedPrekey(tempSession);
-          }
-          effectivePrekeyMgr.generateOneTimePrekeys(tempSession, 10);
-          prekeyBundle = effectivePrekeyMgr.createPrekeyBundle(tempSession);
-        } catch (_prekeyErr) {}
+      // Generate prekeys for tempSession
+      let prekeyBundle: PrekeyBundle;
+      try {
+        if (!effectivePrekeyMgr.getSignedPrekeyPublic(tempSession)) {
+          effectivePrekeyMgr.generateSignedPrekey(tempSession);
+        }
+        effectivePrekeyMgr.generateOneTimePrekeys(tempSession, 10);
+        prekeyBundle = effectivePrekeyMgr.createPrekeyBundle(tempSession);
+      } catch (_prekeyErr) {
+        effectivePrekeyMgr.generateSignedPrekey(tempSession);
+        effectivePrekeyMgr.generateOneTimePrekeys(tempSession, 5);
+        prekeyBundle = effectivePrekeyMgr.createPrekeyBundle(tempSession);
       }
 
       // Allocate or obtain real mailbox on relay

@@ -472,6 +472,8 @@ export class ConversationManager {
     attachments?: any[];
     replyTo?: any;
     voice?: any;
+    forwarded?: any;
+    forwardedFrom?: any;
     receipt?: ReceiptPayload & { senderIdentityId: string };
   }> {
     this.assertSession(session);

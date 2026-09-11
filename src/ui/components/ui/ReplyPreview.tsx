@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { MicIcon, PaperclipIcon, ImageIcon, VideoIcon, CloseIcon } from '../icons/index.ts';
+import { MicIcon, PaperclipIcon, ImageIcon, VideoIcon, CloseIcon, ReplyIcon } from '../icons/index.ts';
 
 export interface ReplyPreviewData {
   messageId: string;

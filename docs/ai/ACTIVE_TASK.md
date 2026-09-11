@@ -1,6 +1,27 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 80 — MODERN MESSENGER UX & DISAPPEARING VIDEO CONTROLS OVERHAUL
+## Active Phase: PHASE 81 — STRICT TYPECHECK & COMPILATION SAFETY HARDENING (UNDEFINED IDENTIFIER PREVENTION)
+- **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero runtime undefined errors)
+- **Branch**: `main`
+
+### Phase 81 Tasks Completed:
+- [x] **Direct Root Cause Fix (`ReplyPreview.tsx`)**:
+  - Imported missing `ReplyIcon` from `../icons/index.ts` into `src/ui/components/ui/ReplyPreview.tsx`.
+- [x] **Permanent Structural Compilation Guard (`package.json`)**:
+  - Wired `tsc --noEmit` directly into `build` (`"build": "tsc --noEmit && vite build && node scripts/release-build.mjs"`) and `test` (`"test": "tsc --noEmit && vitest run"`).
+  - Added dedicated `"typecheck": "tsc --noEmit"` script.
+  - Guarantees that no undeclared identifiers, missing imports, or type errors can ever pass build or test pipelines into production.
+- [x] **Zero TypeScript Errors Across Entire Workspace (`tsc --noEmit`)**:
+  - Resolved `PrekeyBundle` typing and assignment in `src/account/accountManager.ts`.
+  - Added `BlobPart` casting for `Uint8Array` in `src/attachments/webmFix.ts`, `src/media/NativeDeviceMediaBridge.ts`, and `src/ui/app/AppState.tsx`.
+  - Added `forwarded` and `forwardedFrom` properties to `receiveMessage` return type in `src/messaging/conversationManager.ts`.
+- [x] **Comprehensive Test Suite & Icon Safety Audit (`tests/phase81-reply-preview-and-icon-safety.test.tsx`)**:
+  - Created dedicated test suite (8/8 tests pass) validating all `ReplyPreview` scenarios (text, image, video, voice, file, cancel/dismiss) and programmatically verifying that every exported icon in `src/ui/components/icons/Icons.tsx` is defined and renders valid SVG markup without runtime exceptions.
+- [x] **UI Layout & SVG Audit Compliance**:
+  - Added `veil-context-reactions-bar` dual class name and 7-emoji slice to `ConversationView.tsx`.
+  - Replaced raw Unicode arrow with SVG `<polyline>` in `MessageComposer.tsx` and restored default composer placeholder.
+
+## Previous Phase: PHASE 80 — MODERN MESSENGER UX & DISAPPEARING VIDEO CONTROLS OVERHAUL
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, Capacitor Android synced)
 - **Branch**: `main`
 

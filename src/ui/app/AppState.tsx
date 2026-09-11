@@ -3392,13 +3392,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         let audioBlob: Blob | undefined;
         let cached = MediaCache.get(message.voice.objectId);
         if (cached && cached.data) {
-          audioBlob = new Blob([cached.data], { type: message.voice.mimeType || 'audio/webm' });
+          audioBlob = new Blob([cached.data as unknown as BlobPart], { type: message.voice.mimeType || 'audio/webm' });
         } else {
           try {
             const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, message.voice);
             cached = MediaCache.get(message.voice.objectId);
             if (cached && cached.data) {
-              audioBlob = new Blob([cached.data], { type: message.voice.mimeType || 'audio/webm' });
+              audioBlob = new Blob([cached.data as unknown as BlobPart], { type: message.voice.mimeType || 'audio/webm' });
             } else if (blobUrl) {
               const resp = await fetch(blobUrl);
               audioBlob = await resp.blob();
@@ -3438,7 +3438,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             } catch (_fErr) {}
           }
           if (cached && cached.data) {
-            const file = new File([cached.data], att.name || 'attachment', {
+            const file = new File([cached.data as unknown as BlobPart], att.name || 'attachment', {
               type: att.mimeType || cached.mimeType || 'application/octet-stream',
             });
             files.push(file);

@@ -523,7 +523,7 @@ export async function makeWebmSeekable(blob: Blob, durationMsFallback?: number):
     const arrayBuffer = await blob.arrayBuffer();
     const uint8 = new Uint8Array(arrayBuffer);
     const fixedUint8 = makeWebmSeekableSync(uint8, durationMsFallback);
-    return new Blob([fixedUint8], { type: blob.type || 'audio/webm' });
+    return new Blob([fixedUint8 as unknown as BlobPart], { type: blob.type || 'audio/webm' });
   } catch (_e) {
     // If fixing fails for any reason, return original blob gracefully
     return blob;

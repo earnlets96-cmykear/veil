@@ -2,6 +2,24 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase81-strict-typecheck-and-compilation-safety] - 2026-09-11
+
+### Strict Typecheck & Compilation Safety Hardening (Phase 81)
+- **Direct Runtime Fix (`src/ui/components/ui/ReplyPreview.tsx`)**:
+  - Added missing `ReplyIcon` to imports from `../icons/index.ts`.
+- **Permanent Build Pipeline Guard (`package.json`)**:
+  - Embedded `tsc --noEmit` into `npm test` and `npm run build` scripts to eliminate Vite's transpiler bypassing TypeScript undeclared identifier checks.
+  - Added `"typecheck": "tsc --noEmit"` npm task.
+- **TypeScript Strict Compliance Across Codebase**:
+  - Resolved `PrekeyBundle` non-null assignment in `src/account/accountManager.ts`.
+  - Added `BlobPart` casting in `src/attachments/webmFix.ts`, `src/media/NativeDeviceMediaBridge.ts`, and `src/ui/app/AppState.tsx`.
+  - Added optional `forwarded` and `forwardedFrom` properties to `receiveMessage` return type in `src/messaging/conversationManager.ts`.
+- **Dedicated Icon Safety Audit Suite (`tests/phase81-reply-preview-and-icon-safety.test.tsx`)**:
+  - Added automated test suite verifying all 8 `ReplyPreview` state permutations and programmatically asserting all 40+ exported SVG icons are defined and render valid markup.
+- **UI Layout & SVG Audit Compliance**:
+  - Maintained `veil-context-reactions-bar` dual class and 7-emoji quick reactions in `src/ui/components/ConversationView.tsx`.
+  - Replaced raw Unicode arrow with SVG `<polyline>` in `src/ui/components/MessageComposer.tsx` and restored default composer placeholder.
+
 ## [1.0.0-phase80-modern-messenger-ux-and-video-controls] - 2026-09-11
 
 ### Modern Messenger UX Alignment & Disappearing Video Player Controls (Phase 80)

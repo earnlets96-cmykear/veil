@@ -513,7 +513,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                   }}
                 >
                   <LockIcon size={12} color="var(--veil-accent-primary, #14b8a6)" />
-                  <span>Slide up to lock ↑</span>
+                  <span>Slide up to lock</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
                 </div>
               )}
 
@@ -572,7 +575,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             <textarea
               ref={textareaRef}
               className="veil-composer-input"
-              placeholder="Message..."
+              placeholder="Type an encrypted message..."
               value={text}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}

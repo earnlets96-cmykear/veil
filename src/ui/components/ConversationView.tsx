@@ -1252,8 +1252,8 @@ export const ConversationView: React.FC = () => {
   // Get the display emojis for the reaction bar (recent or defaults)
   const DEFAULT_REACTION_EMOJIS = ['\u2764\uFE0F', '\u{1F44D}', '\u{1F602}', '\u{1F62E}', '\u{1F622}', '\u{1F64F}', '\u{1F525}'];
   const displayEmojis = recentEmojis.length > 0
-    ? [...new Set([...recentEmojis.slice(0, 6)])].slice(0, 6)
-    : DEFAULT_REACTION_EMOJIS.slice(0, 6);
+    ? [...new Set([...recentEmojis.slice(0, 7)])].slice(0, 7)
+    : DEFAULT_REACTION_EMOJIS.slice(0, 7);
 
   // Context Menu Actions
   const handleCopyText = (text?: string) => {
@@ -1731,7 +1731,7 @@ export const ConversationView: React.FC = () => {
       {/* Floating Reactions Pill (Rendered directly above the message / context menu) */}
       {contextMenu.isOpen && contextMenu.message && (
         <div
-          className="veil-floating-reactions-pill"
+          className="veil-floating-reactions-pill veil-context-reactions-bar"
           style={{
             position: 'fixed',
             top: `${Math.max(12, contextMenu.y - 56)}px`,

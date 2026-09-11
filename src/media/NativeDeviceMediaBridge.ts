@@ -110,7 +110,7 @@ export class NativeDeviceMediaBridge {
   public async fileFromUri(uri: string): Promise<File> {
     const media = await this.readMedia(uri);
     const bytes = base64ToBytes(media.base64Data);
-    return new File([bytes], media.name, { type: media.mimeType });
+    return new File([bytes as unknown as BlobPart], media.name, { type: media.mimeType });
   }
 
   public async pickDocuments(): Promise<DeviceMediaItem[]> {
