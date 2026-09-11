@@ -38,9 +38,16 @@
   - Made `.veil-composer` completely see-through (`background: transparent; border-top: none;`).
   - Embedded the emoji toggle button directly inside the message input pill capsule (`.veil-composer-input-island`).
   - Styled Plus (`+`), Input Box, and Send/Mic controls as floating islands with blur backdrop and soft shadow.
+  - Eliminated inner capsule border artifact on focus.
+- [x] **Emoji Drawer Overhaul & Mobile Usability Refinements**:
+  - Rebuilt Emoji Drawer matching reference mockup (`media_1789139012988.png`): centered drag handle, pill search input, segmented control tabs (`Emoji / Stickers / GIFs`), category navigation bar with active accent pill, 8-column emoji grid, and 44x44px floating circular bottom-right backspace button.
+  - Implemented keyword-based emoji search indexing (`EMOJI_KEYWORD_MAP`) supporting queries like "smile", "happy", "love", "heart", "fire", "laugh", "dog", "car", etc.
+  - Mitigated mobile soft keyboard interference: added `onMouseDown={(e) => e.preventDefault()}` on drawer buttons, updated `handleInsertEmoji` and `handleEmojiBackspace` to avoid calling `.focus()`, and blurred textarea on emoji drawer toggle.
+  - Preserved 100% compliance with strict zero-literal-Unicode icon audit (`tests/phase44a-ui-layout-and-icons.test.tsx`).
 - [x] **Zero Regressions & Full Test Suite Pass**:
-  - All 391 test files and 1,235 tests pass with 100% success rate.
+  - All test files pass with 100% success rate.
   - Production build (`npm run build`) succeeds cleanly with 7 release artifacts.
+  - Capacitor Android synced and native debug APK compiled (`gradlew.bat assembleDebug`).
 
 ## Previous Phase: PHASE 81 — STRICT TYPECHECK & COMPILATION SAFETY HARDENING (UNDEFINED IDENTIFIER PREVENTION)
 - **Status**: COMPLETE & PRODUCTION-VERIFIED (100% pass across all test suites, TypeScript release build success, zero runtime undefined errors)

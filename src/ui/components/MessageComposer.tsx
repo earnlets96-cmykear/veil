@@ -181,9 +181,12 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       const nextText = prev.slice(0, start) + emoji + prev.slice(end);
       setTimeout(() => {
         if (textareaRef.current) {
-          textareaRef.current.focus();
           const newPos = start + emoji.length;
-          textareaRef.current.setSelectionRange(newPos, newPos);
+          try {
+            textareaRef.current.setSelectionRange(newPos, newPos);
+          } catch {
+            // Ignore if setSelectionRange is not supported
+          }
           textareaRef.current.style.height = 'auto';
           textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
         }
@@ -199,7 +202,19 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       const start = textarea?.selectionStart ?? prev.length;
       const end = textarea?.selectionEnd ?? prev.length;
       if (start !== end) {
-        return prev.slice(0, start) + prev.slice(end);
+        const nextText = prev.slice(0, start) + prev.slice(end);
+        setTimeout(() => {
+          if (textareaRef.current) {
+            try {
+              textareaRef.current.setSelectionRange(start, start);
+            } catch {
+              // Ignore
+            }
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+          }
+        }, 0);
+        return nextText;
       }
       if (start === 0) return prev;
       const chars = Array.from(prev);
@@ -218,8 +233,13 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         const newPos = Math.max(0, start - (prev.length - nextText.length));
         setTimeout(() => {
           if (textareaRef.current) {
-            textareaRef.current.focus();
-            textareaRef.current.setSelectionRange(newPos, newPos);
+            try {
+              textareaRef.current.setSelectionRange(newPos, newPos);
+            } catch {
+              // Ignore
+            }
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
           }
         }, 0);
         return nextText;
@@ -635,6 +655,12 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                 value={text}
                 onChange={handleTextChange}
                 onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (isEmojiDrawerOpen) setIsEmojiDrawerOpen(false);
+                }}
+                onClick={() => {
+                  if (isEmojiDrawerOpen) setIsEmojiDrawerOpen(false);
+                }}
                 rows={1}
                 aria-label="Type an encrypted message..."
               />
@@ -643,7 +669,13 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               <button
                 type="button"
                 className={`veil-composer-emoji-btn ${isEmojiDrawerOpen ? 'veil-composer-emoji-btn-active' : ''}`}
-                onClick={() => setIsEmojiDrawerOpen((prev) => !prev)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (!isEmojiDrawerOpen && textareaRef.current) {
+                    textareaRef.current.blur();
+                  }
+                  setIsEmojiDrawerOpen((prev) => !prev);
+                }}
                 aria-label="Toggle emoji picker"
                 title="Toggle emoji picker"
               >

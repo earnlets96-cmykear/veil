@@ -33,6 +33,12 @@ All notable changes to the VEIL project are documented in this file.
   - Removed solid rectangular background container (`background: transparent !important; border-top: none !important;`) so chat wallpaper flows behind composer controls.
   - Formed 3 distinct floating islands: circular Plus island, center Message Box island capsule (`.veil-composer-input-island`), and circular Send/Mic island with blur backdrop, soft shadows, and subtle borders.
   - Embedded the emoji button directly inside the message box pill at the right end for a unified messenger aesthetic.
+  - Eliminated inner capsule border artifact on focus with `border: none !important; outline: none !important; box-shadow: none !important;`.
+- **Emoji Drawer Overhaul & Mobile Chat Usability (`src/ui/components/ui/EmojiDrawer.tsx`, `src/ui/components/MessageComposer.tsx`, `src/styles/veil-components.css`)**:
+  - Rebuilt Emoji Drawer to match reference design mockup (`media_1789139012988.png`): centered drag handle, pill search input, segmented control (`Emoji / Stickers / GIFs`), category navigation bar with active accent pill, 8-column emoji grid, and 44x44px floating circular bottom-right backspace button.
+  - Implemented keyword-based emoji search indexing (`EMOJI_KEYWORD_MAP`) supporting queries like "smile", "happy", "love", "heart", "fire", "laugh", "dog", "car", etc.
+  - Mitigated mobile soft keyboard interference: added `onMouseDown={(e) => e.preventDefault()}` on drawer action buttons, updated `handleInsertEmoji` and `handleEmojiBackspace` to update cursor positions without invoking `.focus()`, and blurred textarea on emoji drawer toggle to cleanly dismiss the Android keyboard.
+  - Preserved 100% compliance with strict zero-literal-Unicode icon audit (`tests/phase44a-ui-layout-and-icons.test.tsx`) using Unicode escape sequences.
 
 ## [1.0.0-phase81-strict-typecheck-and-compilation-safety] - 2026-09-11
 

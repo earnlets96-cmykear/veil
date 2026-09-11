@@ -1099,15 +1099,17 @@ body {
   box-shadow: 0 0 0 1px var(--veil-accent-primary, #14b8a6), 0 2px 12px rgba(20, 184, 166, 0.2);
 }
 
-.veil-composer-input-island .veil-composer-input {
+.veil-composer-input-island .veil-composer-input,
+.veil-composer-input-island .veil-composer-input:focus {
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
   outline: none !important;
-  padding: 8px 4px 8px 0 !important;
   box-shadow: none !important;
+  padding: 8px 4px 8px 0 !important;
   min-height: 24px;
   max-height: 120px;
-  border-radius: 0;
+  border-radius: 0 !important;
 }
 
 .veil-composer-input {
