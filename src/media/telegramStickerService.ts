@@ -460,19 +460,27 @@ class TelegramStickerService {
       });
     }
 
-    // Pre-cache stickers in background so sending is instant and 100% offline-resilient
+    // Pre-cache stickers in background with 1-second auto-retry on failure
     if (typeof window !== 'undefined' && Array.isArray(pack.stickers)) {
-      const stickersToCache = pack.stickers.slice(0, 30);
-      setTimeout(async () => {
-        for (const stk of stickersToCache) {
-          if (stk.url && !this.blobCache.has(stk.url)) {
-            try {
-              const blob = await this.fetchStickerBlob(stk.url);
-              this.blobCache.set(stk.url, blob);
-            } catch {}
+      const stickersToCache = pack.stickers.slice(0, 60);
+      const cacheItem = async (stk: StickerItem, retriesLeft = 8) => {
+        if (!stk.url || this.blobCache.has(stk.url)) return;
+        try {
+          const blob = await this.fetchStickerBlob(stk.url);
+          this.blobCache.set(stk.url, blob);
+        } catch {
+          if (retriesLeft > 0) {
+            setTimeout(() => {
+              void cacheItem(stk, retriesLeft - 1);
+            }, 1000);
           }
         }
-      }, 100);
+      };
+      setTimeout(() => {
+        for (const stk of stickersToCache) {
+          void cacheItem(stk);
+        }
+      }, 50);
     }
   }
 

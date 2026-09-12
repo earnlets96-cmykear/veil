@@ -220,6 +220,143 @@ const EMOJI_KEYWORD_MAP: Record<string, string[]> = {
   '\u{26A0}\u{FE0F}': ['warning', 'alert', 'caution', 'danger'],
 };
 
+interface StickerGridCellProps {
+  sticker: StickerItem;
+  onClick: (sticker: StickerItem) => void;
+}
+
+const StickerGridCell: React.FC<StickerGridCellProps> = ({ sticker, onClick }) => {
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [resolvedUrl, setResolvedUrl] = useState<string>(sticker.url);
+  const [retryKey, setRetryKey] = useState<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setResolvedUrl(sticker.url);
+    setLoadStatus('loading');
+  }, [sticker.url]);
+
+  useEffect(() => {
+    if (loadStatus === 'error') {
+      retryTimeoutRef.current = setTimeout(async () => {
+        try {
+          const blob = await telegramStickerService.fetchStickerBlob(sticker.url);
+          const blobUrl = URL.createObjectURL(blob);
+          setResolvedUrl(blobUrl);
+          setLoadStatus('loading');
+          setRetryKey((k) => k + 1);
+        } catch {
+          setRetryKey((k) => k + 1);
+        }
+      }, 1000);
+    }
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, [loadStatus, retryKey, sticker.url]);
+
+  return (
+    <button
+      key={sticker.id}
+      type="button"
+      className="veil-sticker-cell"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => onClick(sticker)}
+      title={sticker.emoji || 'Sticker'}
+      aria-label={`Sticker ${sticker.emoji || ''}`}
+    >
+      {loadStatus !== 'loaded' && <div className="veil-sticker-skeleton" />}
+      <img
+        key={`${resolvedUrl}_${retryKey}`}
+        src={resolvedUrl}
+        alt=""
+        loading="lazy"
+        onLoad={() => setLoadStatus('loaded')}
+        onError={() => setLoadStatus('error')}
+        style={{ display: loadStatus === 'loaded' ? 'block' : 'none' }}
+      />
+    </button>
+  );
+};
+
+interface StickerPackTabButtonProps {
+  pack: StickerPack;
+  isActive: boolean;
+  onSelect: (packId: string) => void;
+}
+
+const StickerPackTabButton: React.FC<StickerPackTabButtonProps> = ({ pack, isActive, onSelect }) => {
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'loaded' | 'error'>(pack.thumbnailUrl ? 'loading' : 'loaded');
+  const [resolvedThumb, setResolvedThumb] = useState<string>(pack.thumbnailUrl || '');
+  const [retryKey, setRetryKey] = useState<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setResolvedThumb(pack.thumbnailUrl || '');
+    setLoadStatus(pack.thumbnailUrl ? 'loading' : 'loaded');
+  }, [pack.thumbnailUrl]);
+
+  useEffect(() => {
+    if (loadStatus === 'error' && pack.thumbnailUrl) {
+      retryTimeoutRef.current = setTimeout(async () => {
+        try {
+          const blob = await telegramStickerService.fetchStickerBlob(pack.thumbnailUrl);
+          const blobUrl = URL.createObjectURL(blob);
+          setResolvedThumb(blobUrl);
+          setLoadStatus('loading');
+          setRetryKey((k) => k + 1);
+        } catch {
+          setRetryKey((k) => k + 1);
+        }
+      }, 1000);
+    }
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, [loadStatus, retryKey, pack.thumbnailUrl]);
+
+  return (
+    <button
+      key={pack.id}
+      type="button"
+      className={`veil-emoji-category-icon-btn veil-sticker-pack-btn ${isActive ? 'active' : ''}`}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => onSelect(pack.id)}
+      title={pack.title}
+      aria-label={pack.title}
+    >
+      {pack.thumbnailUrl ? (
+        <>
+          {loadStatus !== 'loaded' && (
+            <div
+              className="veil-sticker-skeleton"
+              style={{ width: '22px', height: '22px', borderRadius: '4px' }}
+            />
+          )}
+          <img
+            key={`${resolvedThumb}_${retryKey}`}
+            src={resolvedThumb}
+            alt=""
+            className="veil-sticker-pack-thumb"
+            loading="lazy"
+            onLoad={() => setLoadStatus('loaded')}
+            onError={() => setLoadStatus('error')}
+            style={{ display: loadStatus === 'loaded' ? 'block' : 'none' }}
+          />
+        </>
+      ) : (
+        <span>{'\u{2B50}'}</span>
+      )}
+    </button>
+  );
+};
+
 export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
   isOpen,
   onSelectEmoji,
@@ -469,26 +606,12 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
           </button>
 
           {packs.map((p) => (
-            <button
+            <StickerPackTabButton
               key={p.id}
-              type="button"
-              className={`veil-emoji-category-icon-btn veil-sticker-pack-btn ${activePackId === p.id ? 'active' : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setActivePackId(p.id)}
-              title={p.title}
-              aria-label={p.title}
-            >
-              {p.thumbnailUrl ? (
-                <img
-                  src={p.thumbnailUrl}
-                  alt={p.title}
-                  className="veil-sticker-pack-thumb"
-                  loading="lazy"
-                />
-              ) : (
-                <span>{'\u{2B50}'}</span>
-              )}
-            </button>
+              pack={p}
+              isActive={activePackId === p.id}
+              onSelect={setActivePackId}
+            />
           ))}
 
           <button
@@ -568,17 +691,11 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
             ) : (
               <div className="veil-sticker-grid">
                 {filteredStickers.map((stk: StickerItem) => (
-                  <button
+                  <StickerGridCell
                     key={stk.id}
-                    type="button"
-                    className="veil-sticker-cell"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleStickerClick(stk)}
-                    title={stk.emoji || 'Sticker'}
-                    aria-label={`Sticker ${stk.emoji || ''}`}
-                  >
-                    <img src={stk.url} alt={stk.emoji} loading="lazy" />
-                  </button>
+                    sticker={stk}
+                    onClick={handleStickerClick}
+                  />
                 ))}
               </div>
             )}

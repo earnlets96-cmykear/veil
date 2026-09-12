@@ -3999,26 +3999,28 @@
 
 .veil-sticker-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding: 8px 14px 24px 14px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 6px 10px 20px 10px;
 }
 
 .veil-sticker-cell {
   aspect-ratio: 1 / 1;
   background: transparent;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 3px;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
 }
 
 .veil-sticker-cell:hover {
-  background-color: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.08);
   transform: scale(1.08);
 }
 
@@ -4033,6 +4035,21 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   user-select: none;
   -webkit-user-drag: none;
+}
+
+.veil-sticker-skeleton {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.12) 37%,
+    rgba(255, 255, 255, 0.05) 63%
+  );
+  background-size: 400% 100%;
+  animation: veilSkeletonPulse 1.4s ease infinite;
 }
 
 /* Frameless Chat Bubble for Stickers */
@@ -4053,10 +4070,10 @@
 .veil-message-sticker-img .veil-media-thumbnail-img,
 .veil-message-sticker-img img,
 img.veil-message-sticker-img {
-  width: 180px !important;
-  height: 180px !important;
-  max-width: 180px !important;
-  max-height: 180px !important;
+  width: 136px !important;
+  height: 136px !important;
+  max-width: 136px !important;
+  max-height: 136px !important;
   object-fit: contain !important;
   background: transparent !important;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35)) !important;
@@ -4079,16 +4096,16 @@ img.veil-message-sticker-img {
   border-radius: 0 !important;
   border: none !important;
   overflow: visible !important;
-  width: 180px !important;
-  height: 180px !important;
-  max-width: 180px !important;
-  max-height: 180px !important;
+  width: 136px !important;
+  height: 136px !important;
+  max-width: 136px !important;
+  max-height: 136px !important;
 }
 
 .veil-sticker-bubble-container .veil-media-skeleton-pulse {
-  width: 180px;
-  height: 180px;
-  border-radius: 16px;
+  width: 136px;
+  height: 136px;
+  border-radius: 14px;
 }
 
 /* Add Telegram Sticker Pack Modal (Phase 93 Redesign) */

@@ -1,6 +1,32 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 97 — TELEGRAM STICKER DISPATCH RELIABILITY, MULTI-TIER PROXYING, OFFLINE PRE-CACHING & GUARANTEED VECTOR FALLBACK
+## Active Phase: PHASE 99 — STICKER SKELETON LOADERS, 1S AUTO-REFRESH ON FAILURE & COMPACT SIZING
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 99 Tasks Completed:
+- [x] **Animated Skeleton Loaders & Suppress Broken Image / Raw Filename**:
+  - Added `.veil-sticker-skeleton` in `src/styles/veil-components.css` with `veilSkeletonPulse` shimmer animation.
+  - Replaced broken image display in `src/ui/components/ui/EmojiDrawer.tsx` (`StickerGridCell` and `StickerPackTabButton`) with smooth skeleton pulse.
+  - Suppressed alt text leakage (`alt=""`) so file basenames are never displayed as text on error.
+  - Handled sticker load failures in `src/ui/components/media/MediaImage.tsx` with `.veil-media-skeleton-pulse`.
+- [x] **1-Second Continuous Auto-Refresh on Network Glitches**:
+  - Added 1s retry loop to `StickerGridCell` via `telegramStickerService.fetchStickerBlob`.
+  - Added 1s retry loop to `StickerPackTabButton` for pack thumbnails.
+  - Added 1s self-healing recovery loop in `MediaImage` for sticker attachments.
+  - Added 1s background pre-caching retry in `telegramStickerService.installStickerPack`.
+- [x] **Compact Sticker Sizing & Tighter Drawer Layout**:
+  - Reduced chat sticker bubbles from `180px` to `136px` in `.veil-message-sticker-img`.
+  - Reconfigured `.veil-sticker-grid` to 5 columns (`repeat(5, 1fr)`) with `6px` gap and `3px` cell padding.
+- [x] **Verification**:
+  - Added `tests/phase99-sticker-skeleton-and-sizing.test.tsx` (11/11 passing).
+  - Production build clean (`npm run build` exits 0).
+
+## Previous Phase: PHASE 98 — UNIFIED FULL-ROW SWIPE-TO-REPLY ACROSS ALL MESSAGE TYPES
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+## Previous Phase: PHASE 97 — TELEGRAM STICKER DISPATCH RELIABILITY, MULTI-TIER PROXYING, OFFLINE PRE-CACHING & GUARANTEED VECTOR FALLBACK
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

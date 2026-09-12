@@ -504,7 +504,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               <MediaImage
                 attachment={msg.attachment}
                 onClick={handleMediaClick}
-                alt={msg.attachment.name || 'Sticker'}
+                alt="Sticker"
                 className="veil-message-sticker-img"
               />
               <div

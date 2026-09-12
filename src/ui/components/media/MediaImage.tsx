@@ -11,6 +11,7 @@ import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/media
 import { MediaLogger } from '../../utils/mediaLogger.ts';
 import { ThumbnailGenerator } from '../../../attachments/thumbnailGenerator.ts';
 import { PlayIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
+import { telegramStickerService } from '../../../media/telegramStickerService.ts';
 
 export interface MediaImageProps {
   attachment: AttachmentPayload;
@@ -52,14 +53,27 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
   const [isLoading, setIsLoading] = useState(!media && !displayUrl);
   const [error, setError] = useState<string | null>(null);
+  const [hasImgError, setHasImgError] = useState(false);
   const [videoThumbnailUrl, setVideoThumbnailUrl] = useState<string | null>(() => durableThumbnail || null);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const isMountedRef = useRef(true);
+  const stickerRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isSticker = Boolean(
+    (attachment as any).isSticker ||
+    attachment.mimeType?.includes('sticker') ||
+    attachment.name?.endsWith('.sticker.webp') ||
+    attachment.name?.includes('.sticker.')
+  );
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (stickerRetryTimerRef.current) {
+        clearTimeout(stickerRetryTimerRef.current);
+        stickerRetryTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -139,10 +153,45 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
   // Handle broken/stale blob image or video load failure
   const handleMediaError = () => {
-    if (isMountedRef.current) {
-      MediaCache.invalidate(key);
-      if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
-      if (attachment.attachmentId) MediaCache.invalidate(attachment.attachmentId);
+    if (!isMountedRef.current) return;
+    setHasImgError(true);
+    MediaCache.invalidate(key);
+    if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
+    if (attachment.attachmentId) MediaCache.invalidate(attachment.attachmentId);
+
+    if (isSticker) {
+      const attemptStickerRecovery = async () => {
+        try {
+          const sourceUrl =
+            attachment.previewUrl ||
+            attachment.localPreviewUrl ||
+            (attachment as any).url ||
+            attachment.name;
+          const blob = await telegramStickerService.fetchStickerBlob(sourceUrl);
+          const blobUrl = URL.createObjectURL(blob);
+          if (isMountedRef.current) {
+            const recoveredStub: DecryptedMedia = {
+              id: key,
+              blobUrl,
+              data: new Uint8Array(0),
+              mimeType: attachment.mimeType || 'image/webp',
+              name: attachment.name,
+              sizeBytes: blob.size,
+            };
+            MediaCache.set(key, recoveredStub);
+            if (attachment.name) MediaCache.set(attachment.name, recoveredStub);
+            setMedia(recoveredStub);
+            setHasImgError(false);
+            setIsLoading(false);
+          }
+        } catch {
+          if (isMountedRef.current) {
+            stickerRetryTimerRef.current = setTimeout(attemptStickerRecovery, 1000);
+          }
+        }
+      };
+      void attemptStickerRecovery();
+    } else {
       fetchAndDecrypt(true);
     }
   };
@@ -229,6 +278,17 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
   }
 
   if (error && !displayUrl) {
+    if (isSticker) {
+      return (
+        <div
+          className={`veil-media-thumbnail-loading ${className}`.trim()}
+          role="progressbar"
+          aria-label="Loading sticker..."
+        >
+          <div className="veil-media-skeleton-pulse" />
+        </div>
+      );
+    }
     return (
       <div className={`veil-media-thumbnail-error ${className}`.trim()} role="alert">
         <AlertCircleIcon size={22} color="var(--veil-danger)" />
@@ -262,12 +322,12 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
         }
       }}
     >
-      {displayUrl ? (
+      {displayUrl && !hasImgError ? (
         isVideoMedia ? (
           videoThumbnailUrl ? (
             <img
               src={videoThumbnailUrl}
-              alt={alt || attachment.name}
+              alt={isSticker ? '' : (alt || attachment.name)}
               className={`veil-media-thumbnail-img ${isShowingThumbnail ? 'veil-media-thumbnail-blurred' : ''}`.trim()}
               loading="lazy"
               onError={() => setVideoThumbnailUrl(null)}
@@ -285,9 +345,10 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
         ) : (
           <img
             src={displayUrl}
-            alt={alt || attachment.name}
+            alt={isSticker ? '' : (alt || attachment.name)}
             className={`veil-media-thumbnail-img ${isShowingThumbnail ? 'veil-media-thumbnail-blurred' : ''}`.trim()}
             loading="lazy"
+            onLoad={() => setHasImgError(false)}
             onError={handleMediaError}
           />
         )

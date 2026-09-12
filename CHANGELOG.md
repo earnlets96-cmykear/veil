@@ -2,6 +2,31 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase99-sticker-skeleton-and-sizing] - 2026-09-12
+
+### Sticker Skeleton Loaders, 1-Second Auto-Refresh & Compact Sizing (Phase 99)
+- **Elimination of Broken Image Icons & Raw Filenames**:
+  - Suppressed raw attachment filename display (`alt=""` and `isSticker` alt suppression) across chat messages and the sticker drawer.
+  - Replaced broken image icon with smooth animated shimmering skeleton loader (`.veil-sticker-skeleton` and `.veil-media-skeleton-pulse`).
+- **1-Second Continuous Auto-Refresh on Network Failure**:
+  - `StickerGridCell` and `StickerPackTabButton` automatically retry fetching via `telegramStickerService.fetchStickerBlob` every 1s on network errors.
+  - `MediaImage` self-heals broken sticker blobs via 1s auto-retry loop.
+  - `telegramStickerService` background pre-caching retries every 1s on network glitch.
+- **Compact Sticker Sizing & Tighter Grid**:
+  - Reduced chat sticker bubbles from `180px` to `136px`.
+  - Compact 5-column grid (`repeat(5, 1fr)`), `6px` gap, `3px` cell padding in drawer.
+- **Verification & Test Coverage**:
+  - Automated test suite: `tests/phase99-sticker-skeleton-and-sizing.test.tsx` (11/11 passing).
+  - Production build clean: `npm run build` succeeds cleanly.
+
+## [1.0.0-phase98-unified-swipe-to-reply] - 2026-09-12
+
+### Unified Full-Row Swipe-to-Reply Across All Message Types (Phase 98)
+- **Row-Level Horizontal Touch Listeners**: Captured across full width of `.veil-msg-row` regardless of message type (text, media, audio, sticker, voice).
+- **Delegated Swipe Handling**: Added `disableInternalSwipe` in `MessageBubble` to avoid duplicate drag offsets.
+- **Gesture Isolation**: Protected interactive card elements (scrubbers, waveforms, inputs, reaction chips) from gesture collisions.
+- **Verification**: `tests/phase98-unified-swipe-to-reply.test.tsx` (10/10 passing).
+
 ## [1.0.0-phase97-sticker-dispatch-and-proxy-resilience] - 2026-09-12
 
 ### Telegram Sticker Dispatch Reliability, Multi-Tier Proxying, & Guaranteed Vector Fallback (Phase 97)

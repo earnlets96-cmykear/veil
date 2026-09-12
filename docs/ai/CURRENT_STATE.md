@@ -1,6 +1,25 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 97 — TELEGRAM STICKER DISPATCH RELIABILITY, MULTI-TIER PROXYING, OFFLINE PRE-CACHING & GUARANTEED VECTOR FALLBACK
+## Current Verified Phase: PHASE 99 — STICKER SKELETON LOADERS, 1S AUTO-REFRESH ON FAILURE & COMPACT SIZING
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 11 PHASE 99 TESTS PASS, PRODUCTION BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Elimination of Broken Image Icons & Raw Filenames**:
+    - Suppressed raw attachment filename display (`alt=""` and `isSticker` alt suppression) across chat and drawer.
+    - Replaced broken image icon with smooth animated skeleton shimmer (`.veil-sticker-skeleton` and `.veil-media-skeleton-pulse`).
+  - **1-Second Auto-Refresh / Self-Healing**:
+    - `StickerGridCell` and `StickerPackTabButton` automatically retry fetching via `telegramStickerService.fetchStickerBlob` every 1s on network errors.
+    - `MediaImage` recovers failed sticker blobs via 1s auto-retry.
+    - `telegramStickerService` retries background pre-caching every 1s.
+  - **Compact Sticker Sizing & Tighter Grid**:
+    - Reduced chat sticker bubbles from `180px` to `136px`.
+    - Compact 5-column grid (`repeat(5, 1fr)`), `6px` gap, `3px` cell padding in drawer.
+
+## Previous Verified Phase: PHASE 98 — UNIFIED FULL-ROW SWIPE-TO-REPLY ACROSS ALL MESSAGE TYPES
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 10 PHASE 98 TESTS PASS, 37/37 REGRESSION TESTS PASS, PRODUCTION BUILD CLEAN)**
+- **Branch**: `main`
+
+## Previous Verified Phase: PHASE 97 — TELEGRAM STICKER DISPATCH RELIABILITY, MULTI-TIER PROXYING, OFFLINE PRE-CACHING & GUARANTEED VECTOR FALLBACK
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 8 PHASE 97 TESTS PASS, ALL 91 REGRESSION TESTS PASS, PRODUCTION BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:
