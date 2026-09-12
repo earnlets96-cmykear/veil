@@ -1,6 +1,29 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 92 — AUDIO SCRUBBER CONTEXT MENU ISOLATION & GESTURE DISAMBIGUATION
+## Active Phase: PHASE 93 — TELEGRAM STICKER PACK MODAL REDESIGN & DIRECT IN-CHAT USAGE
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 93 Tasks Completed:
+- [x] **AddStickerPackModal View Redesign & Portalling (`AddStickerPackModal.tsx`)**:
+  - Mounted via `createPortal(..., document.body)` escaping `.veil-emoji-drawer`'s 350px container clipping.
+  - Added fixed full-screen glass backdrop (`position: fixed; inset: 0; backdrop-filter: blur(16px); z-index: 1200; display: flex; align-items: center; justify-content: center;`).
+  - Removed `slice(0, 24)` artificial limit; all stickers in the pack are rendered in the showcase.
+  - Implemented `.veil-add-sticker-preview-grid-wrap` scroll container with max-height and custom scrollbar.
+  - Implemented `.veil-add-sticker-sticky-footer` with prominent, permanent CTA: `+ Add [N] Stickers to VEIL` (or `Installed in VEIL ✓`).
+  - Added back button navigation from preview to pack search.
+- [x] **CORS Proxy & Reliable Sticker Dispatching (`vite.config.ts`, `relayServer.ts`, `telegramStickerService.ts`, `MessageComposer.tsx`)**:
+  - Implemented `/api/telegram-stickers/proxy?url=` and `/v1/stickers/proxy?url=` endpoints with `Access-Control-Allow-Origin: *`.
+  - Added `fetchStickerBlob` in `telegramStickerService.ts` supporting data URLs, direct CDN fetches, and proxy fallback.
+  - Updated `MessageComposer.tsx` `handleSelectSticker` to use `fetchStickerBlob` and display toast on network error.
+  - Updated `EmojiDrawer.tsx` `onPackInstalled` to automatically switch to `stickers` tab and activate the new pack.
+- [x] **Automated Tests & Regression Suite (`tests/phase93-telegram-sticker-modal-redesign.test.tsx`)**:
+  - Created Phase 93 test suite (20/20 tests passing).
+  - Regression suite passes: 49/49 tests passing.
+  - Production build clean: `npm run build` succeeds in 3.15s.
+  - Zero literal Unicode emojis in all touched files.
+
+## Previous Phase: PHASE 92 — AUDIO SCRUBBER CONTEXT MENU ISOLATION & GESTURE DISAMBIGUATION
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

@@ -1,6 +1,29 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 92 — AUDIO SCRUBBER CONTEXT MENU ISOLATION & GESTURE DISAMBIGUATION
+## Current Verified Phase: PHASE 93 — TELEGRAM STICKER PACK MODAL REDESIGN & DIRECT IN-CHAT USAGE
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 20 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **AddStickerPackModal View Redesign & Portalling (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
+    - Portalled to `document.body` via `createPortal`, breaking out of `.veil-emoji-drawer`'s 350px container clipping.
+    - Added full-screen glass backdrop (`position: fixed; inset: 0; backdrop-filter: blur(16px); background: rgba(0, 0, 0, 0.75)`), centered on screen.
+    - Removed `slice(0, 24)` artificial limit; all stickers in the pack are rendered in the showcase grid.
+    - Implemented `.veil-add-sticker-preview-grid-wrap` scroll container (`max-height: 380px; overflow-y: auto`) with custom dark scrollbars.
+    - Implemented `.veil-add-sticker-sticky-footer` with a prominent, permanently visible CTA: `+ Add [N] Stickers to VEIL` (or `Installed in VEIL ✓`), ensuring users can always see and tap to install without being cut off by the taskbar.
+    - Added back button navigation (`ArrowLeftIcon`) from preview to pack search.
+  - **CORS Proxy & Reliable Sticker Dispatching (`vite.config.ts`, `src/server/relayServer.ts`, `src/media/telegramStickerService.ts`, `src/ui/components/MessageComposer.tsx`)**:
+    - Added `/api/telegram-stickers/proxy?url=` in Vite dev server and `/v1/stickers/proxy?url=` in `RelayServer` streaming upstream sticker WebPs with `Access-Control-Allow-Origin: *`.
+    - Implemented `fetchStickerBlob` in `telegramStickerService.ts` supporting data URLs, direct CDN fetches, and proxy fallback.
+    - Updated `MessageComposer.tsx` `handleSelectSticker` to use `fetchStickerBlob` and display toast on error.
+    - Updated `EmojiDrawer.tsx` `onPackInstalled` to automatically switch active tab to `'stickers'` and select the newly installed pack.
+  - **Component Styling Polish (`src/styles/veil-components.css`)**:
+    - Implemented comprehensive CSS for `.veil-modal-backdrop`, `.veil-add-sticker-modal`, `.veil-add-sticker-preview-grid-wrap`, and `.veil-add-sticker-sticky-footer` per `/impeccable` and `ui-ux-pro-max` craft standards.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase93-telegram-sticker-modal-redesign.test.tsx` (20/20 passing).
+  - Regression tests passing: `phase93`, `phase92`, `phase91`, `phase90` (49/49 passing).
+  - Production release build: `npm run build` succeeds cleanly in 3.15s.
+
+## Previous Verified Phase: PHASE 92 — AUDIO SCRUBBER CONTEXT MENU ISOLATION & GESTURE DISAMBIGUATION
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 10 TESTS PASS, REGRESSION SUITES PASS, FULL TEST SUITE 1325/1325 PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

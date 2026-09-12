@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Spinner } from '../ui/index.ts';
-import { CloseIcon, KeyIcon } from '../icons/index.ts';
+import { CloseIcon, KeyIcon, ArrowLeftIcon, CheckIcon } from '../icons/index.ts';
 import { telegramStickerService, StickerPack, StickerItem } from '../../../media/telegramStickerService.ts';
 
 export interface AddStickerPackModalProps {
@@ -19,15 +20,26 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [previewPack, setPreviewPack] = useState<StickerPack | null>(null);
   const [showTokenInput, setShowTokenInput] = useState(false);
+  const [installedPackIds, setInstalledPackIds] = useState<Set<string>>(new Set());
   const [botToken, setBotToken] = useState(() => {
     return (typeof window !== 'undefined' && localStorage.getItem('veil:telegram:bot_token')) || '';
   });
 
   const previewRef = useRef<HTMLDivElement>(null);
-
   const featuredPacks = useMemo(() => telegramStickerService.getFeaturedPacks(), []);
 
+  // Track installed packs to show "Installed" state
+  useEffect(() => {
+    if (isOpen) {
+      telegramStickerService.getInstalledPacks().then((installed) => {
+        setInstalledPackIds(new Set(installed.map((p) => p.id.toLowerCase())));
+      });
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const isAlreadyInstalled = Boolean(previewPack && installedPackIds.has(previewPack.id.toLowerCase()));
 
   const handleResolvePack = async (packInput?: string, e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -63,6 +75,7 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
     setIsLoading(true);
     try {
       await telegramStickerService.installStickerPack(previewPack);
+      setInstalledPackIds((prev) => new Set([...prev, previewPack.id.toLowerCase()]));
       onPackInstalled(previewPack);
       onClose();
     } catch (err: any) {
@@ -85,9 +98,9 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
     } catch {}
   };
 
-  return (
+  const modalContent = (
     <div
-      className="veil-modal-backdrop"
+      className="veil-modal-backdrop veil-add-sticker-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           e.preventDefault();
@@ -109,18 +122,39 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
       <div
         className="veil-add-sticker-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxHeight: '85vh', overflowY: 'auto' }}
       >
         {/* Header */}
         <div className="veil-add-sticker-header">
-          <div className="veil-add-sticker-header-text">
-            <h3 id="add-sticker-title" className="veil-add-sticker-title">
-              Add Telegram Stickers
-            </h3>
-            <p className="veil-add-sticker-subtitle">
-              Paste any Telegram sticker link (e.g. t.me/addstickers/Animals)
-            </p>
-          </div>
+          {previewPack ? (
+            <div className="veil-add-sticker-header-left">
+              <button
+                type="button"
+                className="veil-add-sticker-back-btn"
+                onClick={() => setPreviewPack(null)}
+                title="Search another sticker pack"
+                aria-label="Back to search"
+              >
+                <ArrowLeftIcon size={18} />
+              </button>
+              <div className="veil-add-sticker-header-text">
+                <h3 id="add-sticker-title" className="veil-add-sticker-title" title={previewPack.title}>
+                  {previewPack.title}
+                </h3>
+                <span className="veil-add-sticker-count-badge">
+                  {previewPack.stickers.length} stickers
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="veil-add-sticker-header-text">
+              <h3 id="add-sticker-title" className="veil-add-sticker-title">
+                Add Telegram Stickers
+              </h3>
+              <p className="veil-add-sticker-subtitle">
+                Enter any Telegram sticker set link or name (e.g. t.me/addstickers/Animals)
+              </p>
+            </div>
+          )}
           <button
             type="button"
             className="veil-btn-close"
@@ -131,132 +165,155 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
           </button>
         </div>
 
-        {/* Input Form */}
-        <form onSubmit={(e) => handleResolvePack(undefined, e)} className="veil-add-sticker-form">
-          <div className="veil-add-sticker-input-row">
-            <input
-              type="text"
-              className="veil-add-sticker-input"
-              placeholder="t.me/addstickers/... or pack name"
-              value={inputUrl}
-              onChange={(e) => {
-                setInputUrl(e.target.value);
-                if (error) setError(null);
-              }}
-              autoFocus
-              aria-label="Telegram sticker link"
-            />
-            <button
-              type="submit"
-              className="veil-add-sticker-resolve-btn"
-              disabled={isLoading || !inputUrl.trim()}
-            >
-              {isLoading ? <Spinner size="sm" /> : 'Find'}
-            </button>
-          </div>
-
-          {error && <div className="veil-add-sticker-error">{error}</div>}
-        </form>
-
-        {/* Featured 1-Tap Popular Packs */}
-        <div className="veil-add-sticker-featured">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--veil-accent-primary, #6366f1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="veil-icon">
-              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-            </svg>
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--veil-text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Popular Telegram Packs
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {featuredPacks.map((fp) => (
-              <button
-                key={fp.id}
-                type="button"
-                className={`veil-sticker-pack-chip ${inputUrl.toLowerCase() === fp.name.toLowerCase() ? 'active' : ''}`}
-                onClick={() => handleSelectFeatured(fp.name)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '16px',
-                  padding: '5px 12px',
-                  color: 'var(--veil-text-primary, #f1f5f9)',
-                  fontSize: '0.78rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {fp.title}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Live Preview */}
-        {previewPack && (
-          <div className="veil-add-sticker-preview" ref={previewRef}>
-            <div className="veil-add-sticker-preview-header">
-              <span className="veil-add-sticker-preview-title">{previewPack.title}</span>
-              <span className="veil-add-sticker-preview-count">
-                {previewPack.stickers.length} stickers
-              </span>
-            </div>
+        {/* Content Body */}
+        {previewPack ? (
+          /* Live Full-Set Scrollable Preview */
+          <div className="veil-add-sticker-preview-grid-wrap" ref={previewRef}>
             <div className="veil-add-sticker-preview-grid">
-              {previewPack.stickers.slice(0, 24).map((stk: StickerItem) => (
-                <div key={stk.id} className="veil-add-sticker-preview-cell" title={stk.emoji}>
-                  <img src={stk.url} alt={stk.emoji} loading="lazy" />
+              {previewPack.stickers.map((stk: StickerItem, idx: number) => (
+                <div
+                  key={stk.id || `stk-${idx}`}
+                  className="veil-add-sticker-preview-cell"
+                  title={stk.emoji || 'Sticker'}
+                >
+                  <img src={stk.url} alt={stk.emoji || 'Sticker'} loading="lazy" />
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              className="veil-add-sticker-install-btn"
-              onClick={handleInstall}
-              disabled={isLoading}
-            >
-              {isLoading ? <Spinner size="sm" /> : `Install "${previewPack.title}" (${previewPack.stickers.length} stickers)`}
-            </button>
+          </div>
+        ) : (
+          /* Search & Popular Sets Screen */
+          <div className="veil-add-sticker-search-body">
+            {/* Input Form */}
+            <form onSubmit={(e) => handleResolvePack(undefined, e)} className="veil-add-sticker-form">
+              <div className="veil-add-sticker-input-row">
+                <input
+                  type="text"
+                  className="veil-add-sticker-input"
+                  placeholder="t.me/addstickers/... or pack name"
+                  value={inputUrl}
+                  onChange={(e) => {
+                    setInputUrl(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  autoFocus
+                  aria-label="Telegram sticker link"
+                />
+                <button
+                  type="submit"
+                  className="veil-add-sticker-resolve-btn"
+                  disabled={isLoading || !inputUrl.trim()}
+                >
+                  {isLoading ? <Spinner size="sm" /> : 'Find'}
+                </button>
+              </div>
+
+              {error && <div className="veil-add-sticker-error">{error}</div>}
+            </form>
+
+            {/* Featured 1-Tap Popular Packs */}
+            <div className="veil-add-sticker-featured">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--veil-accent-primary, #14b8a6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="veil-icon">
+                  <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                </svg>
+                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--veil-text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Popular Telegram Packs
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {featuredPacks.map((fp) => (
+                  <button
+                    key={fp.id}
+                    type="button"
+                    className={`veil-sticker-pack-chip ${inputUrl.toLowerCase() === fp.name.toLowerCase() ? 'active' : ''}`}
+                    onClick={() => handleSelectFeatured(fp.name)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '16px',
+                      padding: '6px 13px',
+                      color: 'var(--veil-text-primary, #f1f5f9)',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {fp.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Optional Telegram Bot Token Setting */}
+            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowTokenInput(!showTokenInput)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: 'var(--veil-text-muted, #64748b)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <KeyIcon size={12} />
+                <span>Telegram Bot Token (Optional for private packs)</span>
+              </button>
+              {showTokenInput && (
+                <div style={{ marginTop: '8px' }}>
+                  <input
+                    type="password"
+                    className="veil-add-sticker-input"
+                    placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                    value={botToken}
+                    onChange={(e) => handleSaveToken(e.target.value)}
+                    style={{ fontSize: '0.8rem', padding: '8px 12px' }}
+                    aria-label="Telegram Bot Token"
+                  />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--veil-text-muted, #64748b)', display: 'block', marginTop: '4px' }}>
+                    Stored locally on this device only. Allows unrestricted pack downloading directly from Telegram API.
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Optional Telegram Bot Token Setting */}
-        <div style={{ marginTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '10px' }}>
-          <button
-            type="button"
-            onClick={() => setShowTokenInput(!showTokenInput)}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: 'var(--veil-text-muted, #64748b)',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-            }}
-          >
-            <KeyIcon size={12} />
-            <span>Telegram Bot Token (Optional for private packs)</span>
-          </button>
-          {showTokenInput && (
-            <div style={{ marginTop: '8px' }}>
-              <input
-                type="password"
-                className="veil-add-sticker-input"
-                placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                value={botToken}
-                onChange={(e) => handleSaveToken(e.target.value)}
-                style={{ fontSize: '0.8rem', padding: '8px 12px' }}
-                aria-label="Telegram Bot Token"
-              />
-              <span style={{ fontSize: '0.7rem', color: 'var(--veil-text-muted, #64748b)', display: 'block', marginTop: '4px' }}>
-                Stored locally on this device only. Allows unrestricted pack downloading directly from Telegram API.
-              </span>
-            </div>
-          )}
-        </div>
+        {/* Sticky Action Footer when previewing pack */}
+        {previewPack && (
+          <div className="veil-add-sticker-sticky-footer">
+            <button
+              type="button"
+              className={`veil-add-sticker-install-btn ${isAlreadyInstalled ? 'installed' : ''}`}
+              onClick={handleInstall}
+              disabled={isLoading || isAlreadyInstalled}
+            >
+              {isLoading ? (
+                <Spinner size="sm" />
+              ) : isAlreadyInstalled ? (
+                <>
+                  <CheckIcon size={16} />
+                  <span>Installed in VEIL</span>
+                </>
+              ) : (
+                <span>{`+ Add ${previewPack.stickers.length} Stickers to VEIL`}</span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
+
+  // Portal to document.body so modal is never clipped by parent drawer or containers
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };

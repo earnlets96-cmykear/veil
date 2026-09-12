@@ -11,7 +11,7 @@ import React, { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import { useApp, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
-import { StickerItem } from '../../media/telegramStickerService.ts';
+import { StickerItem, telegramStickerService } from '../../media/telegramStickerService.ts';
 import {
   SendIcon,
   PaperclipIcon,
@@ -255,19 +255,21 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     async (sticker: StickerItem) => {
       try {
         setIsEmojiDrawerOpen(false);
-        const res = await fetch(sticker.url);
-        const blob = await res.blob();
+        const blob = await telegramStickerService.fetchStickerBlob(sticker.url);
         const isSvg = sticker.url.startsWith('data:image/svg') || (blob.type && blob.type.includes('svg'));
         const mimeType = isSvg ? 'image/svg+xml' : 'image/webp';
         const ext = isSvg ? 'svg' : 'webp';
         const file = new File([blob], `${sticker.id}.sticker.${ext}`, { type: mimeType });
         (file as any).isSticker = true;
         await sendAttachment(conversationId, file, { isSticker: true } as any);
-      } catch (_err) {
-        // preserve
+      } catch (err: any) {
+        showToast({
+          type: 'error',
+          message: err?.message || 'Failed to send sticker',
+        });
       }
     },
-    [conversationId, sendAttachment]
+    [conversationId, sendAttachment, showToast]
   );
 
   // Voice recording controls with runtime permission management

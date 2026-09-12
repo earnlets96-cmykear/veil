@@ -277,6 +277,39 @@ export class RelayServer {
         return;
       }
 
+      if (method === 'GET' && (url.startsWith('/v1/stickers/proxy?url=') || url.startsWith('/api/telegram-stickers/proxy?url='))) {
+        const prefix = url.startsWith('/v1/stickers/proxy?url=') ? '/v1/stickers/proxy?url=' : '/api/telegram-stickers/proxy?url=';
+        const rawTarget = url.slice(prefix.length);
+        const targetUrl = decodeURIComponent(rawTarget);
+        if (!targetUrl) {
+          this.sendError(res, 'BAD_REQUEST', 'Missing target sticker url', 400);
+          return;
+        }
+        try {
+          const upstream = await fetch(targetUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+            },
+          });
+          if (upstream.ok) {
+            const contentType = upstream.headers.get('content-type') || 'image/webp';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            const buffer = Buffer.from(await upstream.arrayBuffer());
+            res.statusCode = 200;
+            res.end(buffer);
+          } else {
+            res.statusCode = upstream.status;
+            res.end('UPSTREAM_ERROR');
+          }
+        } catch (err: any) {
+          res.statusCode = 500;
+          res.end(err?.message || 'PROXY_ERROR');
+        }
+        return;
+      }
+
       if (method === 'GET' && (url.startsWith('/v1/stickers/') || url.startsWith('/api/telegram-stickers/'))) {
         const packName = url.replace(/^\/(?:v1\/stickers|api\/telegram-stickers)\//, '');
         const botToken = (req.headers['x-telegram-bot-token'] as string) || undefined;

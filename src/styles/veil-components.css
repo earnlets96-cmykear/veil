@@ -4091,35 +4091,101 @@ img.veil-message-sticker-img {
   border-radius: 16px;
 }
 
-/* Add Telegram Sticker Pack Modal */
+/* Add Telegram Sticker Pack Modal (Phase 93 Redesign) */
+.veil-modal-backdrop,
+.veil-add-sticker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.76);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+  animation: veilFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .veil-add-sticker-modal {
-  background: rgba(22, 27, 34, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(22, 27, 34, 0.98);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;
-  width: 92%;
-  max-width: 440px;
-  padding: 20px;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  width: 94%;
+  max-width: 460px;
+  max-height: min(620px, 86vh);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow: hidden;
   animation: veilFadeScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .veil-add-sticker-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
   gap: 12px;
+}
+
+.veil-add-sticker-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.veil-add-sticker-back-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--veil-text-primary, #ffffff);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.veil-add-sticker-back-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(-1px);
+}
+
+.veil-add-sticker-header-text {
+  min-width: 0;
+  flex: 1;
 }
 
 .veil-add-sticker-title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--veil-text-primary, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.veil-add-sticker-count-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--veil-accent-primary, #14b8a6);
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.25);
+  padding: 1px 8px;
+  border-radius: 10px;
+  margin-top: 4px;
 }
 
 .veil-add-sticker-subtitle {
@@ -4127,6 +4193,14 @@ img.veil-message-sticker-img {
   font-size: 0.8rem;
   color: var(--veil-text-secondary, #94a3b8);
   line-height: 1.35;
+}
+
+.veil-add-sticker-search-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
 }
 
 .veil-add-sticker-form {
@@ -4182,47 +4256,49 @@ img.veil-message-sticker-img {
   padding: 2px 4px;
 }
 
-.veil-add-sticker-preview {
-  background: rgba(13, 17, 23, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Scrollable Preview Grid (Full Set) */
+.veil-add-sticker-preview-grid-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  min-height: 240px;
+  max-height: 380px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
-.veil-add-sticker-preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.veil-add-sticker-preview-grid-wrap::-webkit-scrollbar {
+  width: 6px;
 }
 
-.veil-add-sticker-preview-title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--veil-text-primary, #ffffff);
-}
-
-.veil-add-sticker-preview-count {
-  font-size: 0.78rem;
-  color: var(--veil-text-secondary, #94a3b8);
+.veil-add-sticker-preview-grid-wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
 }
 
 .veil-add-sticker-preview-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
 .veil-add-sticker-preview-cell {
   aspect-ratio: 1 / 1;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 6px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+
+.veil-add-sticker-preview-cell:hover {
+  transform: scale(1.08);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(20, 184, 166, 0.3);
 }
 
 .veil-add-sticker-preview-cell img {
@@ -4231,25 +4307,52 @@ img.veil-message-sticker-img {
   object-fit: contain;
 }
 
+/* Sticky Action Footer */
+.veil-add-sticker-sticky-footer {
+  padding: 14px 20px;
+  background: rgba(18, 22, 29, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .veil-add-sticker-install-btn {
+  flex: 1;
   background: var(--veil-accent-primary, #14b8a6);
   color: #ffffff;
   border: none;
-  border-radius: 12px;
-  padding: 11px;
+  border-radius: 14px;
+  padding: 12px 18px;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: all 0.18s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(20, 184, 166, 0.25);
 }
 
-.veil-add-sticker-install-btn:hover {
-  opacity: 0.92;
+.veil-add-sticker-install-btn:hover:not(:disabled) {
+  opacity: 0.95;
   transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(20, 184, 166, 0.35);
 }
+
+.veil-add-sticker-install-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.veil-add-sticker-install-btn.installed {
+  background: rgba(20, 184, 166, 0.18);
+  color: var(--veil-accent-primary, #14b8a6);
+  border: 1px solid rgba(20, 184, 166, 0.4);
+  box-shadow: none;
+}
+
 
 
 

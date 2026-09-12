@@ -7,6 +7,35 @@ function telegramStickersPlugin() {
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
         const url = req.url || '';
+        if (req.method === 'GET' && url.startsWith('/api/telegram-stickers/proxy?url=')) {
+          const rawTarget = url.slice('/api/telegram-stickers/proxy?url='.length);
+          const targetUrl = decodeURIComponent(rawTarget);
+          if (!targetUrl) return next();
+          try {
+            const upstream = await fetch(targetUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+              },
+            });
+            if (upstream.ok) {
+              const contentType = upstream.headers.get('content-type') || 'image/webp';
+              res.setHeader('Content-Type', contentType);
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Cache-Control', 'public, max-age=86400');
+              const buffer = Buffer.from(await upstream.arrayBuffer());
+              res.statusCode = 200;
+              res.end(buffer);
+            } else {
+              res.statusCode = upstream.status;
+              res.end('UPSTREAM_ERROR');
+            }
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(err?.message || 'PROXY_ERROR');
+          }
+          return;
+        }
+
         if (req.method === 'GET' && url.startsWith('/api/telegram-stickers/')) {
           const packName = url.replace(/^\/api\/telegram-stickers\//, '').split('?')[0];
           if (!packName) return next();

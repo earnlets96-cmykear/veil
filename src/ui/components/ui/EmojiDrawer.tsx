@@ -629,6 +629,7 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
         onClose={() => setIsAddModalOpen(false)}
         onPackInstalled={(newPack) => {
           setPacks((prev) => [...prev.filter((p) => p.id !== newPack.id), newPack]);
+          setActiveTab('stickers');
           setActivePackId(newPack.id);
         }}
       />

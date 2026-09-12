@@ -2,6 +2,28 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase93-telegram-sticker-modal-redesign] - 2026-09-12
+
+### Telegram Sticker Pack Modal Redesign, Full Set Scrolling, & Direct In-Chat Usage (Phase 93)
+- **AddStickerPackModal View Redesign & Portalling (`AddStickerPackModal.tsx`)**:
+  - Portalled modal directly to `document.body` via `ReactDOM.createPortal`, completely freeing it from `<EmojiDrawer>`'s 350px container clipping and overflow clipping.
+  - Added fixed full-screen glass backdrop (`position: fixed; inset: 0; backdrop-filter: blur(16px); background: rgba(0, 0, 0, 0.75)`), properly centered on screen.
+  - Removed `slice(0, 24)` artificial limit; all stickers in the pack are now visible in the showcase grid.
+  - Added `.veil-add-sticker-preview-grid-wrap` scroll container (`max-height: 380px; overflow-y: auto`) with custom dark scrollbar.
+  - Added `.veil-add-sticker-sticky-footer` with a prominent, permanently pinned CTA button: `+ Add [N] Stickers to VEIL` (or `Installed in VEIL ✓`), ensuring the button is never cut off by the Windows taskbar.
+  - Added back button navigation (`ArrowLeftIcon`) from preview mode to pack search.
+- **CORS Proxy & Reliable Sticker Dispatching (`vite.config.ts`, `relayServer.ts`, `telegramStickerService.ts`, `MessageComposer.tsx`)**:
+  - Implemented `/api/telegram-stickers/proxy?url=` in Vite dev server and `/v1/stickers/proxy?url=` in `RelayServer` streaming upstream sticker WebPs with `Access-Control-Allow-Origin: *`.
+  - Added `fetchStickerBlob(url)` in `telegramStickerService.ts` supporting data URLs, direct CDN fetches, and proxy fallback.
+  - Updated `MessageComposer.tsx` `handleSelectSticker` to use `fetchStickerBlob` and display toast on error.
+  - Updated `EmojiDrawer.tsx` `onPackInstalled` to automatically switch active tab to `'stickers'` and select the newly installed pack.
+- **Phase 44a Zero Literal Unicode Emoji Compliance**:
+  - 100% verified zero literal Unicode emojis across all new and modified files.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase93-telegram-sticker-modal-redesign.test.tsx` (20/20 passing).
+  - Regression tests passing: `phase93`, `phase92`, `phase91`, `phase90` (49/49 passing).
+  - Production build clean: `npm run build` succeeds in 3.15s with 7 release artifacts.
+
 ## [1.0.0-phase92-audio-scrubber-context-menu-isolation] - 2026-09-12
 
 ### Audio Scrubber Context Menu Isolation & Gesture Disambiguation (Phase 92)

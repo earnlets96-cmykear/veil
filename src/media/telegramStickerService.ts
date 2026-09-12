@@ -580,6 +580,51 @@ class TelegramStickerService {
     );
   }
 
+  /**
+   * Fetches a sticker image as a binary Blob, handling data URLs, direct CDN requests,
+   * and automatic server proxy fallbacks when browser CORS restrictions prevent direct access.
+   */
+  public async fetchStickerBlob(url: string): Promise<Blob> {
+    if (!url) {
+      throw new Error('Missing sticker URL');
+    }
+
+    // 1. Data URLs (SVG / WebP data strings)
+    if (url.startsWith('data:')) {
+      const res = await fetch(url);
+      return await res.blob();
+    }
+
+    // 2. Direct fetch with timeout
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        return await res.blob();
+      }
+    } catch (_directErr) {
+      // Fall through to proxy endpoints
+    }
+
+    // 3. Fallback to Local/Relay Sticker Proxy
+    const proxyEndpoints = [
+      `/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
+      `/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
+    ];
+
+    for (const ep of proxyEndpoints) {
+      try {
+        const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          return await res.blob();
+        }
+      } catch (_proxyErr) {
+        // try next
+      }
+    }
+
+    throw new Error('Failed to load sticker image data');
+  }
+
   private inMemoryRecents: StickerItem[] = [];
 
   /**
