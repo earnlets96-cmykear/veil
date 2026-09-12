@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Spinner } from '../ui/index.ts';
 import { CloseIcon, KeyIcon } from '../icons/index.ts';
 import { telegramStickerService, StickerPack, StickerItem } from '../../../media/telegramStickerService.ts';
@@ -23,6 +23,8 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
     return (typeof window !== 'undefined' && localStorage.getItem('veil:telegram:bot_token')) || '';
   });
 
+  const previewRef = useRef<HTMLDivElement>(null);
+
   const featuredPacks = useMemo(() => telegramStickerService.getFeaturedPacks(), []);
 
   if (!isOpen) return null;
@@ -41,6 +43,9 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
     try {
       const pack = await telegramStickerService.fetchTelegramPack(clean);
       setPreviewPack(pack);
+      setTimeout(() => {
+        previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
     } catch (err: any) {
       setError(err?.message || 'Could not find Telegram sticker pack. Verify the pack link or name.');
     } finally {
@@ -189,7 +194,7 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
 
         {/* Live Preview */}
         {previewPack && (
-          <div className="veil-add-sticker-preview">
+          <div className="veil-add-sticker-preview" ref={previewRef}>
             <div className="veil-add-sticker-preview-header">
               <span className="veil-add-sticker-preview-title">{previewPack.title}</span>
               <span className="veil-add-sticker-preview-count">
@@ -197,8 +202,8 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
               </span>
             </div>
             <div className="veil-add-sticker-preview-grid">
-              {previewPack.stickers.slice(0, 12).map((stk: StickerItem) => (
-                <div key={stk.id} className="veil-add-sticker-preview-cell">
+              {previewPack.stickers.slice(0, 24).map((stk: StickerItem) => (
+                <div key={stk.id} className="veil-add-sticker-preview-cell" title={stk.emoji}>
                   <img src={stk.url} alt={stk.emoji} loading="lazy" />
                 </div>
               ))}

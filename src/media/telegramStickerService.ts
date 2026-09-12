@@ -518,10 +518,34 @@ class TelegramStickerService {
 
     // 3. Check custom Telegram bot token if configured
     const botToken = (typeof window !== 'undefined' && localStorage.getItem('veil:telegram:bot_token')) || '';
+
+    // 3. Try Local Dev Server / Relay Sticker Resolver Endpoint
+    try {
+      const endpoints = [
+        `/api/telegram-stickers/${encodeURIComponent(packName)}`,
+        `/v1/stickers/${encodeURIComponent(packName)}`,
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, {
+            headers: botToken ? { 'x-telegram-bot-token': botToken } : {},
+            signal: AbortSignal.timeout(4500),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.ok && data.pack && data.pack.stickers?.length > 0) {
+              return data.pack;
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // 4. Try Direct Telegram Bot API if bot token is configured
     if (botToken) {
       try {
         const res = await fetch(`https://api.telegram.org/bot${botToken}/getStickerSet?name=${encodeURIComponent(packName)}`, {
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(4000),
         });
         if (res.ok) {
           const data = await res.json();
@@ -551,111 +575,9 @@ class TelegramStickerService {
       } catch {}
     }
 
-    // 4. Live Scraper Gateway (stickers.wiki)
-    try {
-      const wikiRes = await fetch(`https://stickers.wiki/telegram/${encodeURIComponent(packName)}/`, {
-        signal: AbortSignal.timeout(8000),
-      });
-      if (wikiRes.ok) {
-        const html = await wikiRes.text();
-        const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-        const rawTitle = titleMatch ? titleMatch[1] : '';
-        const title = rawTitle
-          .replace(/ - Sticker pack for Telegram.*/i, '')
-          .replace(/ - Stickers Wiki.*/i, '')
-          .trim() || packName.replace(/_/g, ' ');
-
-        const matches = Array.from(
-          html.matchAll(/https:\/\/assets\.stickers\.wiki\/img\/([a-f0-9]+)\.webp/g)
-        ).map((m) => m[0]);
-
-        const uniqueUrls = Array.from(new Set(matches));
-        if (uniqueUrls.length > 0) {
-          const stickers: StickerItem[] = uniqueUrls.slice(0, 80).map((url, idx) => ({
-            id: `${lowerId}_${idx}`,
-            packId: lowerId,
-            emoji: '\u{1F31F}',
-            url,
-            width: 512,
-            height: 512,
-          }));
-
-          return {
-            id: lowerId,
-            name: packName,
-            title: title || packName,
-            thumbnailUrl: stickers[0].url,
-            stickers,
-            installedAt: Date.now(),
-          };
-        }
-      }
-    } catch {}
-
-    // 5. Fallback vector pack generation for offline/custom names
-    const generatedStickers: StickerItem[] = [
-      {
-        id: `${lowerId}_1`,
-        packId: lowerId,
-        emoji: '\u{1F389}',
-        width: 512,
-        height: 512,
-        url: createSvgSticker(`
-          <rect width="512" height="512" rx="120" fill="#6366f1" />
-          <text x="256" y="240" font-family="sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle">${packName.toUpperCase()}</text>
-          <circle cx="256" cy="340" r="60" fill="#facc15" />
-          <text x="256" y="360" font-family="sans-serif" font-weight="bold" font-size="48" fill="#1e1b4b" text-anchor="middle">\u{2605}</text>
-        `),
-      },
-      {
-        id: `${lowerId}_2`,
-        packId: lowerId,
-        emoji: '\u{1F44D}',
-        width: 512,
-        height: 512,
-        url: createSvgSticker(`
-          <rect width="512" height="512" rx="120" fill="#14b8a6" />
-          <text x="256" y="240" font-family="sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle">APPROVED</text>
-          <circle cx="256" cy="340" r="60" fill="#ffffff" />
-          <text x="256" y="360" font-family="sans-serif" font-weight="bold" font-size="48" fill="#0f766e" text-anchor="middle">\u{2713}</text>
-        `),
-      },
-      {
-        id: `${lowerId}_3`,
-        packId: lowerId,
-        emoji: '\u{2764}\u{FE0F}',
-        width: 512,
-        height: 512,
-        url: createSvgSticker(`
-          <rect width="512" height="512" rx="120" fill="#ec4899" />
-          <text x="256" y="240" font-family="sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle">LOVE IT</text>
-          <path d="M256 380 Q210 320 220 280 Q240 260 256 290 Q272 260 292 280 Q302 320 256 380 Z" fill="#ffffff" />
-        `),
-      },
-      {
-        id: `${lowerId}_4`,
-        packId: lowerId,
-        emoji: '\u{1F525}',
-        width: 512,
-        height: 512,
-        url: createSvgSticker(`
-          <rect width="512" height="512" rx="120" fill="#f97316" />
-          <text x="256" y="240" font-family="sans-serif" font-weight="900" font-size="52" fill="#ffffff" text-anchor="middle">FIRE</text>
-          <circle cx="256" cy="340" r="50" fill="#fef08a" />
-        `),
-      },
-    ];
-
-    const fallbackPack: StickerPack = {
-      id: lowerId,
-      name: packName,
-      title: packName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-      thumbnailUrl: generatedStickers[0].url,
-      stickers: generatedStickers,
-      installedAt: Date.now(),
-    };
-
-    return fallbackPack;
+    throw new Error(
+      `Could not find Telegram sticker pack "${packName}". Verify the pack link or enter an optional Telegram Bot Token below.`
+    );
   }
 
   private inMemoryRecents: StickerItem[] = [];

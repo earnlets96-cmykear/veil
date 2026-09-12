@@ -48,6 +48,7 @@ import { MemoryCloudDatabase } from './cloud/database/memoryCloudDatabase.ts';
 import type { IObjectStorage } from './cloud/storage/types.ts';
 import { LocalDiskObjectStorage } from './cloud/storage/localDiskObjectStorage.ts';
 import { CloudHandler } from './cloud/cloudHandler.ts';
+import { TelegramStickerResolver } from './stickers/telegramStickerResolver.ts';
 
 export class RelayServer {
   private config: RelayServerConfig;
@@ -273,6 +274,20 @@ export class RelayServer {
       if (method === 'GET' && url.startsWith('/v1/directory/identity/')) {
         const identityId = decodeURIComponent(url.slice('/v1/directory/identity/'.length));
         await this.handleGetProfileByIdentity(identityId, res);
+        return;
+      }
+
+      if (method === 'GET' && (url.startsWith('/v1/stickers/') || url.startsWith('/api/telegram-stickers/'))) {
+        const packName = url.replace(/^\/(?:v1\/stickers|api\/telegram-stickers)\//, '');
+        const botToken = (req.headers['x-telegram-bot-token'] as string) || undefined;
+        const pack = await TelegramStickerResolver.resolvePack(packName, botToken);
+        if (pack) {
+          res.statusCode = 200;
+          res.end(JSON.stringify({ ok: true, pack }));
+        } else {
+          res.statusCode = 404;
+          res.end(JSON.stringify({ ok: false, error: 'STICKER_PACK_NOT_FOUND' }));
+        }
         return;
       }
 

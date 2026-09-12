@@ -1,6 +1,32 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 90 — ACCOUNT PROFILE AVATAR IN HEADER & AUDIOPLAYER CARD INLINE PLAYBACK
+## Current Verified Phase: PHASE 91 — AUDIO PLAYER PLAY/PAUSE & SEEKING FIXES, AND TELEGRAM STICKER SET RESOLUTION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 11 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Audio Player Lifecycle & Play/Pause State Sync (`src/ui/components/ui/AudioPlayerCard.tsx`)**:
+    - Eliminated duplicate `new Audio()` creation in `handlePlayToggle`. All audio playback is consolidated into a single `HTMLAudioElement` lifecycle within `useEffect`.
+    - Bound native audio events (`play`, `pause`, `ended`, `error`) to React state (`isPlaying`), ensuring 100% synchronization with hardware audio output and completely preventing orphaned audio streams from playing while the UI shows paused.
+    - Used `autoPlayPendingRef` to coordinate instant playback upon in-memory audio decryption.
+  - **Smooth Scrubber Seeking Without Decoding Stutter ("Tweaking") (`AudioPlayerCard.tsx`)**:
+    - During drag (`onPointerMove`), `updateScrubberVisual` computes timestamp and percentage at 60fps for silky smooth needle motion without mutating `audio.currentTime`.
+    - Commits `audio.currentTime = targetSeekTimeRef.current` once on `onPointerUp`, completely eliminating audio decoder thrashing, glitches, buffer resets, and timestamp fighting.
+  - **Global Single Audio Playback Invariant (`AudioPlayerCard.tsx`)**:
+    - Added `veil:audio:play` global event subscription. If another audio track or voice note plays in the chat, active audio cards automatically pause.
+  - **Telegram Sticker Pack Resolution Backend (`src/server/stickers/telegramStickerResolver.ts`, `relayServer.ts`, `vite.config.ts`)**:
+    - Implemented `TelegramStickerResolver` capable of indexing public Telegram sticker sets (such as `Zane_fozol_0_9`) via Combot and Stickers.wiki mirrors without browser CORS restrictions.
+    - Automatically extracts all 20 real WebP sticker URLs (`https://cdn.combot.online/...`), dimensions, titles, and decodes UTF-8 hex emoji representations (`decodeHexEmoji`) without literal Unicode emojis.
+    - Added `/v1/stickers/:packName` route to `RelayServer` and dev server middleware to `vite.config.ts` (`/api/telegram-stickers/:packName`).
+  - **Telegram Sticker Service & UI Modal UX (`telegramStickerService.ts`, `AddStickerPackModal.tsx`)**:
+    - Updated `fetchTelegramPack` to query local server / relay endpoints before falling back to bot token.
+    - Attached `previewRef` and auto-scrolls to preview (`previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })`) when a pack is resolved, providing instant visual feedback.
+    - Displayed up to 24 preview stickers with tooltips and 1-tap installation.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase91-audio-player-and-stickers.test.tsx` (11/11 passing).
+  - Regression tests passing: `tests/phase90-profile-avatar-and-audio-player.test.tsx` (8/8), `tests/phase89-context-menu-outside-dismiss.test.tsx` (6/6), `tests/phase88-modal-outside-dismiss.test.tsx` (10/10), `tests/phase87-universal-floating-reactions.test.tsx` (7/7), `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.67s.
+
+## Previous Verified Phase: PHASE 90 — ACCOUNT PROFILE AVATAR IN HEADER & AUDIOPLAYER CARD INLINE PLAYBACK
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 8 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

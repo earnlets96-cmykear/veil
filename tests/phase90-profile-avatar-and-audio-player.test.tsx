@@ -61,7 +61,7 @@ describe('Phase 90 — AudioPlayerCard Inline Playback & Decoupled Download', ()
     const audioCard = fs.readFileSync(path.join(rootDir, 'src/ui/components/ui/AudioPlayerCard.tsx'), 'utf-8');
 
     // Verify handlePlayToggle calls onResolveAudio instead of onDownload
-    expect(audioCard).toMatch(/if\s*\(!resolvedBlobUrl\)\s*\{[\s\S]*?onResolveAudio\(\)[\s\S]*?new Audio\(url\)/);
+    expect(audioCard).toMatch(/if\s*\(!resolvedBlobUrl\)\s*\{[\s\S]*?onResolveAudio\(\)[\s\S]*?setResolvedBlobUrl\(url\)/);
     expect(audioCard).not.toMatch(/if\s*\(!resolvedBlobUrl\)\s*\{[\s\S]*?await\s+onDownload\(\)/);
 
     // Verify onDownload is strictly bound to the header download icon button

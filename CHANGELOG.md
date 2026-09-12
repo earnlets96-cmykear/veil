@@ -2,6 +2,36 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase91-audio-player-and-stickers] - 2026-09-12
+
+### Audio Player Play/Pause Synchronization, Glitch-Free Seeking, and Telegram Sticker Set Resolution (Phase 91)
+- **Audio Player Play/Pause Synchronization (`AudioPlayerCard.tsx`)**:
+  - Eliminated duplicate `new Audio()` creation in `handlePlayToggle`. Consolidated all audio playback into a single `HTMLAudioElement` lifecycle managed by `useEffect`.
+  - Bound native audio events (`play`, `pause`, `ended`, `error`) directly to React state (`isPlaying`), ensuring state is 100% synchronized with hardware audio output at all times.
+  - Completely resolved the issue where music continued playing out of speakers even when the button was in a paused state.
+  - Added `autoPlayPendingRef` coordinating instant playback upon in-memory audio decryption.
+- **Smooth Scrubber Seeking Without Decoding Stutter ("Tweaking") (`AudioPlayerCard.tsx`)**:
+  - Decoupled scrubber visual tracking from audio hardware mutations:
+    - During drag (`onPointerMove`), `updateScrubberVisual` computes timestamp and percentage at 60fps for silky smooth needle motion without mutating `audio.currentTime`.
+    - Commits `audio.currentTime = targetSeekTimeRef.current` once on `onPointerUp`.
+  - Completely eliminated audio decoder buffer thrashing, stuttering, and timestamp fighting.
+- **Global Single Audio Playback Invariant (`AudioPlayerCard.tsx`)**:
+  - Added `veil:audio:play` global event subscription. If another audio track or voice note starts playing anywhere in the application, any active audio card automatically pauses.
+- **Telegram Sticker Pack Resolution Backend (`src/server/stickers/telegramStickerResolver.ts`, `relayServer.ts`, `vite.config.ts`)**:
+  - Implemented `TelegramStickerResolver` capable of indexing public Telegram sticker sets (such as `Zane_fozol_0_9`) via Combot and Stickers.wiki mirrors without browser CORS restrictions.
+  - Automatically extracts all 20 real WebP sticker URLs (`https://cdn.combot.online/...`), dimensions, titles, and decodes UTF-8 hex emoji representations (`decodeHexEmoji`) without literal Unicode emojis.
+  - Added `/v1/stickers/:packName` route to `RelayServer` and dev server middleware to `vite.config.ts` (`/api/telegram-stickers/:packName`).
+- **Telegram Sticker Service & UI Modal UX (`telegramStickerService.ts`, `AddStickerPackModal.tsx`)**:
+  - Updated `fetchTelegramPack` to query local server / relay endpoints before falling back to bot token.
+  - Attached `previewRef` and auto-scrolls to preview (`previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })`) when a pack is resolved, providing instant visual feedback.
+  - Displayed up to 24 preview stickers with tooltips and 1-tap installation.
+- **Phase 44a Zero Literal Unicode Emoji Compliance**:
+  - 100% verified zero literal Unicode emojis across all new and modified files.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase91-audio-player-and-stickers.test.tsx` (11/11 passing).
+  - 100% test pass across regression suites (`phase91`, `phase90`, `phase89`, `phase88`, `phase87`, `phase85` -> 49/49 passing).
+  - Full TypeScript validation and production Vite bundle verification (`npm run build`).
+
 ## [1.0.0-phase90-profile-avatar-and-audio-player] - 2026-09-12
 
 ### Account Profile in Sidebar Header & Inline Audio Player Fix (Phase 90)

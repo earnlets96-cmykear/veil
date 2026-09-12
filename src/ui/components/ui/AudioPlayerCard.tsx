@@ -56,6 +56,8 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrubberRef = useRef<HTMLDivElement>(null);
   const isScrubbingRef = useRef(false);
+  const autoPlayPendingRef = useRef(false);
+  const targetSeekTimeRef = useRef(0);
 
   // Sync blobUrl from prop or cache if available
   useEffect(() => {
@@ -73,12 +75,31 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
     }
   }, [messageId, objectId, attachmentId, name, propBlobUrl]);
 
-  // Manage HTMLAudioElement lifecycle
+  // Global listener: stop this audio if another audio or voice note starts playing
+  useEffect(() => {
+    const handleGlobalPlay = (e: Event) => {
+      const customEvent = e as CustomEvent<{ messageId?: string }>;
+      if (customEvent.detail?.messageId !== messageId) {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+        }
+      }
+    };
+    window.addEventListener('veil:audio:play', handleGlobalPlay);
+    return () => {
+      window.removeEventListener('veil:audio:play', handleGlobalPlay);
+    };
+  }, [messageId]);
+
+  // Manage single HTMLAudioElement lifecycle & event listeners
   useEffect(() => {
     if (!resolvedBlobUrl) return;
 
     const audio = new Audio(resolvedBlobUrl);
     audioRef.current = audio;
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
 
     const onLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
@@ -104,20 +125,31 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       setIsPlaying(false);
     };
 
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
 
+    if (autoPlayPendingRef.current) {
+      autoPlayPendingRef.current = false;
+      VoicePlayer.stop();
+      window.dispatchEvent(new CustomEvent('veil:audio:play', { detail: { messageId } }));
+      audio.play().catch(() => setIsPlaying(false));
+    }
+
     return () => {
       audio.pause();
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('error', onError);
       audioRef.current = null;
     };
-  }, [resolvedBlobUrl]);
+  }, [resolvedBlobUrl, messageId]);
 
   const handlePlayToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -143,41 +175,8 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
         }
 
         if (url) {
+          autoPlayPendingRef.current = true;
           setResolvedBlobUrl(url);
-          // Pause any other voice notes playing via VoicePlayer
-          VoicePlayer.stop();
-
-          const audio = new Audio(url);
-          audioRef.current = audio;
-
-          const onLoadedMetadata = () => {
-            if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-              setDuration(audio.duration);
-            }
-          };
-          const onTimeUpdate = () => {
-            if (isScrubbingRef.current) return;
-            setCurrentTime(audio.currentTime);
-            if (audio.duration > 0) {
-              setProgressPercentState((audio.currentTime / audio.duration) * 100);
-            }
-          };
-          const onEnded = () => {
-            setIsPlaying(false);
-            setCurrentTime(0);
-            setProgressPercentState(0);
-          };
-          const onError = () => {
-            setIsPlaying(false);
-          };
-
-          audio.addEventListener('loadedmetadata', onLoadedMetadata);
-          audio.addEventListener('timeupdate', onTimeUpdate);
-          audio.addEventListener('ended', onEnded);
-          audio.addEventListener('error', onError);
-
-          await audio.play();
-          setIsPlaying(true);
         }
       } catch (_err) {
         setIsPlaying(false);
@@ -192,49 +191,52 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
 
     if (isPlaying) {
       audio.pause();
-      setIsPlaying(false);
     } else {
       try {
-        // Pause any other voice notes playing via VoicePlayer
+        // Pause any other voice notes and audio players
         VoicePlayer.stop();
+        window.dispatchEvent(new CustomEvent('veil:audio:play', { detail: { messageId } }));
         await audio.play();
-        setIsPlaying(true);
       } catch (_err) {
         setIsPlaying(false);
       }
     }
   };
 
-  const handleSeek = (clientX: number) => {
+  const updateScrubberVisual = (clientX: number) => {
     if (!scrubberRef.current || duration <= 0) return;
     const rect = scrubberRef.current.getBoundingClientRect();
     const clampedX = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    const percent = clampedX / rect.width;
+    const percent = rect.width > 0 ? clampedX / rect.width : 0;
     const targetSeconds = percent * duration;
 
+    targetSeekTimeRef.current = targetSeconds;
     setCurrentTime(targetSeconds);
     setProgressPercentState(percent * 100);
-
-    if (audioRef.current) {
-      audioRef.current.currentTime = targetSeconds;
-    }
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
+    if (!audioRef.current || duration <= 0) return;
+
     isScrubbingRef.current = true;
     setIsScrubbing(true);
-    handleSeek(e.clientX);
+    updateScrubberVisual(e.clientX);
 
     const onPointerMove = (moveEvent: PointerEvent) => {
-      handleSeek(moveEvent.clientX);
+      updateScrubberVisual(moveEvent.clientX);
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (upEvent: PointerEvent) => {
       isScrubbingRef.current = false;
       setIsScrubbing(false);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+
+      updateScrubberVisual(upEvent.clientX);
+      if (audioRef.current && isFinite(targetSeekTimeRef.current)) {
+        audioRef.current.currentTime = targetSeekTimeRef.current;
+      }
     };
 
     window.addEventListener('pointermove', onPointerMove);
