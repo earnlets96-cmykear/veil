@@ -224,10 +224,12 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
     updateScrubberVisual(e.clientX);
 
     const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.stopPropagation();
       updateScrubberVisual(moveEvent.clientX);
     };
 
     const onPointerUp = (upEvent: PointerEvent) => {
+      upEvent.stopPropagation();
       isScrubbingRef.current = false;
       setIsScrubbing(false);
       window.removeEventListener('pointermove', onPointerMove);
@@ -263,6 +265,10 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       role="region"
       aria-label={`Audio player for ${name}`}
       data-no-swipe="true"
+      onClick={(e) => {
+        // Prevent clicking inside audio player from triggering message row context menu
+        e.stopPropagation();
+      }}
     >
       {/* Play / Pause Circular Button */}
       <div className="veil-audio-player-btn-wrap">
@@ -318,11 +324,24 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
           ref={scrubberRef}
           className="veil-audio-player-track-wrap veil-audio-scrubber-track"
           onPointerDown={handlePointerDown}
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onContextMenu={(e) => {
+            e.stopPropagation();
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+          }}
+          onTouchMove={(e) => {
+            e.stopPropagation();
+          }}
           role="slider"
           aria-valuenow={Math.round(progressPercentState)}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Audio progress scrubber"
+          data-no-swipe="true"
         >
           <div className="veil-audio-player-track-bg">
             <div

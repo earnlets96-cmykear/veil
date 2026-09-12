@@ -1,6 +1,26 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 91 — AUDIO PLAYER PLAY/PAUSE & SEEKING FIXES, AND TELEGRAM STICKER SET RESOLUTION
+## Active Phase: PHASE 92 — AUDIO SCRUBBER CONTEXT MENU ISOLATION & GESTURE DISAMBIGUATION
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 92 Tasks Completed:
+- [x] **Event Propagation Isolation on Audio Card & Scrubber (`AudioPlayerCard.tsx`)**:
+  - Added `onClick={(e) => e.stopPropagation()}` to `.veil-audio-player-card` and `.veil-audio-player-track-wrap`.
+  - Added `onContextMenu={(e) => e.stopPropagation()}` to `.veil-audio-player-track-wrap` so seeking or holding the scrubber never summons the message context menu.
+  - Added `onTouchStart={(e) => e.stopPropagation()}` and `onTouchMove={(e) => e.stopPropagation()}` on the scrubber track.
+  - Stopped event propagation during pointer movements (`onPointerMove`) and pointer release (`onPointerUp`) in `handlePointerDown`.
+- [x] **Interactive Element Recognition in Message Row (`ConversationView.tsx`)**:
+  - Expanded `isInteractive` filter in `.veil-msg-row`'s `onClick` to include:
+    `[role="slider"]`, `.veil-audio-player-card`, `.veil-audio-player-track-wrap`, `.veil-audio-scrubber-track`, `.veil-waveform-container`, `.veil-voicenote-card`, and `[data-no-swipe="true"]`.
+  - Excluded `[role="slider"]`, `.veil-audio-player-card`, and `.veil-audio-player-track-wrap` from `handleTouchStart`'s 500ms long-press timer and `handleTouchMove`'s horizontal swipe gestures.
+- [x] **Automated Tests & Regression Suite (`tests/phase92-audio-scrubber-context-menu-isolation.test.tsx`)**:
+  - Created Phase 92 test suite covering event isolation, selector recognition, and touch gesture exclusions (10/10 passing).
+  - Validated full test suite: 402 test files, 1325 tests passed (100%).
+  - Full production build validated: `npm run build` succeeded.
+  - Zero literal Unicode emojis in all touched files.
+
+## Previous Phase: PHASE 91 — AUDIO PLAYER PLAY/PAUSE & SEEKING FIXES, AND TELEGRAM STICKER SET RESOLUTION
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

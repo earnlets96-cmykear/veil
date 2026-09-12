@@ -1,6 +1,22 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 91 — AUDIO PLAYER PLAY/PAUSE & SEEKING FIXES, AND TELEGRAM STICKER SET RESOLUTION
+## Current Verified Phase: PHASE 92 — AUDIO SCRUBBER CONTEXT MENU ISOLATION & GESTURE DISAMBIGUATION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 10 TESTS PASS, REGRESSION SUITES PASS, FULL TEST SUITE 1325/1325 PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Audio Scrubber Event Isolation (`src/ui/components/ui/AudioPlayerCard.tsx`)**:
+    - Added `onClick={(e) => e.stopPropagation()}` on `.veil-audio-player-card` and `.veil-audio-player-track-wrap` to prevent click bubbling to parent message row.
+    - Added `onContextMenu={(e) => e.stopPropagation()}` and touch handlers (`onTouchStart`, `onTouchMove`) on the scrubber track so seeking never triggers context actions.
+    - Absorbed pointer movement and release events (`moveEvent.stopPropagation()`, `upEvent.stopPropagation()`).
+  - **Message Row Interactive Element Recognition (`src/ui/components/ConversationView.tsx`)**:
+    - Expanded `isInteractive` in `.veil-msg-row`'s `onClick` to include: `[role="slider"]`, `.veil-audio-player-card`, `.veil-audio-player-track-wrap`, `.veil-audio-scrubber-track`, `.veil-waveform-container`, `.veil-voicenote-card`, and `[data-no-swipe="true"]`.
+    - Excluded audio controls from `handleTouchStart` long-press timer and `handleTouchMove` horizontal swipe gestures.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase92-audio-scrubber-context-menu-isolation.test.tsx` (10/10 passing).
+  - Full project test runner: `npm test` -> 402 files, 1325/1325 tests passing (100%).
+  - Production release build: `npm run build` succeeds cleanly in 2.88s.
+
+## Previous Verified Phase: PHASE 91 — AUDIO PLAYER PLAY/PAUSE & SEEKING FIXES, AND TELEGRAM STICKER SET RESOLUTION
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 11 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

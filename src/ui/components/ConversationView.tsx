@@ -224,7 +224,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, input, textarea, a, [data-no-swipe="true"]')) {
+    if (target?.closest('button, input, textarea, a, [role="slider"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"]')) {
       return;
     }
     if (e.touches && e.touches.length === 1) {
@@ -237,7 +237,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 
   const handleTouchMove = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('.veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"]')) {
+    if (target?.closest('.veil-waveform-container, .veil-voicenote-card, .veil-audio-player-card, .veil-audio-player-track-wrap, [role="slider"], [data-no-swipe="true"]')) {
       return;
     }
     if (!touchStartRef.current || !e.touches || e.touches.length !== 1) return;
@@ -329,7 +329,10 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           }
           const target = e.target as HTMLElement | null;
           const isInteractive = target?.closest(
-            'button, a, input, textarea, select, [role="checkbox"], .veil-reactions-bar, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox'
+            'button, a, input, textarea, select, [role="checkbox"], [role="slider"], ' +
+            '.veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, ' +
+            '.veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"], ' +
+            '.veil-reactions-bar, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox'
           );
           if (!isInteractive && (!window.getSelection || window.getSelection()?.toString().length === 0)) {
             onContextMenu(e, msg);

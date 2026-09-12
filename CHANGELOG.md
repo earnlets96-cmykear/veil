@@ -2,6 +2,23 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase92-audio-scrubber-context-menu-isolation] - 2026-09-12
+
+### Audio Scrubber Context Menu Isolation & Gesture Disambiguation (Phase 92)
+- **Audio Scrubber Event Isolation (`AudioPlayerCard.tsx`)**:
+  - Added `onClick={(e) => e.stopPropagation()}` on `.veil-audio-player-card` and `.veil-audio-player-track-wrap` to prevent click bubbling to parent `.veil-msg-row`.
+  - Added `onContextMenu={(e) => e.stopPropagation()}` and touch handlers (`onTouchStart`, `onTouchMove`) on the scrubber track so seeking, clicking, or dragging the slider never summons the message context actions menu or floating reaction pill.
+  - Absorbed pointer movement and release events (`moveEvent.stopPropagation()`, `upEvent.stopPropagation()`) during scrubbing.
+- **Message Row Interactive Element Recognition (`ConversationView.tsx`)**:
+  - Expanded `isInteractive` in `.veil-msg-row`'s `onClick` to include: `[role="slider"]`, `.veil-audio-player-card`, `.veil-audio-player-track-wrap`, `.veil-audio-scrubber-track`, `.veil-waveform-container`, `.veil-voicenote-card`, and `[data-no-swipe="true"]`.
+  - Excluded audio controls and sliders from `handleTouchStart` long-press context menu timers and `handleTouchMove` horizontal swipe-to-reply gestures.
+- **Phase 44a Zero Literal Unicode Emoji Compliance**:
+  - 100% verified zero literal Unicode emojis across all new and modified files.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase92-audio-scrubber-context-menu-isolation.test.tsx` (10/10 passing).
+  - Full project test suite: 402 files, 1325/1325 tests passing (100%).
+  - Full TypeScript validation and production Vite bundle verification (`npm run build`).
+
 ## [1.0.0-phase91-audio-player-and-stickers] - 2026-09-12
 
 ### Audio Player Play/Pause Synchronization, Glitch-Free Seeking, and Telegram Sticker Set Resolution (Phase 91)
