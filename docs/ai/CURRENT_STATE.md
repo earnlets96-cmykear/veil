@@ -1,6 +1,21 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 86 — REAL DEVICE STORAGE MEDIA, NATIVE CAMERA, FILES TAB & DYNAMIC THEME ALIGNMENT
+## Current Verified Phase: PHASE 86 — VOICE MESSAGE TOUCH SCROLLING PASS-THROUGH & DIRECTIONAL SCRUBBING DISAMBIGUATION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 396 TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Scroll Pass-Through on Voice Bubbles (`src/styles/veil-components.css`, `VoiceNoteCard.tsx`)**: Replaced `touch-action: none;` with `touch-action: pan-y;` on both `.veil-voicenote-card` and `.veil-waveform-container`. Users can touch anywhere on the voice message bubble (background, padding, timer row, speed pill, or waveform) to scroll the conversation timeline vertically without freezing or jumping.
+  - **Directional Gesture Disambiguation (`VoiceNoteCard.tsx`)**: Removed greedy `preventDefault()` on initial contact. Added directional disambiguation logic comparing `deltaX` vs `deltaY`:
+    - Dominant vertical movement (`|deltaY| >= 7 && |deltaY| >= |deltaX|`) enters `'scrolling'` mode, allowing the conversation list to scroll without seeking or altering playback.
+    - Dominant horizontal movement (`|deltaX| >= 7 && |deltaX| > |deltaY|`) locks into `'scrubbing'` mode, updating audio seek position with live tooltip and haptic feedback.
+    - Tapping without dragging (`< 7px`) executes a clean tap-to-seek to jump to the tapped position.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase86-voicenote-touch-scroll.test.tsx` (4/4 passing).
+  - Complete repository test suite: 396 test files, 1273 tests passing (100% pass, 0 failures).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.55s.
+  - Native Android debug APK: `gradlew.bat assembleDebug` compiled successfully in 22s.
+
+## Previous Verified Phase: PHASE 86 — REAL DEVICE STORAGE MEDIA, NATIVE CAMERA, FILES TAB & DYNAMIC THEME ALIGNMENT
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 395 TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

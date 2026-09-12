@@ -65,6 +65,9 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const pendingSeekRef = useRef<{ percent: number; revision: number } | null>(null);
   const seekRevisionRef = useRef<number>(0);
   const pointerActiveRef = useRef<boolean>(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const gestureStateRef = useRef<'idle' | 'pending' | 'scrubbing' | 'scrolling'>('idle');
+  const isPointerDownRef = useRef<boolean>(false);
   const prevPropProgressRef = useRef(propProgressPercent);
   const prevPropTimeRef = useRef(propCurrentTime);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -186,87 +189,193 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   );
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    e.preventDefault();
     if (isUploading || isError) return;
-    pointerActiveRef.current = true;
-    isScrubbingRef.current = true;
-    setIsScrubbing(true);
     const target = e.currentTarget;
-    try {
-      target.setPointerCapture(e.pointerId);
-    } catch (_e) {}
 
-    handleSeekFromClientX(e.clientX, false);
+    if (e.pointerType === 'mouse') {
+      if (e.button !== 0) return;
+      e.stopPropagation();
+      pointerActiveRef.current = true;
+      isScrubbingRef.current = true;
+      setIsScrubbing(true);
+      try {
+        target.setPointerCapture(e.pointerId);
+      } catch (_e) {}
 
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      moveEvent.stopPropagation();
-      moveEvent.preventDefault();
-      handleSeekFromClientX(moveEvent.clientX, false);
+      handleSeekFromClientX(e.clientX, false);
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        moveEvent.stopPropagation();
+        handleSeekFromClientX(moveEvent.clientX, false);
+      };
+
+      const handlePointerUp = (upEvent: PointerEvent) => {
+        upEvent.stopPropagation();
+        isScrubbingRef.current = false;
+        setIsScrubbing(false);
+        lastHapticStepRef.current = -1;
+        handleSeekFromClientX(upEvent.clientX, true);
+        try {
+          target.releasePointerCapture(upEvent.pointerId);
+        } catch (_e) {}
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+        setTimeout(() => {
+          pointerActiveRef.current = false;
+        }, 150);
+      };
+
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+      return;
+    }
+
+    // Touch / Pen interaction:
+    // Do NOT call e.preventDefault() on start so the browser can freely recognize pan-y scrolling.
+    isPointerDownRef.current = true;
+    touchStartRef.current = { x: e.clientX, y: e.clientY };
+    gestureStateRef.current = 'pending';
+
+    const handleTouchPointerMove = (moveEvent: PointerEvent) => {
+      if (gestureStateRef.current === 'scrolling') return;
+      if (!touchStartRef.current) return;
+
+      const deltaX = moveEvent.clientX - touchStartRef.current.x;
+      const deltaY = moveEvent.clientY - touchStartRef.current.y;
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (gestureStateRef.current === 'pending') {
+        if (absY >= 7 && absY >= absX) {
+          // Dominant vertical motion -> User is scrolling the message timeline!
+          gestureStateRef.current = 'scrolling';
+          isScrubbingRef.current = false;
+          setIsScrubbing(false);
+          return;
+        }
+        if (absX >= 7 && absX > absY) {
+          // Dominant horizontal motion -> User is scrubbing the waveform!
+          gestureStateRef.current = 'scrubbing';
+          isScrubbingRef.current = true;
+          setIsScrubbing(true);
+          pointerActiveRef.current = true;
+          try {
+            target.setPointerCapture(moveEvent.pointerId);
+          } catch (_e) {}
+          try {
+            moveEvent.preventDefault();
+          } catch (_e) {}
+          handleSeekFromClientX(moveEvent.clientX, false);
+        }
+      } else if (gestureStateRef.current === 'scrubbing') {
+        try {
+          moveEvent.preventDefault();
+        } catch (_e) {}
+        handleSeekFromClientX(moveEvent.clientX, false);
+      }
     };
 
-    const handlePointerUp = (upEvent: PointerEvent) => {
-      upEvent.stopPropagation();
-      upEvent.preventDefault();
+    const handleTouchPointerUp = (upEvent: PointerEvent) => {
+      if (gestureStateRef.current === 'pending') {
+        // Tap without dragging -> intentional tap to seek!
+        handleSeekFromClientX(upEvent.clientX, true);
+      } else if (gestureStateRef.current === 'scrubbing') {
+        // Finished dragging scrubber -> commit final position
+        handleSeekFromClientX(upEvent.clientX, true);
+      }
+
+      gestureStateRef.current = 'idle';
+      touchStartRef.current = null;
       isScrubbingRef.current = false;
       setIsScrubbing(false);
       lastHapticStepRef.current = -1;
-      handleSeekFromClientX(upEvent.clientX, true);
+      isPointerDownRef.current = false;
       try {
         target.releasePointerCapture(upEvent.pointerId);
       } catch (_e) {}
-      target.removeEventListener('pointermove', handlePointerMove);
-      target.removeEventListener('pointerup', handlePointerUp);
-      target.removeEventListener('pointercancel', handlePointerUp);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('pointermove', handleTouchPointerMove);
+      window.removeEventListener('pointerup', handleTouchPointerUp);
+      window.removeEventListener('pointercancel', handleTouchPointerUp);
       setTimeout(() => {
         pointerActiveRef.current = false;
       }, 150);
     };
 
-    target.addEventListener('pointermove', handlePointerMove);
-    target.addEventListener('pointerup', handlePointerUp);
-    target.addEventListener('pointercancel', handlePointerUp);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('pointermove', handleTouchPointerMove);
+    window.addEventListener('pointerup', handleTouchPointerUp);
+    window.addEventListener('pointercancel', handleTouchPointerUp);
   };
 
   const handleTouchStartTrack = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    try { e.preventDefault(); } catch (_e) {}
     if (isUploading || isError) return;
-    isScrubbingRef.current = true;
-    setIsScrubbing(true);
-    if (e.touches && e.touches[0]) {
-      handleSeekFromClientX(e.touches[0].clientX, false);
-    }
+    if (isPointerDownRef.current) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    gestureStateRef.current = 'pending';
   };
 
   const handleTouchMoveTrack = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    try { e.preventDefault(); } catch (_e) {}
-    if (!isScrubbingRef.current) return;
-    if (e.touches && e.touches[0]) {
-      handleSeekFromClientX(e.touches[0].clientX, false);
+    if (isPointerDownRef.current) return;
+    if (gestureStateRef.current === 'scrolling') return;
+    if (!touchStartRef.current || !e.touches || !e.touches[0]) return;
+
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartRef.current.x;
+    const deltaY = touch.clientY - touchStartRef.current.y;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (gestureStateRef.current === 'pending') {
+      if (absY >= 7 && absY >= absX) {
+        gestureStateRef.current = 'scrolling';
+        return;
+      }
+      if (absX >= 7 && absX > absY) {
+        gestureStateRef.current = 'scrubbing';
+        isScrubbingRef.current = true;
+        setIsScrubbing(true);
+        pointerActiveRef.current = true;
+        try {
+          e.preventDefault();
+        } catch (_e) {}
+        handleSeekFromClientX(touch.clientX, false);
+      }
+    } else if (gestureStateRef.current === 'scrubbing') {
+      try {
+        e.preventDefault();
+      } catch (_e) {}
+      handleSeekFromClientX(touch.clientX, false);
     }
   };
 
   const handleTouchEndTrack = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    try { e.preventDefault(); } catch (_e) {}
+    if (isPointerDownRef.current) return;
+    if (gestureStateRef.current === 'pending') {
+      const touch = e.changedTouches?.[0];
+      if (touch) {
+        handleSeekFromClientX(touch.clientX, true);
+      }
+    } else if (gestureStateRef.current === 'scrubbing') {
+      const touch = e.changedTouches?.[0];
+      if (touch) {
+        handleSeekFromClientX(touch.clientX, true);
+      }
+    }
+    gestureStateRef.current = 'idle';
+    touchStartRef.current = null;
     isScrubbingRef.current = false;
     setIsScrubbing(false);
     lastHapticStepRef.current = -1;
-    if (e.changedTouches && e.changedTouches[0]) {
-      handleSeekFromClientX(e.changedTouches[0].clientX, true);
-    }
+    setTimeout(() => {
+      pointerActiveRef.current = false;
+    }, 150);
   };
 
   const handleClickTrack = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (pointerActiveRef.current || isScrubbingRef.current) return;
+    if (pointerActiveRef.current || isScrubbingRef.current || gestureStateRef.current !== 'idle') return;
     e.stopPropagation();
     if (isUploading || isError) return;
     handleSeekFromClientX(e.clientX, true);
@@ -311,6 +420,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
         boxSizing: 'border-box',
         userSelect: 'none',
         position: 'relative',
+        touchAction: 'pan-y',
       }}
     >
       {/* Play/Pause/Retry Button Container with Perimeter Progress Ring */}
@@ -478,7 +588,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
             gap: '1.5px',
             cursor: isUploading || isError ? 'default' : 'pointer',
             userSelect: 'none',
-            touchAction: 'none',
+            touchAction: 'pan-y',
           }}
         >
           {/* Floating Scrubbing Tooltip */}

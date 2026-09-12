@@ -1,6 +1,26 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 86 — REAL DEVICE STORAGE MEDIA, NATIVE CAMERA, FILES TAB & DYNAMIC THEME ALIGNMENT
+## Active Phase: PHASE 86 — VOICE MESSAGE TOUCH SCROLLING PASS-THROUGH & DIRECTIONAL SCRUBBING DISAMBIGUATION
+- **Status**: COMPLETE & VERIFIED (100% test pass across all 396 test files, Android debug APK compiled)
+- **Branch**: `main`
+
+### Phase 86 Tasks Completed:
+- [x] **Voice Note Card Native Vertical Scroll Pass-Through (`VoiceNoteCard.tsx`, `src/styles/veil-components.css`)**:
+  - Replaced `touch-action: none;` on `.veil-voicenote-card` and `.veil-waveform-container` with `touch-action: pan-y;`.
+  - Allowed browser/WebView compositor to natively handle vertical scrolling over the entire voice bubble without interference.
+- [x] **Directional Gesture Disambiguation (`VoiceNoteCard.tsx`)**:
+  - Eliminated unconditional `preventDefault()` and immediate `handleSeekFromClientX()` calls on `pointerdown` and `touchstart`.
+  - Implemented directional delta calculation (`deltaX` vs `deltaY`):
+    - When `|deltaY| >= 7 && |deltaY| >= |deltaX|`: sets gesture state to `'scrolling'`, bypasses seek logic, and allows the native conversation list to scroll smoothly.
+    - When `|deltaX| >= 7 && |deltaX| > |deltaY|`: sets gesture state to `'scrubbing'`, calls `preventDefault()`, shows tactile scrubber tooltip, and updates audio position.
+    - When lifting without movement (`< 7px` total displacement): executes deliberate tap-to-seek to jump to the tapped waveform position.
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase86-voicenote-touch-scroll.test.tsx` (4/4 passing).
+  - 100% pass across all 396 test files (1273 tests passing).
+  - Web production bundle built in 2.55s (`npm run build`).
+  - Native Android debug APK assembled successfully (`BUILD SUCCESSFUL in 22s`).
+
+## Previous Phase: PHASE 86 — REAL DEVICE STORAGE MEDIA, NATIVE CAMERA, FILES TAB & DYNAMIC THEME ALIGNMENT
 - **Status**: COMPLETE & VERIFIED (100% test pass across 395 test files, Android debug APK compiled)
 - **Branch**: `main`
 

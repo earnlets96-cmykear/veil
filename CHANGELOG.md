@@ -2,6 +2,24 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase86-voicenote-touch-scroll-fix] - 2026-09-12
+
+### Voice Message Touch Scrolling Pass-Through & Directional Scrubbing Disambiguation (Phase 86)
+- **Eliminated Scroll Interference on Voice Notes (`src/styles/veil-components.css`, `VoiceNoteCard.tsx`)**:
+  - Replaced restrictive `touch-action: none;` on `.veil-voicenote-card` and `.veil-waveform-container` with `touch-action: pan-y;` in CSS and inline styling.
+  - Allows the browser/WebView compositor to natively scroll the `.veil-timeline` when dragging vertically anywhere on the voice message bubble (background, waveform, padding, timer row, or speed pill).
+- **Directional Gesture Disambiguation (`VoiceNoteCard.tsx`)**:
+  - Removed unconditional `preventDefault()` and immediate `handleSeekFromClientX()` calls on `pointerdown` and `touchstart`.
+  - Implemented real-time directional delta tracking (`deltaX` vs `deltaY`):
+    - When vertical movement dominates (`|deltaY| >= 7 && |deltaY| >= |deltaX|`), transitions to `'scrolling'` mode: suppresses seeking, never calls `preventDefault()`, and allows native conversation scrolling to proceed unimpeded.
+    - When horizontal movement dominates (`|deltaX| >= 7 && |deltaX| > |deltaY|`), locks into `'scrubbing'` mode: calls `preventDefault()`, shows tactile scrubber tooltip, fires 5% haptic ticks, and updates seek position in real time.
+    - When a tap/release occurs without dragging (`< 7px` total movement), cleanly executes tap-to-seek to jump playback directly to the tapped waveform position.
+- **Verification & Test Coverage**:
+  - Created `tests/phase86-voicenote-touch-scroll.test.tsx` verifying CSS rules, component inline styles, non-blocking touch down, directional disambiguation logic, and zero-Unicode compliance.
+  - 100% test pass across all 396 test suites in repository (1273 tests passing, 0 failures).
+  - Web production bundle built cleanly with Vite; Android native debug APK compiled successfully via Gradle (`BUILD SUCCESSFUL in 22s`).
+
+
 ## [1.0.0-phase86-real-device-media-and-theme] - 2026-09-12
 
 ### Real Device Storage Media, Native Camera Hardware, Files Tab & Dynamic Theme Alignment (Phase 86)
