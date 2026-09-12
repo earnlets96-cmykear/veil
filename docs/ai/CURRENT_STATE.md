@@ -1,6 +1,25 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 99 — STICKER SKELETON LOADERS, 1S AUTO-REFRESH ON FAILURE & COMPACT SIZING
+## Current Verified Phase: PHASE 100 — 60FPS CHAT SMOOTHNESS, CSS CONTAINMENT & TIMELINE OPTIMIZATION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 14 PHASE 100 TESTS PASS, 64/64 REGRESSION TESTS PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **CSS 60fps GPU Compositor Pipeline**:
+    - `.veil-timeline` utilizes `contain: content; will-change: scroll-position; transform: translateZ(0);` for GPU-accelerated scrolling.
+    - `.veil-msg-row` utilizes `content-visibility: auto; contain-intrinsic-size: auto 60px; contain: layout style;` to eliminate off-screen layout and paint overhead.
+    - Promoted `.veil-bubble-wrapper`, `.veil-chat-header`, `.veil-composer-container`, `.veil-pinned-bar`, and `.veil-active-audio-banner` to distinct GPU layers.
+  - **Strict React.memo & Prop Decoupling (`src/ui/components/ConversationView.tsx`)**:
+    - Decoupled `ConversationMessageRowProps` from shared dictionary objects (`playbackProgress`, `playbackCurrentTime`, `uploadProgress`, `downloadProgress`).
+    - Pass scalar values per row (`isAudioPlaying`, `uploadPercent`, `downloadPercent`, etc.).
+    - Implemented `areEqualMessageRowProps` custom comparator on `ConversationMessageRow`, preventing invalidation and saving 60Hz redundant re-renders of the entire 60+ message timeline during audio playback or file upload.
+  - **High-Frequency Touch Gesture Optimization**:
+    - RAF throttling on swipe-to-reply touch moves via `swipeRafRef`.
+    - Zero-guarding on vertical scroll cancellations (`if (swipeOffset !== 0) setSwipeOffset(0);`) to eliminate main-thread microtask flooding.
+    - RAF throttling and zero-guarding on edge back-swipe gesture via `chatBackRafRef` and `chatBackOffsetRef`.
+  - **Callback Stabilization**:
+    - Grounded `handleOpenMedia` and `handleJumpToMessage` with `activeMessagesRef` and `renderedCountRef`.
+
+## Previous Verified Phase: PHASE 99 — STICKER SKELETON LOADERS, 1S AUTO-REFRESH ON FAILURE & COMPACT SIZING
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 11 PHASE 99 TESTS PASS, PRODUCTION BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

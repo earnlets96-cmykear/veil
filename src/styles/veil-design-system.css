@@ -758,6 +758,8 @@ body {
   box-sizing: border-box;
   z-index: var(--veil-z-header);
   flex-shrink: 0;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .veil-conversation-header-left,
@@ -862,6 +864,9 @@ body {
   background-color: var(--veil-bg-base);
   width: 100%;
   box-sizing: border-box;
+  contain: content;
+  will-change: scroll-position;
+  transform: translateZ(0);
 }
 
 /* Message Rows & Bubbles */
@@ -870,6 +875,9 @@ body {
   width: 100%;
   box-sizing: border-box;
   align-items: flex-end;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+  contain: layout style;
 }
 
 .veil-msg-row.outgoing {
@@ -887,6 +895,8 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .veil-message-row {
@@ -1079,6 +1089,8 @@ body {
   z-index: var(--veil-z-header);
   background: transparent;
   box-sizing: border-box;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .veil-composer {

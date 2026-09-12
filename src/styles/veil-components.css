@@ -4663,8 +4663,15 @@ img.veil-message-sticker-img {
   }
 }
 
+/* ==========================================================================
+   Phase 100: 60fps GPU Compositor Layer Promotion
+   ========================================================================== */
+.veil-pinned-bar {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
 
-
-
-
-
+.veil-active-audio-banner {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}

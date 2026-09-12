@@ -957,9 +957,9 @@ export class VoicePlaybackManager {
 
   /**
    * Stops active playback, resets position to 0, and clears active session state.
-   * @param revokeUrl Whether to revoke the object URL (defaults to true for complete cleanup, false for backgrounding/preserving cache)
+   * @param revokeUrl Whether to revoke the object URL (defaults to false to preserve blob URLs in cache for replay/banner recovery)
    */
-  public stop(revokeUrl: boolean = true): void {
+  public stop(revokeUrl: boolean = false): void {
     if (this.isNative) {
       NativeMediaBridge.getInstance().stopAudio();
       this.nativeIsPlaying = false;

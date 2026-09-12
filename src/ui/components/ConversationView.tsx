@@ -95,18 +95,14 @@ interface ConversationMessageRowProps {
   isContextActive?: boolean;
   isGroupedWithPrevious?: boolean;
   isGroupedWithNext?: boolean;
-  downloadingAttachmentId?: string | null;
-  downloadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
+  isGroup?: boolean;
+  isCurrentlyDownloading?: boolean;
   downloadPercent?: number;
   downloadLoadedBytes?: number;
-  uploadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
   uploadPercent?: number;
   uploadLoadedBytes?: number;
-  playbackProgress?: Record<string, number>;
-  playbackCurrentTime?: Record<string, number>;
   currentPlaybackProgress?: number;
   currentPlaybackTime?: number;
-  playingAudioId?: string | null;
   isAudioPlaying?: boolean;
   unreadRef: React.RefObject<HTMLDivElement | null>;
   onToggleSelect: (id: string) => void;
@@ -122,7 +118,6 @@ interface ConversationMessageRowProps {
   peerAvatar?: string;
   onReactionClick?: (msg: UIMessage, emoji: string) => void;
   onResolveAudioAttachment?: (msg: UIMessage) => Promise<string | undefined>;
-  isGroup?: boolean;
 }
 
 const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = ({
@@ -135,19 +130,14 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   isGroupedWithPrevious,
   isGroupedWithNext,
   isGroup = false,
-  downloadingAttachmentId,
-  downloadProgress,
+  isCurrentlyDownloading = false,
   downloadPercent,
   downloadLoadedBytes,
-  uploadProgress,
   uploadPercent,
   uploadLoadedBytes,
-  playbackProgress,
-  playbackCurrentTime,
   currentPlaybackProgress,
   currentPlaybackTime,
-  playingAudioId,
-  isAudioPlaying,
+  isAudioPlaying = false,
   unreadRef,
   onToggleSelect,
   onContextMenu,
@@ -167,6 +157,18 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasTriggeredHapticRef = useRef(false);
+  const swipeRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (swipeRafRef.current !== null) {
+        cancelAnimationFrame(swipeRafRef.current);
+      }
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
+    };
+  }, []);
 
   const isAudioAttachment = Boolean(
     msg.attachment &&
@@ -204,25 +206,13 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     msg.text !== 'Voice Message'
   );
 
-  const isCurrentlyPlaying = isAudioPlaying ?? (playingAudioId === msg.id);
-  const isCurrentlyDownloading = downloadingAttachmentId === msg.id;
-  const currentProgress = currentPlaybackProgress ?? (playbackProgress ? playbackProgress[msg.id] || 0 : 0);
-  const currentTime = currentPlaybackTime ?? (playbackCurrentTime ? playbackCurrentTime[msg.id] || 0 : 0);
-  const dlPercent = downloadPercent ?? (downloadProgress ? downloadProgress[msg.id]?.percent : undefined);
-  const dlLoaded = downloadLoadedBytes ?? (downloadProgress ? downloadProgress[msg.id]?.loaded : undefined);
-
-  const effectiveUploadPercent =
-    uploadPercent ??
-    (uploadProgress ? uploadProgress[msg.id]?.percent : undefined) ??
-    (msg.attachment?.attachmentId && uploadProgress ? uploadProgress[msg.attachment.attachmentId]?.percent : undefined) ??
-    (msg.attachment?.objectId && uploadProgress ? uploadProgress[msg.attachment.objectId]?.percent : undefined) ??
-    msg.uploadProgress;
-
-  const effectiveUploadLoaded =
-    uploadLoadedBytes ??
-    (uploadProgress ? uploadProgress[msg.id]?.loaded : undefined) ??
-    (msg.attachment?.attachmentId && uploadProgress ? uploadProgress[msg.attachment.attachmentId]?.loaded : undefined) ??
-    (msg.attachment?.objectId && uploadProgress ? uploadProgress[msg.attachment.objectId]?.loaded : undefined);
+  const isCurrentlyPlaying = isAudioPlaying;
+  const currentProgress = currentPlaybackProgress ?? 0;
+  const currentTime = currentPlaybackTime ?? 0;
+  const dlPercent = downloadPercent;
+  const dlLoaded = downloadLoadedBytes;
+  const effectiveUploadPercent = uploadPercent ?? msg.uploadProgress;
+  const effectiveUploadLoaded = uploadLoadedBytes;
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
@@ -249,7 +239,13 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 
     // Vertical scroll cancels swipe
     if (Math.abs(deltaY) > Math.abs(deltaX)) {
-      setSwipeOffset(0);
+      if (swipeOffset !== 0) {
+        if (swipeRafRef.current !== null) {
+          cancelAnimationFrame(swipeRafRef.current);
+          swipeRafRef.current = null;
+        }
+        setSwipeOffset(0);
+      }
       hasTriggeredHapticRef.current = false;
       return;
     }
@@ -261,7 +257,13 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
       }
       // Elastic resistance: non-linear damping matching Telegram physics
       const elasticOffset = -Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6);
-      setSwipeOffset(elasticOffset);
+      if (swipeRafRef.current !== null) {
+        cancelAnimationFrame(swipeRafRef.current);
+      }
+      swipeRafRef.current = requestAnimationFrame(() => {
+        setSwipeOffset(elasticOffset);
+        swipeRafRef.current = null;
+      });
 
       // Reply trigger threshold: -45px
       if (elasticOffset <= -45) {
@@ -280,10 +282,16 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    if (swipeRafRef.current !== null) {
+      cancelAnimationFrame(swipeRafRef.current);
+      swipeRafRef.current = null;
+    }
     if (swipeOffset <= -45) {
       onReplyTrigger(msg);
     }
-    setSwipeOffset(0);
+    if (swipeOffset !== 0) {
+      setSwipeOffset(0);
+    }
     hasTriggeredHapticRef.current = false;
     touchStartRef.current = null;
   };
@@ -745,7 +753,56 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   );
 };
 
-export const ConversationMessageRow = React.memo(ConversationMessageRowComponent);
+function areEqualMessageRowProps(
+  prev: ConversationMessageRowProps,
+  next: ConversationMessageRowProps
+): boolean {
+  if (prev.msg !== next.msg) {
+    if (
+      prev.msg.id !== next.msg.id ||
+      prev.msg.text !== next.msg.text ||
+      prev.msg.status !== next.msg.status ||
+      prev.msg.edited !== next.msg.edited ||
+      prev.msg.uploadProgress !== next.msg.uploadProgress ||
+      prev.msg.reactions !== next.msg.reactions ||
+      prev.msg.attachment !== next.msg.attachment ||
+      prev.msg.attachments !== next.msg.attachments ||
+      prev.msg.voice !== next.msg.voice ||
+      prev.msg.replyTo !== next.msg.replyTo
+    ) {
+      return false;
+    }
+  }
+
+  if (
+    prev.isUnreadFirst !== next.isUnreadFirst ||
+    prev.isSelected !== next.isSelected ||
+    prev.isSelectionMode !== next.isSelectionMode ||
+    prev.isHighlighted !== next.isHighlighted ||
+    prev.isContextActive !== next.isContextActive ||
+    prev.isGroupedWithPrevious !== next.isGroupedWithPrevious ||
+    prev.isGroupedWithNext !== next.isGroupedWithNext ||
+    prev.isGroup !== next.isGroup ||
+    prev.isAudioPlaying !== next.isAudioPlaying ||
+    prev.isCurrentlyDownloading !== next.isCurrentlyDownloading ||
+    prev.downloadPercent !== next.downloadPercent ||
+    prev.downloadLoadedBytes !== next.downloadLoadedBytes ||
+    prev.uploadPercent !== next.uploadPercent ||
+    prev.uploadLoadedBytes !== next.uploadLoadedBytes ||
+    prev.currentPlaybackProgress !== next.currentPlaybackProgress ||
+    prev.currentPlaybackTime !== next.currentPlaybackTime ||
+    prev.peerAvatar !== next.peerAvatar
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export const ConversationMessageRow = React.memo(
+  ConversationMessageRowComponent,
+  areEqualMessageRowProps
+);
 
 export const ConversationView: React.FC = () => {
   const {
@@ -780,6 +837,16 @@ export const ConversationView: React.FC = () => {
   const timelineEndRef = useRef<HTMLDivElement>(null);
   const unreadRef = useRef<HTMLDivElement>(null);
   const chatBackTouchRef = useRef<{ x: number; y: number; direction: 'ltr' | 'rtl' } | null>(null);
+  const chatBackRafRef = useRef<number | null>(null);
+  const chatBackOffsetRef = useRef<number>(0);
+
+  useEffect(() => {
+    return () => {
+      if (chatBackRafRef.current !== null) {
+        cancelAnimationFrame(chatBackRafRef.current);
+      }
+    };
+  }, []);
 
   // Dynamic Visual Viewport & Keyboard State
   const { isKeyboardOpen, visualViewportHeight } = useVisualViewport();
@@ -877,20 +944,42 @@ export const ConversationView: React.FC = () => {
     const deltaY = event.touches[0].clientY - start.y;
     const logicalDelta = start.direction === 'rtl' ? -deltaX : deltaX;
     if (logicalDelta <= 0 || Math.abs(deltaY) >= Math.abs(deltaX)) {
-      setChatBackOffset(0);
+      if (chatBackOffsetRef.current !== 0) {
+        if (chatBackRafRef.current !== null) {
+          cancelAnimationFrame(chatBackRafRef.current);
+          chatBackRafRef.current = null;
+        }
+        chatBackOffsetRef.current = 0;
+        setChatBackOffset(0);
+      }
       return;
     }
 
     event.preventDefault();
-    // Smooth responsive translation following finger
-    setChatBackOffset(Math.min(window.innerWidth * 0.85, logicalDelta));
+    // Smooth responsive translation following finger, throttled via RAF
+    const targetOffset = Math.min(window.innerWidth * 0.85, logicalDelta);
+    if (chatBackRafRef.current !== null) {
+      cancelAnimationFrame(chatBackRafRef.current);
+    }
+    chatBackRafRef.current = requestAnimationFrame(() => {
+      chatBackOffsetRef.current = targetOffset;
+      setChatBackOffset(targetOffset);
+      chatBackRafRef.current = null;
+    });
   }, []);
 
   const finishChatBackSwipe = useCallback((event?: React.TouchEvent<HTMLDivElement>) => {
     const start = chatBackTouchRef.current;
     chatBackTouchRef.current = null;
+    if (chatBackRafRef.current !== null) {
+      cancelAnimationFrame(chatBackRafRef.current);
+      chatBackRafRef.current = null;
+    }
     if (!start || !event || event.changedTouches.length !== 1) {
-      setChatBackOffset(0);
+      if (chatBackOffsetRef.current !== 0) {
+        chatBackOffsetRef.current = 0;
+        setChatBackOffset(0);
+      }
       return;
     }
 
@@ -912,6 +1001,7 @@ export const ConversationView: React.FC = () => {
       }
       selectConversation(null);
     }
+    chatBackOffsetRef.current = 0;
     setChatBackOffset(0);
   }, [selectConversation]);
 
@@ -952,6 +1042,16 @@ export const ConversationView: React.FC = () => {
   const INITIAL_MESSAGE_WINDOW = 60;
   const WINDOW_INCREMENT = 40;
   const [renderedCount, setRenderedCount] = useState<number>(INITIAL_MESSAGE_WINDOW);
+
+  const activeMessagesRef = useRef<UIMessage[]>(activeMessages);
+  useEffect(() => {
+    activeMessagesRef.current = activeMessages;
+  }, [activeMessages]);
+
+  const renderedCountRef = useRef<number>(renderedCount);
+  useEffect(() => {
+    renderedCountRef.current = renderedCount;
+  }, [renderedCount]);
 
   useEffect(() => {
     setRenderedCount(INITIAL_MESSAGE_WINDOW);
@@ -1016,9 +1116,11 @@ export const ConversationView: React.FC = () => {
 
   // Handle Jump-to-message with automatic window expansion
   const handleJumpToMessage = useCallback((targetMsgId: string) => {
-    const targetIdx = activeMessages.findIndex((m) => m.id === targetMsgId);
-    if (targetIdx >= 0 && targetIdx < activeMessages.length - renderedCount) {
-      const neededCount = activeMessages.length - targetIdx + 20;
+    const msgs = activeMessagesRef.current;
+    const curRendered = renderedCountRef.current;
+    const targetIdx = msgs.findIndex((m) => m.id === targetMsgId);
+    if (targetIdx >= 0 && targetIdx < msgs.length - curRendered) {
+      const neededCount = msgs.length - targetIdx + 20;
       setRenderedCount(neededCount);
       requestAnimationFrame(() => {
         const element = document.getElementById(`msg-${targetMsgId}`);
@@ -1043,7 +1145,7 @@ export const ConversationView: React.FC = () => {
     } else {
       showToast({ type: 'info', message: 'Original message not found in timeline' });
     }
-  }, [activeMessages, renderedCount, showToast]);
+  }, [showToast]);
 
   // Handle Audio Banner Jump to message (with cross-chat support)
   const handleAudioBannerJump = useCallback((targetMsgId: string, conversationId?: string) => {
@@ -1288,7 +1390,7 @@ export const ConversationView: React.FC = () => {
   const handleOpenMedia = useCallback((msg: UIMessage) => {
     if (!msg.attachment && (!msg.attachments || msg.attachments.length === 0)) return;
 
-    const allMediaMessages = activeMessages.filter(
+    const allMediaMessages = activeMessagesRef.current.filter(
       (m) =>
         (m.attachment && (m.attachment.mimeType?.startsWith('image/') || m.attachment.mimeType?.startsWith('video/'))) ||
         (m.attachments && m.attachments.length > 0)
@@ -1335,7 +1437,7 @@ export const ConversationView: React.FC = () => {
     const currentIdx = items.findIndex((i) => i.id === msg.id || i.id.startsWith(`${msg.id}_`));
     setViewerMediaList(items);
     setViewerItem(items[currentIdx >= 0 ? currentIdx : 0]);
-  }, [activeMessages]);
+  }, []);
 
   const handleOpenGroupedMedia = useCallback((msg: UIMessage, index: number) => {
     if (!msg.attachments || msg.attachments.length === 0) return;
@@ -1964,6 +2066,19 @@ export const ConversationView: React.FC = () => {
               Boolean(activeConversation?.groupState)
             );
 
+            const uploadPercentVal =
+              uploadProgress?.[msg.id]?.percent ??
+              (msg.attachment?.attachmentId ? uploadProgress?.[msg.attachment.attachmentId]?.percent : undefined) ??
+              (msg.attachment?.objectId ? uploadProgress?.[msg.attachment.objectId]?.percent : undefined) ??
+              msg.uploadProgress;
+
+            const uploadLoadedVal =
+              uploadProgress?.[msg.id]?.loaded ??
+              (msg.attachment?.attachmentId ? uploadProgress?.[msg.attachment.attachmentId]?.loaded : undefined) ??
+              (msg.attachment?.objectId ? uploadProgress?.[msg.attachment.objectId]?.loaded : undefined);
+
+            const isAudioActive = playingAudioId === msg.id;
+
             return (
               <ConversationMessageRow
                 key={msg.id}
@@ -1976,26 +2091,14 @@ export const ConversationView: React.FC = () => {
                 isGroupedWithPrevious={isGroupedWithPrevious}
                 isGroupedWithNext={isGroupedWithNext}
                 isGroup={isGroupConversation}
-                downloadingAttachmentId={downloadingAttachmentId}
-                downloadProgress={downloadProgress}
+                isCurrentlyDownloading={downloadingAttachmentId === msg.id}
                 downloadPercent={downloadProgress?.[msg.id]?.percent}
                 downloadLoadedBytes={downloadProgress?.[msg.id]?.loaded}
-                uploadProgress={uploadProgress}
-                uploadPercent={
-                  uploadProgress?.[msg.id]?.percent ??
-                  (msg.attachment?.attachmentId ? uploadProgress?.[msg.attachment.attachmentId]?.percent : undefined) ??
-                  (msg.attachment?.objectId ? uploadProgress?.[msg.attachment.objectId]?.percent : undefined) ??
-                  msg.uploadProgress
-                }
-                uploadLoadedBytes={
-                  uploadProgress?.[msg.id]?.loaded ??
-                  (msg.attachment?.attachmentId ? uploadProgress?.[msg.attachment.attachmentId]?.loaded : undefined) ??
-                  (msg.attachment?.objectId ? uploadProgress?.[msg.attachment.objectId]?.loaded : undefined)
-                }
-                playbackProgress={playbackProgress}
-                playbackCurrentTime={playbackCurrentTime}
-                playingAudioId={playingAudioId}
-                isAudioPlaying={playingAudioId === msg.id}
+                uploadPercent={uploadPercentVal}
+                uploadLoadedBytes={uploadLoadedVal}
+                currentPlaybackProgress={isAudioActive ? playbackProgress[msg.id] : undefined}
+                currentPlaybackTime={isAudioActive ? playbackCurrentTime[msg.id] : undefined}
+                isAudioPlaying={isAudioActive}
                 unreadRef={unreadRef}
                 onToggleSelect={handleToggleSelectMessage}
                 onContextMenu={handleContextMenu}

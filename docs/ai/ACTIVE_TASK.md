@@ -1,6 +1,31 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 99 — STICKER SKELETON LOADERS, 1S AUTO-REFRESH ON FAILURE & COMPACT SIZING
+## Active Phase: PHASE 100 — 60FPS CHAT SMOOTHNESS, CSS CONTAINMENT & TIMELINE OPTIMIZATION
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 100 Tasks Completed:
+- [x] **CSS 60fps GPU Pipeline & Content-Visibility Virtualization**:
+  - Added `contain: content; will-change: scroll-position; transform: translateZ(0);` to `.veil-timeline` in `src/styles/veil-design-system.css`.
+  - Added `content-visibility: auto; contain-intrinsic-size: auto 60px; contain: layout style;` to `.veil-msg-row`.
+  - Promoted `.veil-bubble-wrapper`, `.veil-chat-header`, and `.veil-composer-container` to GPU compositor layers with `transform: translateZ(0); backface-visibility: hidden;`.
+  - Promoted `.veil-pinned-bar` and `.veil-active-audio-banner` in `src/styles/veil-components.css`.
+- [x] **React.memo Strict Memoization & Prop Decoupling (`src/ui/components/ConversationView.tsx`)**:
+  - Decoupled `ConversationMessageRowProps` from shared dictionary objects (`downloadProgress`, `uploadProgress`, `playbackProgress`, `playbackCurrentTime`).
+  - Evaluated scalar props per message (`downloadPercent`, `downloadLoadedBytes`, `uploadPercent`, `uploadLoadedBytes`, `isAudioPlaying`, `currentPlaybackProgress`, `currentPlaybackTime`, `isCurrentlyDownloading`).
+  - Implemented `areEqualMessageRowProps` custom comparator on `React.memo(ConversationMessageRowComponent, areEqualMessageRowProps)`, preventing re-renders of unaffected rows during 60Hz audio ticks, upload updates, and scrolling.
+- [x] **Touch Event RAF Throttling & Scroll Guarding**:
+  - Added `swipeRafRef` and `requestAnimationFrame` coalescing to message swipe-to-reply gesture.
+  - Guarded vertical scroll cancellation with `if (swipeOffset !== 0) setSwipeOffset(0);` to eliminate main-thread microtask flooding.
+  - Added RAF throttling and `chatBackOffsetRef` zero-guarding to edge back-swipe gesture.
+- [x] **Callback Stabilization**:
+  - Grounded `handleOpenMedia` and `handleJumpToMessage` with `activeMessagesRef` and `renderedCountRef`, stabilizing callback identity across renders.
+- [x] **Verification**:
+  - Added `tests/phase100-chat-smoothness-and-fps-optimization.test.tsx` (14/14 passing).
+  - Regression test suites passing: Phase 96, 98, 79, 99, 100 (64/64 passing).
+  - Production build clean (`npm run build` exits 0) and synced with Capacitor Android.
+
+## Previous Phase: PHASE 99 — STICKER SKELETON LOADERS, 1S AUTO-REFRESH ON FAILURE & COMPACT SIZING
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

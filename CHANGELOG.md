@@ -2,6 +2,29 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase100-chat-smoothness-and-fps-optimization] - 2026-09-13
+
+### 60fps Chat Smoothness, CSS Containment & Timeline Performance (Phase 100)
+- **CSS 60fps GPU Pipeline & Content-Visibility Containment**:
+  - Added `contain: content; will-change: scroll-position; transform: translateZ(0);` on `.veil-timeline`.
+  - Added `content-visibility: auto; contain-intrinsic-size: auto 60px; contain: layout style;` on `.veil-msg-row`, eliminating continuous layout calculation for offscreen messages.
+  - Promoted `.veil-bubble-wrapper`, `.veil-chat-header`, `.veil-composer-container`, `.veil-pinned-bar`, and `.veil-active-audio-banner` to dedicated GPU compositor layers.
+- **Strict React.memo & Prop Decoupling (`ConversationView.tsx`)**:
+  - Removed global dictionary props (`downloadProgress`, `uploadProgress`, `playbackProgress`, `playbackCurrentTime`) from `ConversationMessageRowProps`.
+  - Evaluated scalar values per row (`downloadPercent`, `uploadPercent`, `isAudioPlaying`, `isCurrentlyDownloading`).
+  - Added custom `areEqualMessageRowProps` comparator to `React.memo(ConversationMessageRowComponent, areEqualMessageRowProps)`, eliminating 60Hz invalidation cascades across all 60+ messages during audio playback or file progress.
+- **High-Frequency Touch Gesture Optimization**:
+  - Added `swipeRafRef` and `requestAnimationFrame` coalescing to message swipe-to-reply gesture.
+  - Guarded vertical scroll cancellation with `if (swipeOffset !== 0) setSwipeOffset(0);` to eliminate main-thread microtask flooding.
+  - Added RAF throttling and `chatBackOffsetRef` zero-guarding to edge back-swipe gesture.
+- **Callback Stabilization**:
+  - Grounded `handleOpenMedia` and `handleJumpToMessage` with `activeMessagesRef` and `renderedCountRef`.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase100-chat-smoothness-and-fps-optimization.test.tsx` (14/14 passing).
+  - Regression tests passing: Phase 96, 98, 79, 99, 100 (64/64 passing).
+  - Production build clean: `npm run build` succeeds cleanly.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
 ## [1.0.0-phase99-sticker-skeleton-and-sizing] - 2026-09-12
 
 ### Sticker Skeleton Loaders, 1-Second Auto-Refresh & Compact Sizing (Phase 99)
