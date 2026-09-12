@@ -1,6 +1,39 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 95 — FULL 120+ HIGH-DEFINITION TELEGRAM STICKERS & ON-DEMAND FILE PROXY
+## Active Phase: PHASE 96 — PERSISTENT FLOATING AUDIO PLAYER BANNER IN CHATS LIST & NON-DESTRUCTIVE STOP FIX
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 96 Tasks Completed:
+- [x] **Root Cause Diagnosis**:
+  - Issue 1 (Disabling on close): `VoicePlayer.stop()` executed `URL.revokeObjectURL(this.currentBlobUrl)` and `this.currentAudio.src = ''`, destroying the cached media blob in browser memory and causing `net::ERR_FILE_NOT_FOUND`.
+  - Issue 2 (Music stops on chat exit): `AudioPlayerCard`'s unmount `useEffect` cleanup unconditionally invoked `audio.pause()`, interrupting playback when navigating between chats or back to the chats list.
+  - Issue 3 (Banner missing in chats list): `<ActiveAudioBanner />` was only mounted in `ConversationView`, leaving no controls to pause, scrub, or view the playing track in the conversations list.
+- [x] **Non-Destructive Stop & Resilient Audio Reference (`voicePlayer.ts`)**:
+  - Removed `URL.revokeObjectURL(this.currentBlobUrl)` and `this.currentAudio.src = ''` from `VoicePlaybackManager.stop()`.
+  - Closing the banner now halts playback cleanly without revoking cached media blobs.
+  - Added `VoicePlayer.getCurrentAudio(): HTMLAudioElement | null` allowing components to safely re-attach to the active audio stream.
+- [x] **Self-Healing Blob URL Regeneration (`mediaCache.ts`)**:
+  - Implemented `MediaCache.refreshBlobUrl(id)` recreating fresh object URLs on-demand from stored `Uint8Array` data if any invalidation occurs.
+- [x] **Continuous Playback Across Navigation (`AudioPlayerCard.tsx`)**:
+  - Updated `useEffect` unmount cleanup to NOT pause audio when `VoicePlayer.getPlayingId() === messageId`.
+  - Re-attaches to `VoicePlayer.getCurrentAudio()` on mount if the track is already actively playing.
+  - Added self-healing recovery on `onError` via `MediaCache.refreshBlobUrl` and `onResolveAudio`.
+  - Forwarded `conversationId` and `senderName` in `playAudioTrack` metadata.
+- [x] **Chats List ActiveAudioBanner Integration (`Sidebar.tsx`, `ConversationView.tsx`)**:
+  - Mounted `<ActiveAudioBanner />` docked above the conversation list in `Sidebar.tsx`.
+  - Implemented `handleSidebarJumpToMessage` to select the target conversation and store `sessionStorage['veil:pendingJumpMessageId']`.
+  - `ConversationView` listens for pending jump IDs and `veil:jumpToMessage` events to scroll and highlight the audio message upon mount.
+- [x] **CSS Responsive Layout & Desktop Deduplication (`veil-components.css`)**:
+  - Added `.veil-sidebar-audio-banner` styling with clean margins and `flex-shrink: 0`.
+  - Added `@media (min-width: 769px)` rule to hide the redundant sidebar audio banner when a chat is open alongside the sidebar on desktop.
+- [x] **Automated Tests & Regression Suite (`tests/phase96-audio-banner-persistence-and-recovery.test.tsx`)**:
+  - Created Phase 96 test suite (24/24 tests passing).
+  - Regression suites passing: Phase 96, 95, 94, 91, 90, 44a (89/89 tests passing).
+  - Production build clean: `npm run build` succeeds cleanly with release manifest generated.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
+## Previous Phase: PHASE 95 — FULL 120+ HIGH-DEFINITION TELEGRAM STICKERS & ON-DEMAND FILE PROXY
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

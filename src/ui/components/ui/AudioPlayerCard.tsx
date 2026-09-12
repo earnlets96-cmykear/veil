@@ -20,6 +20,8 @@ export interface AudioPlayerCardProps {
   blobUrl?: string;
   objectId?: string;
   attachmentId?: string;
+  conversationId?: string;
+  senderName?: string;
   isOutgoing?: boolean;
   status?: 'idle' | 'uploading' | 'downloading' | 'ready' | 'error';
   progressPercent?: number;
@@ -37,6 +39,8 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
   blobUrl: propBlobUrl,
   objectId,
   attachmentId,
+  conversationId,
+  senderName,
   isOutgoing = false,
   status = 'ready',
   progressPercent = 0,
@@ -110,7 +114,13 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
   useEffect(() => {
     if (!resolvedBlobUrl) return;
 
-    const audio = new Audio(resolvedBlobUrl);
+    let audio: HTMLAudioElement;
+    const globalAudio = VoicePlayer.getCurrentAudio();
+    if (VoicePlayer.getPlayingId() === messageId && globalAudio) {
+      audio = globalAudio;
+    } else {
+      audio = new Audio(resolvedBlobUrl);
+    }
     audioRef.current = audio;
 
     const onPlay = () => setIsPlaying(true);
@@ -136,8 +146,25 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       setProgressPercentState(0);
     };
 
-    const onError = () => {
+    const onError = async () => {
       setIsPlaying(false);
+      // Attempt self-healing recovery if blobUrl was invalidated
+      const freshUrl = objectId
+        ? MediaCache.refreshBlobUrl(objectId)
+        : attachmentId
+        ? MediaCache.refreshBlobUrl(attachmentId)
+        : name
+        ? MediaCache.refreshBlobUrl(name)
+        : MediaCache.refreshBlobUrl(messageId);
+
+      if (freshUrl && freshUrl !== resolvedBlobUrl) {
+        setResolvedBlobUrl(freshUrl);
+      } else if (onResolveAudio) {
+        try {
+          const reResolved = await onResolveAudio();
+          if (reResolved) setResolvedBlobUrl(reResolved);
+        } catch (_e) {}
+      }
     };
 
     audio.addEventListener('play', onPlay);
@@ -146,6 +173,16 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('error', onError);
+
+    // If already playing in global VoicePlayer, sync state immediately
+    if (VoicePlayer.getPlayingId() === messageId && VoicePlayer.isPlaying(messageId)) {
+      setIsPlaying(true);
+      setCurrentTime(audio.currentTime || 0);
+      if (audio.duration && isFinite(audio.duration)) {
+        setDuration(audio.duration);
+        setProgressPercentState(((audio.currentTime || 0) / audio.duration) * 100);
+      }
+    }
 
     if (autoPlayPendingRef.current) {
       autoPlayPendingRef.current = false;
@@ -157,6 +194,8 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
           messageId,
           {
             title: name,
+            senderName,
+            conversationId,
             duration: audio.duration || duration,
           },
           {},
@@ -166,7 +205,10 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
     }
 
     return () => {
-      audio.pause();
+      // NOTE: Do NOT pause if this track is the active global track playing in VoicePlayer
+      if (VoicePlayer.getPlayingId() !== messageId) {
+        audio.pause();
+      }
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
@@ -175,7 +217,7 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       audio.removeEventListener('error', onError);
       audioRef.current = null;
     };
-  }, [resolvedBlobUrl, messageId, duration, name]);
+  }, [resolvedBlobUrl, messageId, duration, name, conversationId, senderName, objectId, attachmentId, onResolveAudio]);
 
   const handlePlayToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -239,6 +281,8 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
           messageId,
           {
             title: name,
+            senderName,
+            conversationId,
             duration: audio.duration || duration,
           },
           {},

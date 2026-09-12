@@ -332,6 +332,33 @@ class MediaCacheManager {
   }
 
   /**
+   * Refreshes a Blob URL for a cached entry if it was revoked or invalidated.
+   * Recreates the URL from cached Uint8Array data and updates all aliases.
+   */
+  public refreshBlobUrl(id: string): string | null {
+    const item = this.cache.get(id);
+    if (!item || !item.data) return null;
+
+    // Revoke stale URL if still around
+    if (item.blobUrl && typeof URL !== 'undefined') {
+      try {
+        URL.revokeObjectURL(item.blobUrl);
+      } catch (_e) {}
+    }
+
+    const newBlobUrl = AttachmentPipeline.createEphemeralBlobUrl(item.data, item.mimeType || 'application/octet-stream');
+    item.blobUrl = newBlobUrl;
+
+    // Update all matching entries in RAM cache
+    for (const [k, v] of this.cache.entries()) {
+      if (v === item || v.id === item.id || (v.data && v.data === item.data)) {
+        v.blobUrl = newBlobUrl;
+      }
+    }
+    return newBlobUrl;
+  }
+
+  /**
    * Explicitly invalidates a key and revokes its Blob URL (used on error or re-fetch retry).
    */
   public invalidate(key: string): void {

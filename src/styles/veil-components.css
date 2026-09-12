@@ -4635,6 +4635,18 @@ img.veil-message-sticker-img {
   }
 }
 
+.veil-sidebar-audio-banner {
+  margin: 4px 12px 10px 12px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 769px) {
+  .veil-app-layout.has-active-chat .veil-sidebar-audio-banner {
+    display: none !important;
+  }
+}
+
+
 
 
 

@@ -11,7 +11,7 @@
  * - Bottom navigation bar: Chats, Calls, Groups, Settings
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { getRelationshipState } from '../../contacts/relationshipHelper.ts';
 import { DirectorySearchResult } from '../../server/types.ts';
@@ -26,6 +26,7 @@ import {
   Spinner,
   UserSearchResult,
   MessageStatus,
+  ActiveAudioBanner,
 } from './ui/index.ts';
 import {
   LockIcon,
@@ -269,6 +270,16 @@ export const Sidebar: React.FC = () => {
     pinConversation,
     unpinConversation,
   } = useApp();
+
+  const handleSidebarJumpToMessage = useCallback((messageId: string, conversationId?: string) => {
+    if (conversationId) {
+      selectConversation(conversationId);
+      try {
+        sessionStorage.setItem('veil:pendingJumpMessageId', messageId);
+        window.dispatchEvent(new CustomEvent('veil:jumpToMessage', { detail: { messageId, conversationId } }));
+      } catch (_e) {}
+    }
+  }, [selectConversation]);
 
   const [activeChip, setActiveChip] = useState<'all' | 'unread' | 'group'>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -661,6 +672,12 @@ export const Sidebar: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Floating Active Audio Player Notification Banner */}
+      <ActiveAudioBanner
+        onJumpToMessage={handleSidebarJumpToMessage}
+        className="veil-sidebar-audio-banner"
+      />
 
       {/* Conversation / Contacts / Unified Search List */}
       <div

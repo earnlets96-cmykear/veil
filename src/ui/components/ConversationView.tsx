@@ -582,6 +582,8 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               blobUrl={msg.attachment.previewUrl || msg.attachment.localPreviewUrl}
               objectId={msg.attachment.objectId}
               attachmentId={msg.attachment.attachmentId}
+              conversationId={msg.conversationId}
+              senderName={msg.senderName}
               isOutgoing={msg.isOutgoing}
               status={
                 isCurrentlyDownloading
@@ -1036,6 +1038,34 @@ export const ConversationView: React.FC = () => {
       handleJumpToMessage(targetMsgId);
     }
   }, [activeChatId, selectConversation, handleJumpToMessage]);
+
+  // Check for pending jump message (e.g. from Sidebar audio banner jump or cross-chat navigation)
+  useEffect(() => {
+    try {
+      const pendingMsgId = sessionStorage.getItem('veil:pendingJumpMessageId');
+      if (pendingMsgId) {
+        sessionStorage.removeItem('veil:pendingJumpMessageId');
+        const timer = setTimeout(() => {
+          handleJumpToMessage(pendingMsgId);
+        }, 120);
+        return () => clearTimeout(timer);
+      }
+    } catch (_e) {}
+  }, [activeChatId, activeMessages.length, handleJumpToMessage]);
+
+  // Global listener for cross-chat jump events
+  useEffect(() => {
+    const handleJumpEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ messageId?: string; conversationId?: string }>;
+      if (customEvent.detail?.messageId) {
+        if (!customEvent.detail.conversationId || customEvent.detail.conversationId === activeChatId) {
+          handleJumpToMessage(customEvent.detail.messageId);
+        }
+      }
+    };
+    window.addEventListener('veil:jumpToMessage', handleJumpEvent);
+    return () => window.removeEventListener('veil:jumpToMessage', handleJumpEvent);
+  }, [activeChatId, handleJumpToMessage]);
 
   // Track playback progress & current time per message
   const [playbackProgress, setPlaybackProgress] = useState<Record<string, number>>({});

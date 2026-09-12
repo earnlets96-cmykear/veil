@@ -967,18 +967,14 @@ export class VoicePlaybackManager {
     if (this.currentAudio) {
       try {
         this.currentAudio.pause();
-        this.currentAudio.src = '';
-        this.currentAudio.load();
+        this.currentAudio.currentTime = 0;
       } catch (_e) {}
       this.currentAudio = null;
     }
 
-    if (this.currentBlobUrl && typeof URL !== 'undefined') {
-      try {
-        URL.revokeObjectURL(this.currentBlobUrl);
-      } catch (_e) {}
-      this.currentBlobUrl = null;
-    }
+    // NOTE: NEVER call URL.revokeObjectURL(this.currentBlobUrl) here!
+    // Decrypted blob URLs are managed by MediaCache. Revoking them breaks subsequent playback with ERR_FILE_NOT_FOUND.
+    this.currentBlobUrl = null;
 
     const previousId = this.currentPlayingId;
     this.currentPlayingId = null;
@@ -999,6 +995,13 @@ export class VoicePlaybackManager {
         }
       }
     }
+  }
+
+  /**
+   * Safely returns the currently active HTMLAudioElement instance, if any.
+   */
+  public getCurrentAudio(): HTMLAudioElement | null {
+    return this.currentAudio;
   }
 
   /**
