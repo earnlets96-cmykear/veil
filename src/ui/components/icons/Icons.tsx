@@ -609,3 +609,20 @@ export const StarIcon: React.FC<IconProps> = ({ size = 20, className = '', color
   </svg>
 );
 
+export const Volume2Icon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+  </svg>
+);
+
+export const Rewind10Icon: React.FC<IconProps> = ({ size = 20, className = '', color, strokeWidth = 2, ...props }) => (
+  <svg {...defaultProps} width={size} height={size} stroke={color || 'currentColor'} strokeWidth={strokeWidth} className={`veil-icon ${className}`.trim()} {...props}>
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+    <text x="12" y="15.5" textAnchor="middle" fontSize="6.5" fontWeight="700" fill={color || 'currentColor'} stroke="none" fontFamily="system-ui, -apple-system, sans-serif">10</text>
+  </svg>
+);
+
+

@@ -16,6 +16,21 @@ import { NativeMediaBridge } from '../media/NativeMediaBridge.ts';
 
 export type VoicePlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
+export interface ActiveTrackMetadata {
+  id: string; // messageId
+  conversationId?: string;
+  type: 'voice' | 'audio';
+  title: string;
+  senderName?: string;
+  duration: number;
+  currentTime: number;
+  isPlaying: boolean;
+  playbackRate: number;
+  isMuted: boolean;
+}
+
+export type ActiveTrackListener = (track: ActiveTrackMetadata | null) => void;
+
 export interface VoicePlaybackCallbacks {
   onProgress?: (progressPercent: number, currentTime: number, duration: number) => void;
   onEnded?: () => void;
@@ -39,6 +54,10 @@ export class VoicePlaybackManager {
   private knownDurations: Record<string, number> = {};
   private stagedSeekPercent: Record<string, number> = {};
   private listeners: Map<string, Set<VoicePlaybackListener>> = new Map();
+  private activeTrackMeta: ActiveTrackMetadata | null = null;
+  private activeTrackListeners: Set<ActiveTrackListener> = new Set();
+  private currentPlaybackRate: number = 1.0;
+  private currentIsMuted: boolean = false;
   private isNative: boolean = false;
   private nativeCurrentTime: number = 0;
   private nativeDuration: number = 0;
@@ -240,6 +259,23 @@ export class VoicePlaybackManager {
     };
   }
 
+  public notifyActiveTrack(): void {
+    if (this.activeTrackMeta) {
+      this.activeTrackMeta.isPlaying = this.currentStatus === 'playing';
+      this.activeTrackMeta.playbackRate = this.currentPlaybackRate;
+      this.activeTrackMeta.isMuted = this.currentIsMuted;
+      this.activeTrackMeta.currentTime = this.getCurrentTime();
+      const dur = this.getDuration(this.activeTrackMeta.duration);
+      if (dur > 0) this.activeTrackMeta.duration = dur;
+    }
+    const snapshot = this.activeTrackMeta ? { ...this.activeTrackMeta } : null;
+    for (const listener of this.activeTrackListeners) {
+      try {
+        listener(snapshot);
+      } catch (_e) {}
+    }
+  }
+
   private notifyListeners(
     status: VoicePlaybackStatus,
     progressPercent: number,
@@ -250,6 +286,12 @@ export class VoicePlaybackManager {
     const id = targetId || this.currentPlayingId;
     if (id === this.currentPlayingId) {
       this.currentStatus = status;
+    }
+    if (this.activeTrackMeta && (!id || id === this.activeTrackMeta.id)) {
+      this.activeTrackMeta.isPlaying = status === 'playing';
+      this.activeTrackMeta.currentTime = currentTime;
+      if (duration > 0) this.activeTrackMeta.duration = duration;
+      this.notifyActiveTrack();
     }
     if (!id) return;
     const set = this.listeners.get(id);
@@ -276,7 +318,8 @@ export class VoicePlaybackManager {
     cloudClient: CloudClient,
     meta: VoiceRecordingMetadata,
     messageId: string,
-    callbacks: VoicePlaybackCallbacks = {}
+    callbacks: VoicePlaybackCallbacks = {},
+    trackMeta?: { title?: string; senderName?: string; conversationId?: string }
   ): Promise<void> {
     this.activeCallbacks = callbacks;
     this.lastPlayContext = { session, cloudClient, meta, messageId, callbacks };
@@ -285,6 +328,20 @@ export class VoicePlaybackManager {
     if (safeDuration > 0 && messageId) {
       this.knownDurations[messageId] = safeDuration;
     }
+
+    this.activeTrackMeta = {
+      id: messageId,
+      conversationId: trackMeta?.conversationId,
+      type: 'voice',
+      title: trackMeta?.title || (trackMeta?.senderName ? `Voice note - ${trackMeta.senderName}` : 'Voice note'),
+      senderName: trackMeta?.senderName,
+      duration: safeDuration,
+      currentTime: this.getCurrentTime() || 0,
+      isPlaying: true,
+      playbackRate: this.currentPlaybackRate,
+      isMuted: this.currentIsMuted,
+    };
+    this.notifyActiveTrack();
 
     // 1. If this exact message is already loaded and paused, resume immediately!
     if (this.currentPlayingId === messageId && this.currentStatus === 'paused') {
@@ -443,6 +500,10 @@ export class VoicePlaybackManager {
       }
 
       this.currentAudio = audio;
+      try {
+        audio.playbackRate = this.currentPlaybackRate;
+        audio.muted = this.currentIsMuted;
+      } catch (_e) {}
 
       // Capture staged seek for this message
       const stagedSeek = this.stagedSeekPercent[messageId];
@@ -925,6 +986,8 @@ export class VoicePlaybackManager {
     this.activeCallbacks = null;
     this.lastPlayContext = null;
     this.currentDuration = 0;
+    this.activeTrackMeta = null;
+    this.notifyActiveTrack();
 
     if (previousId) {
       const set = this.listeners.get(previousId);
@@ -936,6 +999,257 @@ export class VoicePlaybackManager {
         }
       }
     }
+  }
+
+  /**
+   * Plays a generic audio/music track using unified playback coordination.
+   */
+  public async playAudioTrack(
+    blobUrl: string,
+    messageId: string,
+    meta: {
+      title: string;
+      senderName?: string;
+      conversationId?: string;
+      duration?: number;
+    },
+    callbacks: VoicePlaybackCallbacks = {},
+    existingAudio?: HTMLAudioElement
+  ): Promise<void> {
+    if (this.currentPlayingId === messageId && this.currentStatus === 'paused') {
+      await this.resume();
+      return;
+    }
+
+    this.stop();
+
+    this.activeCallbacks = callbacks;
+    this.currentPlayingId = messageId;
+    this.currentStatus = 'loading';
+    const safeDuration = meta.duration && isFinite(meta.duration) ? meta.duration : 0;
+    this.currentDuration = safeDuration;
+    if (safeDuration > 0) {
+      this.knownDurations[messageId] = safeDuration;
+    }
+
+    this.activeTrackMeta = {
+      id: messageId,
+      conversationId: meta.conversationId,
+      type: 'audio',
+      title: meta.title || 'Audio',
+      senderName: meta.senderName,
+      duration: safeDuration,
+      currentTime: 0,
+      isPlaying: true,
+      playbackRate: this.currentPlaybackRate,
+      isMuted: this.currentIsMuted,
+    };
+    this.notifyActiveTrack();
+    this.notifyListeners('loading', 0, 0, safeDuration);
+
+    let audio: HTMLAudioElement;
+    if (existingAudio) {
+      audio = existingAudio;
+    } else if (typeof Audio !== 'undefined') {
+      audio = new Audio(blobUrl);
+    } else if (typeof (globalThis as any).Audio !== 'undefined') {
+      const AudioClass = (globalThis as any).Audio;
+      audio = new AudioClass(blobUrl);
+    } else {
+      audio = {
+        src: blobUrl,
+        currentTime: 0,
+        duration: safeDuration || 1,
+        paused: true,
+        ended: false,
+        readyState: 4,
+        playbackRate: 1,
+        muted: false,
+        play: async () => { (audio as any).paused = false; },
+        pause: () => { (audio as any).paused = true; },
+        load: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      } as any;
+    }
+
+    try {
+      audio.playbackRate = this.currentPlaybackRate;
+      audio.muted = this.currentIsMuted;
+    } catch (_e) {}
+
+    this.currentAudio = audio;
+    this.currentBlobUrl = blobUrl;
+
+    const onPlay = () => {
+      this.currentStatus = 'playing';
+      if (this.activeTrackMeta) this.activeTrackMeta.isPlaying = true;
+      const dur = this.getDuration(safeDuration);
+      const cur = this.getCurrentTime();
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      this.notifyListeners('playing', pct, cur, dur);
+      this.notifyActiveTrack();
+    };
+
+    const onPause = () => {
+      this.currentStatus = 'paused';
+      if (this.activeTrackMeta) this.activeTrackMeta.isPlaying = false;
+      const dur = this.getDuration(safeDuration);
+      const cur = this.getCurrentTime();
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      this.notifyListeners('paused', pct, cur, dur);
+      this.notifyActiveTrack();
+    };
+
+    const onLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        this.currentDuration = audio.duration;
+        this.knownDurations[messageId] = audio.duration;
+        if (this.activeTrackMeta) this.activeTrackMeta.duration = audio.duration;
+        this.notifyActiveTrack();
+      }
+    };
+
+    const onTimeUpdate = () => {
+      const cur = audio.currentTime || 0;
+      const dur = this.getDuration(safeDuration);
+      const pct = dur > 0 ? (cur / dur) * 100 : 0;
+      if (this.activeTrackMeta) {
+        this.activeTrackMeta.currentTime = cur;
+        if (dur > 0) this.activeTrackMeta.duration = dur;
+      }
+      this.notifyListeners(this.currentStatus, pct, cur, dur);
+      this.notifyActiveTrack();
+      if (this.activeCallbacks?.onProgress) {
+        this.activeCallbacks.onProgress(pct, cur, dur);
+      }
+    };
+
+    const onEnded = () => {
+      this.currentStatus = 'idle';
+      if (this.activeTrackMeta) {
+        this.activeTrackMeta.isPlaying = false;
+        this.activeTrackMeta.currentTime = 0;
+      }
+      this.notifyListeners('idle', 0, 0, this.getDuration(safeDuration));
+      this.notifyActiveTrack();
+      if (this.activeCallbacks?.onEnded) this.activeCallbacks.onEnded();
+    };
+
+    const onError = () => {
+      this.currentStatus = 'error';
+      if (this.activeTrackMeta) this.activeTrackMeta.isPlaying = false;
+      this.notifyListeners('error', 0, 0, this.getDuration(safeDuration));
+      this.notifyActiveTrack();
+      if (this.activeCallbacks?.onError) this.activeCallbacks.onError(new Error('Audio playback failed'));
+    };
+
+    if (typeof audio.addEventListener === 'function') {
+      audio.addEventListener('play', onPlay);
+      audio.addEventListener('pause', onPause);
+      audio.addEventListener('loadedmetadata', onLoadedMetadata);
+      audio.addEventListener('timeupdate', onTimeUpdate);
+      audio.addEventListener('ended', onEnded);
+      audio.addEventListener('error', onError);
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('veil:audio:play', { detail: { messageId } }));
+      }
+      await audio.play();
+      this.currentStatus = 'playing';
+      if (this.activeTrackMeta) this.activeTrackMeta.isPlaying = true;
+      this.notifyActiveTrack();
+    } catch (playErr) {
+      this.currentStatus = 'paused';
+      if (this.activeTrackMeta) this.activeTrackMeta.isPlaying = false;
+      this.notifyActiveTrack();
+    }
+  }
+
+  /**
+   * Sets playback rate (e.g. 1.0, 1.5, 2.0).
+   */
+  public setPlaybackRate(rate: number): void {
+    this.currentPlaybackRate = rate;
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.playbackRate = rate;
+      } catch (_e) {}
+    }
+    if (this.activeTrackMeta) {
+      this.activeTrackMeta.playbackRate = rate;
+    }
+    this.notifyActiveTrack();
+  }
+
+  /**
+   * Returns current playback rate.
+   */
+  public getPlaybackRate(): number {
+    return this.currentPlaybackRate;
+  }
+
+  /**
+   * Toggles audio mute state.
+   */
+  public toggleMute(): boolean {
+    this.currentIsMuted = !this.currentIsMuted;
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.muted = this.currentIsMuted;
+      } catch (_e) {}
+    }
+    if (this.activeTrackMeta) {
+      this.activeTrackMeta.isMuted = this.currentIsMuted;
+    }
+    this.notifyActiveTrack();
+    return this.currentIsMuted;
+  }
+
+  /**
+   * Returns current mute state.
+   */
+  public isMuted(): boolean {
+    return this.currentIsMuted;
+  }
+
+  /**
+   * Seeks to a specific timestamp in seconds.
+   */
+  public seekTime(targetSeconds: number): void {
+    const dur = this.getDuration(this.activeTrackMeta?.duration || 0);
+    const clamped = Math.max(0, Math.min(dur || targetSeconds, targetSeconds));
+    if (dur > 0) {
+      const pct = (clamped / dur) * 100;
+      this.seek(pct, this.currentPlayingId || undefined, dur);
+    } else if (this.currentAudio) {
+      try {
+        this.currentAudio.currentTime = clamped;
+      } catch (_e) {}
+    }
+  }
+
+  /**
+   * Returns currently active audio track metadata, if any.
+   */
+  public getActiveTrack(): ActiveTrackMetadata | null {
+    if (!this.activeTrackMeta) return null;
+    return { ...this.activeTrackMeta };
+  }
+
+  /**
+   * Subscribes to changes in the active audio track for in-app floating banner notifications.
+   */
+  public subscribeActiveTrack(listener: ActiveTrackListener): () => void {
+    this.activeTrackListeners.add(listener);
+    try {
+      listener(this.activeTrackMeta ? { ...this.activeTrackMeta } : null);
+    } catch (_e) {}
+    return () => {
+      this.activeTrackListeners.delete(listener);
+    };
   }
 }
 

@@ -1,6 +1,41 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 93 — TELEGRAM STICKER PACK MODAL REDESIGN & DIRECT IN-CHAT USAGE
+## Active Phase: PHASE 94 — IN-APP FLOATING AUDIO PLAYER NOTIFICATION BANNER
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 94 Tasks Completed:
+- [x] **Unified Playback & Active Track Architecture (`voicePlayer.ts`)**:
+  - Defined `ActiveTrackMetadata` interface (`id`, `title`, `senderName`, `conversationId`, `type`, `duration`, `currentTime`, `isPlaying`, `playbackRate`, `isMuted`).
+  - Added reactive subscription `VoicePlayer.subscribeActiveTrack(...)` for real-time floating UI updates.
+  - Implemented `VoicePlayer.playAudioTrack(blobUrl, messageId, meta, callbacks, existingAudio)` enabling audio files and voice notes to share single-stream coordination.
+  - Added `setPlaybackRate(rate)` (1.0x, 1.5x, 2.0x) with hardware audio sync.
+  - Added `toggleMute()` / `isMuted()` with hardware muted property binding.
+  - Added `seekTime(targetSeconds)` timestamp seek with boundary clamping.
+  - Added `stop()` clearing active track and notifying subscribers with `null`.
+- [x] **Floating Audio Player Notification Banner Component (`ActiveAudioBanner.tsx`)**:
+  - Implemented glassmorphic banner docked directly below conversation header matching reference UI.
+  - Glowing purple circular play/pause button with responsive touch/click scale animations.
+  - Animated 4-bar equalizer waveform indicator (`.veil-active-audio-equalizer`) with CSS keyframe pulses active only during playback.
+  - Dynamic track title and tabular formatted elapsed / duration times.
+  - Interactive speed selector pill button cycling `1.0x -> 1.5x -> 2.0x -> 1.0x`.
+  - Jump button (`[↗ Jump]`) invoking `onJumpToMessage(targetMsgId, conversationId)` with cross-chat switching and smooth scroll to message.
+  - Action buttons: Rewind 10s (`Rewind10Icon`), Mute/Volume toggle (`Volume2Icon`/`VolumeXIcon`), and Stop/Close (`CloseIcon`).
+  - Bottom edge interactive scrubber progress bar with `role="slider"`, drag tracking, and timestamp seek.
+  - Event isolation on banner container to prevent triggering parent context menus.
+- [x] **ConversationView & AudioPlayerCard Integration**:
+  - Mounted `<ActiveAudioBanner onJumpToMessage={handleAudioBannerJump} />` below pinned banner and above message timeline in `ConversationView.tsx`.
+  - Updated `handleToggleVoice` in `ConversationView.tsx` to pass rich track metadata (`title: Voice note - ${senderName}`, `senderName`, `conversationId`).
+  - Integrated `AudioPlayerCard.tsx` with `VoicePlayer.playAudioTrack` while preserving native event hooks and `audioRef`.
+- [x] **Modern Design System Styling (`veil-components.css`)**:
+  - Implemented `.veil-active-audio-banner`, `.veil-active-audio-btn-play`, `.veil-active-audio-equalizer`, `.veil-eq-bar`, keyframes `veilEqPulse1..4`, `.veil-active-audio-speed-btn`, `.veil-active-audio-jump-btn`, `.veil-active-audio-scrubber-track`, and mobile responsive styles.
+- [x] **Automated Tests & Regression Suite (`tests/phase94-active-audio-notification-banner.test.tsx`)**:
+  - Created Phase 94 test suite (27/27 tests passing).
+  - Regression suite passes: `phase94`, `phase93`, `phase92`, `phase91`, `phase90`, `phase38` (78/78 tests passing).
+  - Production build clean: `npm run build` succeeds cleanly.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
+## Previous Phase: PHASE 93 — TELEGRAM STICKER PACK MODAL REDESIGN & DIRECT IN-CHAT USAGE
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

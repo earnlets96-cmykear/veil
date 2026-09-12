@@ -42,6 +42,7 @@ import {
   useToast,
   EmojiPickerModal,
   ProgressCircle,
+  ActiveAudioBanner,
 } from './ui/index.ts';
 import {
   ArrowLeftIcon,
@@ -1024,6 +1025,18 @@ export const ConversationView: React.FC = () => {
     }
   }, [activeMessages, renderedCount, showToast]);
 
+  // Handle Audio Banner Jump to message (with cross-chat support)
+  const handleAudioBannerJump = useCallback((targetMsgId: string, conversationId?: string) => {
+    if (conversationId && activeChatId !== conversationId) {
+      selectConversation(conversationId);
+      setTimeout(() => {
+        handleJumpToMessage(targetMsgId);
+      }, 150);
+    } else {
+      handleJumpToMessage(targetMsgId);
+    }
+  }, [activeChatId, selectConversation, handleJumpToMessage]);
+
   // Track playback progress & current time per message
   const [playbackProgress, setPlaybackProgress] = useState<Record<string, number>>({});
   const [playbackCurrentTime, setPlaybackCurrentTime] = useState<Record<string, number>>({});
@@ -1052,23 +1065,36 @@ export const ConversationView: React.FC = () => {
         await ensureCloudSession(activeSession);
       }
 
+      const senderName = msg.senderName || (msg.isOutgoing ? (activeSession?.name || myProfile?.displayName || 'You') : (activeContact?.name || conversationName || 'Contact'));
+
       setPlayingAudioId(msg.id);
-      await VoicePlayer.playVoiceNote(activeSession, cloudClient, msg.voice, msg.id, {
-        onEnded: () => {
-          setPlayingAudioId(null);
-          setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
-          setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
+      await VoicePlayer.playVoiceNote(
+        activeSession,
+        cloudClient,
+        msg.voice,
+        msg.id,
+        {
+          onEnded: () => {
+            setPlayingAudioId(null);
+            setPlaybackProgress((prev) => ({ ...prev, [msg.id]: 0 }));
+            setPlaybackCurrentTime((prev) => ({ ...prev, [msg.id]: 0 }));
+          },
+          onError: (err) => {
+            setPlayingAudioId(null);
+            showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
+          },
         },
-        onError: (err) => {
-          setPlayingAudioId(null);
-          showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
-        },
-      });
+        {
+          title: `Voice note - ${senderName}`,
+          senderName,
+          conversationId: activeChatId || undefined,
+        }
+      );
     } catch (err: any) {
       setPlayingAudioId(null);
       showToast({ type: 'error', message: err.message || 'Failed to play voice message' });
     }
-  }, [activeSession, cloudClient, ensureCloudSession, showToast]);
+  }, [activeSession, activeChatId, activeContact, cloudClient, conversationName, ensureCloudSession, myProfile, showToast]);
 
   const handleSeekVoice = useCallback((m: UIMessage, percent: number) => {
     VoicePlayer.seek(percent, m.id, m.voice?.durationSeconds);
@@ -1830,6 +1856,9 @@ export const ConversationView: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* In-App Floating Audio Player Notification Banner */}
+      <ActiveAudioBanner onJumpToMessage={handleAudioBannerJump} />
 
       {/* In-Chat Search Bar */}
       {isSearchingInChat && (

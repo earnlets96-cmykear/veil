@@ -2,6 +2,32 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase94-active-audio-notification-banner] - 2026-09-12
+
+### In-App Floating Audio Player Notification Banner (Phase 94)
+- **Unified Audio Playback & Active Track Architecture (`voicePlayer.ts`)**:
+  - Unified voice notes and generic audio files into a single, coordinated audio stream manager in `VoicePlaybackManager` (`VoicePlayer`).
+  - Added `ActiveTrackMetadata` model capturing track id, title, senderName, conversationId, duration, currentTime, isPlaying, playbackRate, and isMuted.
+  - Implemented reactive subscription `subscribeActiveTrack(listener)` notifying connected UI elements instantaneously.
+  - Added `playAudioTrack(blobUrl, messageId, meta, callbacks, existingAudio)` enabling audio cards to attach to the global stream without creating conflicting audio streams.
+  - Added speed controls (`setPlaybackRate` / `getPlaybackRate`), mute toggles (`toggleMute` / `isMuted`), timestamp seeking (`seekTime`), and clean session clearing (`stop`).
+- **Floating Audio Notification Banner (`ActiveAudioBanner.tsx`)**:
+  - Implemented glassmorphic floating notification banner docked directly below the chat header in `ConversationView`.
+  - Glowing circular purple play/pause button with smooth scale micro-animations.
+  - Dynamic 4-bar equalizer waveform indicator animating only while audio is actively playing.
+  - Subtitle row featuring tabular timestamps, speed cycling pill (`1.0x` -> `1.5x` -> `2.0x` -> `1.0x`), and `[↗ Jump]` button scrolling smoothly to the active message in chat.
+  - Action buttons for 10-second rewind (`Rewind10Icon`), mute toggle (`Volume2Icon`/`VolumeXIcon`), and stop/close (`CloseIcon`).
+  - Full-width bottom edge interactive scrubber track supporting pointer dragging and instant seeking.
+- **Integration & Design System Polish (`ConversationView.tsx`, `AudioPlayerCard.tsx`, `veil-components.css`)**:
+  - Updated `handleToggleVoice` in `ConversationView.tsx` to populate sender name and conversation id metadata.
+  - Created `handleAudioBannerJump` supporting in-chat smooth scrolling and automatic cross-conversation switching.
+  - Implemented rich CSS animations (`veilAudioBannerSlideDown`, `veilEqPulse1..4`) and glassmorphic backdrop blur.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase94-active-audio-notification-banner.test.tsx` (27/27 passing).
+  - Regression tests passing: `phase94`, `phase93`, `phase92`, `phase91`, `phase90`, `phase38` (78/78 passing).
+  - Production build clean: `npm run build` succeeds cleanly with 7 release artifacts.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
 ## [1.0.0-phase93-telegram-sticker-modal-redesign] - 2026-09-12
 
 ### Telegram Sticker Pack Modal Redesign, Full Set Scrolling, & Direct In-Chat Usage (Phase 93)

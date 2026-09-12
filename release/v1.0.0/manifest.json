@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-12T12:14:31.537Z",
+  "generatedAt": "2026-09-12T12:33:10.241Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-Cw2xb1zm.css",
-      "sizeBytes": 125520,
-      "sha256": "c3eaf29b5d99212f52b8e2f011a60317e347e778f46edc35ba8b5d365a41029a"
+      "path": "dist/assets/index-BslbOFv4.css",
+      "sizeBytes": 130242,
+      "sha256": "977bf57157662bd5970967208be3027f2a21189f48abd23ef297b318bee18693"
     },
     {
-      "path": "dist/assets/index-DR_d9lhV.js",
-      "sizeBytes": 971845,
-      "sha256": "41579b5ca7f178fd632f8f4e834f11c2fbdf50a8908057a171ea42c11947d1b4"
+      "path": "dist/assets/index-C7XMjW2n.js",
+      "sizeBytes": 983997,
+      "sha256": "b9272faf2ca2d1ac5afc9213bf3ffcae90ec1bd83421fbf7cf13fbafb5b1b2ab"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-BlIyUu9p.js",
-      "sizeBytes": 8728,
-      "sha256": "0744e4ab62f24e711a6962fc05036f14a39a154960e604971d573af8075a48ca"
-    },
-    {
-      "path": "dist/assets/web-BsE-pctk.js",
+      "path": "dist/assets/web-1mPM3wZH.js",
       "sizeBytes": 842,
-      "sha256": "ecd873be2dd5926659424cdc487a1eb56823f3ae61ee7d7036fb7ff596be0e35"
+      "sha256": "a21ab99e5956b0f979bce21ffd2e114e56d640a690085f6aa62a2b6d46c25729"
     },
     {
-      "path": "dist/assets/web-DxsYSIvh.js",
+      "path": "dist/assets/web-Df7yMwAr.js",
+      "sizeBytes": 8728,
+      "sha256": "2568f6f9f7e86fc00ef2e332d0a53a1e1de1c961c0c820d90cbb75ad689eb54a"
+    },
+    {
+      "path": "dist/assets/web-UIcvvUYF.js",
       "sizeBytes": 361,
-      "sha256": "8111c0e9b62bbdd4afa97f8e76e29a383128b00de08c0f3a514cbd5c672135ca"
+      "sha256": "3df8c98f89c2e464c295085961587498faf9c9c2ad24cb9d4d920208bf453af9"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "58cb5d6e0c91d05370b79022307c38513beb2c28e66e821a2604295aaaa3be30"
+      "sha256": "1009783c18a91488f3bf5e8ebe0e174f59063271d7a084279ea67f2ad0f1e1ac"
     }
   ]
 }

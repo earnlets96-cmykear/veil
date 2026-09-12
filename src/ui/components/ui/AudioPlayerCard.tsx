@@ -91,6 +91,21 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
     };
   }, [messageId]);
 
+  // Subscribe to unified VoicePlayer for this messageId
+  useEffect(() => {
+    const unsub = VoicePlayer.subscribe(messageId, (status, progress, cur, dur) => {
+      setIsPlaying(status === 'playing');
+      if (!isScrubbingRef.current) {
+        setCurrentTime(cur);
+        setProgressPercentState(progress);
+      }
+      if (dur > 0) {
+        setDuration(dur);
+      }
+    });
+    return unsub;
+  }, [messageId]);
+
   // Manage single HTMLAudioElement lifecycle & event listeners
   useEffect(() => {
     if (!resolvedBlobUrl) return;
@@ -136,7 +151,18 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       autoPlayPendingRef.current = false;
       VoicePlayer.stop();
       window.dispatchEvent(new CustomEvent('veil:audio:play', { detail: { messageId } }));
-      audio.play().catch(() => setIsPlaying(false));
+      audio.play().then(() => {
+        VoicePlayer.playAudioTrack(
+          resolvedBlobUrl,
+          messageId,
+          {
+            title: name,
+            duration: audio.duration || duration,
+          },
+          {},
+          audio
+        );
+      }).catch(() => setIsPlaying(false));
     }
 
     return () => {
@@ -149,13 +175,23 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       audio.removeEventListener('error', onError);
       audioRef.current = null;
     };
-  }, [resolvedBlobUrl, messageId]);
+  }, [resolvedBlobUrl, messageId, duration, name]);
 
   const handlePlayToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     // If audio is currently uploading/downloading, let user wait
     if (status === 'uploading' || status === 'downloading') return;
+
+    if (VoicePlayer.getPlayingId() === messageId) {
+      if (VoicePlayer.isPlaying(messageId)) {
+        VoicePlayer.pause();
+        return;
+      } else if (VoicePlayer.isPaused(messageId)) {
+        await VoicePlayer.resume();
+        return;
+      }
+    }
 
     // If we do not have a blobUrl, fetch and decrypt into memory (NEVER save to disk)
     if (!resolvedBlobUrl) {
@@ -191,12 +227,23 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
 
     if (isPlaying) {
       audio.pause();
+      VoicePlayer.pause();
     } else {
       try {
         // Pause any other voice notes and audio players
         VoicePlayer.stop();
         window.dispatchEvent(new CustomEvent('veil:audio:play', { detail: { messageId } }));
         await audio.play();
+        await VoicePlayer.playAudioTrack(
+          resolvedBlobUrl,
+          messageId,
+          {
+            title: name,
+            duration: audio.duration || duration,
+          },
+          {},
+          audio
+        );
       } catch (_err) {
         setIsPlaying(false);
       }
@@ -238,6 +285,7 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
       updateScrubberVisual(upEvent.clientX);
       if (audioRef.current && isFinite(targetSeekTimeRef.current)) {
         audioRef.current.currentTime = targetSeekTimeRef.current;
+        VoicePlayer.seekTime(targetSeekTimeRef.current);
       }
     };
 

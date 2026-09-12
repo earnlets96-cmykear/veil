@@ -32,3 +32,5 @@ export * from './ProgressCircle.tsx';
 export * from './EmojiPickerModal.tsx';
 export * from './AudioPlayerCard.tsx';
 export * from './EmojiDrawer.tsx';
+export * from './ActiveAudioBanner.tsx';
+
