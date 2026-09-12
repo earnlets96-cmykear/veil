@@ -1,14 +1,14 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-12T14:53:36.353Z",
+  "generatedAt": "2026-09-12T15:09:05.818Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-BajhtnCU.js",
-      "sizeBytes": 990869,
-      "sha256": "0141b0afd43447c44419e979b2ab39f19a6f0931f00fbd06b2f05144b6ffeb14"
+      "path": "dist/assets/index-Az5WZ8xI.js",
+      "sizeBytes": 991761,
+      "sha256": "e72e5e7450dcea4e7e7eab02bd4e40980d67947fabb8afc3a1326288c4284c41"
     },
     {
       "path": "dist/assets/index-Ca_vfxwN.css",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-C79CxQwx.js",
+      "path": "dist/assets/web-Bs19Y3vF.js",
       "sizeBytes": 361,
-      "sha256": "2662a22a6a0295d7f513d2a49d9d115192f5280d89d982ed5f5c256bc91eff32"
+      "sha256": "1c9adc7260ea76587e480345147a2bffcd3c76d1013a9d3554e2a20693a42d99"
     },
     {
-      "path": "dist/assets/web-CCPBp7-F.js",
+      "path": "dist/assets/web-CaXELPiO.js",
       "sizeBytes": 842,
-      "sha256": "eaf93c4d8ec6bbfca85dcb8efc13744b49ea94d0f2e27ce6d06eb4faf605d37b"
+      "sha256": "c36b0c91c8480b37e585808aadf449b2b009c716d50e737787be3b4b3146ae53"
     },
     {
-      "path": "dist/assets/web-DGtraGLq.js",
+      "path": "dist/assets/web-DrD8BHSh.js",
       "sizeBytes": 8728,
-      "sha256": "c0f11c8325f3b10d47b6536b4b0896f1eba738865187e90a318d2667c0299933"
+      "sha256": "55bb05ac5c333cecb065a539a31725e35245ee04d76996dcb463a52ce0b9fb58"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "78bfd4c31139003188b34a6bd48fec6cdb34a3e975a1b13e352f85ee88ad09b8"
+      "sha256": "bc37564cf8ce7300a25b11eeddfccd426f3f5bff8afb19addfad0fba3164c385"
     }
   ]
 }

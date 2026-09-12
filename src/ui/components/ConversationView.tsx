@@ -166,6 +166,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTriggeredHapticRef = useRef(false);
 
   const isAudioAttachment = Boolean(
     msg.attachment &&
@@ -225,7 +226,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, input, textarea, a, [role="slider"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"]')) {
+    if (target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-voicenote-card, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]')) {
       return;
     }
     if (e.touches && e.touches.length === 1) {
@@ -238,7 +239,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 
   const handleTouchMove = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('.veil-waveform-container, .veil-voicenote-card, .veil-audio-player-card, .veil-audio-player-track-wrap, [role="slider"], [data-no-swipe="true"]')) {
+    if (target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-voicenote-card, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]')) {
       return;
     }
     if (!touchStartRef.current || !e.touches || e.touches.length !== 1) return;
@@ -249,6 +250,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     // Vertical scroll cancels swipe
     if (Math.abs(deltaY) > Math.abs(deltaX)) {
       setSwipeOffset(0);
+      hasTriggeredHapticRef.current = false;
       return;
     }
 
@@ -257,7 +259,19 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
-      setSwipeOffset(Math.max(-50, deltaX));
+      // Elastic resistance: non-linear damping matching Telegram physics
+      const elasticOffset = -Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6);
+      setSwipeOffset(elasticOffset);
+
+      // Reply trigger threshold: -45px
+      if (elasticOffset <= -45) {
+        if (!hasTriggeredHapticRef.current && typeof navigator !== 'undefined' && navigator.vibrate) {
+          try { navigator.vibrate(12); } catch (_e) {}
+          hasTriggeredHapticRef.current = true;
+        }
+      } else {
+        hasTriggeredHapticRef.current = false;
+      }
     }
   };
 
@@ -266,10 +280,11 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    if (swipeOffset < -35) {
+    if (swipeOffset <= -45) {
       onReplyTrigger(msg);
     }
     setSwipeOffset(0);
+    hasTriggeredHapticRef.current = false;
     touchStartRef.current = null;
   };
 
@@ -340,10 +355,10 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           }
         }}
         onContextMenu={(e) => onContextMenu(e, msg)}
-        onTouchStart={!hasVisibleTextBubble ? handleTouchStart : undefined}
-        onTouchMove={!hasVisibleTextBubble ? handleTouchMove : undefined}
-        onTouchEnd={!hasVisibleTextBubble ? handleTouchEnd : undefined}
-        onTouchCancel={!hasVisibleTextBubble ? handleTouchEnd : undefined}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={{ position: 'relative' }}
       >
         {isSelectionMode && !msg.isOutgoing && (
@@ -360,30 +375,32 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
           </button>
         )}
 
-        {/* Visual Swipe-to-reply icon indicator for non-text bubbles */}
-        {!hasVisibleTextBubble && swipeOffset < -15 && (
+        {/* Visual Telegram-style Spring Reply Icon Indicator for all messages */}
+        {swipeOffset < -10 && (
           <div
+            className="veil-swipe-reply-indicator"
             style={{
               position: 'absolute',
               right: '8px',
               top: '50%',
-              transform: 'translateY(-50%)',
-              width: '28px',
-              height: '28px',
+              transform: `translateY(-50%) scale(${Math.min(1, Math.max(0.4, Math.abs(swipeOffset) / 45))}) rotate(${Math.max(-25, swipeOffset * 0.35)}deg)`,
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
-              background: 'var(--veil-accent-primary)',
+              background: swipeOffset <= -45 ? 'var(--veil-accent-primary, #14b8a6)' : 'rgba(20, 184, 166, 0.65)',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-              opacity: Math.min(1, Math.abs(swipeOffset) / 35),
-              transition: 'opacity 0.1s ease',
+              boxShadow: swipeOffset <= -45 ? '0 0 12px rgba(20, 184, 166, 0.5)' : '0 2px 6px rgba(0,0,0,0.2)',
+              opacity: Math.min(1, Math.abs(swipeOffset) / 25),
+              transition: swipeOffset === 0 ? 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'background 0.15s ease, box-shadow 0.15s ease',
               zIndex: 5,
+              pointerEvents: 'none',
             }}
             aria-hidden="true"
           >
-            <ReplyIcon size={14} />
+            <ReplyIcon size={16} />
           </div>
         )}
 
@@ -415,8 +432,8 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
         <div
           className={`veil-bubble-wrapper ${isSticker ? 'veil-bubble-wrapper-sticker' : ''} ${isSelected ? 'selected' : ''}`}
           style={{
-            transform: !hasVisibleTextBubble ? `translateX(${swipeOffset}px)` : undefined,
-            transition: !hasVisibleTextBubble && swipeOffset === 0 ? 'transform 0.15s ease-out' : 'none',
+            transform: swipeOffset !== 0 ? `translateX(${swipeOffset}px)` : undefined,
+            transition: swipeOffset === 0 ? 'transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none',
           }}
         >
           {/* Forwarded Attribution Header for Non-Text Bubbles */}
@@ -685,6 +702,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               edited={msg.edited}
               onReactionClick={onReactionClick ? handleReactionAction : undefined}
               onContextMenu={handleContextMenuAction}
+              disableInternalSwipe={true}
             />
           )}
 

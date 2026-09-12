@@ -46,6 +46,7 @@ export interface MessageBubbleProps {
   edited?: boolean;
   uploadProgress?: number;
   className?: string;
+  disableInternalSwipe?: boolean;
 }
 
 const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
@@ -81,6 +82,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   isGroupedWithNext = false,
   edited = false,
   className = '',
+  disableInternalSwipe = false,
 }) => {
   const effectiveId = id || messageId || 'msg';
   const effectiveStatus: DeliveryStatus = status || deliveryStatus || 'DELIVERED_TO_RECIPIENT';
@@ -184,10 +186,10 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
       className={`veil-message-row ${isOutgoing ? 'outgoing' : 'incoming'} ${groupedClass} ${className}`.trim()}
       onClick={isSelectionMode && onSelectToggle ? onSelectToggle : undefined}
       onContextMenu={onContextMenu}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onTouchStart={!disableInternalSwipe ? handleTouchStart : undefined}
+      onTouchMove={!disableInternalSwipe ? handleTouchMove : undefined}
+      onTouchEnd={!disableInternalSwipe ? handleTouchEnd : undefined}
+      onTouchCancel={!disableInternalSwipe ? handleTouchEnd : undefined}
       style={{
         cursor: isSelectionMode ? 'pointer' : undefined,
         position: 'relative',
@@ -206,7 +208,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
       )}
 
       {/* Telegram-style Spring Reply Icon Indicator */}
-      {swipeOffset < -10 && (
+      {!disableInternalSwipe && swipeOffset < -10 && (
         <div
           style={{
             position: 'absolute',
@@ -238,8 +240,8 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
           isSelected ? 'veil-message-selected' : ''
         } ${isHighlighted ? 'veil-message-highlight' : ''}`}
         style={{
-          transform: swipeOffset !== 0 ? `translateX(${swipeOffset}px)` : undefined,
-          transition: swipeOffset === 0 ? 'transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none',
+          transform: (!disableInternalSwipe && swipeOffset !== 0) ? `translateX(${swipeOffset}px)` : undefined,
+          transition: (!disableInternalSwipe && swipeOffset === 0) ? 'transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none',
         }}
       >
         {forwarded && (
