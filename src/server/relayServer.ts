@@ -169,7 +169,7 @@ export class RelayServer {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-telegram-bot-token');
 
     if (req.method === 'OPTIONS') {
       res.statusCode = 204;
@@ -190,7 +190,9 @@ export class RelayServer {
       return;
     }
 
-    const url = req.url?.split('?')[0] || '/';
+    const rawUrl = req.url || '/';
+    const parsedReqUrl = new URL(rawUrl, 'http://localhost');
+    const url = parsedReqUrl.pathname;
     const method = req.method;
 
     try {
@@ -258,9 +260,7 @@ export class RelayServer {
       }
 
       if (method === 'GET' && url === '/v1/directory/search') {
-        const rawUrl = req.url || '';
-        const queryParams = new URL(rawUrl, `http://${this.config.host}`).searchParams;
-        const q = queryParams.get('q') || '';
+        const q = parsedReqUrl.searchParams.get('q') || '';
         await this.handleDirectorySearch(q, res);
         return;
       }
@@ -278,11 +278,10 @@ export class RelayServer {
       }
 
       // On-demand Telegram Sticker File Proxy (Full HD 512x512 WebP)
-      if (method === 'GET' && (url.startsWith('/v1/stickers/file') || url.startsWith('/api/telegram-stickers/file'))) {
-        const parsedUrl = new URL(url, 'http://localhost');
-        const fileId = parsedUrl.searchParams.get('file_id') || '';
+      if (method === 'GET' && (url === '/v1/stickers/file' || url === '/api/telegram-stickers/file')) {
+        const fileId = parsedReqUrl.searchParams.get('file_id') || '';
         const token =
-          parsedUrl.searchParams.get('token') ||
+          parsedReqUrl.searchParams.get('token') ||
           (req.headers['x-telegram-bot-token'] as string) ||
           process.env.TELEGRAM_BOT_TOKEN ||
           '';
@@ -309,20 +308,27 @@ export class RelayServer {
         return;
       }
 
-      if (method === 'GET' && (url.startsWith('/v1/stickers/proxy?url=') || url.startsWith('/api/telegram-stickers/proxy?url='))) {
-        const prefix = url.startsWith('/v1/stickers/proxy?url=') ? '/v1/stickers/proxy?url=' : '/api/telegram-stickers/proxy?url=';
-        const rawTarget = url.slice(prefix.length);
-        const targetUrl = decodeURIComponent(rawTarget);
+      // Generic Third-Party Sticker Proxy with CORS headers
+      if (method === 'GET' && (url.startsWith('/v1/stickers/proxy?url=') || url.startsWith('/api/telegram-stickers/proxy?url=') || url === '/v1/stickers/proxy' || url === '/api/telegram-stickers/proxy')) {
+        const targetUrl = parsedReqUrl.searchParams.get('url') || (rawUrl.startsWith('/v1/stickers/proxy?url=') ? decodeURIComponent(rawUrl.slice('/v1/stickers/proxy?url='.length)) : decodeURIComponent(rawUrl.slice('/api/telegram-stickers/proxy?url='.length)));
         if (!targetUrl) {
           this.sendError(res, 'BAD_REQUEST', 'Missing target sticker url', 400);
           return;
         }
         try {
+          const controller = new AbortController();
+          const timeoutTimer = setTimeout(() => controller.abort(), 12000);
+
           const upstream = await fetch(targetUrl, {
+            signal: controller.signal,
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Referer': 'https://combot.org/',
+              'Accept': 'image/webp,image/png,image/*,*/*',
             },
           });
+          clearTimeout(timeoutTimer);
+
           if (upstream.ok) {
             const contentType = upstream.headers.get('content-type') || 'image/webp';
             res.setHeader('Content-Type', contentType);
@@ -332,36 +338,44 @@ export class RelayServer {
             res.statusCode = 200;
             res.end(buffer);
           } else {
+            res.setHeader('Access-Control-Allow-Origin', '*');
             res.statusCode = upstream.status;
             res.end('UPSTREAM_ERROR');
           }
         } catch (err: any) {
-          res.statusCode = 500;
-          res.end(err?.message || 'PROXY_ERROR');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          this.sendError(res, 'INTERNAL_ERROR', err?.message || 'Proxy error', 500);
         }
         return;
       }
 
+      // Sticker Pack Manifest Resolver
       if (method === 'GET' && (url.startsWith('/v1/stickers/') || url.startsWith('/api/telegram-stickers/'))) {
         const packName = url
           .replace(/^\/(?:v1\/stickers|api\/telegram-stickers)\//, '')
           .split('?')[0];
-        const parsedUrl = new URL(url, 'http://localhost');
-        const botToken =
-          (req.headers['x-telegram-bot-token'] as string) ||
-          parsedUrl.searchParams.get('token') ||
-          undefined;
-        const pack = await TelegramStickerResolver.resolvePack(packName, botToken);
-        if (pack) {
-          res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.statusCode = 200;
-          res.end(JSON.stringify({ ok: true, pack }));
+
+        if (!packName || packName === 'proxy' || packName === 'file') {
+          // not a pack name, fall through
         } else {
-          res.statusCode = 404;
-          res.end(JSON.stringify({ ok: false, error: 'STICKER_PACK_NOT_FOUND' }));
+          const botToken =
+            (req.headers['x-telegram-bot-token'] as string) ||
+            parsedReqUrl.searchParams.get('token') ||
+            undefined;
+          const pack = await TelegramStickerResolver.resolvePack(packName, botToken);
+          if (pack) {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.statusCode = 200;
+            res.end(JSON.stringify({ ok: true, pack }));
+          } else {
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.statusCode = 404;
+            res.end(JSON.stringify({ ok: false, error: 'STICKER_PACK_NOT_FOUND' }));
+          }
+          return;
         }
-        return;
       }
 
       // Check Cloud & Account API routes

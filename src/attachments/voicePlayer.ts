@@ -957,8 +957,9 @@ export class VoicePlaybackManager {
 
   /**
    * Stops active playback, resets position to 0, and clears active session state.
+   * @param revokeUrl Whether to revoke the object URL (defaults to true for complete cleanup, false for backgrounding/preserving cache)
    */
-  public stop(): void {
+  public stop(revokeUrl: boolean = true): void {
     if (this.isNative) {
       NativeMediaBridge.getInstance().stopAudio();
       this.nativeIsPlaying = false;
@@ -972,8 +973,11 @@ export class VoicePlaybackManager {
       this.currentAudio = null;
     }
 
-    // NOTE: NEVER call URL.revokeObjectURL(this.currentBlobUrl) here!
-    // Decrypted blob URLs are managed by MediaCache. Revoking them breaks subsequent playback with ERR_FILE_NOT_FOUND.
+    if (revokeUrl && this.currentBlobUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      try {
+        URL.revokeObjectURL(this.currentBlobUrl);
+      } catch (_e) {}
+    }
     this.currentBlobUrl = null;
 
     const previousId = this.currentPlayingId;

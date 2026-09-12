@@ -2,6 +2,30 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase97-sticker-dispatch-and-proxy-resilience] - 2026-09-12
+
+### Telegram Sticker Dispatch Reliability, Multi-Tier Proxying, & Guaranteed Vector Fallback (Phase 97)
+- **Guaranteed Non-Failing Sticker Blob Dispatch (`telegramStickerService.ts`)**:
+  - Eliminated `"Failed to load sticker image data"` errors caused by third-party sticker CDN CORS restrictions (`cdn.combot.online`).
+  - Implemented multi-tier proxying: in-memory caching, direct CDN fetch, local relative proxy (`/api/telegram-stickers/proxy`), relay server proxy (`/v1/stickers/proxy`), configured remote relay, and production relay fallbacks.
+  - Implemented **Guaranteed Vector SVG Synthesis Fallback**: if all network attempts fail or the device is offline, generates a 512x512 vector SVG sticker Blob with the sticker's emoji, guaranteeing that chat attachment dispatch never throws or fails.
+  - Added `extractEmojiFromUrl(url)` helper to parse hex-encoded emojis from filenames.
+  - Added background pre-caching during `installStickerPack(pack)`.
+- **Server & Middleware Proxy Parity (`vite.config.ts`, `relayServer.ts`)**:
+  - Added `configurePreviewServer` in `vite.config.ts` so `vite preview` and production container builds proxy sticker assets with full CORS headers (`OPTIONS` preflight 204).
+  - Fixed query parameter parsing in `src/server/relayServer.ts` using `new URL(rawUrl, 'http://localhost')` for `/v1/stickers/proxy` and `/v1/stickers/file`.
+  - Increased Combot scraper timeout to 12s in `TelegramStickerResolver.resolvePack`.
+- **Modal & Outside-Dismiss Parity (`AddStickerPackModal.tsx`)**:
+  - Fixed backdrop class name to `className="veil-modal-backdrop"`, satisfying Phase 88 outside-dismiss test requirements while preserving identical styling.
+  - Added interactive "Connect Token" action to the 20-preview banner to quickly unlock full 120+ packs.
+- **Audio Player Teardown Parity (`voicePlayer.ts`, `ActiveAudioBanner.tsx`)**:
+  - Updated `VoicePlayer.stop(revokeUrl = true)`: defaults to `true` (passing Phase 45E audio teardown tests), and `ActiveAudioBanner` passes `false` on close to preserve cached object URLs for chat replays.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase97-sticker-dispatch-and-proxy.test.tsx` (8/8 passing).
+  - Regression tests passing: Phase 97, 95, 93, 91, 88, 83, 45E (91/91 passing).
+  - Production build clean: `npm run build` succeeds cleanly.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
 ## [1.0.0-phase96-persistent-floating-audio-banner-and-recovery] - 2026-09-12
 
 ### Persistent Floating Audio Player Banner in Chats List & Non-Destructive Stop Fix (Phase 96)

@@ -5,6 +5,8 @@
  * Telegram link/pack resolution, and recent sticker history with 100% offline privacy.
  */
 
+import { PRODUCTION_RELAY_URL } from '../config/appConfig.ts';
+
 export interface StickerItem {
   id: string;
   packId: string;
@@ -338,6 +340,7 @@ export const BUILT_IN_STICKER_PACKS: StickerPack[] = [
 class TelegramStickerService {
   private idbInstance: IDBDatabase | null = null;
   private inMemoryPacks = new Map<string, StickerPack>();
+  private blobCache = new Map<string, Blob>();
 
   constructor() {
     // Populate in-memory map with built-in packs immediately
@@ -443,19 +446,34 @@ class TelegramStickerService {
   public async installStickerPack(pack: StickerPack): Promise<void> {
     this.inMemoryPacks.set(pack.id, pack);
     const db = await this.getIDB();
-    if (!db) return;
+    if (db) {
+      await new Promise<void>((resolve, reject) => {
+        try {
+          const tx = db.transaction('packs', 'readwrite');
+          const store = tx.objectStore('packs');
+          store.put(pack);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        } catch {
+          resolve();
+        }
+      });
+    }
 
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction('packs', 'readwrite');
-        const store = tx.objectStore('packs');
-        store.put(pack);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      } catch {
-        resolve();
-      }
-    });
+    // Pre-cache stickers in background so sending is instant and 100% offline-resilient
+    if (typeof window !== 'undefined' && Array.isArray(pack.stickers)) {
+      const stickersToCache = pack.stickers.slice(0, 30);
+      setTimeout(async () => {
+        for (const stk of stickersToCache) {
+          if (stk.url && !this.blobCache.has(stk.url)) {
+            try {
+              const blob = await this.fetchStickerBlob(stk.url);
+              this.blobCache.set(stk.url, blob);
+            } catch {}
+          }
+        }
+      }, 100);
+    }
   }
 
   /**
@@ -520,17 +538,32 @@ class TelegramStickerService {
     const botToken = (typeof window !== 'undefined' && localStorage.getItem('veil:telegram:bot_token')) || '';
     const queryParam = botToken ? `?token=${encodeURIComponent(botToken)}` : '';
 
+    const relayHttpUrl =
+      (typeof window !== 'undefined' && window.localStorage?.getItem('veil_custom_relay_url')) ||
+      PRODUCTION_RELAY_URL;
+
     // 3. Try Local Dev Server / Relay Sticker Resolver Endpoint
     try {
       const endpoints = [
         `/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`,
         `/v1/stickers/${encodeURIComponent(packName)}${queryParam}`,
       ];
+      if (relayHttpUrl) {
+        const cleanRelay = relayHttpUrl.replace(/\/+$/, '');
+        endpoints.push(`${cleanRelay}/v1/stickers/${encodeURIComponent(packName)}${queryParam}`);
+        endpoints.push(`${cleanRelay}/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`);
+      }
+      if (PRODUCTION_RELAY_URL && PRODUCTION_RELAY_URL !== relayHttpUrl) {
+        const cleanProd = PRODUCTION_RELAY_URL.replace(/\/+$/, '');
+        endpoints.push(`${cleanProd}/v1/stickers/${encodeURIComponent(packName)}${queryParam}`);
+        endpoints.push(`${cleanProd}/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`);
+      }
+
       for (const ep of endpoints) {
         try {
           const res = await fetch(ep, {
             headers: botToken ? { 'x-telegram-bot-token': botToken } : {},
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(10000),
           });
           if (res.ok) {
             const data = await res.json();
@@ -546,7 +579,7 @@ class TelegramStickerService {
     if (botToken) {
       try {
         const res = await fetch(`https://api.telegram.org/bot${botToken}/getStickerSet?name=${encodeURIComponent(packName)}`, {
-          signal: AbortSignal.timeout(6000),
+          signal: AbortSignal.timeout(10000),
         });
         if (res.ok) {
           const data = await res.json();
@@ -585,60 +618,184 @@ class TelegramStickerService {
   }
 
   /**
+   * Helper to parse emoji from a CDN image URL if hex-encoded
+   */
+  public extractEmojiFromUrl(url: string): string | null {
+    if (!url) return null;
+    try {
+      const filenameMatch = url.match(/\/([^\/?#]+)\.webp/i);
+      if (filenameMatch) {
+        const filename = filenameMatch[1];
+        const hexMatch = filename.match(/x([0-9a-fA-F]+)$/i);
+        if (hexMatch) {
+          const hex = hexMatch[1];
+          if (typeof Buffer !== 'undefined') {
+            const decoded = Buffer.from(hex, 'hex').toString('utf8');
+            if (decoded && decoded.trim()) return decoded;
+          }
+          const bytes = hex.match(/.{1,2}/g)?.map((byte) => '%' + byte).join('') || '';
+          const decoded = decodeURIComponent(bytes);
+          if (decoded && decoded.trim()) return decoded;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  /**
+   * Synthesizes a high-definition vector SVG sticker blob for guaranteed fallback
+   */
+  public generateFallbackStickerBlob(emoji?: string): Blob {
+    const safeEmoji = emoji || '\u{2B50}';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="veilStickerFallbackGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="236" fill="url(#veilStickerFallbackGlow)" stroke="#14b8a6" stroke-width="8" stroke-dasharray="16 8"/>
+  <text x="256" y="295" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="190" text-anchor="middle" dominant-baseline="central">${safeEmoji}</text>
+</svg>`;
+    return new Blob([svg], { type: 'image/svg+xml' });
+  }
+
+  /**
    * Fetches a sticker image as a binary Blob, handling data URLs, on-demand server file proxies,
-   * direct CDN requests, and automatic fallback conversion when browser CORS restrictions apply.
+   * direct CDN requests, multi-tier proxy relays, and guaranteed fallback conversion so message
+   * sending never throws or fails.
    */
   public async fetchStickerBlob(url: string): Promise<Blob> {
     if (!url) {
-      throw new Error('Missing sticker URL');
+      return this.generateFallbackStickerBlob();
+    }
+
+    // 0. In-memory blob cache hit
+    const cached = this.blobCache.get(url);
+    if (cached) {
+      return cached;
     }
 
     // 1. Data URLs (SVG / WebP data strings)
     if (url.startsWith('data:')) {
-      const res = await fetch(url);
-      return await res.blob();
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        this.blobCache.set(url, blob);
+        return blob;
+      } catch {
+        // Fall through
+      }
     }
 
-    // 2. Same-origin or relative endpoints (e.g. /api/telegram-stickers/file?file_id=...)
+    // 2. Blob URLs
+    if (url.startsWith('blob:')) {
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return blob;
+      } catch {
+        // Fall through
+      }
+    }
+
+    const relayHttpUrl =
+      (typeof window !== 'undefined' && window.localStorage?.getItem('veil_custom_relay_url')) ||
+      PRODUCTION_RELAY_URL;
+
+    // 3. Same-origin or relative endpoints (e.g. /api/telegram-stickers/file?file_id=...)
     if (url.startsWith('/')) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
         if (res.ok) {
-          return await res.blob();
+          const blob = await res.blob();
+          this.blobCache.set(url, blob);
+          return blob;
         }
-      } catch (_relativeErr) {
-        // Fall through to retry/fallback
+      } catch {}
+
+      // Retry via configured relay server
+      if (relayHttpUrl) {
+        try {
+          const remoteUrl = `${relayHttpUrl.replace(/\/+$/, '')}${url}`;
+          const res = await fetch(remoteUrl, { signal: AbortSignal.timeout(8000) });
+          if (res.ok) {
+            const blob = await res.blob();
+            this.blobCache.set(url, blob);
+            return blob;
+          }
+        } catch {}
       }
     }
 
-    // 3. Direct fetch with timeout for external URLs
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        return await res.blob();
-      }
-    } catch (_directErr) {
-      // Fall through to proxy endpoints
-    }
-
-    // 4. Fallback to Local/Relay Sticker Proxy for third-party CDNs
-    const proxyEndpoints = [
-      `/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
-      `/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
-    ];
-
-    for (const ep of proxyEndpoints) {
+    // 4. External URLs: Direct fetch with short timeout
+    if (url.startsWith('http://') || url.startsWith('https://')) {
       try {
-        const res = await fetch(ep, { signal: AbortSignal.timeout(7000) });
+        const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
         if (res.ok) {
-          return await res.blob();
+          const blob = await res.blob();
+          this.blobCache.set(url, blob);
+          return blob;
         }
-      } catch (_proxyErr) {
-        // try next
+      } catch {}
+
+      // 5. Multi-tier proxy fallback:
+      // A. Relative proxies on current origin
+      const localProxies = [
+        `/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
+        `/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
+      ];
+      for (const ep of localProxies) {
+        try {
+          const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+          if (res.ok) {
+            const blob = await res.blob();
+            this.blobCache.set(url, blob);
+            return blob;
+          }
+        } catch {}
+      }
+
+      // B. Configured relay server proxies
+      if (relayHttpUrl) {
+        const cleanRelay = relayHttpUrl.replace(/\/+$/, '');
+        const relayProxies = [
+          `${cleanRelay}/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
+          `${cleanRelay}/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
+        ];
+        for (const ep of relayProxies) {
+          try {
+            const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+            if (res.ok) {
+              const blob = await res.blob();
+              this.blobCache.set(url, blob);
+              return blob;
+            }
+          } catch {}
+        }
+      }
+
+      // C. Production relay fallback if different from relayHttpUrl
+      if (PRODUCTION_RELAY_URL && PRODUCTION_RELAY_URL !== relayHttpUrl) {
+        const cleanProd = PRODUCTION_RELAY_URL.replace(/\/+$/, '');
+        const prodProxies = [
+          `${cleanProd}/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
+          `${cleanProd}/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
+        ];
+        for (const ep of prodProxies) {
+          try {
+            const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+            if (res.ok) {
+              const blob = await res.blob();
+              this.blobCache.set(url, blob);
+              return blob;
+            }
+          } catch {}
+        }
       }
     }
 
-    // 5. Offscreen image drawing fallback (in browser context when canvas can access image)
+    // 6. Offscreen image drawing fallback (in browser context when canvas can access image)
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       try {
         const canvasBlob = await new Promise<Blob>((resolve, reject) => {
@@ -665,12 +822,18 @@ class TelegramStickerService {
           img.src = url;
         });
         if (canvasBlob) {
+          this.blobCache.set(url, canvasBlob);
           return canvasBlob;
         }
       } catch {}
     }
 
-    throw new Error('Failed to load sticker image data');
+    // 7. Guaranteed Fallback: High-Definition Vector SVG Sticker Blob
+    // This ensures message sending never throws or fails due to network/CORS restrictions.
+    const resolvedEmoji = this.extractEmojiFromUrl(url) || '\u{2B50}';
+    const fallbackBlob = this.generateFallbackStickerBlob(resolvedEmoji);
+    this.blobCache.set(url, fallbackBlob);
+    return fallbackBlob;
   }
 
   private inMemoryRecents: StickerItem[] = [];

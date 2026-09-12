@@ -144,7 +144,7 @@ export class TelegramStickerResolver {
       try {
         const tgRes = await fetch(
           `https://api.telegram.org/bot${effectiveToken}/getStickerSet?name=${encodeURIComponent(cleanName)}`,
-          { signal: AbortSignal.timeout(6000) }
+          { signal: AbortSignal.timeout(10000) }
         );
         if (tgRes.ok) {
           const data: any = await tgRes.json();
@@ -183,7 +183,7 @@ export class TelegramStickerResolver {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(12000),
       });
 
       if (combotRes.ok) {
@@ -238,7 +238,7 @@ export class TelegramStickerResolver {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (wikiRes.ok) {

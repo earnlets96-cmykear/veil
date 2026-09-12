@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-12T13:58:26.142Z",
+  "generatedAt": "2026-09-12T14:53:36.353Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
+      "path": "dist/assets/index-BajhtnCU.js",
+      "sizeBytes": 990869,
+      "sha256": "0141b0afd43447c44419e979b2ab39f19a6f0931f00fbd06b2f05144b6ffeb14"
+    },
+    {
       "path": "dist/assets/index-Ca_vfxwN.css",
       "sizeBytes": 130412,
       "sha256": "513f0affb0e9bd04f7a6cdd6e09f49eb4f59d40fd4532414a04e9795c71af025"
-    },
-    {
-      "path": "dist/assets/index-DVbCxIgJ.js",
-      "sizeBytes": 987208,
-      "sha256": "ae9210c9d6f2b9ae806c84b5ef6b8bece170aeb940fc1ed2bbe0f1081ca684d5"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-BnAA9hhn.js",
+      "path": "dist/assets/web-C79CxQwx.js",
       "sizeBytes": 361,
-      "sha256": "ff1109e5dfd6b5168bb240d67b803995ef66a16373ddd0accb997c899e041e97"
+      "sha256": "2662a22a6a0295d7f513d2a49d9d115192f5280d89d982ed5f5c256bc91eff32"
     },
     {
-      "path": "dist/assets/web-DdSlzeAl.js",
+      "path": "dist/assets/web-CCPBp7-F.js",
       "sizeBytes": 842,
-      "sha256": "a3d780001b7ee70a8b435295c3cf459a1e66d80e1dc34fb6fae3ff5dbe3f032e"
+      "sha256": "eaf93c4d8ec6bbfca85dcb8efc13744b49ea94d0f2e27ce6d06eb4faf605d37b"
     },
     {
-      "path": "dist/assets/web-Rnrvep8R.js",
+      "path": "dist/assets/web-DGtraGLq.js",
       "sizeBytes": 8728,
-      "sha256": "1141bea03b112f8ff9f477724c82866cc7efd92a396728bb4e663fa2b463761e"
+      "sha256": "c0f11c8325f3b10d47b6536b4b0896f1eba738865187e90a318d2667c0299933"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "b5a8ae87e7efc879cf47a2f8e9113b01e864cb45f9a6f54ae99edcc80f26d8bb"
+      "sha256": "78bfd4c31139003188b34a6bd48fec6cdb34a3e975a1b13e352f85ee88ad09b8"
     }
   ]
 }

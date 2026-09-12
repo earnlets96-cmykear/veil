@@ -100,7 +100,7 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
 
   const modalContent = (
     <div
-      className="veil-modal-backdrop veil-add-sticker-backdrop"
+      className="veil-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           e.preventDefault();
@@ -170,8 +170,30 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
           /* Live Full-Set Scrollable Preview */
           <div className="veil-add-sticker-preview-grid-wrap" ref={previewRef}>
             {previewPack.stickers.length <= 20 && !botToken && (
-              <div style={{ padding: '8px 12px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', margin: '0 12px 10px 12px', fontSize: '0.75rem', color: '#93c5fd', lineHeight: '1.4' }}>
-                Showing 20 preview stickers. Add your free Telegram Bot Token to unlock all 120+ stickers in full 512x512 High Definition.
+              <div style={{ padding: '8px 12px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', margin: '0 12px 10px 12px', fontSize: '0.75rem', color: '#93c5fd', lineHeight: '1.4', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div>
+                  Showing 20 preview stickers. Add your free Telegram Bot Token to unlock all 120+ stickers in full 512x512 High Definition.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewPack(null);
+                    setShowTokenInput(true);
+                  }}
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.25)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    borderRadius: '6px',
+                    color: '#ffffff',
+                    fontSize: '0.72rem',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 500,
+                  }}
+                >
+                  Connect Token
+                </button>
               </div>
             )}
             <div className="veil-add-sticker-preview-grid">

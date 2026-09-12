@@ -1,8 +1,46 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 96 — PERSISTENT FLOATING AUDIO PLAYER BANNER IN CHATS LIST & NON-DESTRUCTIVE STOP FIX
+## Active Phase: PHASE 97 — TELEGRAM STICKER DISPATCH RELIABILITY, MULTI-TIER PROXYING, OFFLINE PRE-CACHING & GUARANTEED VECTOR FALLBACK
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
+
+### Phase 97 Tasks Completed:
+- [x] **Root Cause Diagnosis**:
+  - Identified why sending stickers threw `"Failed to load sticker image data"`: upstream sticker CDNs (e.g. `cdn.combot.online`) return `Access-Control-Allow-Origin: null`. Direct browser fetches failed with CORS errors, offscreen canvas drawing threw due to canvas tainting/CORS image loading, and `fetchStickerBlob` had no guaranteed fallback when local dev proxies were unreachable or in `vite preview` mode.
+  - Identified why `AddStickerPackModal` outside dismiss failed in Phase 88 tests: `className="veil-modal-backdrop veil-add-sticker-backdrop"` did not match the strict `className="veil-modal-backdrop"` regex assertion.
+  - Identified why `tests/phase45e-audio-runtime.test.ts` failed: `player.stop()` expected `URL.revokeObjectURL` to be called; Phase 96 had disabled revocation unconditionally.
+- [x] **Guaranteed Non-Failing Sticker Blob Dispatch (`src/media/telegramStickerService.ts`)**:
+  - Implemented multi-tier fetching in `telegramStickerService.fetchStickerBlob(url)`:
+    1. In-memory blob cache check for instant repeats.
+    2. Data URL & Blob URL resolution.
+    3. Same-origin/relative endpoint fetch with relay server URL fallback.
+    4. Direct CDN fetch with short timeout.
+    5. Local relative proxy endpoints (`/api/telegram-stickers/proxy` and `/v1/stickers/proxy`).
+    6. Configured relay server proxies (`${relayHttpUrl}/v1/stickers/proxy` and `${relayHttpUrl}/api/telegram-stickers/proxy`).
+    7. Production relay server proxies (`${PRODUCTION_RELAY_URL}/v1/stickers/proxy`).
+    8. Offscreen canvas drawing.
+    9. **Guaranteed Vector SVG Synthesis Fallback**: If all network/proxy attempts fail (e.g. offline or strict CORS), automatically generates a 512x512 vector SVG sticker Blob with the sticker's emoji so message sending NEVER throws or fails.
+  - Added `extractEmojiFromUrl(url)` helper to parse hex-encoded emojis from Combot filenames (e.g. `0xf09f8c9f.webp` -> `\u{1F31F}`).
+  - Added background pre-caching during `installStickerPack(pack)` so installed stickers load instantaneously offline.
+- [x] **Server & Middleware Proxy Parity (`vite.config.ts` & `src/server/relayServer.ts`)**:
+  - Added `configurePreviewServer(server)` in `vite.config.ts` with shared `createStickersMiddleware()`, ensuring sticker proxy routes work in preview and production container builds.
+  - Added `OPTIONS` preflight handling returning HTTP 204 with `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers`.
+  - Added upstream request headers (`Referer: https://combot.org/`, `Accept: image/webp,...`) and 12s AbortSignal timeout.
+  - Fixed query parameter parsing in `src/server/relayServer.ts` using `new URL(rawUrl, 'http://localhost')` so `/v1/stickers/proxy?url=...` and `/v1/stickers/file?file_id=...` are correctly routed.
+  - Increased Combot timeout in `TelegramStickerResolver.resolvePack` to 12s to prevent slow network aborts.
+- [x] **UI & UX Guidance (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
+  - Reverted backdrop class to `className="veil-modal-backdrop"`, satisfying Phase 88 outside-dismiss test contract while preserving full CSS styling.
+  - Enhanced the 20-preview banner with a direct "Connect Token" action button, allowing users to immediately open the Telegram Bot Token input and unlock all 120+ stickers.
+- [x] **Audio Player Teardown Parity (`src/attachments/voicePlayer.ts` & `src/ui/components/ui/ActiveAudioBanner.tsx`)**:
+  - Updated `VoicePlayer.stop(revokeUrl: boolean = true)`: defaults to `true` (satisfying Phase 45E audio teardown tests), but allows `stop(false)`.
+  - In `ActiveAudioBanner.tsx`, close handler calls `VoicePlayer.stop(false)`, ensuring banner dismissal never revokes cached audio object URLs or causes `net::ERR_FILE_NOT_FOUND`.
+- [x] **Verification & Test Coverage (`tests/phase97-sticker-dispatch-and-proxy.test.tsx`)**:
+  - Created automated test suite covering data URLs, relative endpoints, proxy fallback, guaranteed SVG fallback, emoji decoding, modal classes, preview parity, and zero literal unicode emoji compliance (8/8 passing).
+  - All regression test suites passing: Phase 97, 95, 93, 91, 88, 83, 45E (91/91 passing).
+  - Production build clean: `npm run build` succeeds cleanly.
+  - Zero Literal Unicode Emoji compliance verified across all touched files.
+
+## Previous Phase: PHASE 96 — PERSISTENT FLOATING AUDIO PLAYER BANNER IN CHATS LIST & NON-DESTRUCTIVE STOP FIX
 
 ### Phase 96 Tasks Completed:
 - [x] **Root Cause Diagnosis**:

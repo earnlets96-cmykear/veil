@@ -94,7 +94,7 @@ export const ActiveAudioBanner: React.FC<ActiveAudioBannerProps> = ({
 
   const handleClose = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    VoicePlayer.stop();
+    VoicePlayer.stop(false);
   }, []);
 
   const handleJump = useCallback((e: React.MouseEvent) => {
