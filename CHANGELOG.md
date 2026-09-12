@@ -2,6 +2,27 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase87-universal-floating-reactions] - 2026-09-12
+
+### Universal Floating Reaction Badges & Ultra-Premium Glassmorphic Styling (Phase 87)
+- **Universal Floating Reaction Display Model (`ConversationView.tsx`)**:
+  - Unified reaction display across all message types: text, voice notes, media pictures/videos, audio cards, file attachments, and Telegram stickers now use the identical floating badge design model.
+  - Removed the `!hasVisibleTextBubble` restriction in `ConversationView.tsx` so `.veil-floating-reaction-badge` renders unconditionally at the bottom corner of every bubble wrapper whenever reactions exist.
+- **Decoupled Text Bubble Action Row (`ConversationView.tsx`, `MessageBubble.tsx`)**:
+  - Passed `reactions={undefined}` to `<MessageBubble />` inside `ConversationView.tsx`, removing the cramped inline `.veil-message-reactions` row that previously crowded the message timestamp and delivery status.
+  - Text messages now maintain a clean, spacious timestamp action row while reactions float elegantly at the bottom edge.
+  - Maintained full backward compatibility in `MessageBubble.tsx` for isolated component unit tests that pass the `reactions` prop directly.
+- **Ultra-Premium Obsidian Glassmorphism & Spring Physics (`veil-components.css`, `veil-design-system.css`)**:
+  - Implemented deep obsidian glassmorphism (`rgba(18, 24, 34, 0.88)`) with 16px saturation backdrop blur (`-webkit-backdrop-filter: blur(16px) saturate(180%)`).
+  - Added specular bevel edge highlights (`inset 0 1px 0 rgba(255, 255, 255, 0.16)`) and multi-layer depth shadow (`0 4px 14px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3)`).
+  - Perfected corner overlap: `margin-top: -8px`, `align-self: flex-end; margin-right: 6px;` (outgoing) and `align-self: flex-start; margin-left: 6px;` (incoming).
+  - Fluid spring physics micro-interactions with `cubic-bezier(0.34, 1.56, 0.64, 1)` easing on hover (`scale(1.08) translateY(-1px)`) and active tap (`scale(0.93)`).
+  - Active `.user-reacted` state with vibrant teal ambient glow (`box-shadow: 0 0 12px rgba(20, 184, 166, 0.35)`), gradient background, and full light theme parity.
+- **Verification & Test Coverage**:
+  - Created comprehensive test suite `tests/phase87-universal-floating-reactions.test.tsx` (7/7 passing).
+  - 100% test pass across existing suites (`phase85`, `phase68`, `conversation-view-render`).
+  - Full TypeScript validation and production Vite bundle verification (`npm run build`).
+
 ## [1.0.0-phase86-voicenote-touch-scroll-fix] - 2026-09-12
 
 ### Voice Message Touch Scrolling Pass-Through & Directional Scrubbing Disambiguation (Phase 86)

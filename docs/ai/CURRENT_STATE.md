@@ -1,8 +1,19 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 86 — VOICE MESSAGE TOUCH SCROLLING PASS-THROUGH & DIRECTIONAL SCRUBBING DISAMBIGUATION
-- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 396 TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS, NATIVE ANDROID APK COMPILED)**
+## Current Verified Phase: PHASE 87 — UNIVERSAL FLOATING REACTION BADGES & ULTRA-PREMIUM GLASSMORPHIC STYLING
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL REACTION TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS)**
 - **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Universal Reaction Display Parity (`ConversationView.tsx`)**: Unified reactions across all message types (text bubbles, voice notes, audio cards, photos/videos, files, and Telegram stickers) to use the identical floating badge design model. Text messages no longer cram reaction pills inside the bubble action row.
+  - **Decoupled Bubble Action Row**: Text messages pass `reactions={undefined}` to `<MessageBubble />` in `ConversationView.tsx`, ensuring the timestamp (`11:59 AM`) and delivery checks remain clean and unconstrained on the right, while the floating badge overlaps at the bottom corner.
+  - **Ultra-Premium Obsidian Glassmorphism & Spring Physics (`veil-components.css`, `veil-design-system.css`)**: Implemented deep obsidian glass (`rgba(18, 24, 34, 0.88)`), specular highlights (`inset 0 1px 0 rgba(255, 255, 255, 0.16)`), 16px saturation backdrop blur, -8px corner overlap, spring physics micro-interactions with `cubic-bezier(0.34, 1.56, 0.64, 1)`, and teal glow `.user-reacted` state.
+  - **Zero-Unicode Security Compliance**: All reaction definitions strictly use Unicode escape sequences (`\u{...}`).
+- **Verification Deliverables**:
+  - New test suite: `tests/phase87-universal-floating-reactions.test.tsx` (7/7 passing).
+  - Regression tests passing: `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7), `tests/phase68-chat-bubbles-and-context-menu.test.tsx` (19/19), `tests/conversation-view-render.test.tsx` (6/6).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.28s.
+
+## Previous Verified Phase: PHASE 86 — VOICE MESSAGE TOUCH SCROLLING PASS-THROUGH & DIRECTIONAL SCRUBBING DISAMBIGUATION
 - **Key Deliverables & Fixes**:
   - **Scroll Pass-Through on Voice Bubbles (`src/styles/veil-components.css`, `VoiceNoteCard.tsx`)**: Replaced `touch-action: none;` with `touch-action: pan-y;` on both `.veil-voicenote-card` and `.veil-waveform-container`. Users can touch anywhere on the voice message bubble (background, padding, timer row, speed pill, or waveform) to scroll the conversation timeline vertically without freezing or jumping.
   - **Directional Gesture Disambiguation (`VoiceNoteCard.tsx`)**: Removed greedy `preventDefault()` on initial contact. Added directional disambiguation logic comparing `deltaX` vs `deltaY`:

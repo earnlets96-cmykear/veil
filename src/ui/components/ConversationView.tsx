@@ -664,15 +664,15 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               onRetry={onRetry ? handleRetryAction : undefined}
               isGroupedWithPrevious={isGroupedWithPrevious}
               isGroupedWithNext={isGroupedWithNext}
-              reactions={(msg as any).reactions}
+              reactions={undefined}
               edited={msg.edited}
               onReactionClick={onReactionClick ? handleReactionAction : undefined}
               onContextMenu={handleContextMenuAction}
             />
           )}
 
-          {/* Universal Reactions Badge for Non-Text Cards (Screenshot 2 / floating reaction pill) */}
-          {!hasVisibleTextBubble && (msg as any).reactions && (msg as any).reactions.length > 0 && (
+          {/* Universal Floating Reactions Badge for all message types (Text, Voice, Media, File, Sticker) */}
+          {(msg as any).reactions && (msg as any).reactions.length > 0 && (
             <div className="veil-floating-reaction-badge" role="group" aria-label="Reactions">
               {((msg as any).reactions as Array<{ emoji: string; count: number; userReacted?: boolean }>).map((r, i) => (
                 <button

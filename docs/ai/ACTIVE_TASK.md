@@ -1,8 +1,25 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 86 — VOICE MESSAGE TOUCH SCROLLING PASS-THROUGH & DIRECTIONAL SCRUBBING DISAMBIGUATION
-- **Status**: COMPLETE & VERIFIED (100% test pass across all 396 test files, Android debug APK compiled)
+## Active Phase: PHASE 87 — UNIVERSAL FLOATING REACTION BADGES & ULTRA-PREMIUM GLASSMORPHIC STYLING
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
+
+### Phase 87 Tasks Completed:
+- [x] **Universal Floating Reaction Badge Rendering (`ConversationView.tsx`)**:
+  - Removed `!hasVisibleTextBubble` barrier on `.veil-floating-reaction-badge` so all message types (text, voice, audio, media, files, stickers) render reactions in the floating pill badge layout.
+  - Decoupled `MessageBubble` action row by passing `reactions={undefined}` from `ConversationView.tsx`, preventing reaction chips from crowding the timestamp and status indicators.
+  - Preserved backward compatibility for isolated `MessageBubble` unit tests.
+- [x] **Ultra-Premium Obsidian Glassmorphism & Spring Physics (`veil-components.css`, `veil-design-system.css`)**:
+  - High-refraction obsidian glass background (`rgba(18, 24, 34, 0.88)`), specular edge highlights (`inset 0 1px 0 rgba(255, 255, 255, 0.16)`), 16px saturation backdrop blur.
+  - Corner-anchored layout with -8px overlap: outgoing right-aligned (`margin-right: 6px`), incoming left-aligned (`margin-left: 6px`).
+  - Spring-physics micro-animations with `cubic-bezier(0.34, 1.56, 0.64, 1)` easing for hover and tap states.
+  - Glowing teal active state for reacted pills (`.user-reacted`) and light mode color harmony.
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase87-universal-floating-reactions.test.tsx` (7/7 passing).
+  - 100% pass on all existing reaction suites (`phase85`, `phase68`, `conversation-view-render`).
+  - Full TypeScript validation and production Vite bundle verification (`npm run build`).
+
+## Previous Phase: PHASE 86 — VOICE MESSAGE TOUCH SCROLLING PASS-THROUGH & DIRECTIONAL SCRUBBING DISAMBIGUATION
 
 ### Phase 86 Tasks Completed:
 - [x] **Voice Note Card Native Vertical Scroll Pass-Through (`VoiceNoteCard.tsx`, `src/styles/veil-components.css`)**:
