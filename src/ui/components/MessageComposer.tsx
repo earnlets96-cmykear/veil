@@ -69,6 +69,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const lastMediaPickerClosedAtRef = useRef<number>(0);
   const [isEmojiDrawerOpen, setIsEmojiDrawerOpen] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [isPermissionPermanent, setIsPermissionPermanent] = useState(false);
@@ -447,7 +448,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       {isMediaPickerOpen && (
         <MediaPickerModal
           isOpen={isMediaPickerOpen}
-          onClose={() => setIsMediaPickerOpen(false)}
+          onClose={() => {
+            lastMediaPickerClosedAtRef.current = Date.now();
+            setIsMediaPickerOpen(false);
+          }}
           onSend={handleMediaPickerSend}
         />
       )}
@@ -659,7 +663,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             <button
               type="button"
               className="veil-composer-plus-btn"
-              onClick={() => setIsMediaPickerOpen(true)}
+              onClick={() => {
+                if (Date.now() - lastMediaPickerClosedAtRef.current < 350) return;
+                setIsMediaPickerOpen(true);
+              }}
               aria-label="Attach Encrypted File"
               title="Attach File or Media"
             >

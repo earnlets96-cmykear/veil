@@ -73,7 +73,20 @@ export const PermissionsModal: React.FC<PermissionsModalProps> = ({
   return (
     <div
       className="veil-modal-overlay"
-      onClick={onCancel}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="perm-modal-title"

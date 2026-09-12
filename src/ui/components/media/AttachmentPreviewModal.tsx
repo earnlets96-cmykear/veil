@@ -99,7 +99,26 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
   };
 
   return (
-    <div className="veil-modal-overlay" onClick={onCancel} role="dialog" aria-modal="true" aria-label="Attachment preview">
+    <div
+      className="veil-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Attachment preview"
+    >
       <div className="veil-attachment-preview-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="veil-preview-header">

@@ -2,6 +2,22 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase88-modal-outside-dismiss] - 2026-09-12
+
+### Universal Modal Outside Touch Dismissal & Ghost Click Prevention (Phase 88)
+- **Universal Backdrop Dismissal on Touch and Click**:
+  - Implemented target-verified outside click/touch dismissal across all dialog overlays (`NewChatModal`, `NewGroupModal`, `ProfileModal`, `GroupDetailsModal`, `ContactDetailsModal`, `CreateSpaceModal`, `RestoreAccountModal`, `SettingsModal`, `AccountsAndSpacesModal`, `AppLockSetupModal`, `PermissionsModal`, `AvatarCropModal`, `AttachmentPreviewModal`, `MediaGalleryModal`, `AddStickerPackModal`, `EmojiPickerModal`, and `ConversationView` confirmation/forward modals).
+  - Wired `if (e.target === e.currentTarget)` checks with `e.preventDefault()` and `e.stopPropagation()` on both `onClick` and `onTouchEnd`.
+- **Two-Tier Ghost-Click Prevention Architecture**:
+  - **Tier 1 (Event level)**: Added `e.preventDefault()` on backdrop `onTouchEnd` to prevent mobile browsers and WebViews from dispatching 300ms synthesized mouse/click events to elements beneath the dismissed backdrop.
+  - **Tier 2 (State level)**: Added 350ms cooldown guard in `AppState.tsx` (`lastModalClosedAtRef`) and `MessageComposer.tsx` (`lastMediaPickerClosedAtRef`). Re-opening attempts made within 350ms of a modal closure are safely neutralized, permanently ending the "modal opens again" loop.
+- **Card Click Isolation**:
+  - Attached `onClick={(e) => e.stopPropagation()}` and `onPointerDown={(e) => e.stopPropagation()}` to all modal cards and containers, ensuring interactions inside the dialog never inadvertently trigger backdrop dismissal.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase88-modal-outside-dismiss.test.tsx` (10/10 passing).
+  - 100% test pass on all regression test suites.
+  - Full TypeScript check and Vite production bundle verification (`npm run build`).
+
 ## [1.0.0-phase87-universal-floating-reactions] - 2026-09-12
 
 ### Universal Floating Reaction Badges & Ultra-Premium Glassmorphic Styling (Phase 87)

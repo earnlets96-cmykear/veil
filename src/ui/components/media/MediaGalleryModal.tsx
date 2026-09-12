@@ -106,7 +106,26 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
   };
 
   return (
-    <div className="veil-modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Shared media gallery">
+    <div
+      className="veil-modal-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Shared media gallery"
+    >
       <div className="veil-gallery-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="veil-gallery-header">

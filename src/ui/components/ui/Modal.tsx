@@ -71,18 +71,41 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, closeOnEscape, onClose]);
 
+  const touchStartOnBackdropRef = useRef(false);
+
   if (!isOpen) return null;
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (closeOnBackdrop && e.target === e.currentTarget) {
+      e.preventDefault();
+      e.stopPropagation();
       onClose();
     }
+  };
+
+  const handleBackdropPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (closeOnBackdrop && e.target === e.currentTarget) {
+      touchStartOnBackdropRef.current = true;
+    } else {
+      touchStartOnBackdropRef.current = false;
+    }
+  };
+
+  const handleBackdropTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (closeOnBackdrop && touchStartOnBackdropRef.current && e.target === e.currentTarget) {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
+    touchStartOnBackdropRef.current = false;
   };
 
   return (
     <div
       className="veil-modal-overlay"
       onClick={handleBackdropClick}
+      onPointerDown={handleBackdropPointerDown}
+      onTouchEnd={handleBackdropTouchEnd}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -91,6 +114,8 @@ export const Modal: React.FC<ModalProps> = ({
         ref={modalRef}
         className={`veil-modal-card ${className}`.trim()}
         style={{ maxWidth }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="veil-modal-header">
           <h2 id={titleId} className="veil-type-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>

@@ -149,8 +149,32 @@ export const NewGroupModal: React.FC = () => {
   };
 
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="create-group-title">
-      <div className="veil-modal-card" style={{ maxWidth: '480px', width: '90vw' }}>
+    <div
+      className="veil-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-group-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+    >
+      <div
+        className="veil-modal-card"
+        style={{ maxWidth: '480px', width: '90vw' }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <div className="veil-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <UsersIcon size={20} color="var(--veil-accent-primary)" />

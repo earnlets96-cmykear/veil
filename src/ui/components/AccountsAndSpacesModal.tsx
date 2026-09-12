@@ -215,11 +215,23 @@ export const AccountsAndSpacesModal: React.FC = () => {
         padding: '1rem',
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) closeModal();
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
       }}
     >
       <div
         className="veil-card"
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '440px',

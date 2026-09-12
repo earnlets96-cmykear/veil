@@ -300,6 +300,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const lastBackgroundTimeRef = useRef<number | null>(null);
   const isFilePickerActiveRef = useRef<boolean>(false);
   const filePickerGraceTimerRef = useRef<any>(null);
+  const lastModalClosedAtRef = useRef<number>(0);
 
   const markFilePickerActive = useCallback(() => {
     if (filePickerGraceTimerRef.current) {
@@ -4161,11 +4162,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const openModal = useCallback((modal: ActiveModal) => {
+    // Suppress rapid re-opening from touch-through / ghost-click events immediately after modal dismissal
+    if (Date.now() - lastModalClosedAtRef.current < 350) {
+      return;
+    }
     setActiveModal(modal);
     sessionController.recordUserActivity();
   }, []);
 
   const closeModal = useCallback(() => {
+    lastModalClosedAtRef.current = Date.now();
     setActiveModal(null);
     sessionController.recordUserActivity();
   }, []);

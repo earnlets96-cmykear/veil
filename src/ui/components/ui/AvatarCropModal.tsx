@@ -225,12 +225,27 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
     <div
       className="veil-modal-overlay"
       style={{ zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
         className="veil-modal-card veil-crop-modal-card"
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '380px',

@@ -51,8 +51,27 @@ export const CreateSpaceModal: React.FC = () => {
   };
 
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="create-space-title">
-      <div className="veil-modal-card">
+    <div
+      className="veil-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-space-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+    >
+      <div className="veil-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="veil-modal-header">
           <h2 id="create-space-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Create Isolated Space</h2>
           <IconButton icon={<CloseIcon size={18} />} aria-label="Close dialog" onClick={closeModal} />

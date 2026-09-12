@@ -1,6 +1,21 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 87 — UNIVERSAL FLOATING REACTION BADGES & ULTRA-PREMIUM GLASSMORPHIC STYLING
+## Current Verified Phase: PHASE 88 — UNIVERSAL MODAL OUTSIDE TOUCH DISMISSAL & GHOST CLICK PREVENTION
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 10 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Universal Modal Outside Dismissal**: Touching or clicking anywhere outside an active modal dialog immediately and smoothly dismisses the modal across the entire application (`NewChatModal`, `NewGroupModal`, `ProfileModal`, `GroupDetailsModal`, `ContactDetailsModal`, `CreateSpaceModal`, `RestoreAccountModal`, `SettingsModal`, `AccountsAndSpacesModal`, `AppLockSetupModal`, `PermissionsModal`, `AvatarCropModal`, `AttachmentPreviewModal`, `MediaGalleryModal`, `AddStickerPackModal`, `EmojiPickerModal`, and in-chat confirmation/forward modals).
+  - **Ghost-Click Prevention Architecture**: Eliminated the Android/mobile touch issue where dismissing a modal via touch synthesized a follow-up `click` event 300ms later at `(clientX, clientY)`, which hit the underlying button (e.g. `+` FAB in Sidebar, `+` in MessageComposer) and immediately re-opened the modal. Solved via two complementary defense layers:
+    1. Event-level: Backdrop `onTouchEnd` calls `e.preventDefault()` to instruct the browser/WebView not to dispatch synthetic mouse/click events.
+    2. State-level: 350ms cooldown guard (`lastModalClosedAtRef` in `AppState.tsx`, `lastMediaPickerClosedAtRef` in `MessageComposer.tsx`) that rejects any re-opening attempt dispatched immediately after a close.
+  - **Inner Modal Card Event Isolation**: All modal cards feature `onClick={(e) => e.stopPropagation()}` and `onPointerDown={(e) => e.stopPropagation()}` so touches inside modal cards never trigger backdrop dismissal.
+  - **Zero-Unicode Security Compliance**: Strict Phase 44a compliance verified with zero literal Unicode emojis.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase88-modal-outside-dismiss.test.tsx` (10/10 passing).
+  - Regression tests passing: `tests/phase87-universal-floating-reactions.test.tsx` (7/7), `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7), `tests/conversation-view-render.test.tsx` (6/6).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.40s.
+
+## Previous Verified Phase: PHASE 87 — UNIVERSAL FLOATING REACTION BADGES & ULTRA-PREMIUM GLASSMORPHIC STYLING
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL REACTION TEST SUITES PASS, PRODUCTION RELEASE BUILD SUCCESS)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

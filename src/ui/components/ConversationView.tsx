@@ -2122,7 +2122,20 @@ export const ConversationView: React.FC = () => {
       {deleteForEveryoneConfirm && (
         <div
           className="veil-modal-overlay"
-          onClick={() => setDeleteForEveryoneConfirm(null)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              setDeleteForEveryoneConfirm(null);
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              setDeleteForEveryoneConfirm(null);
+            }
+          }}
           style={{ zIndex: 1100 }}
         >
           <div
@@ -2194,7 +2207,20 @@ export const ConversationView: React.FC = () => {
       {forwardingMessage && (
         <div
           className="veil-modal-overlay"
-          onClick={() => setForwardingMessage(null)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              setForwardingMessage(null);
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              setForwardingMessage(null);
+            }
+          }}
           style={{ zIndex: 1100 }}
         >
           <div

@@ -36,8 +36,27 @@ export const RestoreAccountModal: React.FC = () => {
   };
 
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="restore-account-title">
-      <div className="veil-modal-card">
+    <div
+      className="veil-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="restore-account-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+    >
+      <div className="veil-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="veil-modal-header">
           <h2 id="restore-account-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>Restore Account & Keys</h2>
           <IconButton icon={<CloseIcon size={18} />} aria-label="Close dialog" onClick={closeModal} />

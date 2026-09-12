@@ -148,8 +148,32 @@ export const NewChatModal: React.FC = () => {
   };
 
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="new-chat-title">
-      <div className="veil-modal-card" style={{ maxWidth: '500px' }}>
+    <div
+      className="veil-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-chat-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+    >
+      <div
+        className="veil-modal-card"
+        style={{ maxWidth: '500px' }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <div className="veil-modal-header">
           <h2 id="new-chat-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>
             Start New Conversation

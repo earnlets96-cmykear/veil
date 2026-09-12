@@ -125,7 +125,20 @@ export const EmojiPickerModal: React.FC<EmojiPickerModalProps> = ({
       {/* Backdrop */}
       <div
         className="veil-emoji-picker-backdrop"
-        onClick={onClose}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }
+        }}
         aria-hidden="true"
         style={{
           position: 'fixed',

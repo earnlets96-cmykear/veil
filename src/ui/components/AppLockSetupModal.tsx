@@ -182,9 +182,24 @@ export const AppLockSetupModal: React.FC<AppLockSetupModalProps> = ({
         justifyContent: 'center',
         padding: '1rem',
       }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleDismiss();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleDismiss();
+        }
+      }}
     >
       <div
         className="veil-card"
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '380px',

@@ -108,8 +108,31 @@ export const ContactDetailsModal: React.FC<ContactDetailsModalProps> = ({ conver
   };
 
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="verify-modal-title">
-      <div className="veil-modal-card" style={{ maxWidth: '480px' }}>
+    <div
+      className="veil-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="verify-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+    >
+      <div
+        className="veil-modal-card"
+        style={{ maxWidth: '480px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="veil-modal-header">
           <h2 id="verify-modal-title" style={{ fontSize: 'var(--veil-text-lg)', fontWeight: 600 }}>

@@ -543,8 +543,32 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
   };
 
   return (
-    <div className="veil-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
-      <div className="veil-modal-card" style={{ maxWidth: '440px', padding: 0, overflow: 'hidden' }}>
+    <div
+      className="veil-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="profile-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+    >
+      <div
+        className="veil-modal-card"
+        style={{ maxWidth: '440px', padding: 0, overflow: 'hidden' }}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         {/* 1. Header Section with Avatar, Display Name, Status & Close Button */}
         <div
           style={{
@@ -1299,7 +1323,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
       {showLightbox && currentPhoto && (
         <div
           className="veil-modal-overlay"
-          onClick={() => setShowLightbox(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowLightbox(false);
+            }
+          }}
+          onTouchEnd={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowLightbox(false);
+            }
+          }}
           style={{
             zIndex: 1300,
             background: 'rgba(0, 0, 0, 0.92)',

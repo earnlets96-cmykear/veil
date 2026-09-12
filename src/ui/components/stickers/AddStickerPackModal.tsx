@@ -83,7 +83,20 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
   return (
     <div
       className="veil-modal-backdrop"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-sticker-title"

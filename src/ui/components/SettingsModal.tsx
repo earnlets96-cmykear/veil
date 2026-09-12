@@ -333,7 +333,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   return (
     <div
       className="veil-modal-overlay"
-      onClick={closeModal}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-label="Settings"
@@ -1007,9 +1020,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               justifyContent: 'center',
               padding: '1rem',
             }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowVerifyPrompt(false);
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (e.target === e.currentTarget) {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowVerifyPrompt(false);
+              }
+            }}
           >
             <div
               className="veil-card"
+              onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
                 maxWidth: '380px',

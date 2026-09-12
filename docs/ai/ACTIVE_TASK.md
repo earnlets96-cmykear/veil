@@ -1,6 +1,25 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 87 — UNIVERSAL FLOATING REACTION BADGES & ULTRA-PREMIUM GLASSMORPHIC STYLING
+## Active Phase: PHASE 88 — UNIVERSAL MODAL OUTSIDE TOUCH DISMISSAL & GHOST CLICK PREVENTION
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 88 Tasks Completed:
+- [x] **Universal Target-Verified Backdrop Dismissal on Touch & Click**:
+  - Implemented `e.target === e.currentTarget` check on all modal dialog overlays: `NewChatModal`, `NewGroupModal`, `ProfileModal`, `GroupDetailsModal`, `ContactDetailsModal`, `CreateSpaceModal`, `RestoreAccountModal`, `SettingsModal`, `AccountsAndSpacesModal`, `AppLockSetupModal`, `PermissionsModal`, `AvatarCropModal`, `AttachmentPreviewModal`, `MediaGalleryModal`, `AddStickerPackModal`, `EmojiPickerModal`, and `ConversationView` confirmation/forward modals.
+  - Added both `onClick` and `onTouchEnd` handlers invoking `e.preventDefault()`, `e.stopPropagation()`, and modal close callback (`closeModal()`, `onClose()`, `onCancel()`, `handleDismiss()`).
+- [x] **Ghost-Click Prevention Architecture (Anti-Reopening Engine)**:
+  - Added `lastModalClosedAtRef = useRef<number>(0)` in `AppState.tsx`. Recorded timestamp on `closeModal()`. Guarded `openModal(modal)` with `if (Date.now() - lastModalClosedAtRef.current < 350) return;` to completely neutralize synthesized 300ms mobile touch-to-click events that bleed through after backdrop dismissal.
+  - Added `lastMediaPickerClosedAtRef = useRef<number>(0)` in `MessageComposer.tsx`. Guarded the `+` attachment button and recorded timestamp in `MediaPickerModal.onClose` to prevent the media picker from instantly reopening when touching outside its sheet.
+- [x] **Inner Modal Card Event Isolation**:
+  - Applied `onClick={(e) => e.stopPropagation()}` and `onPointerDown={(e) => e.stopPropagation()}` to all inner cards and dialog containers, preventing accidental dismissal when interacting with inputs, lists, buttons, or scrollbars inside modals.
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase88-modal-outside-dismiss.test.tsx` (10/10 passing).
+  - 100% pass across regression suites (`phase87`, `phase85`, `conversation-view-render`).
+  - Strict Phase 44a verification ensuring 0 raw literal Unicode emojis in modified files.
+  - Production build verified: `npm run build` succeeds cleanly with 7 release artifacts.
+
+## Previous Phase: PHASE 87 — UNIVERSAL FLOATING REACTION BADGES & ULTRA-PREMIUM GLASSMORPHIC STYLING
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 
