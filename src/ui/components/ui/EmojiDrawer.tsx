@@ -230,11 +230,25 @@ const StickerGridCell: React.FC<StickerGridCellProps> = ({ sticker, onClick }) =
   const [resolvedUrl, setResolvedUrl] = useState<string>(sticker.url);
   const [retryKey, setRetryKey] = useState<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     setResolvedUrl(sticker.url);
     setLoadStatus('loading');
   }, [sticker.url]);
+
+  // Synchronous completion check (handles pre-cached blobs and data URIs instantly)
+  useEffect(() => {
+    if (imgRef.current) {
+      if (imgRef.current.complete) {
+        if (imgRef.current.naturalWidth > 0) {
+          setLoadStatus('loaded');
+        } else if (imgRef.current.src) {
+          setLoadStatus('error');
+        }
+      }
+    }
+  }, [resolvedUrl, retryKey]);
 
   useEffect(() => {
     if (loadStatus === 'error') {
@@ -270,13 +284,19 @@ const StickerGridCell: React.FC<StickerGridCellProps> = ({ sticker, onClick }) =
     >
       {loadStatus !== 'loaded' && <div className="veil-sticker-skeleton" />}
       <img
+        ref={imgRef}
         key={`${resolvedUrl}_${retryKey}`}
         src={resolvedUrl}
         alt=""
-        loading="lazy"
         onLoad={() => setLoadStatus('loaded')}
         onError={() => setLoadStatus('error')}
-        style={{ display: loadStatus === 'loaded' ? 'block' : 'none' }}
+        style={{
+          display: loadStatus === 'error' ? 'none' : 'block',
+          opacity: loadStatus === 'loaded' ? 1 : 0,
+          position: loadStatus !== 'loaded' ? 'absolute' : 'static',
+          pointerEvents: loadStatus === 'loaded' ? 'auto' : 'none',
+          transition: 'opacity 0.15s ease',
+        }}
       />
     </button>
   );
@@ -293,11 +313,25 @@ const StickerPackTabButton: React.FC<StickerPackTabButtonProps> = ({ pack, isAct
   const [resolvedThumb, setResolvedThumb] = useState<string>(pack.thumbnailUrl || '');
   const [retryKey, setRetryKey] = useState<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     setResolvedThumb(pack.thumbnailUrl || '');
     setLoadStatus(pack.thumbnailUrl ? 'loading' : 'loaded');
   }, [pack.thumbnailUrl]);
+
+  // Synchronous completion check for pack thumbnails
+  useEffect(() => {
+    if (imgRef.current) {
+      if (imgRef.current.complete) {
+        if (imgRef.current.naturalWidth > 0) {
+          setLoadStatus('loaded');
+        } else if (imgRef.current.src) {
+          setLoadStatus('error');
+        }
+      }
+    }
+  }, [resolvedThumb, retryKey]);
 
   useEffect(() => {
     if (loadStatus === 'error' && pack.thumbnailUrl) {
@@ -340,14 +374,20 @@ const StickerPackTabButton: React.FC<StickerPackTabButtonProps> = ({ pack, isAct
             />
           )}
           <img
+            ref={imgRef}
             key={`${resolvedThumb}_${retryKey}`}
             src={resolvedThumb}
             alt=""
             className="veil-sticker-pack-thumb"
-            loading="lazy"
             onLoad={() => setLoadStatus('loaded')}
             onError={() => setLoadStatus('error')}
-            style={{ display: loadStatus === 'loaded' ? 'block' : 'none' }}
+            style={{
+              display: loadStatus === 'error' ? 'none' : 'block',
+              opacity: loadStatus === 'loaded' ? 1 : 0,
+              position: loadStatus !== 'loaded' ? 'absolute' : 'static',
+              pointerEvents: loadStatus === 'loaded' ? 'auto' : 'none',
+              transition: 'opacity 0.15s ease',
+            }}
           />
         </>
       ) : (

@@ -53,8 +53,8 @@ function createStickersMiddleware() {
     }
 
     // 2. Generic Third-Party URL Proxy with CORS Headers
-    if (req.method === 'GET' && (url.startsWith('/api/telegram-stickers/proxy?url=') || url.startsWith('/v1/stickers/proxy?url=') || pathname === '/api/telegram-stickers/proxy' || pathname === '/v1/stickers/proxy')) {
-      const targetUrl = parsedUrl.searchParams.get('url') || (url.startsWith('/api/telegram-stickers/proxy?url=') ? decodeURIComponent(url.slice('/api/telegram-stickers/proxy?url='.length)) : decodeURIComponent(url.slice('/v1/stickers/proxy?url='.length)));
+    if (req.method === 'GET' && (rawUrl.startsWith('/api/telegram-stickers/proxy?url=') || rawUrl.startsWith('/v1/stickers/proxy?url=') || pathname === '/api/telegram-stickers/proxy' || pathname === '/v1/stickers/proxy')) {
+      const targetUrl = parsedUrl.searchParams.get('url') || (rawUrl.startsWith('/api/telegram-stickers/proxy?url=') ? decodeURIComponent(rawUrl.slice('/api/telegram-stickers/proxy?url='.length)) : decodeURIComponent(rawUrl.slice('/v1/stickers/proxy?url='.length)));
       if (!targetUrl) {
         res.statusCode = 400;
         res.end('MISSING_TARGET_URL');

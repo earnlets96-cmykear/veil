@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-12T15:40:04.390Z",
+  "generatedAt": "2026-09-12T19:37:00.206Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
   "artifacts": [
     {
-      "path": "dist/assets/index-124Vg-3s.js",
-      "sizeBytes": 994140,
-      "sha256": "b1e790a9ea875c6d48a4bd520a19bcd5260a3604aac799322ebdf98066e75f0a"
-    },
-    {
       "path": "dist/assets/index-4varej4e.css",
       "sizeBytes": 130677,
       "sha256": "b92492d82c6acc9dfa6cf9ac39211662b5f400455b388f20bfe3f77c4048b14c"
+    },
+    {
+      "path": "dist/assets/index-CNm0VzwI.js",
+      "sizeBytes": 994676,
+      "sha256": "82563f1f77ad8f778d50a18c6105d44f6bfa3407b633c8055eec9d3ff51242c1"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-B7yaneSA.js",
+      "path": "dist/assets/web-C_daPGqB.js",
       "sizeBytes": 8728,
-      "sha256": "2bfe70c9f159a6997f963eaa831e74c3b0633fb79793a93396d6f9db6bc2fdeb"
+      "sha256": "97a865dbfdb0be297c407b829f3b6f546cd5df7aca52e839c79b9787d7caf18e"
     },
     {
-      "path": "dist/assets/web-BP0ZJDfT.js",
-      "sizeBytes": 842,
-      "sha256": "2cf15fcd4a506ead767911f12c17c5f3ca06ca9352274e8be708107105b6df2a"
-    },
-    {
-      "path": "dist/assets/web-DXmfRVX6.js",
+      "path": "dist/assets/web-Dr83kwPp.js",
       "sizeBytes": 361,
-      "sha256": "b7a8fbe3b7f602d693e9b460a399ce4fe01bc0f3588ff04dc66a112776d760d2"
+      "sha256": "0f638d1dd19f1f82a77d174edc4197f1a5debf781a5fbaece636c64c507e42a8"
+    },
+    {
+      "path": "dist/assets/web-N1eeYKhC.js",
+      "sizeBytes": 842,
+      "sha256": "04c26882718182e659078ec40e77b818129072d7ec08cacfb8acba3c9ca761e9"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "a67b0ddea4435b269e8872dd26bf76f4ac6bc8f52058610acc5058a7370a7e8c"
+      "sha256": "12ad65b16373ed427899658b918eda82a5e81cfcb5814bca37a2097a06fd379e"
     }
   ]
 }

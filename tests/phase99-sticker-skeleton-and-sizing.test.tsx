@@ -35,7 +35,9 @@ describe('Phase 99: Sticker Skeleton Loaders, 1s Auto-Refresh & Compact Sizing',
     it('renders StickerGridCell with veil-sticker-skeleton while loading or in error', () => {
       expect(drawerContent).toContain('const StickerGridCell');
       expect(drawerContent).toContain('loadStatus !== \'loaded\' && <div className="veil-sticker-skeleton" />');
-      expect(drawerContent).toContain('display: loadStatus === \'loaded\' ? \'block\' : \'none\'');
+      expect(drawerContent).toContain('display: loadStatus === \'error\' ? \'none\' : \'block\'');
+      expect(drawerContent).toContain('opacity: loadStatus === \'loaded\' ? 1 : 0');
+      expect(drawerContent).toContain('if (imgRef.current.complete)');
     });
 
     it('implements 1-second auto-retry on sticker image failure in StickerGridCell', () => {
