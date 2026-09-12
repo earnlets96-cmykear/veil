@@ -1,6 +1,31 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 88 — UNIVERSAL MODAL OUTSIDE TOUCH DISMISSAL & GHOST CLICK PREVENTION
+## Active Phase: PHASE 89 — MESSAGE CONTEXT MENU & FLOATING REACTIONS OUTSIDE-PRESS DISMISSAL
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 89 Tasks Completed:
+- [x] **Universal Capture-Phase Outside Interaction Engine (`ConversationView.tsx`)**:
+  - Registered window event listeners with `{ capture: true }` for: `'pointerdown'`, `'mousedown'`, `'touchstart'`, `'click'`, `'contextmenu'`, and `'scroll'`.
+  - Intercepts any outside touch/click/press in the capture phase before any child element in the conversation (messages, buttons, media) can swallow or stop event propagation.
+- [x] **Strict Event Absorption on Outside Dismissal**:
+  - When an outside press occurs, `handleOutsideDismiss` calls `e.preventDefault()`, `e.stopPropagation()`, and `(e as any).stopImmediatePropagation?.()`, completely neutralizing the event so that underlying elements (voice playback, media viewer, text selection, composer inputs) are never accidentally triggered.
+  - Automatically resets context menu state (`setContextMenu({ isOpen: false, x: 0, y: 0, message: null })`).
+- [x] **Menu & Reactions Pill Internal Interaction Protection**:
+  - Allowed interactions within `.veil-context-menu`, `.veil-floating-reactions-pill`, and `.veil-emoji-picker-modal` through `target?.closest(...)` checks.
+  - Added `onPointerDown={(e) => e.stopPropagation()}` and `onTouchStart={(e) => e.stopPropagation()}` on the menu and floating reactions pill.
+- [x] **Opening Gesture Debounce Guard**:
+  - Added `menuOpenedAtRef` timestamping `handleContextMenu` trigger.
+  - Guarded `handleOutsideDismiss` with `Date.now() - menuOpenedAtRef.current < 60` to prevent the long-press release or right-click from instantaneously dismissing the freshly opened menu.
+- [x] **Enhanced Full-Screen Backdrop (`veil-components.css`, `ConversationView.tsx`)**:
+  - Updated `.veil-context-backdrop` with `position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: calc(var(--veil-z-popover, 1050) - 1); cursor: pointer; user-select: none;`.
+  - Added `onClick`, `onTouchStart`, `onTouchEnd`, `onPointerDown`, and `onMouseDown` handlers on the backdrop in JSX calling `e.preventDefault()` and `e.stopPropagation()`.
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase89-context-menu-outside-dismiss.test.tsx` (6/6 passing).
+  - 100% pass across regression suites (`phase88`, `phase87`, `phase85`).
+  - Production build verified: `npm run build` succeeds cleanly with 7 release artifacts.
+
+## Previous Phase: PHASE 88 — UNIVERSAL MODAL OUTSIDE TOUCH DISMISSAL & GHOST CLICK PREVENTION
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

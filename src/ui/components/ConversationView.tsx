@@ -797,6 +797,7 @@ export const ConversationView: React.FC = () => {
 
   // Context Menu Ref for edge protection
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const menuOpenedAtRef = useRef<number>(0);
 
   // Download progress state
   const [downloadProgress, setDownloadProgress] = useState<Record<string, { percent: number; loaded: number; total: number }>>({});
@@ -1268,12 +1269,13 @@ export const ConversationView: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [contextMenu.isOpen, forwardingMessage, deleteForEveryoneConfirm]);
 
-  // Dismiss context menu on outside touch, scroll, or resize
+  // Dismiss context menu & floating reactions on any outside pointer, touch, mouse, scroll, or resize
   useEffect(() => {
     if (!contextMenu.isOpen) return;
 
     const handleOutsideDismiss = (e: Event) => {
       const target = e.target as HTMLElement | null;
+      // Allow interactions within context menu, floating reactions pill, or emoji picker modal
       if (
         target?.closest('.veil-context-menu') ||
         target?.closest('.veil-floating-reactions-pill') ||
@@ -1281,15 +1283,45 @@ export const ConversationView: React.FC = () => {
       ) {
         return;
       }
+
+      // Ignore if event fired within 60ms of menu opening (prevent initial open event from dismissing)
+      if (Date.now() - menuOpenedAtRef.current < 60) {
+        return;
+      }
+
+      // Absorb outside interaction completely so underlying elements (media, audio, inputs, swipe) do not trigger
+      if (
+        e.type === 'pointerdown' ||
+        e.type === 'mousedown' ||
+        e.type === 'touchstart' ||
+        e.type === 'click' ||
+        e.type === 'contextmenu'
+      ) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        e.stopPropagation();
+        (e as any).stopImmediatePropagation?.();
+      }
+
       setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
     };
 
-    window.addEventListener('touchstart', handleOutsideDismiss, { passive: true, capture: true });
-    window.addEventListener('scroll', handleOutsideDismiss, { passive: true, capture: true });
+    // Capture phase listeners intercept outside interaction BEFORE any child element can stop propagation
+    window.addEventListener('pointerdown', handleOutsideDismiss, { capture: true });
+    window.addEventListener('mousedown', handleOutsideDismiss, { capture: true });
+    window.addEventListener('touchstart', handleOutsideDismiss, { capture: true, passive: false });
+    window.addEventListener('click', handleOutsideDismiss, { capture: true });
+    window.addEventListener('contextmenu', handleOutsideDismiss, { capture: true });
+    window.addEventListener('scroll', handleOutsideDismiss, { capture: true, passive: true });
     window.addEventListener('resize', handleOutsideDismiss, { passive: true });
 
     return () => {
+      window.removeEventListener('pointerdown', handleOutsideDismiss, { capture: true });
+      window.removeEventListener('mousedown', handleOutsideDismiss, { capture: true });
       window.removeEventListener('touchstart', handleOutsideDismiss, { capture: true });
+      window.removeEventListener('click', handleOutsideDismiss, { capture: true });
+      window.removeEventListener('contextmenu', handleOutsideDismiss, { capture: true });
       window.removeEventListener('scroll', handleOutsideDismiss, { capture: true });
       window.removeEventListener('resize', handleOutsideDismiss);
     };
@@ -1341,6 +1373,7 @@ export const ConversationView: React.FC = () => {
     }
     if (y < margin) y = margin;
 
+    menuOpenedAtRef.current = Date.now();
     setContextMenu({
       isOpen: true,
       x,
@@ -1539,16 +1572,6 @@ export const ConversationView: React.FC = () => {
     setSelectedMessageIds(new Set());
   };
 
-  // Close context menu on outside click
-  useEffect(() => {
-    const handleGlobalClick = () => {
-      if (contextMenu.isOpen) {
-        setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-      }
-    };
-    window.addEventListener('click', handleGlobalClick);
-    return () => window.removeEventListener('click', handleGlobalClick);
-  }, [contextMenu.isOpen]);
 
   if (!activeChatId) {
     return (
@@ -1885,12 +1908,30 @@ export const ConversationView: React.FC = () => {
       {contextMenu.isOpen && (
         <div
           className="veil-context-backdrop"
-          onClick={() => setContextMenu({ isOpen: false, x: 0, y: 0, message: null })}
-          onTouchStart={(e) => {
+          onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
           }}
-          onPointerDown={() => setContextMenu({ isOpen: false, x: 0, y: 0, message: null })}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+          }}
           aria-hidden="true"
         />
       )}
@@ -1966,6 +2007,8 @@ export const ConversationView: React.FC = () => {
             overflowY: 'auto',
           }}
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
           role="menu"
         >
           <button

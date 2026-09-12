@@ -710,6 +710,9 @@
 
 .veil-context-backdrop {
   position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   top: 0;
   left: 0;
   right: 0;
@@ -720,6 +723,7 @@
   -webkit-tap-highlight-color: transparent;
   pointer-events: auto;
   touch-action: none;
+  user-select: none;
 }
 
 .veil-context-menu {

@@ -1,6 +1,21 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 88 — UNIVERSAL MODAL OUTSIDE TOUCH DISMISSAL & GHOST CLICK PREVENTION
+## Current Verified Phase: PHASE 89 — MESSAGE CONTEXT MENU & FLOATING REACTIONS OUTSIDE-PRESS DISMISSAL
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 6 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Universal Outside Press Dismissal**: Pressing, clicking, or touching anywhere outside the popped-up message context actions menu or floating reactions pill immediately dismisses both elements regardless of where the press occurs (on another message, image, sticker, empty wallpaper, sidebar, header, or composer).
+  - **Capture-Phase Window Interception (`ConversationView.tsx`)**: Registered window listeners in the capture phase (`{ capture: true }`) for `'pointerdown'`, `'mousedown'`, `'touchstart'`, `'click'`, `'contextmenu'`, and `'scroll'`, completely bypassing child bubble propagation stoppers and ensuring no underlying element consumes the dismiss gesture.
+  - **Event Absorption on Outside Dismiss**: The outside dismiss handler calls `e.preventDefault()`, `e.stopPropagation()`, and `(e as any).stopImmediatePropagation?.()`, ensuring the dismiss press is completely absorbed and never inadvertently activates underlying controls (e.g., will not trigger audio playback, image viewer, swipe-to-reply, or input focus).
+  - **Internal Interaction Protection**: Taps and clicks inside `.veil-context-menu`, `.veil-floating-reactions-pill`, or `.veil-emoji-picker-modal` continue to work flawlessly with `stopPropagation()`.
+  - **Opening Gesture Debounce Guard**: 60ms opening guard prevents the initial right-click or long-press release from inadvertently dismissing the menu.
+  - **Viewport Backdrop Guard**: Enhanced `.veil-context-backdrop` with `position: fixed; inset: 0; width: 100vw; height: 100vh` and multi-event absorption (`onClick`, `onTouchStart`, `onTouchEnd`, `onPointerDown`, `onMouseDown`).
+- **Verification Deliverables**:
+  - New test suite: `tests/phase89-context-menu-outside-dismiss.test.tsx` (6/6 passing).
+  - Regression tests passing: `tests/phase88-modal-outside-dismiss.test.tsx` (10/10), `tests/phase87-universal-floating-reactions.test.tsx` (7/7), `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.82s.
+
+## Previous Verified Phase: PHASE 88 — UNIVERSAL MODAL OUTSIDE TOUCH DISMISSAL & GHOST CLICK PREVENTION
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 10 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

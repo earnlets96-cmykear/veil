@@ -2,6 +2,26 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase89-context-menu-outside-dismiss] - 2026-09-12
+
+### Message Context Menu & Floating Reactions Outside-Press Dismissal (Phase 89)
+- **Universal Capture-Phase Outside Interaction Interception (`ConversationView.tsx`)**:
+  - Registered window event listeners with `{ capture: true }` for: `'pointerdown'`, `'mousedown'`, `'touchstart'`, `'click'`, `'contextmenu'`, and `'scroll'`.
+  - Captures any outside interaction at the window level during the capture phase, completely immune to any `e.stopPropagation()` called by child message bubbles, media containers, or buttons.
+- **Strict Event Absorption on Outside Dismiss**:
+  - In `handleOutsideDismiss`, calls `e.preventDefault()`, `e.stopPropagation()`, and `(e as any).stopImmediatePropagation?.()`, guaranteeing that tapping outside dismisses the menu without triggering underlying elements (e.g. will not play voice audio, open media viewer, trigger swipe-to-reply, or focus inputs).
+- **Internal Menu & Reactions Interaction Protection**:
+  - Checks `target?.closest('.veil-context-menu')`, `target?.closest('.veil-floating-reactions-pill')`, and `target?.closest('.veil-emoji-picker-modal')` to allow taps/clicks inside the menu and reactions pill to execute their intended actions.
+- **Debounce Guard Against Opening Trigger**:
+  - Added `menuOpenedAtRef` recording `Date.now()` on `handleContextMenu`. Events within 60ms of menu opening are ignored to prevent the long-press release or right-click from immediately dismissing the new menu.
+- **Enhanced Full-Screen Backdrop (`veil-components.css`, `ConversationView.tsx`)**:
+  - Positioned `.veil-context-backdrop` with `position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: calc(var(--veil-z-popover, 1050) - 1); cursor: pointer; user-select: none;`.
+  - Equipped with `onClick`, `onTouchStart`, `onTouchEnd`, `onPointerDown`, and `onMouseDown` handlers with `preventDefault()` and `stopPropagation()`.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase89-context-menu-outside-dismiss.test.tsx` (6/6 passing).
+  - 100% test pass on regression suites (`phase88`, `phase87`, `phase85`).
+  - Clean production build verified via `npm run build`.
+
 ## [1.0.0-phase88-modal-outside-dismiss] - 2026-09-12
 
 ### Universal Modal Outside Touch Dismissal & Ghost Click Prevention (Phase 88)
