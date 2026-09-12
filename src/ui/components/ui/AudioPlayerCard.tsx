@@ -18,11 +18,14 @@ export interface AudioPlayerCardProps {
   sizeBytes: number;
   mimeType?: string;
   blobUrl?: string;
+  objectId?: string;
+  attachmentId?: string;
   isOutgoing?: boolean;
   status?: 'idle' | 'uploading' | 'downloading' | 'ready' | 'error';
   progressPercent?: number;
   loadedBytes?: number;
   onDownload?: () => void;
+  onResolveAudio?: () => Promise<string | undefined>;
   className?: string;
 }
 
@@ -32,11 +35,14 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
   sizeBytes,
   mimeType = 'audio/mpeg',
   blobUrl: propBlobUrl,
+  objectId,
+  attachmentId,
   isOutgoing = false,
   status = 'ready',
   progressPercent = 0,
   loadedBytes = 0,
   onDownload,
+  onResolveAudio,
   className = '',
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -51,17 +57,21 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
   const scrubberRef = useRef<HTMLDivElement>(null);
   const isScrubbingRef = useRef(false);
 
-  // Sync blobUrl from cache if available
+  // Sync blobUrl from prop or cache if available
   useEffect(() => {
     if (propBlobUrl) {
       setResolvedBlobUrl(propBlobUrl);
       return;
     }
-    const cached = MediaCache.get(messageId);
+    const cached =
+      (objectId ? MediaCache.get(objectId) : undefined) ||
+      (attachmentId ? MediaCache.get(attachmentId) : undefined) ||
+      MediaCache.get(name) ||
+      MediaCache.get(messageId);
     if (cached?.blobUrl) {
       setResolvedBlobUrl(cached.blobUrl);
     }
-  }, [messageId, propBlobUrl]);
+  }, [messageId, objectId, attachmentId, name, propBlobUrl]);
 
   // Manage HTMLAudioElement lifecycle
   useEffect(() => {
@@ -115,17 +125,62 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
     // If audio is currently uploading/downloading, let user wait
     if (status === 'uploading' || status === 'downloading') return;
 
-    // If we do not have a blobUrl, trigger onDownload to fetch & decrypt
+    // If we do not have a blobUrl, fetch and decrypt into memory (NEVER save to disk)
     if (!resolvedBlobUrl) {
       setIsResolving(true);
       try {
-        if (onDownload) {
-          await onDownload();
+        let url: string | undefined;
+        if (onResolveAudio) {
+          url = await onResolveAudio();
         }
-        const cached = MediaCache.get(messageId);
-        if (cached?.blobUrl) {
-          setResolvedBlobUrl(cached.blobUrl);
+        if (!url) {
+          const cached =
+            (objectId ? MediaCache.get(objectId) : undefined) ||
+            (attachmentId ? MediaCache.get(attachmentId) : undefined) ||
+            MediaCache.get(name) ||
+            MediaCache.get(messageId);
+          url = cached?.blobUrl;
         }
+
+        if (url) {
+          setResolvedBlobUrl(url);
+          // Pause any other voice notes playing via VoicePlayer
+          VoicePlayer.stop();
+
+          const audio = new Audio(url);
+          audioRef.current = audio;
+
+          const onLoadedMetadata = () => {
+            if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+              setDuration(audio.duration);
+            }
+          };
+          const onTimeUpdate = () => {
+            if (isScrubbingRef.current) return;
+            setCurrentTime(audio.currentTime);
+            if (audio.duration > 0) {
+              setProgressPercentState((audio.currentTime / audio.duration) * 100);
+            }
+          };
+          const onEnded = () => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+            setProgressPercentState(0);
+          };
+          const onError = () => {
+            setIsPlaying(false);
+          };
+
+          audio.addEventListener('loadedmetadata', onLoadedMetadata);
+          audio.addEventListener('timeupdate', onTimeUpdate);
+          audio.addEventListener('ended', onEnded);
+          audio.addEventListener('error', onError);
+
+          await audio.play();
+          setIsPlaying(true);
+        }
+      } catch (_err) {
+        setIsPlaying(false);
       } finally {
         setIsResolving(false);
       }
@@ -282,7 +337,7 @@ export const AudioPlayerCard: React.FC<AudioPlayerCardProps> = ({
         {/* Time and Size Subtitle */}
         <div className="veil-audio-player-footer">
           <span className="veil-audio-player-time">
-            {formatTime(currentTime)} / {duration > 0 ? formatTime(duration) : formatSize(sizeBytes)}
+            {duration > 0 ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(currentTime)}
           </span>
           <span className="veil-audio-player-size">
             {formatSize(sizeBytes)}

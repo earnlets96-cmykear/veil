@@ -1,6 +1,35 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 89 — MESSAGE CONTEXT MENU & FLOATING REACTIONS OUTSIDE-PRESS DISMISSAL
+## Active Phase: PHASE 90 — ACCOUNT PROFILE AVATAR IN HEADER & AUDIOPLAYER CARD INLINE PLAYBACK
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
+- **Branch**: `main`
+
+### Phase 90 Tasks Completed:
+- [x] **Sidebar Header Account Profile Avatar (`src/ui/components/Sidebar.tsx`)**:
+  - Replaced static hamburger `<MenuIcon />` in the top-left sidebar header with `<Avatar />` bound to `myProfile`.
+  - Displays user's profile image or deterministic initial/gradient fallback, scaled to 32px circle.
+  - Retained exact same action: clicking opens the Settings & Accounts modal (`openModal({ type: 'settings' })`).
+  - Added `.veil-sidebar-profile-btn` with hover scale (`scale(1.06)`) and ambient teal glow in `veil-components.css`.
+- [x] **Audio/Music Inline Playback & Decoupled Download (`AudioPlayerCard.tsx`, `ConversationView.tsx`)**:
+  - Decoupled in-line playback from device storage download:
+    - Added `onResolveAudio` and `objectId`/`attachmentId` props to `AudioPlayerCard`.
+    - Clicking the green circular Play button calls `onResolveAudio()`, which fetches and decrypts audio in-memory without invoking `FileSaver.saveFile()` or triggering a "Saved to storage" toast.
+    - Immediately initializes `Audio` element, binds metadata/timeupdate listeners, and starts playback.
+    - Dedicated download icon button in the card header remains strictly bound to `onDownload` (`handleDownloadAttachment`), allowing explicit saves to storage.
+  - Fixed subtitle metadata bug (`0:00 / 13.5 MB13.5 MB`):
+    - Now cleanly renders `duration > 0 ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(currentTime)` on the left, and `${formatSize(sizeBytes)}` on the right.
+  - Implemented `handleResolveAudioAttachment` in `ConversationView.tsx`:
+    - Checks in-memory cache and `MediaCache.getOrFetch` to decrypt audio on demand.
+    - Caches decrypted buffer under both attachment key and `msg.id` for instantaneous playback.
+- [x] **Full-Suite Component Styling (`veil-components.css`)**:
+  - Unified CSS classes for `.veil-audio-player-*` matching `AudioPlayerCard.tsx`.
+  - Added `.veil-sidebar-profile-btn` micro-interactions.
+- [x] **Automated Tests & Regression Suite**:
+  - Created `tests/phase90-profile-avatar-and-audio-player.test.tsx` (8/8 passing).
+  - 100% pass across regression suites (`phase89`, `phase88`, `phase87`, `phase85`).
+  - Production build clean: `npm run build` succeeds with 0 type errors.
+
+## Previous Phase: PHASE 89 — MESSAGE CONTEXT MENU & FLOATING REACTIONS OUTSIDE-PRESS DISMISSAL
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

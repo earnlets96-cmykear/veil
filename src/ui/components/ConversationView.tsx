@@ -120,6 +120,7 @@ interface ConversationMessageRowProps {
   onRetry?: (msg: UIMessage) => void;
   peerAvatar?: string;
   onReactionClick?: (msg: UIMessage, emoji: string) => void;
+  onResolveAudioAttachment?: (msg: UIMessage) => Promise<string | undefined>;
   isGroup?: boolean;
 }
 
@@ -159,6 +160,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   onRetry,
   peerAvatar,
   onReactionClick,
+  onResolveAudioAttachment,
 }) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -284,6 +286,12 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const handleReactionAction = useCallback((emoji: string) => {
     if (onReactionClick) onReactionClick(msg, emoji);
   }, [onReactionClick, msg]);
+  const handleResolveAudioAction = useCallback(async () => {
+    if (onResolveAudioAttachment) {
+      return onResolveAudioAttachment(msg);
+    }
+    return undefined;
+  }, [onResolveAudioAttachment, msg]);
   const handleContextMenuAction = useCallback((e: React.MouseEvent) => {
     onContextMenu(e, msg);
   }, [onContextMenu, msg]);
@@ -568,6 +576,8 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               sizeBytes={msg.attachment.sizeBytes}
               mimeType={msg.attachment.mimeType}
               blobUrl={msg.attachment.previewUrl || msg.attachment.localPreviewUrl}
+              objectId={msg.attachment.objectId}
+              attachmentId={msg.attachment.attachmentId}
               isOutgoing={msg.isOutgoing}
               status={
                 isCurrentlyDownloading
@@ -579,6 +589,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               progressPercent={isCurrentlyDownloading ? dlPercent : effectiveUploadPercent}
               loadedBytes={isCurrentlyDownloading ? dlLoaded : effectiveUploadLoaded}
               onDownload={handleDownload}
+              onResolveAudio={handleResolveAudioAction}
             />
           )}
 
@@ -1174,6 +1185,27 @@ export const ConversationView: React.FC = () => {
       });
     }
   }, [activeSession, cloudClient, ensureCloudSession, showToast]);
+
+  // In-Memory Audio Attachment Resolver (Does NOT save to disk)
+  const handleResolveAudioAttachment = useCallback(async (msg: UIMessage): Promise<string | undefined> => {
+    if (!msg.attachment || !activeSession) return undefined;
+    const existing = msg.attachment.previewUrl || msg.attachment.localPreviewUrl;
+    if (existing) return existing;
+
+    const key = msg.attachment.objectId || msg.attachment.attachmentId || msg.attachment.name;
+    let cached = (key ? MediaCache.get(key) : undefined) || MediaCache.get(msg.id);
+    if (cached?.blobUrl) return cached.blobUrl;
+
+    if (!cloudClient.getSessionToken()) {
+      await ensureCloudSession(activeSession);
+    }
+    const decrypted = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
+    if (decrypted?.blobUrl) {
+      MediaCache.set(msg.id, decrypted);
+      return decrypted.blobUrl;
+    }
+    return undefined;
+  }, [activeSession, cloudClient, ensureCloudSession]);
 
   // Open Fullscreen Media Viewer
   const handleOpenMedia = useCallback((msg: UIMessage) => {
@@ -1892,6 +1924,7 @@ export const ConversationView: React.FC = () => {
                 onOpenGroupedMedia={handleOpenGroupedMedia}
                 onOpenMedia={handleOpenMedia}
                 onDownloadAttachment={handleDownloadAttachment}
+                onResolveAudioAttachment={handleResolveAudioAttachment}
                 onToggleVoice={handleToggleVoice}
                 onSeekVoice={handleSeekVoice}
                 onRetry={handleRetryMessage}

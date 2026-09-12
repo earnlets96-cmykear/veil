@@ -2,6 +2,29 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase90-profile-avatar-and-audio-player] - 2026-09-12
+
+### Account Profile in Sidebar Header & Inline Audio Player Fix (Phase 90)
+- **Account Profile Avatar in Sidebar Header (`Sidebar.tsx`)**:
+  - Replaced the generic hamburger menu icon (`MenuIcon`) in the top-left sidebar header with the account owner's `<Avatar />` component.
+  - Bound to `myProfile?.displayName || myProfile?.username || 'Me'`, image URL (`myProfile?.avatar || myProfile?.avatarUrl`), and deterministic identity/space seed.
+  - Preserved the identical trigger action: clicking the profile avatar immediately invokes `openModal({ type: 'settings' })` to open Settings & Account management.
+  - Enhanced with `.veil-sidebar-profile-btn` styling featuring smooth spring hover micro-interaction (`transform: scale(1.06)`), subtle teal ambient focus glow, and zero-distort flex centering.
+- **Decoupled Inline Audio Playback from Device Storage Download (`AudioPlayerCard.tsx`, `ConversationView.tsx`)**:
+  - Fixed severe UX defect where pressing the circular green Play button repeatedly saved audio files to local storage/gallery and popped up "Saved to storage" toasts instead of playing inline.
+  - Separated `handlePlayToggle` logic: pressing Play now strictly requests in-memory audio resolution via `onResolveAudio` and `MediaCache.getOrFetch`, passing the resulting blob URL into an `Audio()` object to play immediately in the browser.
+  - The dedicated download button in the audio card header remains the sole action for saving audio attachments to physical disk storage via `onDownload`.
+  - Passed `onResolveAudioAttachment`, `objectId`, and `attachmentId` directly from `ConversationView.tsx` into `<AudioPlayerCard />` so decrypted buffers are cached and retrieved in-memory without disk I/O.
+- **Fixed Duplicated Audio Card Subtitle Layout (`AudioPlayerCard.tsx`)**:
+  - Resolved subtitle display bug where unstarted or zero-duration tracks rendered redundant concatenated text (`0:00 / 13.5 MB13.5 MB`).
+  - Left span now displays duration timestamp (`0:00` or `currentTime / duration` when duration is known), while the right span exclusively renders the formatted file size (`13.5 MB`).
+- **Phase 44a Zero Literal Unicode Emoji Compliance**:
+  - Maintained 100% compliance with strict Phase 44a zero raw literal emoji rules across all new code and tests.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase90-profile-avatar-and-audio-player.test.tsx` (8/8 passing).
+  - 100% test pass across all regression test suites (`phase90`, `phase89`, `phase88`, `phase87`, `phase85` -> 38/38 passing).
+  - Full TypeScript validation and production Vite bundle verification (`npm run build`).
+
 ## [1.0.0-phase89-context-menu-outside-dismiss] - 2026-09-12
 
 ### Message Context Menu & Floating Reactions Outside-Press Dismissal (Phase 89)

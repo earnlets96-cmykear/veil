@@ -382,20 +382,26 @@ export const Sidebar: React.FC = () => {
           type="button"
           onClick={() => openModal({ type: 'settings' as any })}
           aria-label="Open Settings"
-          title="Settings"
+          title={myProfile?.displayName || myProfile?.username || 'Settings'}
+          className="veil-sidebar-profile-btn"
           style={{
             background: 'none',
             border: 'none',
-            color: '#f3f4f6',
             cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '8px',
+            padding: '2px',
+            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
           }}
         >
-          <MenuIcon size={22} />
+          <Avatar
+            name={myProfile?.displayName || myProfile?.username || 'Me'}
+            imageUrl={myProfile?.avatar || myProfile?.avatarUrl}
+            seed={myProfile?.identityId || activeSession?.spaceId || 'me'}
+            size={32}
+          />
         </button>
 
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

@@ -1,6 +1,19 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 89 — MESSAGE CONTEXT MENU & FLOATING REACTIONS OUTSIDE-PRESS DISMISSAL
+## Current Verified Phase: PHASE 90 — ACCOUNT PROFILE AVATAR IN HEADER & AUDIOPLAYER CARD INLINE PLAYBACK
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 8 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **Sidebar Header Account Profile Avatar (`src/ui/components/Sidebar.tsx`)**: Replaced the static hamburger icon (`MenuIcon`) in the top-left corner of the chat sidebar with the user's account profile avatar (`<Avatar />` bound to `myProfile`). Displays user profile photo or deterministic initial gradient fallback at 32px with hover scale micro-animations. Clicking it executes the exact same action: opening the Settings / Accounts modal (`openModal({ type: 'settings' })`).
+  - **In-Line Music / Audio Playback (`AudioPlayerCard.tsx`, `ConversationView.tsx`)**: Decoupled inline music playing from saving to device storage. Pressing the play button on `AudioPlayerCard` now calls `onResolveAudio()`, decrypting audio in-memory via `MediaCache.getOrFetch` and immediately playing audio without triggering `FileSaver.saveFile()` or popping up "Saved to storage". The dedicated download icon on the card header remains strictly reserved for downloading/saving to disk.
+  - **Subtitle Metadata Fix**: Eliminated the duplicate size display bug (`0:00 / 13.5 MB13.5 MB`). The footer subtitle now cleanly displays elapsed time (`0:00` or `0:15 / 3:45`) on the left and file size (`13.5 MB`) on the right.
+  - **Full Component Styling (`veil-components.css`)**: Implemented comprehensive styles for `.veil-audio-player-*` and `.veil-sidebar-profile-btn` per `/impeccable` and `ui-ux-pro-max` craft standards.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase90-profile-avatar-and-audio-player.test.tsx` (8/8 passing).
+  - Regression tests passing: `tests/phase89-context-menu-outside-dismiss.test.tsx` (6/6), `tests/phase88-modal-outside-dismiss.test.tsx` (10/10), `tests/phase87-universal-floating-reactions.test.tsx` (7/7), `tests/phase85-message-reactions-and-context-dismiss.test.tsx` (7/7).
+  - Production release build: `npm run build` succeeds cleanly with 7 release artifacts in 2.75s.
+
+## Previous Verified Phase: PHASE 89 — MESSAGE CONTEXT MENU & FLOATING REACTIONS OUTSIDE-PRESS DISMISSAL
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 6 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

@@ -3340,8 +3340,30 @@
 }
 
 /* ==========================================================================
-   Phase 82: Audio Player Card (Inline Music / Audio Playback)
+   Phase 90: Sidebar Profile Button & Audio Player Card
    ========================================================================== */
+.veil-sidebar-profile-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease;
+  position: relative;
+}
+
+.veil-sidebar-profile-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.4);
+}
+
+.veil-sidebar-profile-btn:active {
+  transform: scale(0.95);
+}
+
 .veil-audio-player-card {
   display: flex;
   align-items: center;
@@ -3357,16 +3379,26 @@
   user-select: none;
 }
 
-.veil-audio-player-card.veil-audio-player-outgoing {
+.veil-audio-player-card.veil-audio-player-outgoing,
+.veil-audio-player-card.outgoing {
   background: rgba(20, 184, 166, 0.12);
   border-color: rgba(20, 184, 166, 0.25);
 }
 
-.veil-audio-player-card.veil-audio-player-incoming {
+.veil-audio-player-card.veil-audio-player-incoming,
+.veil-audio-player-card.incoming {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+.veil-audio-player-btn-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.veil-audio-player-play-btn,
 .veil-audio-play-btn {
   position: relative;
   width: 44px;
@@ -3384,15 +3416,24 @@
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
+.veil-audio-player-play-btn:hover,
 .veil-audio-play-btn:hover {
   transform: scale(1.05);
   background: var(--veil-accent-hover, #0d9488);
 }
 
+.veil-audio-player-play-btn:active,
 .veil-audio-play-btn:active {
   transform: scale(0.95);
 }
 
+.veil-audio-player-play-btn:disabled,
+.veil-audio-play-btn:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+.veil-audio-player-body,
 .veil-audio-content {
   flex: 1;
   min-width: 0;
@@ -3401,74 +3442,119 @@
   gap: 6px;
 }
 
+.veil-audio-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.veil-audio-player-title,
 .veil-audio-title {
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--veil-text-primary, #ffffff);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
 
+.veil-audio-player-download-btn,
+.veil-audio-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--veil-text-secondary, #94a3b8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.veil-audio-player-download-btn:hover,
+.veil-audio-action-btn:hover {
+  background: rgba(20, 184, 166, 0.15);
+  color: var(--veil-accent-primary, #14b8a6);
+  border-color: rgba(20, 184, 166, 0.3);
+  transform: scale(1.05);
+}
+
+.veil-audio-player-download-btn:active,
+.veil-audio-action-btn:active {
+  transform: scale(0.95);
+}
+
+.veil-audio-player-track-wrap,
 .veil-audio-scrubber-track {
   position: relative;
   width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  height: 14px;
+  display: flex;
+  align-items: center;
   cursor: pointer;
-  padding: 4px 0;
-  background-clip: content-box;
+  touch-action: none;
 }
 
+.veil-audio-player-track-bg {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: visible;
+}
+
+.veil-audio-player-track-fill,
 .veil-audio-scrubber-fill {
   position: absolute;
-  top: 4px;
+  top: 0;
   left: 0;
-  height: 6px;
+  height: 100%;
   background: var(--veil-accent-primary, #14b8a6);
-  border-radius: 3px;
+  border-radius: 2px;
   pointer-events: none;
 }
 
+.veil-audio-player-needle,
 .veil-audio-scrubber-thumb {
   position: absolute;
   top: 50%;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #ffffff;
   transform: translate(-50%, -50%);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   pointer-events: none;
+  transition: transform 0.1s ease;
 }
 
+.veil-audio-player-needle.active {
+  transform: translate(-50%, -50%) scale(1.3);
+  background: var(--veil-accent-primary, #14b8a6);
+}
+
+.veil-audio-player-footer,
 .veil-audio-meta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 0.72rem;
   color: var(--veil-text-secondary, #94a3b8);
+  font-variant-numeric: tabular-nums;
 }
 
-.veil-audio-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--veil-text-secondary, #94a3b8);
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
+.veil-audio-player-time {
+  font-weight: 500;
 }
 
-.veil-audio-action-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--veil-text-primary, #ffffff);
+.veil-audio-player-size {
+  opacity: 0.8;
 }
 
 /* ==========================================================================
