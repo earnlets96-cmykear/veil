@@ -2,6 +2,30 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase95-telegram-sticker-resolution-and-hd] - 2026-09-12
+
+### Telegram Sticker Full 120+ Resolution, Full-HD (512x512) Assets, & Send Fix (Phase 95)
+- **On-Demand Server File Proxy (`vite.config.ts`, `relayServer.ts`, `telegramStickerResolver.ts`)**:
+  - Implemented `/api/telegram-stickers/file` and `/v1/stickers/file` endpoints.
+  - Dynamically resolves `file_id` -> `file_path` on-demand via Telegram Bot `getFile` API without upfront batch rate limits.
+  - Streams full 512x512 High-Definition WebP assets with `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=604800, immutable`.
+  - Implemented LRU in-memory buffer cache (up to 500 stickers, 24h retention) for instant zero-latency repeats.
+- **Full 120+ Sticker Pack Resolution Without Truncation**:
+  - Removed artificial truncation in `TelegramStickerResolver.resolvePack` and `telegramStickerService.fetchTelegramPack`.
+  - Full packs with 120+ stickers now resolve all stickers without being cut off at 20 or 100.
+- **Fix for "Failed to load sticker image data"**:
+  - Fixed root cause where Telegram `getStickerSet` only provides `file_id` without `file_path`, replacing broken direct URLs with `/api/telegram-stickers/file?file_id=...&token=...`.
+  - Enhanced `fetchStickerBlob` to support relative server URLs, direct CDN, proxy fallback, and canvas offscreen conversion fallback.
+- **UI Guidance in AddStickerPackModal (`AddStickerPackModal.tsx`)**:
+  - Added `512x512 HD` indicator badge.
+  - Added informative banner when 20 preview stickers are returned without a bot token.
+  - Added 3-step guide for creating a bot token with `@BotFather` in 20 seconds.
+- **Verification & Test Coverage**:
+  - Created automated test suite `tests/phase95-telegram-sticker-resolution-and-hd.test.tsx` (16/16 passing).
+  - Regression tests passing: `phase95`, `phase93`, `phase91`, `phase83` (63/63 passing).
+  - Production build clean: `npm run build` succeeds cleanly with 7 release artifacts.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
 ## [1.0.0-phase94-active-audio-notification-banner] - 2026-09-12
 
 ### In-App Floating Audio Player Notification Banner (Phase 94)

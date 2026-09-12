@@ -141,7 +141,7 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
                   {previewPack.title}
                 </h3>
                 <span className="veil-add-sticker-count-badge">
-                  {previewPack.stickers.length} stickers
+                  {previewPack.stickers.length} stickers {previewPack.stickers.length > 20 || botToken ? '\u2022 512x512 HD' : ''}
                 </span>
               </div>
             </div>
@@ -169,6 +169,11 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
         {previewPack ? (
           /* Live Full-Set Scrollable Preview */
           <div className="veil-add-sticker-preview-grid-wrap" ref={previewRef}>
+            {previewPack.stickers.length <= 20 && !botToken && (
+              <div style={{ padding: '8px 12px', background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '8px', margin: '0 12px 10px 12px', fontSize: '0.75rem', color: '#93c5fd', lineHeight: '1.4' }}>
+                Showing 20 preview stickers. Add your free Telegram Bot Token to unlock all 120+ stickers in full 512x512 High Definition.
+              </div>
+            )}
             <div className="veil-add-sticker-preview-grid">
               {previewPack.stickers.map((stk: StickerItem, idx: number) => (
                 <div
@@ -245,7 +250,7 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
               </div>
             </div>
 
-            {/* Optional Telegram Bot Token Setting */}
+            {/* Telegram Bot Token Setting */}
             <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px' }}>
               <button
                 type="button"
@@ -257,13 +262,17 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  color: 'var(--veil-text-muted, #64748b)',
+                  color: botToken ? 'var(--veil-accent-primary, #14b8a6)' : 'var(--veil-text-muted, #64748b)',
                   fontSize: '0.75rem',
                   cursor: 'pointer',
                 }}
               >
                 <KeyIcon size={12} />
-                <span>Telegram Bot Token (Optional for private packs)</span>
+                <span>
+                  {botToken
+                    ? 'Telegram Bot Token Connected (120+ HD Stickers Active)'
+                    : 'Telegram Bot Token (Unlock 120+ Stickers in 512x512 HD)'}
+                </span>
               </button>
               {showTokenInput && (
                 <div style={{ marginTop: '8px' }}>
@@ -276,9 +285,14 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
                     style={{ fontSize: '0.8rem', padding: '8px 12px' }}
                     aria-label="Telegram Bot Token"
                   />
-                  <span style={{ fontSize: '0.7rem', color: 'var(--veil-text-muted, #64748b)', display: 'block', marginTop: '4px' }}>
-                    Stored locally on this device only. Allows unrestricted pack downloading directly from Telegram API.
-                  </span>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--veil-text-muted, #64748b)', marginTop: '4px', lineHeight: '1.4' }}>
+                    <p style={{ margin: '0 0 2px 0' }}>
+                      Get a free token in 20 seconds: open <strong>@BotFather</strong> on Telegram &rarr; send <code>/newbot</code> &rarr; paste token.
+                    </p>
+                    <p style={{ margin: 0, color: 'var(--veil-text-secondary, #94a3b8)' }}>
+                      Enables downloading complete 120+ sticker sets in full 512x512 High Definition without limits.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

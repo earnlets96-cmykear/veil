@@ -277,6 +277,38 @@ export class RelayServer {
         return;
       }
 
+      // On-demand Telegram Sticker File Proxy (Full HD 512x512 WebP)
+      if (method === 'GET' && (url.startsWith('/v1/stickers/file') || url.startsWith('/api/telegram-stickers/file'))) {
+        const parsedUrl = new URL(url, 'http://localhost');
+        const fileId = parsedUrl.searchParams.get('file_id') || '';
+        const token =
+          parsedUrl.searchParams.get('token') ||
+          (req.headers['x-telegram-bot-token'] as string) ||
+          process.env.TELEGRAM_BOT_TOKEN ||
+          '';
+
+        if (!fileId || !token) {
+          this.sendError(res, 'BAD_REQUEST', 'Missing file_id or token', 400);
+          return;
+        }
+
+        try {
+          const result = await TelegramStickerResolver.fetchStickerImageBuffer(fileId, token);
+          if (result) {
+            res.setHeader('Content-Type', result.contentType || 'image/webp');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+            res.statusCode = 200;
+            res.end(result.buffer);
+          } else {
+            this.sendError(res, 'NOT_FOUND', 'Sticker file not found', 404);
+          }
+        } catch (err: any) {
+          this.sendError(res, 'INTERNAL_ERROR', err?.message || 'Proxy error', 500);
+        }
+        return;
+      }
+
       if (method === 'GET' && (url.startsWith('/v1/stickers/proxy?url=') || url.startsWith('/api/telegram-stickers/proxy?url='))) {
         const prefix = url.startsWith('/v1/stickers/proxy?url=') ? '/v1/stickers/proxy?url=' : '/api/telegram-stickers/proxy?url=';
         const rawTarget = url.slice(prefix.length);
@@ -311,10 +343,18 @@ export class RelayServer {
       }
 
       if (method === 'GET' && (url.startsWith('/v1/stickers/') || url.startsWith('/api/telegram-stickers/'))) {
-        const packName = url.replace(/^\/(?:v1\/stickers|api\/telegram-stickers)\//, '');
-        const botToken = (req.headers['x-telegram-bot-token'] as string) || undefined;
+        const packName = url
+          .replace(/^\/(?:v1\/stickers|api\/telegram-stickers)\//, '')
+          .split('?')[0];
+        const parsedUrl = new URL(url, 'http://localhost');
+        const botToken =
+          (req.headers['x-telegram-bot-token'] as string) ||
+          parsedUrl.searchParams.get('token') ||
+          undefined;
         const pack = await TelegramStickerResolver.resolvePack(packName, botToken);
         if (pack) {
+          res.setHeader('Content-Type', 'application/json');
+          res.setHeader('Access-Control-Allow-Origin', '*');
           res.statusCode = 200;
           res.end(JSON.stringify({ ok: true, pack }));
         } else {

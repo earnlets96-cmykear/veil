@@ -1,6 +1,30 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 94 — IN-APP FLOATING AUDIO PLAYER NOTIFICATION BANNER
+## Current Verified Phase: PHASE 95 — FULL 120+ HIGH-DEFINITION TELEGRAM STICKERS & ON-DEMAND FILE PROXY
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 16 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **On-Demand Server File Proxy (`vite.config.ts`, `src/server/relayServer.ts`, `src/server/stickers/telegramStickerResolver.ts`)**:
+    - Created on-demand endpoint `/api/telegram-stickers/file` and `/v1/stickers/file` querying Telegram's `getFile` API and serving full-resolution 512x512 WebP image data.
+    - Added in-memory LRU buffer caching (up to 500 stickers, 24h retention) to eliminate redundant Telegram API requests and ensure zero-latency image loads.
+    - Attached CORS header `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=604800, immutable`.
+  - **Full 120+ Sticker Pack Resolution Without Truncation**:
+    - Removed artificial truncation in `TelegramStickerResolver.resolvePack` and `telegramStickerService.fetchTelegramPack`.
+    - Packs with 120+ stickers now resolve all stickers without being cut off at 20 or 100.
+  - **Fix for "Failed to load sticker image data"**:
+    - Fixed root cause where Telegram `getStickerSet` only provides `file_id` without `file_path`, replacing broken direct URLs with `/api/telegram-stickers/file?file_id=...&token=...`.
+    - Enhanced `fetchStickerBlob` to support relative server URLs, direct CDN, proxy fallback, and canvas offscreen conversion fallback.
+  - **UI Guidance in AddStickerPackModal (`src/ui/components/stickers/AddStickerPackModal.tsx`)**:
+    - Added `512x512 HD` indicator badge.
+    - Added informative banner when 20 preview stickers are returned without a bot token.
+    - Added 3-step guide for creating a bot token with `@BotFather` in 20 seconds.
+- **Verification Deliverables**:
+  - New test suite: `tests/phase95-telegram-sticker-resolution-and-hd.test.tsx` (16/16 passing).
+  - Regression tests passing: `phase95`, `phase93`, `phase91`, `phase83` (63/63 passing).
+  - Production release build: `npm run build` succeeds cleanly with release manifest generated.
+  - Strict Phase 44a Zero Literal Unicode Emoji compliance verified across all files.
+
+## Previous Verified Phase: PHASE 94 — IN-APP FLOATING AUDIO PLAYER NOTIFICATION BANNER
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 27 TESTS PASS, REGRESSION SUITES PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

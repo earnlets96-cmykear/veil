@@ -7,8 +7,49 @@ function telegramStickersPlugin() {
     configureServer(server: any) {
       server.middlewares.use(async (req: any, res: any, next: any) => {
         const url = req.url || '';
-        if (req.method === 'GET' && url.startsWith('/api/telegram-stickers/proxy?url=')) {
-          const rawTarget = url.slice('/api/telegram-stickers/proxy?url='.length);
+
+        // 1. On-demand Telegram Sticker File Proxy (High-Definition 512x512 WebP)
+        if (req.method === 'GET' && (url.startsWith('/api/telegram-stickers/file') || url.startsWith('/v1/stickers/file'))) {
+          const parsedUrl = new URL(url, 'http://localhost');
+          const fileId = parsedUrl.searchParams.get('file_id') || '';
+          const token =
+            parsedUrl.searchParams.get('token') ||
+            (req.headers['x-telegram-bot-token'] as string) ||
+            process.env.TELEGRAM_BOT_TOKEN ||
+            '';
+
+          if (!fileId || !token) {
+            res.statusCode = 400;
+            res.end('MISSING_FILE_ID_OR_TOKEN');
+            return;
+          }
+
+          try {
+            const { TelegramStickerResolver } = await import('./src/server/stickers/telegramStickerResolver.ts');
+            const result = await TelegramStickerResolver.fetchStickerImageBuffer(fileId, token);
+            if (result) {
+              res.setHeader('Content-Type', result.contentType || 'image/webp');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+              res.statusCode = 200;
+              res.end(result.buffer);
+            } else {
+              res.statusCode = 404;
+              res.end('STICKER_FILE_NOT_FOUND');
+            }
+          } catch (err: any) {
+            res.statusCode = 500;
+            res.end(err?.message || 'PROXY_ERROR');
+          }
+          return;
+        }
+
+        // 2. Generic Third-Party URL Proxy with CORS Headers
+        if (req.method === 'GET' && (url.startsWith('/api/telegram-stickers/proxy?url=') || url.startsWith('/v1/stickers/proxy?url='))) {
+          const prefix = url.startsWith('/api/telegram-stickers/proxy?url=')
+            ? '/api/telegram-stickers/proxy?url='
+            : '/v1/stickers/proxy?url=';
+          const rawTarget = url.slice(prefix.length);
           const targetUrl = decodeURIComponent(rawTarget);
           if (!targetUrl) return next();
           try {
@@ -36,16 +77,24 @@ function telegramStickersPlugin() {
           return;
         }
 
-        if (req.method === 'GET' && url.startsWith('/api/telegram-stickers/')) {
-          const packName = url.replace(/^\/api\/telegram-stickers\//, '').split('?')[0];
+        // 3. Telegram Sticker Pack Manifest Resolver
+        if (req.method === 'GET' && (url.startsWith('/api/telegram-stickers/') || url.startsWith('/v1/stickers/'))) {
+          const packName = url
+            .replace(/^\/(?:api\/telegram-stickers|v1\/stickers)\//, '')
+            .split('?')[0];
           if (!packName) return next();
 
           try {
             const { TelegramStickerResolver } = await import('./src/server/stickers/telegramStickerResolver.ts');
-            const botToken = (req.headers['x-telegram-bot-token'] as string) || undefined;
+            const parsedUrl = new URL(url, 'http://localhost');
+            const botToken =
+              (req.headers['x-telegram-bot-token'] as string) ||
+              parsedUrl.searchParams.get('token') ||
+              undefined;
             const pack = await TelegramStickerResolver.resolvePack(packName, botToken);
             if (pack) {
               res.setHeader('Content-Type', 'application/json');
+              res.setHeader('Access-Control-Allow-Origin', '*');
               res.statusCode = 200;
               res.end(JSON.stringify({ ok: true, pack }));
             } else {

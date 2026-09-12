@@ -1,6 +1,6 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-12T12:33:10.241Z",
+  "generatedAt": "2026-09-12T13:01:56.350Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 7,
@@ -11,9 +11,9 @@
       "sha256": "977bf57157662bd5970967208be3027f2a21189f48abd23ef297b318bee18693"
     },
     {
-      "path": "dist/assets/index-C7XMjW2n.js",
-      "sizeBytes": 983997,
-      "sha256": "b9272faf2ca2d1ac5afc9213bf3ffcae90ec1bd83421fbf7cf13fbafb5b1b2ab"
+      "path": "dist/assets/index-DJrtsK48.js",
+      "sizeBytes": 985523,
+      "sha256": "1924480fb1e7b0594f78e17a7e08abe3b77687a9a0b97d13e41ccc238b123cee"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,24 +21,24 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/web-1mPM3wZH.js",
-      "sizeBytes": 842,
-      "sha256": "a21ab99e5956b0f979bce21ffd2e114e56d640a690085f6aa62a2b6d46c25729"
-    },
-    {
-      "path": "dist/assets/web-Df7yMwAr.js",
-      "sizeBytes": 8728,
-      "sha256": "2568f6f9f7e86fc00ef2e332d0a53a1e1de1c961c0c820d90cbb75ad689eb54a"
-    },
-    {
-      "path": "dist/assets/web-UIcvvUYF.js",
+      "path": "dist/assets/web-BXGilLyv.js",
       "sizeBytes": 361,
-      "sha256": "3df8c98f89c2e464c295085961587498faf9c9c2ad24cb9d4d920208bf453af9"
+      "sha256": "a4bdd2037c2b799247ffdc8855f7bd402e79cd4be0da0b96fb70aeede61fb5cf"
+    },
+    {
+      "path": "dist/assets/web-CdezPhFz.js",
+      "sizeBytes": 8728,
+      "sha256": "4d709ba9009d50e18efba70d7c6395b01ca5e4890511e4938139b51974954d22"
+    },
+    {
+      "path": "dist/assets/web-KA1FV1C3.js",
+      "sizeBytes": 842,
+      "sha256": "aafe77ecde2dfaa3accff5d64c33575124f6408edb03ecf55a82eafd88b082be"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "1009783c18a91488f3bf5e8ebe0e174f59063271d7a084279ea67f2ad0f1e1ac"
+      "sha256": "d2cada00ffe8eddfe29434db4634de7ec10b971472014282b723f793bbcf28a3"
     }
   ]
 }

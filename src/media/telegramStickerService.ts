@@ -518,18 +518,19 @@ class TelegramStickerService {
 
     // 3. Check custom Telegram bot token if configured
     const botToken = (typeof window !== 'undefined' && localStorage.getItem('veil:telegram:bot_token')) || '';
+    const queryParam = botToken ? `?token=${encodeURIComponent(botToken)}` : '';
 
     // 3. Try Local Dev Server / Relay Sticker Resolver Endpoint
     try {
       const endpoints = [
-        `/api/telegram-stickers/${encodeURIComponent(packName)}`,
-        `/v1/stickers/${encodeURIComponent(packName)}`,
+        `/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`,
+        `/v1/stickers/${encodeURIComponent(packName)}${queryParam}`,
       ];
       for (const ep of endpoints) {
         try {
           const res = await fetch(ep, {
             headers: botToken ? { 'x-telegram-bot-token': botToken } : {},
-            signal: AbortSignal.timeout(4500),
+            signal: AbortSignal.timeout(6000),
           });
           if (res.ok) {
             const data = await res.json();
@@ -545,17 +546,20 @@ class TelegramStickerService {
     if (botToken) {
       try {
         const res = await fetch(`https://api.telegram.org/bot${botToken}/getStickerSet?name=${encodeURIComponent(packName)}`, {
-          signal: AbortSignal.timeout(4000),
+          signal: AbortSignal.timeout(6000),
         });
         if (res.ok) {
           const data = await res.json();
           if (data.ok && data.result) {
             const result = data.result;
-            const stickers: StickerItem[] = (result.stickers || []).slice(0, 100).map((s: any, idx: number) => ({
+            // Retain ALL stickers in the set without arbitrary truncation (e.g. all 120+ stickers)
+            const rawStickers = result.stickers || [];
+            const stickers: StickerItem[] = rawStickers.map((s: any, idx: number) => ({
               id: s.file_unique_id || s.file_id || `${lowerId}_${idx}`,
               packId: lowerId,
               emoji: s.emoji || '\u{2B50}',
-              url: `https://api.telegram.org/file/bot${botToken}/${s.file_path || s.file_id}`,
+              // Serve on-demand via server file proxy with caching and 512x512 resolution
+              url: `/api/telegram-stickers/file?file_id=${encodeURIComponent(s.file_id)}&token=${encodeURIComponent(botToken)}`,
               width: s.width || 512,
               height: s.height || 512,
             }));
@@ -576,13 +580,13 @@ class TelegramStickerService {
     }
 
     throw new Error(
-      `Could not find Telegram sticker pack "${packName}". Verify the pack link or enter an optional Telegram Bot Token below.`
+      `Could not find Telegram sticker pack "${packName}". Verify the pack link or enter your Telegram Bot Token below.`
     );
   }
 
   /**
-   * Fetches a sticker image as a binary Blob, handling data URLs, direct CDN requests,
-   * and automatic server proxy fallbacks when browser CORS restrictions prevent direct access.
+   * Fetches a sticker image as a binary Blob, handling data URLs, on-demand server file proxies,
+   * direct CDN requests, and automatic fallback conversion when browser CORS restrictions apply.
    */
   public async fetchStickerBlob(url: string): Promise<Blob> {
     if (!url) {
@@ -595,9 +599,21 @@ class TelegramStickerService {
       return await res.blob();
     }
 
-    // 2. Direct fetch with timeout
+    // 2. Same-origin or relative endpoints (e.g. /api/telegram-stickers/file?file_id=...)
+    if (url.startsWith('/')) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (res.ok) {
+          return await res.blob();
+        }
+      } catch (_relativeErr) {
+        // Fall through to retry/fallback
+      }
+    }
+
+    // 3. Direct fetch with timeout for external URLs
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
       if (res.ok) {
         return await res.blob();
       }
@@ -605,7 +621,7 @@ class TelegramStickerService {
       // Fall through to proxy endpoints
     }
 
-    // 3. Fallback to Local/Relay Sticker Proxy
+    // 4. Fallback to Local/Relay Sticker Proxy for third-party CDNs
     const proxyEndpoints = [
       `/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
       `/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
@@ -613,13 +629,45 @@ class TelegramStickerService {
 
     for (const ep of proxyEndpoints) {
       try {
-        const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+        const res = await fetch(ep, { signal: AbortSignal.timeout(7000) });
         if (res.ok) {
           return await res.blob();
         }
       } catch (_proxyErr) {
         // try next
       }
+    }
+
+    // 5. Offscreen image drawing fallback (in browser context when canvas can access image)
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      try {
+        const canvasBlob = await new Promise<Blob>((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth || 512;
+              canvas.height = img.naturalHeight || 512;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return reject(new Error('Canvas 2D unavailable'));
+              ctx.drawImage(img, 0, 0);
+              canvas.toBlob(
+                (b) => (b ? resolve(b) : reject(new Error('Blob conversion failed'))),
+                'image/webp',
+                0.95
+              );
+            } catch (cErr) {
+              reject(cErr);
+            }
+          };
+          img.onerror = () => reject(new Error('Image failed to render'));
+          img.src = url;
+        });
+        if (canvasBlob) {
+          return canvasBlob;
+        }
+      } catch {}
     }
 
     throw new Error('Failed to load sticker image data');
