@@ -46,10 +46,42 @@ export interface AttachmentPayload {
   allowForward?: boolean;
 }
 
-class MediaCacheManager {
-  private cache = new Map<string, DecryptedMedia>();
+export class MediaCacheManager {
+  private entries = new Map<string, DecryptedMedia>();
+  private aliasMap = new Map<string, string>();
   private inFlight = new Map<string, Promise<DecryptedMedia>>();
   private idbInstance: IDBDatabase | null = null;
+
+  public static isAudioMedia(mimeType?: string, name?: string): boolean {
+    if (mimeType && mimeType.startsWith('audio/')) {
+      return true;
+    }
+    // Defensive fallback on known audio filenames
+    if (name) {
+      const lower = name.toLowerCase();
+      if (
+        lower.endsWith('.m4a') ||
+        lower.endsWith('.aac') ||
+        lower.endsWith('.mp3') ||
+        lower.endsWith('.ogg') ||
+        lower.endsWith('.opus') ||
+        lower.endsWith('.wav') ||
+        lower.includes('voice_note_') ||
+        lower.includes('voice-message')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public get size(): number {
+    return this.entries.size;
+  }
+
+  public get aliasCount(): number {
+    return this.aliasMap.size;
+  }
 
   private async getIDB(): Promise<IDBDatabase | null> {
     if (this.idbInstance) return this.idbInstance;
@@ -85,6 +117,10 @@ class MediaCacheManager {
           req.onsuccess = () => {
             const val = req.result;
             if (val && val.data) {
+              if (MediaCacheManager.isAudioMedia(val.mimeType, val.name)) {
+                resolve(null);
+                return;
+              }
               const dataBytes = val.data instanceof Uint8Array ? val.data : new Uint8Array(val.data);
               const blobUrl = AttachmentPipeline.createEphemeralBlobUrl(dataBytes, val.mimeType || 'application/octet-stream');
               resolve({
@@ -110,6 +146,10 @@ class MediaCacheManager {
   }
 
   private async saveToIDB(key: string, item: DecryptedMedia): Promise<void> {
+    // HARD RULE: Voice/audio data must remain strictly RAM-only and NEVER written to IDB
+    if (MediaCacheManager.isAudioMedia(item.mimeType, item.name)) {
+      return;
+    }
     try {
       const db = await this.getIDB();
       if (!db) return;
@@ -143,10 +183,11 @@ class MediaCacheManager {
     ].filter(Boolean) as string[];
 
     const primaryKey = candidateKeys[0] || attachment.name;
+    const isAudio = MediaCacheManager.isAudioMedia(attachment.mimeType, attachment.name);
 
     // 1. Return from in-memory RAM cache if actively decrypted in this session
     for (const key of candidateKeys) {
-      const cached = this.cache.get(key);
+      const cached = this.get(key);
       if (cached && cached.blobUrl) {
         return cached;
       }
@@ -162,14 +203,18 @@ class MediaCacheManager {
     // 3. Start asynchronous cloud download and AEAD decryption with timeout guard
     const fetchPromise = (async (): Promise<DecryptedMedia> => {
       try {
-        // Check durable IndexedDB cache (survives app restart without re-downloading)
-        for (const key of candidateKeys) {
-          const persisted = await this.getFromIDB(key);
-          if (persisted && persisted.blobUrl) {
-            for (const k of candidateKeys) {
-              this.cache.set(k, persisted);
+        // Check durable IndexedDB cache for non-audio (survives app restart without re-downloading)
+        if (!isAudio) {
+          for (const key of candidateKeys) {
+            const persisted = await this.getFromIDB(key);
+            if (persisted && persisted.blobUrl) {
+              const canonicalId = persisted.id || primaryKey;
+              this.entries.set(canonicalId, persisted);
+              for (const k of candidateKeys) {
+                this.aliasMap.set(k, canonicalId);
+              }
+              return persisted;
             }
-            return persisted;
           }
         }
 
@@ -247,10 +292,19 @@ class MediaCacheManager {
             sizeBytes: plaintextBytes.length,
           };
 
-          // Store under all candidate keys in RAM and durable IndexedDB
+          // Store single canonical entry and map lookup aliases
+          this.entries.set(primaryKey, mediaItem);
           for (const key of candidateKeys) {
-            this.cache.set(key, mediaItem);
-            this.saveToIDB(key, mediaItem).catch(() => {});
+            this.aliasMap.set(key, primaryKey);
+          }
+          if (mediaItem.id) this.aliasMap.set(mediaItem.id, primaryKey);
+          if (mediaItem.name) this.aliasMap.set(mediaItem.name, primaryKey);
+
+          this.enforceLruLimit();
+
+          // Save to durable IndexedDB ONLY ONCE under canonical key, NEVER for audio
+          if (!isAudio) {
+            this.saveToIDB(primaryKey, mediaItem).catch(() => {});
           }
 
           return mediaItem;
@@ -274,26 +328,32 @@ class MediaCacheManager {
   private static readonly MAX_RAM_ENTRIES = 50;
 
   private enforceLruLimit(): void {
-    if (this.cache.size <= MediaCacheManager.MAX_RAM_ENTRIES) return;
+    if (this.entries.size <= MediaCacheManager.MAX_RAM_ENTRIES) return;
 
-    const keysToEvict: string[] = [];
+    const idsToEvict: string[] = [];
     const itemsToRevoke = new Set<DecryptedMedia>();
 
-    for (const [k, v] of this.cache.entries()) {
-      if (this.cache.size - keysToEvict.length <= MediaCacheManager.MAX_RAM_ENTRIES) {
+    for (const [id, item] of this.entries.entries()) {
+      if (this.entries.size - idsToEvict.length <= MediaCacheManager.MAX_RAM_ENTRIES) {
         break;
       }
-      keysToEvict.push(k);
-      itemsToRevoke.add(v);
+      idsToEvict.push(id);
+      itemsToRevoke.add(item);
     }
 
-    for (const k of keysToEvict) {
-      this.cache.delete(k);
+    for (const id of idsToEvict) {
+      this.entries.delete(id);
+      // Clean up all aliases pointing to this evicted canonical ID
+      for (const [alias, targetId] of Array.from(this.aliasMap.entries())) {
+        if (targetId === id) {
+          this.aliasMap.delete(alias);
+        }
+      }
     }
 
     for (const item of itemsToRevoke) {
       let stillReferenced = false;
-      for (const remaining of this.cache.values()) {
+      for (const remaining of this.entries.values()) {
         if (remaining === item || remaining.blobUrl === item.blobUrl) {
           stillReferenced = true;
           break;
@@ -309,25 +369,68 @@ class MediaCacheManager {
 
   /**
    * Retrieves an item synchronously from in-memory RAM cache if present.
-   * Refreshes LRU position.
+   * Checks primary key and registered aliases, refreshing LRU position.
    */
   public get(key: string): DecryptedMedia | undefined {
-    const item = this.cache.get(key);
+    if (!key) return undefined;
+    const canonicalId = this.aliasMap.get(key) || key;
+    const item = this.entries.get(canonicalId);
     if (item) {
-      this.cache.delete(key);
-      this.cache.set(key, item);
+      // LRU refresh on canonical entry
+      this.entries.delete(canonicalId);
+      this.entries.set(canonicalId, item);
+      return item;
     }
-    return item;
+    // Search entries for matching id or name if alias wasn't mapped directly
+    for (const [id, v] of this.entries.entries()) {
+      if (v.id === key || v.name === key) {
+        this.aliasMap.set(key, id);
+        this.entries.delete(id);
+        this.entries.set(id, v);
+        return v;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Checks if a key or alias is present in the cache without altering LRU order.
+   */
+  public has(key: string): boolean {
+    if (!key) return false;
+    const canonicalId = this.aliasMap.get(key) || key;
+    if (this.entries.has(canonicalId)) {
+      return true;
+    }
+    for (const v of this.entries.values()) {
+      if (v.id === key || v.name === key) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
    * Stores a pre-decrypted media item directly in RAM cache (e.g. freshly staged file before sending).
+   * Also indexes aliases to ensure immediate cross-key resolution.
    */
   public set(key: string, item: DecryptedMedia): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
+    if (!key || !item) return;
+    const canonicalId = item.id || key;
+
+    if (this.entries.has(canonicalId)) {
+      this.entries.delete(canonicalId);
     }
-    this.cache.set(key, item);
+    this.entries.set(canonicalId, item);
+
+    // Map aliases to the single canonical entry
+    this.aliasMap.set(key, canonicalId);
+    if (item.id) {
+      this.aliasMap.set(item.id, canonicalId);
+    }
+    if (item.name) {
+      this.aliasMap.set(item.name, canonicalId);
+    }
     this.enforceLruLimit();
   }
 
@@ -336,7 +439,8 @@ class MediaCacheManager {
    * Recreates the URL from cached Uint8Array data and updates all aliases.
    */
   public refreshBlobUrl(id: string): string | null {
-    const item = this.cache.get(id);
+    const canonicalId = this.aliasMap.get(id) || id;
+    const item = this.entries.get(canonicalId);
     if (!item || !item.data) return null;
 
     // Revoke stale URL if still around
@@ -348,13 +452,6 @@ class MediaCacheManager {
 
     const newBlobUrl = AttachmentPipeline.createEphemeralBlobUrl(item.data, item.mimeType || 'application/octet-stream');
     item.blobUrl = newBlobUrl;
-
-    // Update all matching entries in RAM cache
-    for (const [k, v] of this.cache.entries()) {
-      if (v === item || v.id === item.id || (v.data && v.data === item.data)) {
-        v.blobUrl = newBlobUrl;
-      }
-    }
     return newBlobUrl;
   }
 
@@ -362,36 +459,43 @@ class MediaCacheManager {
    * Explicitly invalidates a key and revokes its Blob URL (used on error or re-fetch retry).
    */
   public invalidate(key: string): void {
-    const item = this.cache.get(key);
+    const canonicalId = this.aliasMap.get(key) || key;
+    const item = this.entries.get(canonicalId);
     if (item) {
       if (item.blobUrl && typeof URL !== 'undefined') {
         try {
           URL.revokeObjectURL(item.blobUrl);
         } catch (_e) {}
       }
-      for (const [k, v] of Array.from(this.cache.entries())) {
-        if (v === item || v.id === item.id || k === key) {
-          this.cache.delete(k);
+      this.entries.delete(canonicalId);
+      for (const [alias, targetId] of Array.from(this.aliasMap.entries())) {
+        if (targetId === canonicalId || alias === key) {
+          this.aliasMap.delete(alias);
         }
       }
     } else {
-      this.cache.delete(key);
+      this.entries.delete(key);
+      this.aliasMap.delete(key);
     }
     this.inFlight.delete(key);
+    if (canonicalId !== key) {
+      this.inFlight.delete(canonicalId);
+    }
   }
 
   /**
    * Clears and revokes all ephemeral media blobs from memory.
    */
   public clear(wipeDurable = false): void {
-    for (const item of this.cache.values()) {
+    for (const item of this.entries.values()) {
       if (item.blobUrl && typeof URL !== 'undefined') {
         try {
           URL.revokeObjectURL(item.blobUrl);
         } catch (_e) {}
       }
     }
-    this.cache.clear();
+    this.entries.clear();
+    this.aliasMap.clear();
     this.inFlight.clear();
 
     if (wipeDurable && this.idbInstance) {

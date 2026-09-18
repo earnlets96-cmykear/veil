@@ -1015,10 +1015,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
               zIndex: 10001,
               backgroundColor: 'rgba(0, 0, 0, 0.75)',
               backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               padding: '1rem',
+              overflowY: 'auto',
+              maxHeight: '100dvh',
+              boxSizing: 'border-box',
             }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
@@ -1046,6 +1050,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                 border: '1px solid var(--veil-border)',
                 backgroundColor: 'var(--veil-card-bg)',
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+                margin: 'auto',
+                maxHeight: 'calc(100dvh - 2rem)',
+                overflowY: 'auto',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>

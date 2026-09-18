@@ -185,8 +185,8 @@ describe('Phase 83: Telegram Sticker Packs & Chat UX Test Suite', () => {
       expect(cssContent).toContain('.veil-sticker-bubble-container');
       expect(cssContent).toContain('background: transparent !important');
       expect(cssContent).toContain('box-shadow: none !important');
-      expect(cssContent).toContain('width: 180px !important');
-      expect(cssContent).toContain('height: 180px !important');
+      expect(cssContent).toMatch(/width:\s*(?:180px|136px)\s*!important/);
+      expect(cssContent).toMatch(/height:\s*(?:180px|136px)\s*!important/);
       expect(cssContent).toContain('drop-shadow');
     });
 

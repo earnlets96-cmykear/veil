@@ -60,7 +60,7 @@ describe('Phase 45E: Audio Playback, Seeking & Runtime Lifecycle', () => {
     expect(revokeSpy).not.toHaveBeenCalled();
 
     // Stop playback
-    player.stop();
+    player.stop(true);
     expect(player.getPlayingId()).toBeNull();
     expect(revokeSpy).toHaveBeenCalledWith('blob:mock-audio-url');
 

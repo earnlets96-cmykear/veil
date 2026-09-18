@@ -125,6 +125,17 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     []
   );
 
+  useEffect(() => {
+    const handleToastEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ type?: ToastType; title?: string; message: string; durationMs?: number }>;
+      if (customEvent.detail && customEvent.detail.message) {
+        showToast(customEvent.detail);
+      }
+    };
+    window.addEventListener('veil:toast', handleToastEvent);
+    return () => window.removeEventListener('veil:toast', handleToastEvent);
+  }, [showToast]);
+
   return (
     <ToastContext.Provider value={{ showToast, dismissToast, clearAllToasts }}>
       {children}

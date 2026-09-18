@@ -1,6 +1,49 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 100 — 60FPS CHAT SMOOTHNESS, CSS CONTAINMENT & TIMELINE OPTIMIZATION
+## Active Phase: PHASE 101 — RELIABILITY, MEDIA, VOICE RETRY & INTERACTION HARDENING
+- **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean, Android Gradle build clean)
+- **Branch**: `main`
+
+### Phase 101 Tasks Completed:
+- [x] **MediaCache Canonical Aliases & RAM-Only Audio Enforcement**:
+  - Refactored `MediaCacheManager` to store one canonical record per media item (`entries: Map<string, DecryptedMedia>`) and alias pointer map (`aliasMap: Map<string, string>`).
+  - Aliases (`objectId`, `attachmentId`, `name`, `id`) resolve without duplicating raw buffers in RAM or IndexedDB.
+  - LRU limit (`MAX_RAM_ENTRIES = 50`) counts canonical entries only; `has()` check does not mutate LRU order; evicted items clean up all associated aliases and revoke blob URLs safely.
+  - Hard security rule: Voice and audio notes strictly remain in ephemeral RAM and are never persisted to IndexedDB (verified by `isAudioMedia` mimeType check and defensive filename extension fallback).
+- [x] **Voice & Attachment Retry Safety**:
+  - Fixed `retryFailedMessage` in `AppState.tsx` so that voice notes with cached audio retry cleanly via `sendVoiceMessage`, while voice notes without cached audio notify the user via error toast and return immediately.
+  - Never sends `"Voice Message"` as plain text fallback under any failure or cache eviction state.
+  - Attachments with cached data retry via `sendAttachments`, while attachments without cached data notify the user and return immediately. Never sends `"Photo"`, `"Video"`, or filename as plain text fallback.
+  - Added guard in standard text retry preventing media placeholder text from being sent.
+- [x] **Centralized Deterministic Back Button Coordinator**:
+  - Implemented `src/ui/utils/backButtonManager.ts` providing single deterministic back event coordination with prioritized levels:
+    - Priority 50: Media Viewer (`viewerItem`)
+    - Priority 40: Context Menu (`contextMenu.isOpen`)
+    - Priority 30: Emoji/Sticker Drawer & Media Picker (`isEmojiDrawerOpen`, `isMediaPickerOpen`)
+    - Priority 20: Conversation Overlays (`forwardingMessage`, `deleteForEveryoneConfirm`, `isSearchingInChat`, `isSelectionMode`)
+    - Priority 10: App-level Modal (`activeModal`)
+    - Priority 0: Normal Conversation Navigation / Exit
+  - Prevents competing window listeners, executes only highest active priority, and dispatches cancelable `veil:backbutton` event with `stopImmediatePropagation()`.
+- [x] **Scroll Preservation & Media Placeholder Dimensions**:
+  - Added `.veil-media-bubble-container .veil-media-thumbnail-loading` in `src/styles/veil-components.css` (`min-height: 160px; max-height: 380px; aspect-ratio: 16 / 10; width: 100%;`) matching `.veil-media-thumbnail-wrapper` to prevent layout shifts upon decryption.
+  - Implemented programmatic scroll preservation in `ConversationView.tsx` with `scrollAnchorRef`, `updateScrollAnchor()`, and `ResizeObserver` compensating `scrollTop += delta` when scrolled upward (`!isNearBottomRef.current`), ensuring visual stability without relying solely on CSS overflow-anchor.
+- [x] **Android Media Picker & Plugin Offloading**:
+  - Offloaded Android MediaStore queries in `VeilDeviceMediaPlugin.kt` to a dedicated background thread pool (`mediaExecutor = Executors.newFixedThreadPool(2)`), preventing main UI thread stutter.
+  - Optimized thumbnail resolution to 120x120 JPEG @ 60% quality.
+  - Added skeleton shimmer grid to `MediaPickerModal.tsx` during initialization.
+- [x] **Verification & Test Coverage**:
+  - `tests/phase101-device-simulator-viewports.test.tsx` (22/22 passing)
+  - `tests/phase101-interaction-and-context-menu.test.tsx` (5/5 passing)
+  - `tests/phase101-media-cache-and-scroll.test.tsx` (7/7 passing)
+  - `tests/phase101-voice-reliability-and-retry.test.tsx` (9/9 passing)
+  - `tests/phase100-chat-smoothness-and-fps-optimization.test.tsx` (14/14 passing)
+  - `tests/phase99-sticker-skeleton-and-sizing.test.tsx` (11/11 passing)
+  - `tests/phase83-telegram-stickers.test.tsx` (16/16 passing)
+  - `tests/phase45e-audio-runtime.test.ts` (10/10 passing)
+  - `tests/phase44a-ui-layout-and-icons.test.tsx` (3/3 passing)
+  - Production build clean (`npm run build` exits 0 with 7 release artifacts).
+
+## Previous Phase: PHASE 100 — 60FPS CHAT SMOOTHNESS, CSS CONTAINMENT & TIMELINE OPTIMIZATION
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean)
 - **Branch**: `main`
 

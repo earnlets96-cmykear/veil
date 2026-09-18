@@ -106,17 +106,29 @@ export const ProgressCircle: React.FC<ProgressCircleProps> = ({
           gap: '0px',
         }}
       >
-        <span
-          style={{
-            fontSize: `${Math.max(9, size * 0.22)}px`,
-            fontWeight: 700,
-            color: '#ffffff',
-            fontVariantNumeric: 'tabular-nums',
-            lineHeight: 1.1,
-          }}
-        >
-          {Math.round(clampedPercent)}%
-        </span>
+        {clampedPercent > 0 ? (
+          <span
+            style={{
+              fontSize: `${Math.max(9, size * 0.22)}px`,
+              fontWeight: 700,
+              color: '#ffffff',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.1,
+            }}
+          >
+            {Math.round(clampedPercent)}%
+          </span>
+        ) : (
+          <span
+            className="veil-spinner veil-spinner-sm"
+            style={{
+              width: `${Math.max(12, size * 0.35)}px`,
+              height: `${Math.max(12, size * 0.35)}px`,
+              borderWidth: '2px',
+            }}
+            aria-label="Preparing transfer..."
+          />
+        )}
         {showSizeLabel && (
           <span
             style={{

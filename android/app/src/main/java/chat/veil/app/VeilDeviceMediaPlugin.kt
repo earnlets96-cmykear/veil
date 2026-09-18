@@ -35,6 +35,7 @@ import java.io.ByteArrayOutputStream
 )
 class VeilDeviceMediaPlugin : Plugin() {
 
+    private val mediaExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
     private var pendingCameraUri: Uri? = null
     private var pendingCameraFile: java.io.File? = null
 
@@ -166,110 +167,116 @@ class VeilDeviceMediaPlugin : Plugin() {
 
     @PluginMethod
     fun listRecentMedia(call: PluginCall) {
-        val limit = (call.getInt("limit") ?: 60).coerceIn(1, 60)
-        val types = call.getArray("types")
-        val typesStr = types?.toString() ?: ""
-        val includeImage = types == null || typesStr.contains("image")
-        val includeVideo = types == null || typesStr.contains("video")
-        val includeFile = types != null && typesStr.contains("file")
-
-        val rows = mutableListOf<MediaRow>()
-
-        val projection = arrayOf(
-            MediaStore.MediaColumns._ID,
-            MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.MIME_TYPE,
-            MediaStore.MediaColumns.SIZE,
-            MediaStore.MediaColumns.DATE_ADDED,
-        )
-
-        fun queryUri(contentUri: Uri, mimePrefix: String? = null, maxCount: Int = limit) {
+        mediaExecutor.execute {
             try {
-                val selection = if (mimePrefix != null) "${MediaStore.MediaColumns.MIME_TYPE} LIKE ?" else null
-                val selectionArgs = if (mimePrefix != null) arrayOf("$mimePrefix%") else null
-                val cursor = context.contentResolver.query(
-                    contentUri,
-                    projection,
-                    selection,
-                    selectionArgs,
-                    "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-                )
-                cursor?.use {
-                    val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-                    val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                    val mimeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
-                    val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                    val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
-                    var c = 0
-                    while (it.moveToNext() && c < maxCount) {
-                        val id = it.getLong(idCol)
-                        val name = it.getString(nameCol) ?: "media"
-                        val mime = it.getString(mimeCol) ?: "application/octet-stream"
-                        val size = it.getLong(sizeCol)
-                        val dateAdded = it.getLong(dateCol)
-                        val itemUri = Uri.withAppendedPath(contentUri, id.toString())
-                        val thumb = if (mime.startsWith("image/") || mime.startsWith("video/")) thumbnailFor(itemUri) else null
-                        rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, thumb))
-                        c++
-                    }
-                }
-            } catch (_: Exception) {}
-        }
+                val limit = (call.getInt("limit") ?: 60).coerceIn(1, 60)
+                val types = call.getArray("types")
+                val typesStr = types?.toString() ?: ""
+                val includeImage = types == null || typesStr.contains("image")
+                val includeVideo = types == null || typesStr.contains("video")
+                val includeFile = types != null && typesStr.contains("file")
 
-        if (includeImage) {
-            queryUri(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image")
-        }
-        if (includeVideo) {
-            queryUri(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video")
-        }
-        if (includeFile) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                queryUri(MediaStore.Downloads.EXTERNAL_CONTENT_URI)
-            }
-            try {
-                val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-                val cursor = context.contentResolver.query(
-                    filesUri,
-                    projection,
-                    "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ${MediaStore.Files.FileColumns.MEDIA_TYPE_NONE}",
-                    null,
-                    "${MediaStore.MediaColumns.DATE_ADDED} DESC"
-                )
-                cursor?.use {
-                    val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-                    val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-                    val mimeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
-                    val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-                    val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
-                    var c = 0
-                    while (it.moveToNext() && c < limit) {
-                        val id = it.getLong(idCol)
-                        val name = it.getString(nameCol) ?: "file"
-                        val mime = it.getString(mimeCol) ?: "application/octet-stream"
-                        val size = it.getLong(sizeCol)
-                        val dateAdded = it.getLong(dateCol)
-                        val itemUri = Uri.withAppendedPath(filesUri, id.toString())
-                        rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, null))
-                        c++
-                    }
-                }
-            } catch (_: Exception) {}
-        }
+                val rows = mutableListOf<MediaRow>()
 
-        // Sort descending by dateAdded and limit
-        val sorted = rows.distinctBy { it.uri }.sortedByDescending { it.dateAdded }.take(limit)
-        val items = JSArray()
-        for (row in sorted) {
-            val item = JSObject().apply {
-                put("uri", row.uri)
-                put("name", row.name)
-                put("mimeType", row.mimeType)
-                put("sizeBytes", row.sizeBytes)
-                row.thumbnailDataUrl?.let { put("thumbnailDataUrl", it) }
+                val projection = arrayOf(
+                    MediaStore.MediaColumns._ID,
+                    MediaStore.MediaColumns.DISPLAY_NAME,
+                    MediaStore.MediaColumns.MIME_TYPE,
+                    MediaStore.MediaColumns.SIZE,
+                    MediaStore.MediaColumns.DATE_ADDED,
+                )
+
+                fun queryUri(contentUri: Uri, mimePrefix: String? = null, maxCount: Int = limit) {
+                    try {
+                        val selection = if (mimePrefix != null) "${MediaStore.MediaColumns.MIME_TYPE} LIKE ?" else null
+                        val selectionArgs = if (mimePrefix != null) arrayOf("$mimePrefix%") else null
+                        val cursor = context.contentResolver.query(
+                            contentUri,
+                            projection,
+                            selection,
+                            selectionArgs,
+                            "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                        )
+                        cursor?.use {
+                            val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                            val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                            val mimeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+                            val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                            val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+                            var c = 0
+                            while (it.moveToNext() && c < maxCount) {
+                                val id = it.getLong(idCol)
+                                val name = it.getString(nameCol) ?: "media"
+                                val mime = it.getString(mimeCol) ?: "application/octet-stream"
+                                val size = it.getLong(sizeCol)
+                                val dateAdded = it.getLong(dateCol)
+                                val itemUri = Uri.withAppendedPath(contentUri, id.toString())
+                                val thumb = if (mime.startsWith("image/") || mime.startsWith("video/")) thumbnailFor(itemUri) else null
+                                rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, thumb))
+                                c++
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (includeImage) {
+                    queryUri(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image")
+                }
+                if (includeVideo) {
+                    queryUri(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, "video")
+                }
+                if (includeFile) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        queryUri(MediaStore.Downloads.EXTERNAL_CONTENT_URI)
+                    }
+                    try {
+                        val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                        val cursor = context.contentResolver.query(
+                            filesUri,
+                            projection,
+                            "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ${MediaStore.Files.FileColumns.MEDIA_TYPE_NONE}",
+                            null,
+                            "${MediaStore.MediaColumns.DATE_ADDED} DESC"
+                        )
+                        cursor?.use {
+                            val idCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+                            val nameCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+                            val mimeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+                            val sizeCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+                            val dateCol = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+                            var c = 0
+                            while (it.moveToNext() && c < limit) {
+                                val id = it.getLong(idCol)
+                                val name = it.getString(nameCol) ?: "file"
+                                val mime = it.getString(mimeCol) ?: "application/octet-stream"
+                                val size = it.getLong(sizeCol)
+                                val dateAdded = it.getLong(dateCol)
+                                val itemUri = Uri.withAppendedPath(filesUri, id.toString())
+                                rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, null))
+                                c++
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                // Sort descending by dateAdded and limit
+                val sorted = rows.distinctBy { it.uri }.sortedByDescending { it.dateAdded }.take(limit)
+                val items = JSArray()
+                for (row in sorted) {
+                    val item = JSObject().apply {
+                        put("uri", row.uri)
+                        put("name", row.name)
+                        put("mimeType", row.mimeType)
+                        put("sizeBytes", row.sizeBytes)
+                        row.thumbnailDataUrl?.let { put("thumbnailDataUrl", it) }
+                    }
+                    items.put(item)
+                }
+                call.resolve(JSObject().put("items", items))
+            } catch (error: Exception) {
+                call.reject("Unable to load recent media", error)
             }
-            items.put(item)
         }
-        call.resolve(JSObject().put("items", items))
     }
 
     @PluginMethod
@@ -399,9 +406,9 @@ class VeilDeviceMediaPlugin : Plugin() {
     private fun thumbnailFor(uri: Uri): String? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         return try {
-            val bitmap = context.contentResolver.loadThumbnail(uri, Size(160, 160), null)
+            val bitmap = context.contentResolver.loadThumbnail(uri, Size(120, 120), null)
             val output = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 65, output)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 60, output)
             bitmap.recycle()
             "data:image/jpeg;base64," + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
         } catch (_: Exception) {

@@ -395,12 +395,31 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           </div>
         )}
 
-        {/* Loading Spinner State */}
+        {/* Skeleton Shimmer State */}
         {recentStatus === 'loading' && recentItems.length === 0 && (
-          <div className="veil-share-loading-box">
-            <div className="veil-spinner" />
-            <span>Loading device items...</span>
-          </div>
+          activeTab === 'files' ? (
+            <div className="veil-share-files-container" aria-label="Loading files...">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="veil-share-file-row" style={{ opacity: 0.6, pointerEvents: 'none' }}>
+                  <div className="veil-share-file-row-icon veil-media-skeleton-pulse" style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                  <div className="veil-share-file-row-info" style={{ gap: '6px' }}>
+                    <div className="veil-media-skeleton-pulse" style={{ height: '14px', width: '60%', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                    <div className="veil-media-skeleton-pulse" style={{ height: '10px', width: '30%', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.05)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="veil-share-media-grid" aria-label="Loading recent media...">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="veil-share-media-cell veil-media-skeleton-pulse"
+                  style={{ aspectRatio: '1', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.06)' }}
+                />
+              ))}
+            </div>
+          )
         )}
 
         {/* Files Tab Listing */}

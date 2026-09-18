@@ -865,6 +865,7 @@ body {
   width: 100%;
   box-sizing: border-box;
   contain: content;
+  overflow-anchor: auto;
   will-change: scroll-position;
   transform: translateZ(0);
 }

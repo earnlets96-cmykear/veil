@@ -1,6 +1,37 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 100 — 60FPS CHAT SMOOTHNESS, CSS CONTAINMENT & TIMELINE OPTIMIZATION
+## Current Verified Phase: PHASE 101 — RELIABILITY, MEDIA, VOICE RETRY & INTERACTION HARDENING
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 43 PHASE 101 TESTS PASS, 97/97 TOTAL VERIFICATION TESTS PASS, ZERO REGRESSIONS, PRODUCTION BUILD CLEAN, RELEASE MANIFEST GENERATED)**
+- **Branch**: `main`
+- **Key Deliverables & Fixes**:
+  - **MediaCache Canonical Aliases & RAM-Only Audio Enforcement**:
+    - Refactored `MediaCacheManager` to store one canonical entry per media item (`entries`) and an alias pointer map (`aliasMap`).
+    - Multiple candidate keys (`objectId`, `attachmentId`, `name`, `id`) resolve through aliases without duplicating raw byte arrays in RAM or IndexedDB.
+    - LRU eviction calculates against canonical entries only (`MAX_RAM_ENTRIES = 50`); `has()` check does not alter LRU order; evicted items purge all pointing aliases and revoke blob URLs safely.
+    - Strict security guarantee: Audio notes are never persisted to IndexedDB (enforced by `isAudioMedia` mimeType check and defensive filename extension fallback).
+  - **Voice & Attachment Retry Safety**:
+    - Fixed `retryFailedMessage` in `AppState.tsx` so that voice messages with cached audio retry cleanly via `sendVoiceMessage`.
+    - Voice messages without cached audio notify the user via error toast and return immediately without sending `"Voice Message"` as plain text.
+    - Attachments with cached data retry via `sendAttachments`; attachments without cached data notify the user and return immediately without sending `"Photo"`, `"Video"`, or filename as plain text.
+    - Added guard in standard text retry preventing media placeholder text from being sent.
+  - **Centralized Deterministic Back Button Coordinator**:
+    - Implemented `src/ui/utils/backButtonManager.ts` providing single deterministic back event coordination with prioritized levels:
+      - Priority 50: Media Viewer (`viewerItem`)
+      - Priority 40: Context Menu (`contextMenu.isOpen`)
+      - Priority 30: Emoji/Sticker Drawer & Media Picker (`isEmojiDrawerOpen`, `isMediaPickerOpen`)
+      - Priority 20: Conversation Overlays (`forwardingMessage`, `deleteForEveryoneConfirm`, `isSearchingInChat`, `isSelectionMode`)
+      - Priority 10: App-level Modal (`activeModal`)
+      - Priority 0: Normal Conversation Navigation / Exit
+    - Prevents competing window listeners, executes only highest active priority, and dispatches cancelable `veil:backbutton` event with `stopImmediatePropagation()`.
+  - **Scroll Preservation & Media Placeholder Dimensions**:
+    - Added `.veil-media-bubble-container .veil-media-thumbnail-loading` in `src/styles/veil-components.css` (`min-height: 160px; max-height: 380px; aspect-ratio: 16 / 10; width: 100%;`) matching `.veil-media-thumbnail-wrapper` to prevent layout shifts upon decryption.
+    - Implemented programmatic scroll preservation in `ConversationView.tsx` with `scrollAnchorRef`, `updateScrollAnchor()`, and `ResizeObserver` compensating `scrollTop += delta` when scrolled upward (`!isNearBottomRef.current`), ensuring visual stability without relying solely on CSS overflow-anchor.
+  - **Android Media Picker & Plugin Offloading**:
+    - Offloaded Android MediaStore queries in `VeilDeviceMediaPlugin.kt` to a dedicated background thread pool (`mediaExecutor = Executors.newFixedThreadPool(2)`), preventing main UI thread stutter.
+    - Optimized thumbnail resolution to 120x120 JPEG @ 60% quality.
+    - Added skeleton shimmer grid to `MediaPickerModal.tsx` during initialization.
+
+## Previous Verified Phase: PHASE 100 — 60FPS CHAT SMOOTHNESS, CSS CONTAINMENT & TIMELINE OPTIMIZATION
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 14 PHASE 100 TESTS PASS, 64/64 REGRESSION TESTS PASS, PRODUCTION RELEASE BUILD CLEAN)**
 - **Branch**: `main`
 - **Key Deliverables & Fixes**:

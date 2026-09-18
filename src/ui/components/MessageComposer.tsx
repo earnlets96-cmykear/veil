@@ -7,7 +7,7 @@
  * contextual Android permission handling, and 100% SVG vector iconography.
  */
 
-import React, { useState, useRef, useCallback, KeyboardEvent } from 'react';
+import React, { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
 import { useApp, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
@@ -26,6 +26,7 @@ import {
 import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
 import { PermissionsModal } from './PermissionsModal.tsx';
+import { BackButtonManager } from '../utils/backButtonManager.ts';
 
 import type { UIMessage } from '../app/types.ts';
 
@@ -249,6 +250,23 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       return prev.slice(0, -1);
     });
   };
+
+  // Register Priority 30: Emoji/Sticker drawer OR Media Picker
+  useEffect(() => {
+    if (!isEmojiDrawerOpen && !isMediaPickerOpen) return;
+
+    return BackButtonManager.register('composer:drawers', 30, () => {
+      if (isEmojiDrawerOpen) {
+        setIsEmojiDrawerOpen(false);
+        return true;
+      }
+      if (isMediaPickerOpen) {
+        setIsMediaPickerOpen(false);
+        return true;
+      }
+      return false;
+    });
+  }, [isEmojiDrawerOpen, isMediaPickerOpen]);
 
   // Sticker selection handler (Double Ratchet E2EE dispatch)
   const handleSelectSticker = useCallback(

@@ -2257,6 +2257,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const selectConversation = useCallback(
     (id: string | null) => {
+      replyTargetRef.current = null;
+      setReplyTargetState(null);
       setActiveChatId(id);
       if (id && activeSession) {
         setConversations((prev) => {
@@ -2831,22 +2833,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     [currentAtt.attachmentId]: { percent, loaded, total },
                     [objectId]: { percent, loaded, total },
                   }));
-                  setMessages((prev) => {
-                    const list = prev[conversationId];
-                    if (!list) return prev;
-                    let touched = false;
-                    const nextList = list.map((m) => {
-                      if (
-                        m.attachment?.attachmentId === currentAtt.attachmentId ||
-                        m.attachments?.some((a) => a.attachmentId === currentAtt.attachmentId)
-                      ) {
-                        touched = true;
-                        return { ...m, uploadProgress: percent };
-                      }
-                      return m;
-                    });
-                    return touched ? { ...prev, [conversationId]: nextList } : prev;
-                  });
                 };
 
                 const createRes = await cloudClient.createAttachment(createParams);
@@ -3139,7 +3125,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const freshContacts = await contactManager.listContacts(activeSession);
-      const targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
+      let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
 
       const activeReply = resolveReplyReference(
         replyTargetRef.current || replyTarget,
@@ -3202,6 +3188,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const arrayBuffer = await audioBlob.arrayBuffer();
           const rawBytes = new Uint8Array(arrayBuffer);
 
+          const localAudioBlobUrl = AttachmentPipeline.createEphemeralBlobUrl(rawBytes, mimeType);
+          const cachedVoiceMedia: DecryptedMedia = {
+            id: msgId,
+            blobUrl: localAudioBlobUrl,
+            data: rawBytes,
+            mimeType,
+            name: 'Voice Message',
+            sizeBytes: rawBytes.length,
+          };
+          MediaCache.set(msgId, cachedVoiceMedia);
+          if (pendingMsg.voice?.objectId) {
+            MediaCache.set(pendingMsg.voice.objectId, cachedVoiceMedia);
+          }
+
           if (!cloudClient.hasAuthenticatedSession()) {
             await ensureCloudSession(activeSession);
           }
@@ -3218,17 +3218,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               ...prev,
               [msgId]: { percent, loaded, total },
             }));
-            setMessages((prev) => {
-              const list = prev[conversationId];
-              if (!list) return prev;
-              const nextList = list.map((m) => {
-                if (m.id === msgId) {
-                  return { ...m, uploadProgress: percent };
-                }
-                return m;
-              });
-              return { ...prev, [conversationId]: nextList };
-            });
           };
 
           const voiceMeta = await VoiceRecorder.uploadVoiceNote(
@@ -3247,6 +3236,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             },
             onVoiceProgress
           );
+
+          if (voiceMeta?.objectId) {
+            MediaCache.set(voiceMeta.objectId, cachedVoiceMedia);
+          }
 
           setUploadProgress((prev) => {
             const next = { ...prev };
@@ -3295,11 +3288,53 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               }
             }
           } else {
-            const peerId = targetContact?.identityId || conversationId;
-            const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+            let peerId = targetContact?.identityId || conversationId;
+            let hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+            let peerPrekey = targetContact?.prekeyBundle;
+
+            // If contact is missing prekeyBundle or ratchet session, perform on-the-fly Directory lookup
+            if (!hasActiveRatchet && !peerPrekey) {
+              try {
+                let profile: SignedProfileDocument | null = null;
+                if (targetContact?.identityId) {
+                  profile = await directoryClient.getProfileByIdentity(targetContact.identityId);
+                }
+                if (!profile && conversationId) {
+                  profile = await directoryClient.getProfileByIdentity(conversationId);
+                }
+                if (!profile && targetContact?.accountUsername) {
+                  profile = await directoryClient.getProfileByUsername(targetContact.accountUsername);
+                }
+                if (!profile && targetContact?.name) {
+                  const lookupName = targetContact.name.replace(/^@/, '').trim();
+                  profile = await directoryClient.getProfileByUsername(lookupName);
+                }
+                if (profile) {
+                  targetContact = await contactManager.addContactFromInvitation(activeSession, {
+                    version: 1,
+                    identityId: profile.identityId,
+                    name: profile.displayName || profile.username,
+                    accountUsername: profile.username,
+                    signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
+                    keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+                    fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+                    mailboxId: profile.mailboxId,
+                    prekeyBundle: profile.prekeyBundle,
+                    createdAt: profile.issuedAt,
+                    expiresAt: profile.expiresAt || 0,
+                    signature: profile.signature,
+                  });
+                  setContacts((prev) => [...prev.filter((c) => c.identityId !== targetContact!.identityId), targetContact!]);
+                  peerPrekey = profile.prekeyBundle;
+                  peerId = profile.identityId;
+                  hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+                }
+              } catch (_dirErr) {}
+            }
+
             const peerTarget = hasActiveRatchet
-              ? { identityId: peerId, prekeyBundle: targetContact?.prekeyBundle }
-              : targetContact?.prekeyBundle;
+              ? { identityId: peerId, prekeyBundle: peerPrekey }
+              : peerPrekey;
 
             if (!peerTarget) {
               throw new Error(`Cannot send voice note: no Double Ratchet session or PrekeyBundle available for peer ${peerId}`);
@@ -3637,10 +3672,86 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const targetMsg = convMessages.find((m) => m.id === messageId);
       if (!targetMsg || !activeSession) return;
 
+      // 1. Handle voice note retry
+      if (targetMsg.voice) {
+        const cached =
+          MediaCache.get(targetMsg.voice.objectId) ||
+          MediaCache.get(targetMsg.id) ||
+          (targetMsg.voice.ciphertextHash ? MediaCache.get(targetMsg.voice.ciphertextHash) : undefined);
+        if (cached && cached.data && cached.data.length > 0) {
+          const audioBlob = new Blob([cached.data as any], { type: targetMsg.voice.mimeType || 'audio/webm' });
+          await deleteMessageLocally(conversationId, messageId);
+          await sendVoiceMessage(conversationId, targetMsg.voice.durationSeconds, audioBlob, targetMsg.voice.mimeType || 'audio/webm', {
+            forwarded: targetMsg.forwarded,
+            forwardedFrom: targetMsg.forwardedFrom,
+          });
+          return;
+        } else {
+          // Hard security rule: Never fall through to send "Voice Message" as plain text
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('veil:toast', {
+                detail: {
+                  type: 'error',
+                  message: 'Original audio is no longer in memory. Please record a new voice note.',
+                },
+              })
+            );
+          }
+          return;
+        }
+      }
+
+      // 2. Handle attachment retry
+      if (targetMsg.attachment || targetMsg.attachments) {
+        const att = targetMsg.attachment || targetMsg.attachments?.[0];
+        if (att) {
+          const key = att.objectId || att.attachmentId || att.name;
+          const cached = MediaCache.get(key) || MediaCache.get(targetMsg.id);
+          if (cached && cached.data && cached.data.length > 0) {
+            const file = new File([cached.data as any], att.name, { type: att.mimeType || 'application/octet-stream' });
+            await deleteMessageLocally(conversationId, messageId);
+            await sendAttachments(conversationId, [file], {
+              allowSave: att.allowSave,
+              allowForward: att.allowForward,
+              forwarded: targetMsg.forwarded,
+              forwardedFrom: targetMsg.forwardedFrom,
+              caption: targetMsg.text && targetMsg.text !== 'Photo' && targetMsg.text !== 'Video' && targetMsg.text !== 'Attachment' ? targetMsg.text : undefined,
+            });
+            return;
+          } else {
+            // Hard rule: Never fall through to send "Photo" / "Video" / filename as plain text
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('veil:toast', {
+                  detail: {
+                    type: 'error',
+                    message: 'Original attachment data is no longer in memory. Please re-attach the file.',
+                  },
+                })
+              );
+            }
+            return;
+          }
+        }
+      }
+
+      // 3. Handle standard text retry (guard against media placeholder text)
+      const isMediaPlaceholder =
+        targetMsg.text === 'Voice Message' ||
+        targetMsg.text === 'Photo' ||
+        targetMsg.text === 'Video' ||
+        targetMsg.text === 'Attachment' ||
+        targetMsg.text.startsWith('Attachment:');
+
+      if (isMediaPlaceholder) {
+        return;
+      }
+
       await deleteMessageLocally(conversationId, messageId);
       await sendMessage(conversationId, targetMsg.text);
     },
-    [activeSession, messages, deleteMessageLocally, sendMessage]
+    [activeSession, messages, deleteMessageLocally, sendMessage, sendVoiceMessage, sendAttachments]
   );
 
   const editMessage = useCallback(
@@ -4571,6 +4682,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const registerBack = async () => {
       try {
         backHandler = await CapacitorApp.addListener('backButton', () => {
+          // Allow active child overlays (context menu, media viewer, sticker picker, etc.) to handle back first
+          const event = new CustomEvent('veil:backbutton', { cancelable: true });
+          window.dispatchEvent(event);
+          if (event.defaultPrevented) {
+            return;
+          }
+
           if (activeModal) {
             setActiveModal(null);
             return;

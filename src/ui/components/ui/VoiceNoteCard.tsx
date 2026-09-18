@@ -11,6 +11,7 @@ export interface VoiceNoteCardProps {
   currentTimeSeconds?: number;
   playbackState?: VoicePlaybackState;
   isOutgoing?: boolean;
+  isFailed?: boolean;
   currentProgressPercent?: number;
   onPlayToggle?: () => void;
   onSeek?: (percent: number) => void;
@@ -47,6 +48,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   playbackState: propPlaybackState = 'idle',
   isOutgoing = false,
   currentProgressPercent: propProgressPercent = 0,
+  isFailed = false,
   onPlayToggle,
   onSeek,
   onRetry,
@@ -70,13 +72,14 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const isPointerDownRef = useRef<boolean>(false);
   const prevPropProgressRef = useRef(propProgressPercent);
   const prevPropTimeRef = useRef(propCurrentTime);
+  const lastRetryTimeRef = useRef<number>(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const SPEED_OPTIONS = [1, 1.5, 2];
 
   // Generate waveform bars once per messageId
   const waveformBars = useMemo(() => generateWaveformBars(messageId, BAR_COUNT), [messageId]);
 
-  // Subscribe directly to VoicePlayer events — use ref for scrubbing to avoid re-mounting
+  // Auto-subscribe to VoicePlayer events for this messageId
   useEffect(() => {
     if (!messageId) return;
 
@@ -113,7 +116,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const effectiveProgress = Math.max(0, Math.min(100, localProgress));
 
   const isUploading = propPlaybackState === 'uploading';
-  const isPropError = propPlaybackState === 'error';
+  const isPropError = propPlaybackState === 'error' || isFailed;
   const isLocalError = localStatus === 'error';
   const isError = isPropError || isLocalError;
   const isLoading = propPlaybackState === 'loading' || localStatus === 'loading';
@@ -489,6 +492,9 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              const now = Date.now();
+              if (now - lastRetryTimeRef.current < 1000) return;
+              lastRetryTimeRef.current = now;
               if (onRetry) onRetry();
               else if (onPlayToggle) onPlayToggle();
             }}

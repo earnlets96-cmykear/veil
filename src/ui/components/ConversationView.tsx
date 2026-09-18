@@ -26,6 +26,7 @@ import type { UIMessage } from '../app/types.ts';
 import { useVisualViewport } from '../hooks/useVisualViewport.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
+import { BackButtonManager } from '../utils/backButtonManager.ts';
 import { CHAT_BACK_EDGE_PX, shouldCompleteConversationBackSwipe } from '../utils/mobileGesturePhysics.ts';
 import {
   Avatar,
@@ -669,9 +670,10 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                   : 'ready'
               }
               currentProgressPercent={currentProgress}
+              isFailed={msg.status === 'FAILED'}
               onPlayToggle={handlePlayToggle}
               onSeek={handleSeek}
-              onRetry={handlePlayToggle}
+              onRetry={onRetry ? () => onRetry(msg) : handlePlayToggle}
             />
           )}
 
@@ -1062,8 +1064,36 @@ export const ConversationView: React.FC = () => {
     return activeMessages.slice(-renderedCount);
   }, [activeMessages, renderedCount]);
 
+  const isNearBottomRef = useRef(true);
+  const scrollAnchorRef = useRef<{ id: string; topOffset: number } | null>(null);
+
+  const updateScrollAnchor = useCallback(() => {
+    const container = timelineRef.current;
+    if (!container || isNearBottomRef.current) {
+      scrollAnchorRef.current = null;
+      return;
+    }
+    const containerRect = container.getBoundingClientRect();
+    const rows = container.querySelectorAll('.veil-msg-row');
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] as HTMLElement;
+      const rect = row.getBoundingClientRect();
+      if (rect.bottom > containerRect.top + 10) {
+        scrollAnchorRef.current = {
+          id: row.id,
+          topOffset: rect.top - containerRect.top,
+        };
+        break;
+      }
+    }
+  }, []);
+
   const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceToBottom < 120;
+    updateScrollAnchor();
+
     if (el.scrollTop < 100 && renderedCount < activeMessages.length) {
       const prevScrollHeight = el.scrollHeight;
       const prevScrollTop = el.scrollTop;
@@ -1075,21 +1105,67 @@ export const ConversationView: React.FC = () => {
         }
       });
     }
-  }, [renderedCount, activeMessages.length]);
+  }, [renderedCount, activeMessages.length, updateScrollAnchor]);
+
+  // Programmatic scroll preservation when scrolled upward and elements above resize/decrypt
+  useEffect(() => {
+    const container = timelineRef.current;
+    if (!container || typeof ResizeObserver === 'undefined') return;
+
+    let isAdjusting = false;
+    const observer = new ResizeObserver(() => {
+      if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current) return;
+      const anchor = scrollAnchorRef.current;
+      if (!anchor.id) return;
+      const el = document.getElementById(anchor.id);
+      if (!el) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const currentRect = el.getBoundingClientRect();
+      const currentOffset = currentRect.top - containerRect.top;
+      const delta = currentOffset - anchor.topOffset;
+
+      if (Math.abs(delta) > 2) {
+        isAdjusting = true;
+        container.scrollTop += delta;
+        requestAnimationFrame(() => {
+          isAdjusting = false;
+        });
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const lastChatIdRef = useRef<string | null>(null);
 
   // Auto-scroll timeline to bottom on load/new message or to unread divider
-  // Uses instantaneous 'auto' scroll on conversation switch and 'smooth' for live messages
+  // Preserves user's scroll position when scrolled up; only auto-scrolls on chat switch, when near bottom, or on outbound send
   useEffect(() => {
     const isChatSwitch = lastChatIdRef.current !== activeChatId;
     lastChatIdRef.current = activeChatId;
     const scrollBehavior: ScrollBehavior = isChatSwitch ? 'auto' : 'smooth';
 
-    if (firstUnreadIndex >= 0 && unreadRef.current) {
-      unreadRef.current.scrollIntoView({ behavior: scrollBehavior, block: 'center' });
-    } else if (timelineEndRef.current) {
-      timelineEndRef.current.scrollIntoView({ behavior: scrollBehavior });
+    if (isChatSwitch) {
+      isNearBottomRef.current = true;
+      if (firstUnreadIndex >= 0 && unreadRef.current) {
+        unreadRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
+      } else if (timelineEndRef.current) {
+        timelineEndRef.current.scrollIntoView({ behavior: 'auto' });
+      }
+      return;
+    }
+
+    const latestMsg = activeMessages.length > 0 ? activeMessages[activeMessages.length - 1] : null;
+    const isRecentlySentByMe = Boolean(latestMsg?.isOutgoing && Date.now() - latestMsg.timestamp < 3500);
+
+    if (isNearBottomRef.current || isRecentlySentByMe) {
+      if (firstUnreadIndex >= 0 && unreadRef.current) {
+        unreadRef.current.scrollIntoView({ behavior: scrollBehavior, block: 'center' });
+      } else if (timelineEndRef.current) {
+        timelineEndRef.current.scrollIntoView({ behavior: scrollBehavior });
+      }
     }
   }, [activeChatId, activeMessages.length, firstUnreadIndex]);
 
@@ -1479,6 +1555,52 @@ export const ConversationView: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [contextMenu.isOpen, forwardingMessage, deleteForEveryoneConfirm]);
+
+  // Register Priority 50: Media Viewer (Dismissed first on hardware back)
+  useEffect(() => {
+    if (!viewerItem) return;
+    return BackButtonManager.register('conversation:viewer', 50, () => {
+      setViewerItem(null);
+      return true;
+    });
+  }, [viewerItem]);
+
+  // Register Priority 40: Context Menu
+  useEffect(() => {
+    if (!contextMenu.isOpen) return;
+    return BackButtonManager.register('conversation:contextMenu', 40, () => {
+      setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+      return true;
+    });
+  }, [contextMenu.isOpen]);
+
+  // Register Priority 20: Conversation Overlays (Forwarding, Delete Confirm, Search in Chat, Selection Mode)
+  useEffect(() => {
+    const hasOverlay = Boolean(forwardingMessage || deleteForEveryoneConfirm || isSearchingInChat || isSelectionMode);
+    if (!hasOverlay) return;
+
+    return BackButtonManager.register('conversation:overlays', 20, () => {
+      if (forwardingMessage) {
+        setForwardingMessage(null);
+        return true;
+      }
+      if (deleteForEveryoneConfirm) {
+        setDeleteForEveryoneConfirm(null);
+        return true;
+      }
+      if (isSearchingInChat) {
+        setIsSearchingInChat(false);
+        setLocalSearchQuery('');
+        return true;
+      }
+      if (isSelectionMode) {
+        setIsSelectionMode(false);
+        setSelectedMessageIds(new Set());
+        return true;
+      }
+      return false;
+    });
+  }, [forwardingMessage, deleteForEveryoneConfirm, isSearchingInChat, isSelectionMode]);
 
   // Dismiss context menu & floating reactions on any outside pointer, touch, mouse, scroll, or resize
   useEffect(() => {

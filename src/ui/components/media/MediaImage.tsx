@@ -77,20 +77,32 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
     };
   }, []);
 
+  const attachmentRef = useRef(attachment);
+  useEffect(() => {
+    attachmentRef.current = attachment;
+  }, [attachment]);
+
+  const isFetchingRef = useRef(false);
+
   const fetchAndDecrypt = useCallback(
     async (forceRetry = false) => {
       if (!activeSession) return;
+      const currentAtt = attachmentRef.current;
+      if (isFetchingRef.current && !forceRetry) return;
+
       if (forceRetry) {
         MediaCache.invalidate(key);
-        if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
-        if (attachment.attachmentId) MediaCache.invalidate(attachment.attachmentId);
+        if (currentAtt.objectId) MediaCache.invalidate(currentAtt.objectId);
+        if (currentAtt.attachmentId) MediaCache.invalidate(currentAtt.attachmentId);
       }
 
-      if (isMountedRef.current) {
+      // Only show full loading shimmer if there is no thumbnail/preview already visible
+      if (isMountedRef.current && !displayUrl) {
         setIsLoading(true);
         setError(null);
       }
 
+      isFetchingRef.current = true;
       try {
         if (!cloudClient.getSessionToken()) {
           await ensureCloudSession(activeSession);
@@ -98,20 +110,20 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
         MediaLogger.log({
           event: 'DECRYPTION_STARTED',
-          attachmentId: attachment.attachmentId,
-          objectId: attachment.objectId,
-          mimeType: attachment.mimeType,
+          attachmentId: currentAtt.attachmentId,
+          objectId: currentAtt.objectId,
+          mimeType: currentAtt.mimeType,
         });
 
-        const result = await MediaCache.getOrFetch(attachment, activeSession, cloudClient);
+        const result = await MediaCache.getOrFetch(currentAtt, activeSession, cloudClient);
         if (isMountedRef.current) {
           setMedia(result);
           setIsLoading(false);
           MediaLogger.log({
             event: 'DECRYPTION_COMPLETED',
-            attachmentId: attachment.attachmentId,
-            objectId: attachment.objectId,
-            mimeType: attachment.mimeType,
+            attachmentId: currentAtt.attachmentId,
+            objectId: currentAtt.objectId,
+            mimeType: currentAtt.mimeType,
             sizeBytes: result.sizeBytes,
           });
         }
@@ -121,14 +133,16 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
           setIsLoading(false);
           MediaLogger.log({
             event: 'MEDIA_ERROR',
-            attachmentId: attachment.attachmentId,
-            objectId: attachment.objectId,
+            attachmentId: currentAtt.attachmentId,
+            objectId: currentAtt.objectId,
             error: err?.message,
           });
         }
+      } finally {
+        isFetchingRef.current = false;
       }
     },
-    [activeSession, cloudClient, ensureCloudSession, key, attachment]
+    [activeSession, cloudClient, ensureCloudSession, key, displayUrl]
   );
 
   useEffect(() => {
