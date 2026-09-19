@@ -63,6 +63,11 @@ describe('Phase 102A: Scroll Performance Regression Fix', () => {
     expect(cvContent).toMatch(/startTransition\(\(\) => \{\s*setRenderedCount/);
   });
 
+  it('settles the scroll anchor from the visible hit-tested row instead of scanning the timeline', () => {
+    expect(cvContent).toContain('document.elementFromPoint');
+    expect(cvContent).not.toContain("container.querySelectorAll('.veil-msg-row')");
+  });
+
   it('verifies scroll anchor settlement simulation', () => {
     // Simulate scroll events arriving rapidly (e.g. 120Hz display, 8ms between events)
     let pendingTimer: any = null;

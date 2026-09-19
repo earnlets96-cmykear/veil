@@ -1095,17 +1095,14 @@ export const ConversationView: React.FC = () => {
       return;
     }
     const containerRect = container.getBoundingClientRect();
-    const rows = container.querySelectorAll('.veil-msg-row');
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i] as HTMLElement;
+    const hit = document.elementFromPoint(containerRect.left + 8, containerRect.top + 12);
+    const row = hit?.closest('.veil-msg-row') as HTMLElement | null;
+    if (row?.id) {
       const rect = row.getBoundingClientRect();
-      if (rect.bottom > containerRect.top + 10) {
-        scrollAnchorRef.current = {
-          id: row.id,
-          topOffset: rect.top - containerRect.top,
-        };
-        break;
-      }
+      scrollAnchorRef.current = {
+        id: row.id,
+        topOffset: rect.top - containerRect.top,
+      };
     }
   }, []);
 
