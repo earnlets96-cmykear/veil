@@ -1069,6 +1069,7 @@ export const ConversationView: React.FC = () => {
   const scrollAnchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prependScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const historyLoadRafRef = useRef<number | null>(null);
+  const timelineScrollRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     const previous = prependScrollRef.current;
@@ -1088,6 +1089,9 @@ export const ConversationView: React.FC = () => {
       }
       if (historyLoadRafRef.current !== null) {
         cancelAnimationFrame(historyLoadRafRef.current);
+      }
+      if (timelineScrollRafRef.current !== null) {
+        cancelAnimationFrame(timelineScrollRafRef.current);
       }
     };
   }, []);
@@ -1111,37 +1115,43 @@ export const ConversationView: React.FC = () => {
   }, []);
 
   const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    isNearBottomRef.current = distanceToBottom < 120;
+    const timeline = e.currentTarget;
+    if (timelineScrollRafRef.current !== null) return;
+    timelineScrollRafRef.current = requestAnimationFrame(() => {
+      timelineScrollRafRef.current = null;
+      const el = timelineRef.current || timeline;
+      if (!el) return;
+      const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      isNearBottomRef.current = distanceToBottom < 120;
 
-    // Phase 102A: Surgical fix for scroll performance regression.
-    // Zero DOM measurements (getBoundingClientRect, querySelectorAll) on the scroll hot path.
-    // Near-bottom immediately clears anchor. Scrolled up anchors are debounced until scrolling settles.
-    if (scrollAnchorTimerRef.current) {
-      clearTimeout(scrollAnchorTimerRef.current);
-      scrollAnchorTimerRef.current = null;
-    }
-    if (isNearBottomRef.current) {
-      scrollAnchorRef.current = null;
-    } else {
-      scrollAnchorTimerRef.current = setTimeout(() => {
-        updateScrollAnchor();
-      }, 100);
-    }
+      // Phase 102A: Surgical fix for scroll performance regression.
+      // Zero DOM measurements (getBoundingClientRect, querySelectorAll) on the scroll hot path.
+      // Near-bottom immediately clears anchor. Scrolled up anchors are debounced until scrolling settles.
+      if (scrollAnchorTimerRef.current) {
+        clearTimeout(scrollAnchorTimerRef.current);
+        scrollAnchorTimerRef.current = null;
+      }
+      if (isNearBottomRef.current) {
+        scrollAnchorRef.current = null;
+      } else {
+        scrollAnchorTimerRef.current = setTimeout(() => {
+          updateScrollAnchor();
+        }, 100);
+      }
 
-    if (el.scrollTop < 100 && renderedCount < activeMessages.length && historyLoadRafRef.current === null) {
-      prependScrollRef.current = {
-        scrollHeight: el.scrollHeight,
-        scrollTop: el.scrollTop,
-      };
-      historyLoadRafRef.current = requestAnimationFrame(() => {
-        historyLoadRafRef.current = null;
-        startTransition(() => {
-          setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
+      if (el.scrollTop < 100 && renderedCount < activeMessages.length && historyLoadRafRef.current === null) {
+        prependScrollRef.current = {
+          scrollHeight: el.scrollHeight,
+          scrollTop: el.scrollTop,
+        };
+        historyLoadRafRef.current = requestAnimationFrame(() => {
+          historyLoadRafRef.current = null;
+          startTransition(() => {
+            setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
+          });
         });
-      });
-    }
+      }
+    });
   }, [renderedCount, activeMessages.length, updateScrollAnchor]);
 
   // Programmatic scroll preservation when scrolled upward and elements above resize/decrypt
