@@ -73,6 +73,11 @@ describe('Phase 102A: Scroll Performance Regression Fix', () => {
     expect(cvContent).toMatch(/resizeAdjustRafRef\.current = requestAnimationFrame/);
   });
 
+  it('coalesces repeated top-of-history load requests into one animation frame', () => {
+    expect(cvContent).toContain('historyLoadRafRef');
+    expect(cvContent).toMatch(/historyLoadRafRef\.current = requestAnimationFrame/);
+  });
+
   it('verifies scroll anchor settlement simulation', () => {
     // Simulate scroll events arriving rapidly (e.g. 120Hz display, 8ms between events)
     let pendingTimer: any = null;

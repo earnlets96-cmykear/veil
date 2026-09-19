@@ -1068,6 +1068,7 @@ export const ConversationView: React.FC = () => {
   const scrollAnchorRef = useRef<{ id: string; topOffset: number } | null>(null);
   const scrollAnchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prependScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const historyLoadRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     const previous = prependScrollRef.current;
@@ -1084,6 +1085,9 @@ export const ConversationView: React.FC = () => {
     return () => {
       if (scrollAnchorTimerRef.current) {
         clearTimeout(scrollAnchorTimerRef.current);
+      }
+      if (historyLoadRafRef.current !== null) {
+        cancelAnimationFrame(historyLoadRafRef.current);
       }
     };
   }, []);
@@ -1126,13 +1130,16 @@ export const ConversationView: React.FC = () => {
       }, 100);
     }
 
-    if (el.scrollTop < 100 && renderedCount < activeMessages.length) {
+    if (el.scrollTop < 100 && renderedCount < activeMessages.length && historyLoadRafRef.current === null) {
       prependScrollRef.current = {
         scrollHeight: el.scrollHeight,
         scrollTop: el.scrollTop,
       };
-      startTransition(() => {
-        setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
+      historyLoadRafRef.current = requestAnimationFrame(() => {
+        historyLoadRafRef.current = null;
+        startTransition(() => {
+          setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
+        });
       });
     }
   }, [renderedCount, activeMessages.length, updateScrollAnchor]);

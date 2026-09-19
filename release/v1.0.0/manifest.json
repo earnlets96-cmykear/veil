@@ -1,14 +1,14 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-19T21:56:25.219Z",
+  "generatedAt": "2026-09-19T21:59:06.025Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 8,
   "artifacts": [
     {
-      "path": "dist/assets/index-BY5fwCMT.js",
-      "sizeBytes": 1009044,
-      "sha256": "33c71034505029181e41e9649ab8da627141d4dd9cb8d0ee871aa9c1931a4896"
+      "path": "dist/assets/index-0HnP-hCe.js",
+      "sizeBytes": 1009266,
+      "sha256": "d2535ecab803ac1697478aa6eac6ec0aa1c007c86b17a71583da51873a5dd57d"
     },
     {
       "path": "dist/assets/index-DX2BhfsY.css",
@@ -26,24 +26,24 @@
       "sha256": "8f562fd02168244055567425b6018e3fbde83c66d85a32f787982be1a6b5916b"
     },
     {
-      "path": "dist/assets/web-BAbq_ype.js",
-      "sizeBytes": 8728,
-      "sha256": "dd0378df94c7c9e410305b106bdd20cdf9903467ba175e401a7452c4851a56ff"
-    },
-    {
-      "path": "dist/assets/web-C9Ld9LOJ.js",
-      "sizeBytes": 842,
-      "sha256": "d58dd6570d87aecccb964b575791b2467a00b1e8696aae2906a4140beaf276ae"
-    },
-    {
-      "path": "dist/assets/web-CWT9l0Lr.js",
+      "path": "dist/assets/web-B3I_AQMc.js",
       "sizeBytes": 361,
-      "sha256": "e6defa705f1f06d4ff6d9a51b862769ae936d5940a2cc500fbad672663702a8f"
+      "sha256": "82bb2683dd2e948259c075e4b79f4b42b8c060a34f6a13d86bc7097364da551b"
+    },
+    {
+      "path": "dist/assets/web-D9GYMF1b.js",
+      "sizeBytes": 8728,
+      "sha256": "cc2df139391f192cf3bd07d4c0099d9b39a69c728390f44f46a39eb49eeb637c"
+    },
+    {
+      "path": "dist/assets/web-DA_Bs8Qo.js",
+      "sizeBytes": 842,
+      "sha256": "660c67c139ff87c24cc30237d498d01ee270d0102dd8ee5a460df4a281c59fb7"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "346dcb6be68f3a98e748ea0e001dc252a56de6ea8cca0e1cfc631e0922266c60"
+      "sha256": "af109960fd996cd82f1f9e017735f60ca98f866f69c328611315a56da55d86d5"
     }
   ]
 }
