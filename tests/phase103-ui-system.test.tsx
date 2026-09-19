@@ -55,4 +55,11 @@ describe('Phase 103: messaging UI system', () => {
     expect(mediaPicker).toContain('veil-attachment-sheet-content');
     expect(mediaPicker).toContain('aria-label="Recent media"');
   });
+
+  it('keeps motion bounded and accessible', () => {
+    expect(designSystem).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(designSystem).toContain('*:focus-visible');
+    expect(components).toContain('var(--veil-motion-fast)');
+    expect(components).not.toContain('color-mix(');
+  });
 });
