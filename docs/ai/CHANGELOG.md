@@ -4,6 +4,13 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 103] - 2026-09-20
+
+### UI
+- Added a unified professional messaging visual system combining chat-first calm, Telegram-style workspace hierarchy, and quiet premium accessibility.
+- Refined conversation list, chat header, timeline bubbles, grouped-message rhythm, composer states, and in-app recent-media picker surfaces.
+- Added semantic light/dark theme aliases, bounded motion, visible focus states, and focused Phase 103 regression coverage.
+
 ## [Phase 102] - 2026-09-20
 
 ### Performance
