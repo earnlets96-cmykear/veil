@@ -46,6 +46,16 @@ button.veil-pill {
 }
 
 :root {
+  /* Semantic messaging roles shared by shell, timeline, composer, and media. */
+  --veil-surface-app: var(--veil-bg-base, #090c13);
+  --veil-surface-panel: var(--veil-bg-surface, #101622);
+  --veil-surface-elevated: var(--veil-bg-surface-elevated, #182233);
+  --veil-accent: var(--veil-accent-primary, #14b8a6);
+  --veil-focus-ring: 0 0 0 2px var(--veil-surface-app), 0 0 0 4px var(--veil-accent);
+  --veil-space-2: 0.5rem;
+  --veil-radius-md: 12px;
+  --veil-motion-fast: 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
   /* =========================================================================
      1. COLORS & SURFACES
      ========================================================================= */
@@ -1707,4 +1717,3 @@ body,
   white-space: nowrap !important;
   border: 0 !important;
 }
-

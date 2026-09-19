@@ -10,6 +10,18 @@
  * Zero purple gradients, zero excessive glows, zero neon clutter.
  */
 
+/* Shared semantic roles keep messaging surfaces aligned across themes. */
+[data-theme="dark"],
+[data-theme="midnight"],
+[data-theme="obsidian"],
+[data-theme="light"],
+[data-theme="nord"] {
+  --veil-surface-app: var(--veil-bg-base);
+  --veil-surface-panel: var(--veil-bg-surface);
+  --veil-surface-elevated: var(--veil-bg-surface-elevated);
+  --veil-accent: var(--veil-accent-primary);
+}
+
 /* =========================================================================
    1. DARK / MIDNIGHT (Default) — Deep dark navy/black surfaces
    ========================================================================= */
