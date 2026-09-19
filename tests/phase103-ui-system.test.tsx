@@ -7,6 +7,8 @@ const designSystem = fs.readFileSync(path.join(root, 'src/styles/veil-design-sys
 const components = fs.readFileSync(path.join(root, 'src/styles/veil-components.css'), 'utf8');
 const themes = fs.readFileSync(path.join(root, 'src/styles/themes.css'), 'utf8');
 const sidebar = fs.readFileSync(path.join(root, 'src/ui/components/Sidebar.tsx'), 'utf8');
+const composer = fs.readFileSync(path.join(root, 'src/ui/components/MessageComposer.tsx'), 'utf8');
+const mediaPicker = fs.readFileSync(path.join(root, 'src/ui/components/media/MediaPickerModal.tsx'), 'utf8');
 
 describe('Phase 103: messaging UI system', () => {
   it('defines shared semantic surface, text, accent, focus, spacing, and motion roles', () => {
@@ -46,5 +48,11 @@ describe('Phase 103: messaging UI system', () => {
     expect(components).toContain('.veil-composer-input-island');
     expect(components).toContain('.veil-btn-composer-send');
     expect(designSystem).toContain('prefers-reduced-motion');
+  });
+
+  it('exposes explicit composer and in-app media picker state surfaces', () => {
+    expect(composer).toContain('veil-composer-stateful');
+    expect(mediaPicker).toContain('veil-attachment-sheet-content');
+    expect(mediaPicker).toContain('aria-label="Recent media"');
   });
 });

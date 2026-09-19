@@ -558,7 +558,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       )}
 
       {/* Composer Input Row */}
-      <div className="veil-composer" role="region" aria-label="Message Composer">
+      <div className="veil-composer veil-composer-stateful" role="region" aria-label="Message Composer">
         <input
           type="file"
           ref={fileInputRef}

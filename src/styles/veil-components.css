@@ -2600,6 +2600,37 @@
   animation: veil-attachment-sheet-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.veil-attachment-sheet-content {
+  padding: var(--veil-space-2);
+}
+
+.veil-attachment-sheet-content .veil-attachment-action-grid {
+  gap: var(--veil-space-2);
+}
+
+.veil-attachment-sheet-content .veil-attachment-action-btn {
+  min-height: 74px;
+  border-radius: var(--veil-radius-md);
+  background: var(--veil-surface-panel);
+  border-color: var(--veil-border);
+  transition: background var(--veil-motion-fast), border-color var(--veil-motion-fast), transform var(--veil-motion-fast);
+}
+
+.veil-attachment-sheet-content .veil-attachment-action-btn:focus-visible,
+.veil-attachment-sheet-content .veil-attachment-action-btn:hover {
+  background: var(--veil-bg-surface-hover);
+  border-color: var(--veil-accent);
+}
+
+.veil-attachment-sheet-content .veil-share-media-grid {
+  gap: var(--veil-space-2);
+  max-height: 300px;
+}
+
+.veil-attachment-sheet-content .veil-share-media-cell {
+  border-radius: var(--veil-radius-md);
+}
+
 @keyframes veil-attachment-sheet-enter {
   from {
     opacity: 0;

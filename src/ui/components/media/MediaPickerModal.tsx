@@ -278,7 +278,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         </div>
       }
     >
-      <div className="veil-attachment-sheet">
+      <div className="veil-attachment-sheet veil-attachment-sheet-content" aria-label="Recent media">
         {/* Top Drag Handle */}
         <div className="veil-bottom-sheet-handle" />
 
