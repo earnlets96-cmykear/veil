@@ -1,6 +1,17 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 101 — RELIABILITY, MEDIA, VOICE RETRY & INTERACTION HARDENING
+## Active Phase: PHASE 102 — CHAT PERFORMANCE & MAIN-THREAD RELIEF
+- **Status**: IMPLEMENTED & LOCALLY VERIFIED (focused Phase 102 tests, TypeScript/Vite build, Capacitor sync)
+- **Branch**: `main`
+
+### Phase 102 Tasks Completed:
+- [x] Offloaded large media hashing, Base64 encoding, and progressive decrypt/reassembly to a reusable worker pool with small-payload fallbacks.
+- [x] Deferred and bounded history expansion while preserving the scroll offset after prepending rows.
+- [x] Limited emoji rendering to the active category and stabilized drawer callback identities.
+- [x] Added Phase 102A–C regression coverage (22 focused tests passing).
+- [x] Web/release build and Capacitor Android sync completed.
+
+## Previous Phase: PHASE 101 — RELIABILITY, MEDIA, VOICE RETRY & INTERACTION HARDENING
 - **Status**: COMPLETE & VERIFIED (100% test pass, TypeScript & Vite build clean, Android Gradle build clean)
 - **Branch**: `main`
 

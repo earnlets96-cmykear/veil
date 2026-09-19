@@ -14,7 +14,7 @@
  * - 100% SVG vector iconography and zero secret leakage.
  */
 
-import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { startTransition, useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { MessageComposer } from './MessageComposer.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
@@ -1042,7 +1042,7 @@ export const ConversationView: React.FC = () => {
 
   // Incremental timeline windowing for smooth rendering of large conversations
   const INITIAL_MESSAGE_WINDOW = 60;
-  const WINDOW_INCREMENT = 40;
+  const WINDOW_INCREMENT = 16;
   const [renderedCount, setRenderedCount] = useState<number>(INITIAL_MESSAGE_WINDOW);
 
   const activeMessagesRef = useRef<UIMessage[]>(activeMessages);
@@ -1066,6 +1066,27 @@ export const ConversationView: React.FC = () => {
 
   const isNearBottomRef = useRef(true);
   const scrollAnchorRef = useRef<{ id: string; topOffset: number } | null>(null);
+  const scrollAnchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prependScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+
+  useEffect(() => {
+    const previous = prependScrollRef.current;
+    if (!previous) return;
+    prependScrollRef.current = null;
+    requestAnimationFrame(() => {
+      const timeline = timelineRef.current;
+      if (!timeline) return;
+      timeline.scrollTop = previous.scrollTop + (timeline.scrollHeight - previous.scrollHeight);
+    });
+  }, [renderedCount]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollAnchorTimerRef.current) {
+        clearTimeout(scrollAnchorTimerRef.current);
+      }
+    };
+  }, []);
 
   const updateScrollAnchor = useCallback(() => {
     const container = timelineRef.current;
@@ -1092,17 +1113,29 @@ export const ConversationView: React.FC = () => {
     const el = e.currentTarget;
     const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = distanceToBottom < 120;
-    updateScrollAnchor();
+
+    // Phase 102A: Surgical fix for scroll performance regression.
+    // Zero DOM measurements (getBoundingClientRect, querySelectorAll) on the scroll hot path.
+    // Near-bottom immediately clears anchor. Scrolled up anchors are debounced until scrolling settles.
+    if (scrollAnchorTimerRef.current) {
+      clearTimeout(scrollAnchorTimerRef.current);
+      scrollAnchorTimerRef.current = null;
+    }
+    if (isNearBottomRef.current) {
+      scrollAnchorRef.current = null;
+    } else {
+      scrollAnchorTimerRef.current = setTimeout(() => {
+        updateScrollAnchor();
+      }, 100);
+    }
 
     if (el.scrollTop < 100 && renderedCount < activeMessages.length) {
-      const prevScrollHeight = el.scrollHeight;
-      const prevScrollTop = el.scrollTop;
-      setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
-      requestAnimationFrame(() => {
-        if (timelineRef.current) {
-          const newScrollHeight = timelineRef.current.scrollHeight;
-          timelineRef.current.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
-        }
+      prependScrollRef.current = {
+        scrollHeight: el.scrollHeight,
+        scrollTop: el.scrollTop,
+      };
+      startTransition(() => {
+        setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
       });
     }
   }, [renderedCount, activeMessages.length, updateScrollAnchor]);

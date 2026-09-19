@@ -2784,7 +2784,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 sizeBytes: currentAtt.sizeBytes,
               });
 
-              const ciphertextHash = bytesToHex(sha256(fileBytes));
+              const ciphertextHash = await AttachmentPipeline.computeSha256Async(fileBytes);
 
               if (!cloudClient.hasAuthenticatedSession()) {
                 await ensureCloudSession(activeSession);

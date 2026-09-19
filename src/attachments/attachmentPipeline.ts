@@ -14,8 +14,10 @@ import {
   base64ToBytes,
   bytesToHex,
 } from '../crypto/utils.ts';
+import { MediaWorkerPool } from './mediaWorkerPool.ts';
 
 export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KiB
+export const FAST_PATH_THRESHOLD_BYTES = 128 * 1024; // 128 KiB: fast path on UI thread for small payloads
 
 /**
  * Calculates bounded optimal chunk size based on payload byte length.
@@ -219,6 +221,161 @@ export class AttachmentPipeline {
     }
 
     return assembled;
+  }
+
+  /**
+   * Asynchronously chunks and encrypts media using a Web Worker for large payloads
+   * to avoid blocking the main UI thread. Falls back to synchronous execution
+   * for small media (< 128 KiB) or in environments where Web Workers are unavailable.
+   */
+  public static async chunkAndEncryptAsync(
+    data: Uint8Array,
+    name: string,
+    mimeType: string,
+    encryptionKey: Uint8Array,
+    chunkSize?: number,
+    existingAttachmentId?: string
+  ): Promise<{ metadata: AttachmentMetadata; chunks: EncryptedAttachmentChunk[] }> {
+    const totalBytes = data.length;
+    const pool = MediaWorkerPool.getInstance();
+
+    if (totalBytes < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+      return this.chunkAndEncrypt(data, name, mimeType, encryptionKey, chunkSize, existingAttachmentId);
+    }
+
+    try {
+      const bufferToTransfer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      const { promise } = pool.execute<{ metadata: AttachmentMetadata; chunks: EncryptedAttachmentChunk[] }>(
+        'CHUNK_AND_ENCRYPT',
+        {
+          data: bufferToTransfer,
+          name,
+          mimeType,
+          encryptionKey: Array.from(encryptionKey),
+          chunkSize,
+          existingAttachmentId,
+        },
+        [bufferToTransfer]
+      );
+      return await promise;
+    } catch (_workerErr) {
+      return this.chunkAndEncrypt(data, name, mimeType, encryptionKey, chunkSize, existingAttachmentId);
+    }
+  }
+
+  /**
+   * Asynchronously decrypts and reassembles chunks using a Web Worker.
+   */
+  public static async decryptAndReassembleAsync(
+    metadata: AttachmentMetadata,
+    chunks: EncryptedAttachmentChunk[],
+    encryptionKey: Uint8Array
+  ): Promise<Uint8Array> {
+    const pool = MediaWorkerPool.getInstance();
+
+    if ((metadata.sizeBytes || 0) < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+      return this.decryptAndReassemble(metadata, chunks, encryptionKey);
+    }
+
+    try {
+      const { promise } = pool.execute<ArrayBuffer>(
+        'DECRYPT_AND_REASSEMBLE',
+        {
+          metadata,
+          chunks,
+          encryptionKey: Array.from(encryptionKey),
+        }
+      );
+      const buffer = await promise;
+      return new Uint8Array(buffer);
+    } catch (_workerErr) {
+      return this.decryptAndReassemble(metadata, chunks, encryptionKey);
+    }
+  }
+
+  /**
+   * Asynchronously decrypts chunks progressively, forwarding progress to onPlayableChunk.
+   */
+  public static async decryptProgressiveAsync(
+    metadata: AttachmentMetadata,
+    chunks: EncryptedAttachmentChunk[],
+    encryptionKey: Uint8Array,
+    onPlayableChunk?: (chunkIndex: number, decryptedSlice: Uint8Array, totalDecryptedSoFar: number) => void
+  ): Promise<Uint8Array> {
+    const pool = MediaWorkerPool.getInstance();
+
+    if ((metadata.sizeBytes || 0) < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+      return this.decryptProgressive(metadata, chunks, encryptionKey, onPlayableChunk);
+    }
+
+    try {
+      const { promise } = pool.execute<ArrayBuffer>(
+        'DECRYPT_PROGRESSIVE',
+        {
+          metadata,
+          chunks,
+          encryptionKey: Array.from(encryptionKey),
+        },
+        [],
+        (progress) => {
+          if (onPlayableChunk) {
+            try {
+              onPlayableChunk(progress.chunkIndex, new Uint8Array(0), progress.totalDecryptedSoFar);
+            } catch (_e) {}
+          }
+        }
+      );
+      const buffer = await promise;
+      return new Uint8Array(buffer);
+    } catch (_workerErr) {
+      return this.decryptProgressive(metadata, chunks, encryptionKey, onPlayableChunk);
+    }
+  }
+
+  /**
+   * Computes SHA-256 digest asynchronously off the main thread for large buffers.
+   */
+  public static async computeSha256Async(data: Uint8Array): Promise<string> {
+    const pool = MediaWorkerPool.getInstance();
+
+    if (data.length < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+      return bytesToHex(sha256(data));
+    }
+
+    try {
+      const bufferToTransfer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      const { promise } = pool.execute<string>(
+        'COMPUTE_SHA256',
+        { data: bufferToTransfer },
+        [bufferToTransfer]
+      );
+      return await promise;
+    } catch (_workerErr) {
+      return bytesToHex(sha256(data));
+    }
+  }
+
+  /**
+   * Encodes binary buffer to Base64 asynchronously off the main thread for large buffers.
+   */
+  public static async bytesToBase64Async(data: Uint8Array): Promise<string> {
+    const pool = MediaWorkerPool.getInstance();
+
+    if (data.length < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+      return bytesToBase64(data);
+    }
+
+    try {
+      const bufferToTransfer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      const { promise } = pool.execute<string>(
+        'BYTES_TO_BASE64',
+        { data: bufferToTransfer },
+        [bufferToTransfer]
+      );
+      return await promise;
+    } catch (_workerErr) {
+      return bytesToBase64(data);
+    }
   }
 
   public static createEphemeralBlobUrl(data: Uint8Array, mimeType: string): string {

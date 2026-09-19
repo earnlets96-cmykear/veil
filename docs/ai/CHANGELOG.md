@@ -4,6 +4,15 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 102] - 2026-09-20
+
+### Performance
+- Deferred large-media hashing, Base64 conversion, and progressive decryption to a reusable Web Worker pool with synchronous small-payload fallbacks.
+- Limited history prepend batches to 16 rows and scheduled them with React transitions while preserving the user's scroll offset.
+- Rendered only the active emoji category and memoized emoji cells/drawer callbacks.
+- Added focused Phase 102 regression suites for scroll behavior, emoji rendering, and worker compatibility.
+- Verified the web build and Capacitor Android sync locally.
+
 ## [Phase 74] - 2026-09-11
 
 ### Added & Fixed

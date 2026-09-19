@@ -397,7 +397,27 @@ const StickerPackTabButton: React.FC<StickerPackTabButtonProps> = ({ pack, isAct
   );
 };
 
-export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
+interface EmojiCellProps {
+  emoji: string;
+  onClick: (e: React.MouseEvent | React.TouchEvent, emoji: string) => void;
+}
+
+const EmojiCell = React.memo<EmojiCellProps>(({ emoji, onClick }) => {
+  return (
+    <button
+      type="button"
+      className="veil-emoji-cell"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => onClick(e, emoji)}
+      aria-label={emoji}
+    >
+      <span>{emoji}</span>
+    </button>
+  );
+});
+EmojiCell.displayName = 'EmojiCell';
+
+const EmojiDrawerComponent: React.FC<EmojiDrawerProps> = ({
   isOpen,
   onSelectEmoji,
   onSelectSticker,
@@ -405,7 +425,7 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'emoji' | 'stickers' | 'gifs'>('emoji');
-  const [activeCategoryId, setActiveCategoryId] = useState('smileys');
+  const [activeCategoryId, setActiveCategoryId] = useState('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [packs, setPacks] = useState<StickerPack[]>(BUILT_IN_STICKER_PACKS);
   const [activePackId, setActivePackId] = useState<string>('spotty');
@@ -465,6 +485,10 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
     }).filter((cat) => cat.emojis.length > 0);
   }, [searchQuery]);
 
+  const selectedCategory = useMemo(() => {
+    return EMOJI_CATEGORIES.find((c) => c.id === activeCategoryId) || null;
+  }, [activeCategoryId]);
+
   const handleEmojiClick = useCallback(
     (e: React.MouseEvent | React.TouchEvent, emoji: string) => {
       e.preventDefault();
@@ -520,19 +544,12 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
     [onSelectSticker]
   );
 
-  const scrollToCategory = (catId: string) => {
+  const scrollToCategory = useCallback((catId: string) => {
     setActiveCategoryId(catId);
-    if (!scrollContainerRef.current) return;
-    if (catId === 'recent') {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
     }
-    const el = document.getElementById(`emoji-section-${catId}`);
-    if (el && scrollContainerRef.current) {
-      const top = el.offsetTop - scrollContainerRef.current.offsetTop;
-      scrollContainerRef.current.scrollTo({ top, behavior: 'smooth' });
-    }
-  };
+  }, []);
 
   return (
     <div
@@ -671,47 +688,58 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
       <div ref={scrollContainerRef} className="veil-emoji-scroll-area">
         {activeTab === 'emoji' ? (
           <>
-            {/* Frequently Used Section */}
-            {!searchQuery && frequentEmojis.length > 0 && (
-              <div id="emoji-section-recent" className="veil-emoji-section">
-                <div className="veil-emoji-section-header">FREQUENTLY USED</div>
-                <div className="veil-emoji-grid">
-                  {frequentEmojis.map((emoji, idx) => (
-                    <button
-                      key={`freq-${idx}`}
-                      type="button"
-                      className="veil-emoji-cell"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => handleEmojiClick(e, emoji)}
-                      aria-label={emoji}
-                    >
-                      <span>{emoji}</span>
-                    </button>
-                  ))}
+            {!searchQuery ? (
+              activeCategoryId === 'recent' ? (
+                <div id="emoji-section-recent" className="veil-emoji-section">
+                  <div className="veil-emoji-section-header">FREQUENTLY USED</div>
+                  <div className="veil-emoji-grid">
+                    {frequentEmojis.map((emoji, idx) => (
+                      <EmojiCell
+                        key={`freq-${idx}`}
+                        emoji={emoji}
+                        onClick={handleEmojiClick}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : selectedCategory ? (
+                <div key={selectedCategory.id} id={`emoji-section-${selectedCategory.id}`} className="veil-emoji-section">
+                  <div className="veil-emoji-section-header">{selectedCategory.name}</div>
+                  <div className="veil-emoji-grid">
+                    {selectedCategory.emojis.map((emoji, idx) => (
+                      <EmojiCell
+                        key={`${selectedCategory.id}-${idx}`}
+                        emoji={emoji}
+                        onClick={handleEmojiClick}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            ) : (
+              filteredCategories.length > 0 ? (
+                filteredCategories.map((cat) => (
+                  <div key={cat.id} id={`emoji-section-${cat.id}`} className="veil-emoji-section">
+                    <div className="veil-emoji-section-header">{cat.name}</div>
+                    <div className="veil-emoji-grid">
+                      {cat.emojis.map((emoji, idx) => (
+                        <EmojiCell
+                          key={`${cat.id}-${idx}`}
+                          emoji={emoji}
+                          onClick={handleEmojiClick}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="veil-emoji-empty-tab" style={{ padding: '30px 16px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--veil-text-secondary, #94a3b8)' }}>
+                    No matching emojis found
+                  </span>
+                </div>
+              )
             )}
-
-            {/* Categorized Emojis */}
-            {filteredCategories.map((cat) => (
-              <div key={cat.id} id={`emoji-section-${cat.id}`} className="veil-emoji-section">
-                <div className="veil-emoji-section-header">{cat.name}</div>
-                <div className="veil-emoji-grid">
-                  {cat.emojis.map((emoji, idx) => (
-                    <button
-                      key={`${cat.id}-${idx}`}
-                      type="button"
-                      className="veil-emoji-cell"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={(e) => handleEmojiClick(e, emoji)}
-                      aria-label={emoji}
-                    >
-                      <span>{emoji}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
           </>
         ) : activeTab === 'stickers' ? (
           <div className="veil-sticker-content-section">
@@ -793,3 +821,5 @@ export const EmojiDrawer: React.FC<EmojiDrawerProps> = ({
     </div>
   );
 };
+
+export const EmojiDrawer = React.memo(EmojiDrawerComponent);

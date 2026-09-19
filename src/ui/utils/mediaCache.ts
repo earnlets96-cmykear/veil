@@ -259,7 +259,7 @@ export class MediaCacheManager {
                 chunkSize: attachment.chunkSize || (64 * 1024),
                 sha256Hash: attachment.sha256Hash || '',
               };
-              plaintextBytes = await AttachmentPipeline.decryptProgressive(meta, chunks, encryptionKey);
+              plaintextBytes = await AttachmentPipeline.decryptProgressiveAsync(meta, chunks, encryptionKey);
               RuntimeDiagnostics.decrypt('decryptionCompleted', {
                 attachmentId: meta.attachmentId,
                 chunkCount: chunks.length,

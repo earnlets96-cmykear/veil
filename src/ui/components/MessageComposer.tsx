@@ -175,7 +175,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   };
 
   // Emoji insertion and backspace handlers
-  const handleInsertEmoji = (emoji: string) => {
+  const handleInsertEmoji = useCallback((emoji: string) => {
     setText((prev) => {
       const textarea = textareaRef.current;
       if (!textarea) return prev + emoji;
@@ -196,9 +196,9 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       }, 0);
       return nextText;
     });
-  };
+  }, []);
 
-  const handleEmojiBackspace = () => {
+  const handleEmojiBackspace = useCallback(() => {
     setText((prev) => {
       if (!prev) return '';
       const textarea = textareaRef.current;
@@ -249,7 +249,11 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       }
       return prev.slice(0, -1);
     });
-  };
+  }, []);
+
+  const handleCloseEmojiDrawer = useCallback(() => {
+    setIsEmojiDrawerOpen(false);
+  }, []);
 
   // Register Priority 30: Emoji/Sticker drawer OR Media Picker
   useEffect(() => {
@@ -777,7 +781,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         onSelectEmoji={handleInsertEmoji}
         onSelectSticker={handleSelectSticker}
         onBackspace={handleEmojiBackspace}
-        onClose={() => setIsEmojiDrawerOpen(false)}
+        onClose={handleCloseEmojiDrawer}
       />
     </div>
   );

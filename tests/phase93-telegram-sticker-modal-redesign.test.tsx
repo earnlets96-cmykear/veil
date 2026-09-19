@@ -96,7 +96,8 @@ describe('Phase 93: Reliable Sticker Blob Dispatching & Proxy Support', () => {
   });
 
   it('vite.config.ts and relayServer.ts provide /api/telegram-stickers/proxy endpoint with CORS headers', () => {
-    expect(viteConfigSource).toContain("url.startsWith('/api/telegram-stickers/proxy?url=')");
+    expect(viteConfigSource).toContain("rawUrl.startsWith('/api/telegram-stickers/proxy?url=')");
+    expect(viteConfigSource).toContain("pathname === '/api/telegram-stickers/proxy'");
     expect(viteConfigSource).toContain("res.setHeader('Access-Control-Allow-Origin', '*')");
 
     expect(relaySource).toContain("url.startsWith('/v1/stickers/proxy?url=')");

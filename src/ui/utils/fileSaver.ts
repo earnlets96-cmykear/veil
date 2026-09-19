@@ -6,6 +6,7 @@
  */
 
 import { bytesToBase64 } from '../../crypto/utils.ts';
+import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
@@ -66,7 +67,7 @@ export class FileSaver {
     triggerShare: boolean
   ): Promise<SaveFileResult> {
     try {
-      const base64Data = bytesToBase64(data);
+      const base64Data = await AttachmentPipeline.bytesToBase64Async(data);
 
       // Check and request filesystem permissions if required by Android runtime
       try {
@@ -210,7 +211,7 @@ export class FileSaver {
     }
 
     try {
-      const base64Data = bytesToBase64(data);
+      const base64Data = await AttachmentPipeline.bytesToBase64Async(data);
 
       // MediaStore owns Gallery visibility on modern Android. It is invoked only
       // for this explicit Save action, never during startup or media selection.
