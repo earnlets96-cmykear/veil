@@ -4757,3 +4757,117 @@ img.veil-message-sticker-img {
   transform: translateZ(0);
   backface-visibility: hidden;
 }
+
+/* Phase 103: unified chat-first visual rhythm. */
+.veil-chat-header {
+  height: 60px;
+  min-height: 60px;
+  padding-inline: var(--veil-space-3) !important;
+  background: var(--veil-surface-panel) !important;
+  border-bottom-color: var(--veil-border) !important;
+}
+
+.veil-chat-header-left,
+.veil-chat-header-avatar-group {
+  gap: var(--veil-space-2);
+}
+
+.veil-chat-header-name {
+  font-size: var(--veil-text-base);
+  font-weight: var(--veil-weight-semibold);
+}
+
+.veil-chat-header-status {
+  color: var(--veil-text-secondary);
+}
+
+.veil-chat-header-actions > button,
+.veil-chat-header-actions [role="button"] {
+  min-width: var(--veil-touch-target-min);
+  min-height: var(--veil-touch-target-min);
+  border-radius: var(--veil-radius-md);
+  transition: background var(--veil-motion-fast), color var(--veil-motion-fast), transform var(--veil-motion-fast);
+}
+
+.veil-chat-header-actions > button:hover,
+.veil-chat-header-actions > button:focus-visible {
+  background: var(--veil-bg-surface-hover) !important;
+  color: var(--veil-text-primary) !important;
+}
+
+.veil-timeline {
+  padding: var(--veil-space-4) clamp(12px, 3vw, 32px) !important;
+  gap: 6px;
+  background: var(--veil-surface-app);
+}
+
+.veil-msg-row + .veil-msg-row.veil-message-grouped-prev,
+.veil-message-row.veil-message-grouped-prev {
+  margin-top: -3px;
+}
+
+.veil-message-bubble {
+  border-radius: 16px;
+  box-shadow: var(--veil-elevation-1);
+  transition: box-shadow var(--veil-motion-fast), transform var(--veil-motion-fast);
+}
+
+.veil-message-bubble:hover {
+  box-shadow: var(--veil-elevation-2);
+}
+
+.veil-message-row.incoming .veil-message-bubble {
+  border-color: var(--veil-border) !important;
+}
+
+.veil-message-meta,
+.veil-message-meta-group {
+  opacity: 0.82;
+  font-variant-numeric: tabular-nums;
+}
+
+.veil-composer {
+  padding-inline: var(--veil-space-3) !important;
+  padding-top: var(--veil-space-2) !important;
+  gap: var(--veil-space-2);
+}
+
+.veil-composer-input-island {
+  min-height: 46px;
+  border-radius: var(--veil-radius-lg) !important;
+  background: var(--veil-surface-panel) !important;
+  border-color: var(--veil-border) !important;
+  box-shadow: var(--veil-elevation-1);
+}
+
+.veil-composer-input-island:focus-within {
+  border-color: var(--veil-accent) !important;
+  box-shadow: var(--veil-focus-ring);
+}
+
+.veil-btn-composer-send {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--veil-radius-md) !important;
+  transition: transform var(--veil-motion-fast), background var(--veil-motion-fast);
+}
+
+.veil-btn-composer-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .veil-chat-header {
+    padding-inline: 8px !important;
+  }
+
+  .veil-timeline {
+    padding-inline: 10px !important;
+  }
+
+  .veil-bubble-wrapper {
+    max-width: min(86vw, 420px);
+  }
+}
