@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Phase 102] - 2026-09-20
 
 ### Performance
+- Coalesced ResizeObserver scroll compensation into one animation frame, preventing repeated scroll writes while media and message rows resize.
 - Replaced post-fling full timeline row scans with a single hit-tested visible-row anchor measurement, reducing layout reads during scroll settlement.
 - Deferred large-media hashing, Base64 conversion, and progressive decryption to a reusable Web Worker pool with synchronous small-payload fallbacks.
 - Limited history prepend batches to 16 rows and scheduled them with React transitions while preserving the user's scroll offset.

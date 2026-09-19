@@ -8,6 +8,7 @@
 - [x] Offloaded large media hashing, Base64 encoding, and progressive decrypt/reassembly to a reusable worker pool with small-payload fallbacks.
 - [x] Deferred and bounded history expansion while preserving the scroll offset after prepending rows.
 - [x] Reduced scroll-anchor settlement to one visible-row measurement instead of scanning every rendered row.
+- [x] Coalesced ResizeObserver scroll compensation into one animation frame per layout burst.
 - [x] Limited emoji rendering to the active category and stabilized drawer callback identities.
 - [x] Added Phase 102A–C regression coverage (22 focused tests passing).
 - [x] Web/release build and Capacitor Android sync completed.

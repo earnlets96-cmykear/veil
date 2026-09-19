@@ -1143,29 +1143,38 @@ export const ConversationView: React.FC = () => {
     if (!container || typeof ResizeObserver === 'undefined') return;
 
     let isAdjusting = false;
+    const resizeAdjustRafRef = { current: null as number | null };
     const observer = new ResizeObserver(() => {
-      if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current) return;
-      const anchor = scrollAnchorRef.current;
-      if (!anchor.id) return;
-      const el = document.getElementById(anchor.id);
-      if (!el) return;
+      if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current || resizeAdjustRafRef.current !== null) return;
+      resizeAdjustRafRef.current = requestAnimationFrame(() => {
+        resizeAdjustRafRef.current = null;
+        const anchor = scrollAnchorRef.current;
+        if (!anchor?.id || isNearBottomRef.current || isAdjusting) return;
+        const el = document.getElementById(anchor.id);
+        if (!el) return;
 
-      const containerRect = container.getBoundingClientRect();
-      const currentRect = el.getBoundingClientRect();
-      const currentOffset = currentRect.top - containerRect.top;
-      const delta = currentOffset - anchor.topOffset;
+        const containerRect = container.getBoundingClientRect();
+        const currentRect = el.getBoundingClientRect();
+        const currentOffset = currentRect.top - containerRect.top;
+        const delta = currentOffset - anchor.topOffset;
 
-      if (Math.abs(delta) > 2) {
-        isAdjusting = true;
-        container.scrollTop += delta;
-        requestAnimationFrame(() => {
-          isAdjusting = false;
-        });
-      }
+        if (Math.abs(delta) > 2) {
+          isAdjusting = true;
+          container.scrollTop += delta;
+          requestAnimationFrame(() => {
+            isAdjusting = false;
+          });
+        }
+      });
     });
 
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (resizeAdjustRafRef.current !== null) {
+        cancelAnimationFrame(resizeAdjustRafRef.current);
+      }
+    };
   }, []);
 
   const lastChatIdRef = useRef<string | null>(null);

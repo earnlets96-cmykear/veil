@@ -1,19 +1,19 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-09-19T21:51:27.912Z",
+  "generatedAt": "2026-09-19T21:56:25.219Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 8,
   "artifacts": [
     {
+      "path": "dist/assets/index-BY5fwCMT.js",
+      "sizeBytes": 1009044,
+      "sha256": "33c71034505029181e41e9649ab8da627141d4dd9cb8d0ee871aa9c1931a4896"
+    },
+    {
       "path": "dist/assets/index-DX2BhfsY.css",
       "sizeBytes": 131251,
       "sha256": "2abdd6563096ba318673731c340c75a157eda349624dc5f46a9a064207e57889"
-    },
-    {
-      "path": "dist/assets/index-g1_wQ0BA.js",
-      "sizeBytes": 1008877,
-      "sha256": "1841df28d25a8c1df1772500c50b2973c6d372e1886e8564d9bb567a04f32509"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -26,24 +26,24 @@
       "sha256": "8f562fd02168244055567425b6018e3fbde83c66d85a32f787982be1a6b5916b"
     },
     {
-      "path": "dist/assets/web-B8C67aQ6.js",
+      "path": "dist/assets/web-BAbq_ype.js",
       "sizeBytes": 8728,
-      "sha256": "63203a6fff895b8ba7ae9fb473d4234b7a8cc117c895f6a0a4e914c9defe3723"
+      "sha256": "dd0378df94c7c9e410305b106bdd20cdf9903467ba175e401a7452c4851a56ff"
     },
     {
-      "path": "dist/assets/web-Bnig0Gdy.js",
+      "path": "dist/assets/web-C9Ld9LOJ.js",
       "sizeBytes": 842,
-      "sha256": "06e89aad95637f13231b6589754c46e310987beb351d3c9916445e4f798471cd"
+      "sha256": "d58dd6570d87aecccb964b575791b2467a00b1e8696aae2906a4140beaf276ae"
     },
     {
-      "path": "dist/assets/web-DCw390n7.js",
+      "path": "dist/assets/web-CWT9l0Lr.js",
       "sizeBytes": 361,
-      "sha256": "777be918f9851e6c216a2abd94a1c04f3f1c7dbdaa2c3ec78714d92cb91aef11"
+      "sha256": "e6defa705f1f06d4ff6d9a51b862769ae936d5940a2cc500fbad672663702a8f"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "b3e03fdc19b2188ecf22d885a5001b1e513c98c44890d89666fac2e27e1eb307"
+      "sha256": "346dcb6be68f3a98e748ea0e001dc252a56de6ea8cca0e1cfc631e0922266c60"
     }
   ]
 }

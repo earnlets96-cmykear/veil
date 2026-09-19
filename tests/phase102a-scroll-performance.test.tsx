@@ -54,7 +54,7 @@ describe('Phase 102A: Scroll Performance Regression Fix', () => {
 
     // ResizeObserver compensator
     expect(cvContent).toContain('new ResizeObserver');
-    expect(cvContent).toContain('if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current) return;');
+    expect(cvContent).toContain('if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current || resizeAdjustRafRef.current !== null) return;');
     expect(cvContent).toContain('container.scrollTop += delta;');
   });
 
@@ -66,6 +66,11 @@ describe('Phase 102A: Scroll Performance Regression Fix', () => {
   it('settles the scroll anchor from the visible hit-tested row instead of scanning the timeline', () => {
     expect(cvContent).toContain('document.elementFromPoint');
     expect(cvContent).not.toContain("container.querySelectorAll('.veil-msg-row')");
+  });
+
+  it('coalesces ResizeObserver scroll compensation into one animation frame', () => {
+    expect(cvContent).toContain('resizeAdjustRafRef');
+    expect(cvContent).toMatch(/resizeAdjustRafRef\.current = requestAnimationFrame/);
   });
 
   it('verifies scroll anchor settlement simulation', () => {
