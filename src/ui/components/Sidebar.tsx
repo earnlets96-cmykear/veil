@@ -588,7 +588,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Expandable Search Input */}
       {(isSearchOpen || searchQuery.trim().length > 0) && (
-        <div style={{ padding: '0 1rem 0.65rem 1rem' }} role="search">
+        <div className="veil-sidebar-search-wrap" style={{ padding: '0 1rem 0.65rem 1rem' }} role="search">
           <SearchInput
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -602,6 +602,7 @@ export const Sidebar: React.FC = () => {
       {/* Category Chips Bar (Screen 4: All, Unread, Groups) */}
       {!searchQuery.trim() && (
         <div
+          className="veil-sidebar-filters"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -928,4 +929,3 @@ export const Sidebar: React.FC = () => {
     </div>
   );
 };
-

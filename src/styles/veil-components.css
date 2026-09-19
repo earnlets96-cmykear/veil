@@ -5,6 +5,80 @@
  * Zero hardcoded colors or random CSS values.
  */
 
+/* Unified messaging workspace refinement. */
+.veil-sidebar {
+  background: var(--veil-surface-app) !important;
+  border-right-color: var(--veil-border) !important;
+}
+
+.veil-sidebar-search-wrap {
+  padding-block: var(--veil-space-2) !important;
+}
+
+.veil-sidebar-filters {
+  gap: var(--veil-space-2) !important;
+  padding-bottom: var(--veil-space-3) !important;
+}
+
+.veil-sidebar-filters .veil-filter-pill {
+  min-height: 36px;
+  padding-inline: 14px !important;
+  border: 1px solid var(--veil-border) !important;
+  background: var(--veil-surface-panel) !important;
+  color: var(--veil-text-secondary) !important;
+  transition: background var(--veil-motion-fast), color var(--veil-motion-fast), border-color var(--veil-motion-fast), transform var(--veil-motion-fast);
+}
+
+.veil-sidebar-filters .veil-filter-pill:hover,
+.veil-sidebar-filters .veil-filter-pill:focus-visible {
+  color: var(--veil-text-primary) !important;
+  border-color: var(--veil-accent) !important;
+  transform: translateY(-1px);
+}
+
+.veil-sidebar .veil-conversation-list {
+  padding-inline: var(--veil-space-2) !important;
+  scrollbar-gutter: stable;
+}
+
+.veil-sidebar .veil-conversation-item {
+  min-height: 64px;
+  margin-bottom: 2px !important;
+  padding: 10px 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--veil-radius-md) !important;
+  background: transparent !important;
+  transition: background var(--veil-motion-fast), border-color var(--veil-motion-fast), transform var(--veil-motion-fast) !important;
+}
+
+.veil-sidebar .veil-conversation-item:hover,
+.veil-sidebar .veil-conversation-item:focus-visible {
+  background: var(--veil-bg-surface-hover) !important;
+  border-color: var(--veil-border) !important;
+}
+
+.veil-sidebar .veil-conversation-item.active {
+  background: var(--veil-accent-primary-subtle) !important;
+  border-color: var(--veil-accent-primary-alpha) !important;
+}
+
+.veil-sidebar .veil-conversation-name {
+  color: var(--veil-text-primary) !important;
+}
+
+.veil-sidebar .veil-conversation-preview {
+  color: var(--veil-text-secondary) !important;
+}
+
+.veil-sidebar .veil-unread-pill {
+  background: var(--veil-accent) !important;
+  min-width: 22px;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* =========================================================================
    1. BUTTONS & ICON BUTTONS
    ========================================================================= */

@@ -5,6 +5,7 @@ import * as path from 'path';
 const root = path.resolve(__dirname, '..');
 const designSystem = fs.readFileSync(path.join(root, 'src/styles/veil-design-system.css'), 'utf8');
 const themes = fs.readFileSync(path.join(root, 'src/styles/themes.css'), 'utf8');
+const sidebar = fs.readFileSync(path.join(root, 'src/ui/components/Sidebar.tsx'), 'utf8');
 
 describe('Phase 103: messaging UI system', () => {
   it('defines shared semantic surface, text, accent, focus, spacing, and motion roles', () => {
@@ -29,5 +30,12 @@ describe('Phase 103: messaging UI system', () => {
     expect(themes).toMatch(/\[data-theme="light"\]/);
     expect(themes).toContain('--veil-surface-app');
     expect(themes).toContain('--veil-text-primary');
+  });
+
+  it('exposes semantic workspace hooks for the responsive conversation list', () => {
+    expect(sidebar).toContain('veil-sidebar-search-wrap');
+    expect(sidebar).toContain('veil-sidebar-filters');
+    expect(sidebar).toContain('veil-conversation-item');
+    expect(sidebar).toContain('aria-label="Conversation List"');
   });
 });
