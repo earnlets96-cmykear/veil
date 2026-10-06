@@ -2,7 +2,25 @@
 
 All notable changes to the VEIL project are documented in this file.
 
-## [1.0.0-phase100-chat-smoothness-and-fps-optimization] - 2026-09-13
+## [1.0.0-phase104-timeline-stability-and-native-scrolling] - 2026-10-06
+
+### Timeline Stability, Native Bottom-Anchored Scroller & Elimination of Scroll Jumps (Phase 104)
+- **Native Bottom-Anchoring Architecture**:
+  - Migrated `.veil-timeline` from standard column flex to native `flex-direction: column-reverse`.
+  - Added `.veil-timeline-inner` wrapper (`display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%`) so messages render in natural chronological order.
+  - Browser automatically and natively keeps bottom anchored during new message arrivals, media loading/decryption, and virtual keyboard expansion without JavaScript layout recalculations.
+- **Root Cause Eradication of Scroll Jumps & Lag**:
+  - Removed `content-visibility: auto` and `contain-intrinsic-size: auto 60px` from `.veil-msg-row` which were guessing row height wrong and causing layout shifts on render.
+  - Removed manual `ResizeObserver` and `scrollAnchorRef` delta compensation loops that previously fought browser layout.
+  - Removed `scrollIntoView({ behavior: 'smooth' })` triggers during messaging and viewport shrinking that previously caused ancestor container jitter.
+  - Removed redundant GPU layer promotions (`transform: translateZ(0)` on every bubble and `will-change: scroll-position` on the scroller), restoring smooth GPU frame rates especially on mobile/Android.
+- **Scroll-to-Bottom Floating Action Button (FAB)**:
+  - Added responsive `.veil-scroll-bottom-btn` with smooth `scrollToBottom(true)` and unread message counter badge (`.veil-scroll-bottom-badge`) when scrolled up (`!isAtBottom`).
+  - Implemented pre-paint instant scroll to bottom on conversation switch (`useLayoutEffect`).
+- **Automated Verification**:
+  - Updated Phase 100, 101, and 102A test suites to reflect native bottom-anchoring and zero-DOM-measurement scroll performance.
+  - All 77 focused and regression tests passing.
+  - Production build clean: `npm run build` succeeds cleanly with release manifest generated.
 
 ### 60fps Chat Smoothness, CSS Containment & Timeline Performance (Phase 100)
 - **CSS 60fps GPU Pipeline & Content-Visibility Containment**:

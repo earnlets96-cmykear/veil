@@ -1,8 +1,24 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Verified Phase: PHASE 101 — RELIABILITY, MEDIA, VOICE RETRY & INTERACTION HARDENING
-- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ALL 43 PHASE 101 TESTS PASS, 97/97 TOTAL VERIFICATION TESTS PASS, ZERO REGRESSIONS, PRODUCTION BUILD CLEAN, RELEASE MANIFEST GENERATED)**
+## Current Verified Phase: PHASE 104 — TIMELINE STABILITY & NATIVE BOTTOM-ANCHORED SCROLL ENGINE
+- **Status**: **VERIFIED & OPERATIONAL (100% PASS — ZERO TYPESCRIPT ERRORS, ALL REGRESSION SUITES PASSING, PRODUCTION RELEASE BUILD CLEAN, RELIABLE FLUID 60FPS CHAT UX)**
 - **Branch**: `main`
+- **Key Deliverables & Architectural Fixes**:
+  - **Native Bottom-Anchored Scroller**:
+    - Converted `.veil-timeline` from standard `column` to `flex-direction: column-reverse`.
+    - Added `.veil-timeline-inner` inside `.veil-timeline` with `display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%;` to render messages in normal top-to-bottom chronological order.
+    - Result: As messages arrive, media loads/decrypts, or the virtual keyboard opens, the browser natively keeps the viewport pinned to the bottom without running JavaScript layout observers or fighting scroll offsets.
+  - **Root Cause Eradication of Scroll Jumps**:
+    - Removed `content-visibility: auto` and `contain-intrinsic-size: auto 60px` from `.veil-msg-row`, which were causing layout shifts as variable-height message bubbles entered the viewport.
+    - Removed manual `ResizeObserver` and `scrollAnchorRef` delta compensation loops that previously fought browser layout.
+    - Removed `scrollIntoView({ behavior: 'smooth' })` triggers during messaging and viewport shrinking that previously caused ancestor container jitter.
+    - Removed redundant GPU layer promotions (`transform: translateZ(0)` on every bubble and `will-change: scroll-position` on the scroller), restoring smooth GPU frame rates especially on mobile/Android.
+  - **Scroll-to-Bottom Floating Action Button**:
+    - Added `.veil-scroll-bottom-btn` with smooth `scrollToBottom(true)` and unread message counter badge (`.veil-scroll-bottom-badge`) when scrolled up.
+    - Instant snap to bottom on conversation switch (`useLayoutEffect` before paint).
+
+## Previous Verified Phase: PHASE 101 — RELIABILITY, MEDIA, VOICE RETRY & INTERACTION HARDENING
+- **Status**: **VERIFIED & OPERATIONAL**
 - **Key Deliverables & Fixes**:
   - **MediaCache Canonical Aliases & RAM-Only Audio Enforcement**:
     - Refactored `MediaCacheManager` to store one canonical entry per media item (`entries`) and an alias pointer map (`aliasMap`).

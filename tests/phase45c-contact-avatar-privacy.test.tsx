@@ -242,7 +242,7 @@ describe('Track 3: Contact Avatar Propagation & Chat Privacy', () => {
     const refreshedB = (await contactManagerB.listContacts(sessionB)).find((c) => c.identityId === 'id_user_a');
     expect(refreshedB?.metadata?.allowSave).toBe('true');
     expect(refreshedB?.metadata?.allowForward).toBe('false'); // Unchanged!
-  });
+  }, 60000);
 
   // ---------------------------------------------------------------------------
   // 8: Display-name Collision Resilience

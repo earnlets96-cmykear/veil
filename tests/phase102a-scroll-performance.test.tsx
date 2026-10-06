@@ -1,76 +1,60 @@
 /**
- * Phase 102A: Scroll Performance Regression Automated Test Suite
+ * Phase 102A & Phase 104: Scroll Performance & Native Bottom-Anchoring Automated Test Suite
  *
- * Verifies that the scroll hot path in ConversationView.tsx does NOT perform
- * synchronous DOM measurements (querySelectorAll, getBoundingClientRect, layout thrashing)
- * while preserving scroll anchoring behavior for when messages/media change size above viewport.
+ * Verifies that the scroll engine in ConversationView.tsx:
+ * 1. Has ZERO DOM measurements (querySelectorAll, getBoundingClientRect, elementFromPoint) on the scroll hot path.
+ * 2. Replaces fragile ResizeObserver and manual scrollAnchor compensations with native column-reverse bottom-anchoring.
+ * 3. Coalesces scroll workloads and history expansion requests via requestAnimationFrame.
+ * 4. Cleans up RAF timers on unmount to prevent leaks.
  */
 
 import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
-describe('Phase 102A: Scroll Performance Regression Fix', () => {
+describe('Phase 102A / 104: Scroll Performance & Native Bottom-Anchoring', () => {
   const cvPath = path.resolve(__dirname, '../src/ui/components/ConversationView.tsx');
   const cvContent = fs.readFileSync(cvPath, 'utf8');
 
-  it('verifies handleTimelineScroll does NOT call updateScrollAnchor or DOM measurement synchronously', () => {
+  it('verifies handleTimelineScroll contains zero synchronous DOM measurements', () => {
     // Extract handleTimelineScroll body
     const handleScrollMatch = cvContent.match(
-      /const handleTimelineScroll = useCallback\(\(e: React\.UIEvent<HTMLDivElement>\) => \{([\s\S]*?)\}, \[renderedCount/
+      /const handleTimelineScroll = useCallback\(\(\) => \{([\s\S]*?)\}, \[\]\);/
     );
     expect(handleScrollMatch).toBeTruthy();
     const handleScrollBody = handleScrollMatch![1];
 
-    // Must NOT contain synchronous updateScrollAnchor() call directly in scroll path
-    // updateScrollAnchor must only be invoked asynchronously inside setTimeout
-    expect(handleScrollBody).not.toMatch(/isNearBottomRef\.current = distanceToBottom < 120;\s*updateScrollAnchor\(\);/);
-    expect(handleScrollBody).toMatch(/scrollAnchorTimerRef\.current = setTimeout\(\(\) => \{\s*updateScrollAnchor\(\);/);
-
-    // Must NOT contain getBoundingClientRect or querySelectorAll in executable code
+    // Must NOT contain DOM measurements in executable code
     const codeWithoutComments = handleScrollBody.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
     expect(codeWithoutComments).not.toContain('getBoundingClientRect');
     expect(codeWithoutComments).not.toContain('querySelectorAll');
+    expect(codeWithoutComments).not.toContain('elementFromPoint');
 
-    // Must update near-bottom detection arithmetic
-    expect(handleScrollBody).toContain('isNearBottomRef.current = distanceToBottom < 120;');
-
-    // Must use debounced timer for updateScrollAnchor
-    expect(handleScrollBody).toContain('scrollAnchorTimerRef.current = setTimeout');
-    expect(handleScrollBody).toContain('updateScrollAnchor()');
+    // Must use simple, non-thrashing scroll arithmetic
+    expect(handleScrollBody).toContain('el.scrollTop > -120');
   });
 
-  it('verifies debounce timer cleanup is registered on unmount', () => {
-    expect(cvContent).toContain('const scrollAnchorTimerRef = useRef');
-    expect(cvContent).toContain('if (scrollAnchorTimerRef.current) {');
-    expect(cvContent).toContain('clearTimeout(scrollAnchorTimerRef.current);');
+  it('verifies animation frame cleanup is registered on unmount', () => {
+    expect(cvContent).toContain('const timelineScrollRafRef = useRef');
+    expect(cvContent).toContain('const historyLoadRafRef = useRef');
+    expect(cvContent).toContain('cancelAnimationFrame(timelineScrollRafRef.current);');
+    expect(cvContent).toContain('cancelAnimationFrame(historyLoadRafRef.current);');
   });
 
-  it('verifies Phase 101 scroll preservation invariants remain intact', () => {
-    // Scroll anchor refs and callbacks
-    expect(cvContent).toContain('const scrollAnchorRef = useRef');
-    expect(cvContent).toContain('const updateScrollAnchor = useCallback');
-    expect(cvContent).toContain('isNearBottomRef.current = distanceToBottom < 120;');
+  it('verifies elimination of ResizeObserver and scrollAnchor hacks in favor of native column-reverse', () => {
+    // No more hacky ResizeObserver loops fighting native browser layout
+    expect(cvContent).not.toContain('new ResizeObserver');
+    expect(cvContent).not.toContain('const scrollAnchorRef');
+    expect(cvContent).not.toContain('const updateScrollAnchor');
 
-    // ResizeObserver compensator
-    expect(cvContent).toContain('new ResizeObserver');
-    expect(cvContent).toContain('if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current || resizeAdjustRafRef.current !== null) return;');
-    expect(cvContent).toContain('container.scrollTop += delta;');
+    // Uses native isAtBottomRef and column-reverse architecture
+    expect(cvContent).toContain('isAtBottomRef');
+    expect(cvContent).toContain('scrollToBottom');
   });
 
   it('defers history expansion and keeps the prepend batch bounded', () => {
-    expect(cvContent).toMatch(/const WINDOW_INCREMENT = 16/);
+    expect(cvContent).toMatch(/const WINDOW_INCREMENT = 30;/);
     expect(cvContent).toMatch(/startTransition\(\(\) => \{\s*setRenderedCount/);
-  });
-
-  it('settles the scroll anchor from the visible hit-tested row instead of scanning the timeline', () => {
-    expect(cvContent).toContain('document.elementFromPoint');
-    expect(cvContent).not.toContain("container.querySelectorAll('.veil-msg-row')");
-  });
-
-  it('coalesces ResizeObserver scroll compensation into one animation frame', () => {
-    expect(cvContent).toContain('resizeAdjustRafRef');
-    expect(cvContent).toMatch(/resizeAdjustRafRef\.current = requestAnimationFrame/);
   });
 
   it('coalesces repeated top-of-history load requests into one animation frame', () => {
@@ -83,40 +67,30 @@ describe('Phase 102A: Scroll Performance Regression Fix', () => {
     expect(cvContent).toMatch(/timelineScrollRafRef\.current = requestAnimationFrame/);
   });
 
-  it('verifies scroll anchor settlement simulation', () => {
-    // Simulate scroll events arriving rapidly (e.g. 120Hz display, 8ms between events)
-    let pendingTimer: any = null;
-    let anchorCalculations = 0;
+  it('verifies scroll throttling simulation under 120Hz scroll events burst', () => {
+    let executedWorkloads = 0;
+    let pendingRaf: number | null = null;
 
-    const simulateScrollEvent = (isNearBottom: boolean) => {
-      if (pendingTimer) {
-        clearTimeout(pendingTimer);
-        pendingTimer = null;
-      }
-      if (isNearBottom) {
-        // Pinned to bottom, no anchor needed
-      } else {
-        pendingTimer = setTimeout(() => {
-          anchorCalculations++;
-        }, 100);
-      }
+    const simulateScrollEvent = () => {
+      if (pendingRaf !== null) return; // coalesced!
+      pendingRaf = 1; // mock raf id
+      setTimeout(() => {
+        pendingRaf = null;
+        executedWorkloads++;
+      }, 16);
     };
 
-    // Simulate 50 scroll events in a burst (e.g. 400ms fling)
-    for (let i = 0; i < 50; i++) {
-      simulateScrollEvent(false);
+    // Simulate 60 scroll events arriving in 10ms (burst)
+    for (let i = 0; i < 60; i++) {
+      simulateScrollEvent();
     }
 
-    // Immediately after scrolling burst, zero anchor calculations have occurred
-    expect(anchorCalculations).toBe(0);
-
-    // Wait for debounce timer to settle
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        // Exactly ONE anchor calculation runs after scrolling settles!
-        expect(anchorCalculations).toBe(1);
+        // Coalesced to exactly 1 execution
+        expect(executedWorkloads).toBe(1);
         resolve();
-      }, 150);
+      }, 50);
     });
   });
 });

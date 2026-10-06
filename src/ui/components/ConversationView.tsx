@@ -14,7 +14,7 @@
  * - 100% SVG vector iconography and zero secret leakage.
  */
 
-import React, { startTransition, useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { startTransition, useRef, useEffect, useLayoutEffect, useState, useMemo, useCallback } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { MessageComposer } from './MessageComposer.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
@@ -68,6 +68,7 @@ import {
   PhoneIcon,
   EditIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   StarIcon,
 } from './icons/index.ts';
 import {
@@ -1042,7 +1043,7 @@ export const ConversationView: React.FC = () => {
 
   // Incremental timeline windowing for smooth rendering of large conversations
   const INITIAL_MESSAGE_WINDOW = 60;
-  const WINDOW_INCREMENT = 16;
+  const WINDOW_INCREMENT = 30;
   const [renderedCount, setRenderedCount] = useState<number>(INITIAL_MESSAGE_WINDOW);
 
   const activeMessagesRef = useRef<UIMessage[]>(activeMessages);
@@ -1064,29 +1065,20 @@ export const ConversationView: React.FC = () => {
     return activeMessages.slice(-renderedCount);
   }, [activeMessages, renderedCount]);
 
-  const isNearBottomRef = useRef(true);
-  const scrollAnchorRef = useRef<{ id: string; topOffset: number } | null>(null);
-  const scrollAnchorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prependScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  // --- Column-reverse native bottom-anchoring ---
+  // With flex-direction: column-reverse on the scroller, scrollTop=0 is the BOTTOM.
+  // The browser keeps the viewport anchored automatically when content above grows.
+  // No ResizeObserver, no scrollAnchor hacks, no manual scrollTop compensation.
+
+  const isAtBottomRef = useRef(true);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [newMsgCount, setNewMsgCount] = useState(0);
+  const prevMsgCountRef = useRef(activeMessages.length);
   const historyLoadRafRef = useRef<number | null>(null);
   const timelineScrollRafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const previous = prependScrollRef.current;
-    if (!previous) return;
-    prependScrollRef.current = null;
-    requestAnimationFrame(() => {
-      const timeline = timelineRef.current;
-      if (!timeline) return;
-      timeline.scrollTop = previous.scrollTop + (timeline.scrollHeight - previous.scrollHeight);
-    });
-  }, [renderedCount]);
-
-  useEffect(() => {
     return () => {
-      if (scrollAnchorTimerRef.current) {
-        clearTimeout(scrollAnchorTimerRef.current);
-      }
       if (historyLoadRafRef.current !== null) {
         cancelAnimationFrame(historyLoadRafRef.current);
       }
@@ -1096,144 +1088,74 @@ export const ConversationView: React.FC = () => {
     };
   }, []);
 
-  const updateScrollAnchor = useCallback(() => {
-    const container = timelineRef.current;
-    if (!container || isNearBottomRef.current) {
-      scrollAnchorRef.current = null;
-      return;
-    }
-    const containerRect = container.getBoundingClientRect();
-    const hit = document.elementFromPoint(containerRect.left + 8, containerRect.top + 12);
-    const row = hit?.closest('.veil-msg-row') as HTMLElement | null;
-    if (row?.id) {
-      const rect = row.getBoundingClientRect();
-      scrollAnchorRef.current = {
-        id: row.id,
-        topOffset: rect.top - containerRect.top,
-      };
-    }
-  }, []);
-
-  const handleTimelineScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const timeline = e.currentTarget;
+  const handleTimelineScroll = useCallback(() => {
     if (timelineScrollRafRef.current !== null) return;
     timelineScrollRafRef.current = requestAnimationFrame(() => {
       timelineScrollRafRef.current = null;
-      const el = timelineRef.current || timeline;
+      const el = timelineRef.current;
       if (!el) return;
-      const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      isNearBottomRef.current = distanceToBottom < 120;
 
-      // Phase 102A: Surgical fix for scroll performance regression.
-      // Zero DOM measurements (getBoundingClientRect, querySelectorAll) on the scroll hot path.
-      // Near-bottom immediately clears anchor. Scrolled up anchors are debounced until scrolling settles.
-      if (scrollAnchorTimerRef.current) {
-        clearTimeout(scrollAnchorTimerRef.current);
-        scrollAnchorTimerRef.current = null;
-      }
-      if (isNearBottomRef.current) {
-        scrollAnchorRef.current = null;
-      } else {
-        scrollAnchorTimerRef.current = setTimeout(() => {
-          updateScrollAnchor();
-        }, 100);
+      // In column-reverse, scrollTop 0 = bottom, scrollTop grows negative
+      const atBottom = el.scrollTop > -120;
+      isAtBottomRef.current = atBottom;
+      setIsAtBottom(atBottom);
+      if (atBottom) {
+        setNewMsgCount(0);
       }
 
-      if (el.scrollTop < 100 && renderedCount < activeMessages.length && historyLoadRafRef.current === null) {
-        prependScrollRef.current = {
-          scrollHeight: el.scrollHeight,
-          scrollTop: el.scrollTop,
-        };
+      // Load older messages when scrolled near the top (large negative end in column-reverse)
+      const scrollableDistance = el.scrollHeight - el.clientHeight;
+      const distFromTop = scrollableDistance + el.scrollTop;
+      if (distFromTop < 200 && renderedCountRef.current < activeMessagesRef.current.length && historyLoadRafRef.current === null) {
         historyLoadRafRef.current = requestAnimationFrame(() => {
           historyLoadRafRef.current = null;
           startTransition(() => {
-            setRenderedCount((prev) => Math.min(activeMessages.length, prev + WINDOW_INCREMENT));
+            setRenderedCount((prev) => Math.min(activeMessagesRef.current.length, prev + WINDOW_INCREMENT));
           });
         });
       }
     });
-  }, [renderedCount, activeMessages.length, updateScrollAnchor]);
+  }, []);
 
-  // Programmatic scroll preservation when scrolled upward and elements above resize/decrypt
-  useEffect(() => {
-    const container = timelineRef.current;
-    if (!container || typeof ResizeObserver === 'undefined') return;
-
-    let isAdjusting = false;
-    const resizeAdjustRafRef = { current: null as number | null };
-    const observer = new ResizeObserver(() => {
-      if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current || resizeAdjustRafRef.current !== null) return;
-      resizeAdjustRafRef.current = requestAnimationFrame(() => {
-        resizeAdjustRafRef.current = null;
-        const anchor = scrollAnchorRef.current;
-        if (!anchor?.id || isNearBottomRef.current || isAdjusting) return;
-        const el = document.getElementById(anchor.id);
-        if (!el) return;
-
-        const containerRect = container.getBoundingClientRect();
-        const currentRect = el.getBoundingClientRect();
-        const currentOffset = currentRect.top - containerRect.top;
-        const delta = currentOffset - anchor.topOffset;
-
-        if (Math.abs(delta) > 2) {
-          isAdjusting = true;
-          container.scrollTop += delta;
-          requestAnimationFrame(() => {
-            isAdjusting = false;
-          });
-        }
-      });
-    });
-
-    observer.observe(container);
-    return () => {
-      observer.disconnect();
-      if (resizeAdjustRafRef.current !== null) {
-        cancelAnimationFrame(resizeAdjustRafRef.current);
-      }
-    };
+  // Scroll to bottom helper (for column-reverse, bottom = scrollTop 0)
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = timelineRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior: smooth ? 'smooth' : 'auto' });
+    isAtBottomRef.current = true;
+    setIsAtBottom(true);
+    setNewMsgCount(0);
   }, []);
 
   const lastChatIdRef = useRef<string | null>(null);
 
-  // Auto-scroll timeline to bottom on load/new message or to unread divider
-  // Preserves user's scroll position when scrolled up; only auto-scrolls on chat switch, when near bottom, or on outbound send
-  useEffect(() => {
+  // On chat switch: instant scroll to bottom (before paint via useLayoutEffect)
+  useLayoutEffect(() => {
     const isChatSwitch = lastChatIdRef.current !== activeChatId;
     lastChatIdRef.current = activeChatId;
-    const scrollBehavior: ScrollBehavior = isChatSwitch ? 'auto' : 'smooth';
-
     if (isChatSwitch) {
-      isNearBottomRef.current = true;
-      if (firstUnreadIndex >= 0 && unreadRef.current) {
-        unreadRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
-      } else if (timelineEndRef.current) {
-        timelineEndRef.current.scrollIntoView({ behavior: 'auto' });
-      }
-      return;
+      scrollToBottom(false);
+      prevMsgCountRef.current = activeMessages.length;
     }
+  }, [activeChatId, scrollToBottom, activeMessages.length]);
 
-    const latestMsg = activeMessages.length > 0 ? activeMessages[activeMessages.length - 1] : null;
+  // On new message: auto-scroll to bottom if already at bottom or sent by me
+  useEffect(() => {
+    const prevCount = prevMsgCountRef.current;
+    prevMsgCountRef.current = activeMessages.length;
+
+    if (activeMessages.length <= prevCount) return;
+
+    const latestMsg = activeMessages[activeMessages.length - 1];
     const isRecentlySentByMe = Boolean(latestMsg?.isOutgoing && Date.now() - latestMsg.timestamp < 3500);
 
-    if (isNearBottomRef.current || isRecentlySentByMe) {
-      if (firstUnreadIndex >= 0 && unreadRef.current) {
-        unreadRef.current.scrollIntoView({ behavior: scrollBehavior, block: 'center' });
-      } else if (timelineEndRef.current) {
-        timelineEndRef.current.scrollIntoView({ behavior: scrollBehavior });
-      }
+    if (isAtBottomRef.current || isRecentlySentByMe) {
+      scrollToBottom(false);
+    } else {
+      setNewMsgCount((c) => c + (activeMessages.length - prevCount));
     }
-  }, [activeChatId, activeMessages.length, firstUnreadIndex]);
+  }, [activeMessages.length, activeMessages, scrollToBottom]);
 
-  // Keep latest message visible above keyboard when keyboard opens or visual viewport shrinks
-  useEffect(() => {
-    if (isKeyboardOpen && timelineEndRef.current) {
-      const timer = setTimeout(() => {
-        timelineEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 60);
-      return () => clearTimeout(timer);
-    }
-  }, [isKeyboardOpen, visualViewportHeight]);
 
   // Auto-clear unread messages counter and dispatch read receipts when active
   useEffect(() => {
@@ -2220,7 +2142,8 @@ export const ConversationView: React.FC = () => {
         aria-label="Message history"
         onScroll={handleTimelineScroll}
       >
-        {displayedMessages.length === 0 ? (
+        <div className="veil-timeline-inner">
+{displayedMessages.length === 0 ? (
           <div className="veil-timeline-empty">
             <div className="veil-timeline-encryption-shield">
               <ShieldIcon size={44} color="var(--veil-accent-primary)" />
@@ -2296,7 +2219,26 @@ export const ConversationView: React.FC = () => {
           })
         )}
         <div ref={timelineEndRef} />
-      </div>
+      
+        </div>
+</div>
+
+      {/* Floating Scroll-to-Bottom FAB */}
+      {!isAtBottom && (
+        <button
+          type="button"
+          className="veil-scroll-bottom-btn"
+          onClick={() => scrollToBottom(true)}
+          aria-label="Scroll to bottom"
+        >
+          <ChevronDownIcon size={20} />
+          {newMsgCount > 0 && (
+            <span className="veil-scroll-bottom-badge" aria-label={`${newMsgCount} new messages`}>
+              {newMsgCount > 99 ? '99+' : newMsgCount}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Floating Context Menu Backdrop */}
       {contextMenu.isOpen && (

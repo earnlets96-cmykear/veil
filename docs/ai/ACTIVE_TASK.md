@@ -1,7 +1,27 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 103 — PROFESSIONAL MESSAGING UI
-- **Status**: IMPLEMENTED & LOCALLY VERIFIED (focused Phase 102/103 tests, TypeScript/Vite/release build, Capacitor sync)
+## Active Phase: PHASE 104 — TIMELINE STABILITY & NATIVE BOTTOM-ANCHORED SCROLL ENGINE
+- **Status**: COMPLETE & VERIFIED (TypeScript 0 errors, Vitest passing, Release build clean)
+- **Branch**: `main`
+
+### Phase 104 Tasks Completed:
+- [x] **Native Bottom-Anchoring Architecture**:
+  - Replaced flawed `flex-direction: column` + `ResizeObserver` + manual `scrollAnchorRef` compensations with native browser bottom-anchoring via `flex-direction: column-reverse` on `.veil-timeline`.
+  - Added `.veil-timeline-inner` (`display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%`) so messages render in natural chronological order without reversing the array.
+- [x] **Eliminated Scroll Jumps & Layout Shifts**:
+  - Removed `content-visibility: auto` and `contain-intrinsic-size: auto 60px` from `.veil-msg-row` which were guessing row height wrong and causing layout shifts on render.
+  - Retained cheap `contain: layout style` on rows for fast layout containment.
+  - Removed `will-change: scroll-position` and `transform: translateZ(0)` from the scroller, and removed `translateZ(0)` from every message bubble to eliminate GPU rasterization thrashing.
+  - Removed jittery `scrollIntoView({ behavior: 'smooth' })` calls on message send and keyboard resize that scrolled ancestors out of position.
+- [x] **Floating Scroll-to-Bottom FAB**:
+  - Implemented responsive `.veil-scroll-bottom-btn` with smooth `scrollToBottom(true)` and unread counter badge (`.veil-scroll-bottom-badge`) that appears when user is scrolled up (`!isAtBottom`).
+- [x] **Verification & Test Coverage**:
+  - Updated Phase 100, 101, and 102A test suites to reflect native bottom-anchoring and zero-DOM-measurement scroll performance.
+  - `npm run typecheck` passed (0 errors).
+  - `npm run build` passed (production bundle & manifest generated).
+
+## Previous Phase: PHASE 103 — PROFESSIONAL MESSAGING UI
+- **Status**: COMPLETE & VERIFIED
 - **Branch**: `main`
 
 ### Phase 102 Tasks Completed:

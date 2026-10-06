@@ -860,7 +860,9 @@ body {
   color: var(--veil-text-primary);
 }
 
-/* Timeline & Scrollable Message Area */
+/* Timeline & Scrollable Message Area
+   column-reverse keeps the scroller pinned to the bottom natively:
+   new messages, keyboard open, images decrypting → no JS scroll hacks. */
 .veil-timeline {
   flex: 1;
   min-height: 0;
@@ -869,15 +871,13 @@ body {
   overscroll-behavior-y: contain;
   padding: 0.75rem 1rem;
   display: flex;
-  flex-direction: column;
-  gap: var(--veil-msg-gap, 0.4rem);
+  flex-direction: column-reverse;
   background-color: var(--veil-bg-base);
   width: 100%;
   box-sizing: border-box;
-  contain: content;
+  contain: layout style;
+  position: relative;
   overflow-anchor: auto;
-  will-change: scroll-position;
-  transform: translateZ(0);
 }
 
 /* Message Rows & Bubbles */
@@ -886,8 +886,6 @@ body {
   width: 100%;
   box-sizing: border-box;
   align-items: flex-end;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 60px;
   contain: layout style;
 }
 
@@ -906,8 +904,6 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  transform: translateZ(0);
-  backface-visibility: hidden;
 }
 
 .veil-message-row {

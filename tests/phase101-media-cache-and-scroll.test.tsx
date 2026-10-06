@@ -92,32 +92,23 @@ describe('Phase 101: Media Cache, Timeline Scroll & CSS Geometry', () => {
       expect(css).toMatch(/\.veil-media-bubble-container\s+\.veil-media-thumbnail-loading\s*\{[^}]*aspect-ratio:\s*16\s*\/\s*10/);
     });
 
-    it('verifies ConversationView implements programmatic scroll anchoring and does not force users to bottom when scrolled up', () => {
+    it('verifies ConversationView implements native column-reverse bottom anchoring and does not force users to bottom when scrolled up', () => {
       const cvPath = path.resolve(__dirname, '../src/ui/components/ConversationView.tsx');
       const cvContent = fs.readFileSync(cvPath, 'utf8');
 
-      // Verify scrollAnchorRef and updateScrollAnchor are defined
-      expect(cvContent).toContain('const scrollAnchorRef = useRef');
-      expect(cvContent).toContain('const updateScrollAnchor = useCallback');
-      expect(cvContent).toContain('isNearBottomRef.current = distanceToBottom < 120;');
+      // Verify column-reverse bottom-anchoring and isAtBottomRef are defined
+      expect(cvContent).toContain('isAtBottomRef');
+      expect(cvContent).toContain('el.scrollTop > -120');
+      expect(cvContent).toContain('if (isAtBottomRef.current || isRecentlySentByMe)');
 
-      // Verify ResizeObserver compensates scroll offset when scrolled upward
-      expect(cvContent).toContain('new ResizeObserver');
-      expect(cvContent).toContain('if (isNearBottomRef.current || isAdjusting || !scrollAnchorRef.current) return;');
-      expect(cvContent).toContain('container.scrollTop += delta;');
+      // Verify no jittery ResizeObserver scroll compensation loops
+      expect(cvContent).not.toContain('new ResizeObserver');
 
-      // Direct simulation of scroll compensation calculation
-      const simulatedContainer = { scrollTop: 300 };
-      const anchor = { topOffset: 40 };
-      const currentOffsetAfterExpansion = 90; // element above grew by 50px
-      const delta = currentOffsetAfterExpansion - anchor.topOffset;
-
-      if (Math.abs(delta) > 2) {
-        simulatedContainer.scrollTop += delta;
-      }
-
-      // Visual scroll position preserved: container scrolled down by exactly the expansion delta
-      expect(simulatedContainer.scrollTop).toBe(350);
+      // Direct simulation of column-reverse bottom anchoring:
+      // In column-reverse, content additions above grow in the negative direction, leaving the visible viewport completely undisturbed.
+      const simulatedContainer = { scrollTop: -150 }; // user scrolled 150px up
+      const isAtBottom = simulatedContainer.scrollTop > -120;
+      expect(isAtBottom).toBe(false);
     });
   });
 });

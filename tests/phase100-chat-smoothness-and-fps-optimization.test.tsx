@@ -26,24 +26,22 @@ describe('Phase 100: 60fps Chat Smoothness & Timeline Performance', () => {
     const dsCss = fs.readFileSync(dsPath, 'utf8');
     const compCss = fs.readFileSync(compPath, 'utf8');
 
-    it('enforces layout containment and hardware acceleration on .veil-timeline', () => {
+    it('enforces layout containment and column-reverse bottom anchoring on .veil-timeline', () => {
       expect(dsCss).toContain('.veil-timeline {');
-      expect(dsCss).toContain('contain: content;');
-      expect(dsCss).toContain('will-change: scroll-position;');
-      expect(dsCss).toContain('transform: translateZ(0);');
-    });
-
-    it('enforces content-visibility: auto and intrinsic sizing on .veil-msg-row', () => {
-      expect(dsCss).toContain('.veil-msg-row {');
-      expect(dsCss).toContain('content-visibility: auto;');
-      expect(dsCss).toContain('contain-intrinsic-size: auto 60px;');
       expect(dsCss).toContain('contain: layout style;');
+      expect(dsCss).toContain('flex-direction: column-reverse;');
     });
 
-    it('promotes .veil-bubble-wrapper to GPU compositor layer with backface-visibility: hidden', () => {
+    it('enforces layout style containment without layout-shifting intrinsic sizing on .veil-msg-row', () => {
+      expect(dsCss).toContain('.veil-msg-row {');
+      expect(dsCss).toContain('contain: layout style;');
+      expect(dsCss).not.toContain('contain-intrinsic-size: auto 60px;');
+    });
+
+    it('keeps .veil-bubble-wrapper clean without redundant GPU layer translations', () => {
       expect(dsCss).toContain('.veil-bubble-wrapper {');
-      expect(dsCss).toContain('transform: translateZ(0);');
-      expect(dsCss).toContain('backface-visibility: hidden;');
+      const bubbleWrapperRule = dsCss.split('.veil-bubble-wrapper {')[1].split('}')[0];
+      expect(bubbleWrapperRule).not.toContain('transform: translateZ(0);');
     });
 
     it('promotes floating header, composer, and pinned bar to compositor layers', () => {

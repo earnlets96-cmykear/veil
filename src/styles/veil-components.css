@@ -936,6 +936,46 @@
   transform: translateY(-2px);
 }
 
+.veil-scroll-bottom-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--veil-accent-primary, #14b8a6);
+  color: var(--veil-text-on-accent, #fff);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* New-message entrance (only applied to messages arriving while chat is open) */
+@keyframes veilMsgEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.veil-msg-enter {
+  animation: veilMsgEnter 180ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veil-msg-enter {
+    animation: none;
+  }
+}
+
 /* Consecutive Message Grouping */
 .veil-message-grouped-prev {
   margin-top: 0px !important;
@@ -4827,9 +4867,17 @@ img.veil-message-sticker-img {
 }
 
 .veil-timeline {
-  padding: var(--veil-space-4) clamp(12px, 3vw, 32px) !important;
-  gap: 6px;
+  padding: 0 !important;
   background: var(--veil-surface-app);
+}
+
+.veil-timeline-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--veil-msg-gap, 6px);
+  padding: var(--veil-space-4) clamp(12px, 3vw, 32px);
+  min-height: 100%;
+  justify-content: flex-end;
 }
 
 .veil-msg-row + .veil-msg-row.veil-message-grouped-prev,
@@ -4840,11 +4888,6 @@ img.veil-message-sticker-img {
 .veil-message-bubble {
   border-radius: 16px;
   box-shadow: var(--veil-elevation-1);
-  transition: box-shadow var(--veil-motion-fast), transform var(--veil-motion-fast);
-}
-
-.veil-message-bubble:hover {
-  box-shadow: var(--veil-elevation-2);
 }
 
 .veil-message-row.incoming .veil-message-bubble {
@@ -4894,7 +4937,7 @@ img.veil-message-sticker-img {
     padding-inline: 8px !important;
   }
 
-  .veil-timeline {
+  .veil-timeline-inner {
     padding-inline: 10px !important;
   }
 

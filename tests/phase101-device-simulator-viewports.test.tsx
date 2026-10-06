@@ -96,13 +96,13 @@ describe('Phase 101: Device Simulator & Mobile Viewports Validation', () => {
       expect(css).toContain('overflow-y: auto;');
     });
 
-    it('verifies ConversationView preserves scroll position when scrolled up (isNearBottomRef)', () => {
+    it('verifies ConversationView preserves scroll position when scrolled up (isAtBottomRef)', () => {
       const cv = fs.readFileSync(getPath('src/ui/components/ConversationView.tsx'), 'utf8');
 
-      expect(cv).toContain('isNearBottomRef');
-      expect(cv).toContain('distanceToBottom < 120');
+      expect(cv).toContain('isAtBottomRef');
+      expect(cv).toContain('el.scrollTop > -120');
       // Guarded auto-scroll
-      expect(cv).toContain('if (isNearBottomRef.current || isRecentlySentByMe)');
+      expect(cv).toContain('if (isAtBottomRef.current || isRecentlySentByMe)');
     });
   });
 
