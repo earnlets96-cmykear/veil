@@ -458,9 +458,14 @@ export class MediaCacheManager {
   /**
    * Explicitly invalidates a key and revokes its Blob URL (used on error or re-fetch retry).
    */
-  public invalidate(key: string): void {
+  public async invalidate(key: string): Promise<void> {
     const canonicalId = this.aliasMap.get(key) || key;
     const item = this.entries.get(canonicalId);
+    const persistedKeys = new Set<string>([key, canonicalId]);
+    if (item?.id) persistedKeys.add(item.id);
+    for (const [alias, targetId] of this.aliasMap.entries()) {
+      if (targetId === canonicalId) persistedKeys.add(alias);
+    }
     if (item) {
       if (item.blobUrl && typeof URL !== 'undefined') {
         try {
@@ -481,6 +486,23 @@ export class MediaCacheManager {
     if (canonicalId !== key) {
       this.inFlight.delete(canonicalId);
     }
+
+    // A corrupt cached thumbnail (including a legacy synthetic sticker) must
+    // not be resurrected from IndexedDB after its in-memory entry is invalidated.
+    const db = await this.getIDB().catch(() => null);
+    if (!db) return;
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction('media', 'readwrite');
+        const store = tx.objectStore('media');
+        for (const persistedKey of persistedKeys) store.delete(persistedKey);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      } catch (_e) {
+        resolve();
+      }
+    });
   }
 
   /**

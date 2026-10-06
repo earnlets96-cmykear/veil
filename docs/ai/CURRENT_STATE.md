@@ -1,6 +1,14 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Phase: PHASE 105 — MEDIA RESPONSIVENESS, VOICE PLAYER CONSISTENCY & STICKER UX
+## Current Phase: PHASE 106 — MEDIA RE-ENTRY RECOVERY
+- **Status**: IMPLEMENTED; TypeScript check passed. Full suite: 1536/1537 passed; the sole failure was an accessibility label omission in a grouped-media loading placeholder, fixed and verified in a focused rerun. Production Vite build passed to a temporary output directory.
+- **Changes under verification**:
+  - Convert persisted outgoing uploads to a clear failed state after app restart because their process-local upload workers and original file/recording buffers no longer exist.
+  - Ignore stale `blob:` previews after re-entry and keep a durable thumbnail's error state visible with a retry action.
+  - Retry encrypted sent stickers through their attachment IDs, and remove invalidated media from IndexedDB so a prior synthetic sticker fallback cannot be restored as the real sticker.
+  - Verification: full suite ran (1536/1537); after the one assertion was fixed, focused Phase 36 + Phase 40 + Phase 99 + Phase 106 tests passed (18/18); production Vite build succeeded. The release manifest script was not run, preserving the already-modified release files.
+
+## Previous Phase: PHASE 105 — MEDIA RESPONSIVENESS, VOICE PLAYER CONSISTENCY & STICKER UX
 - **Status**: IMPLEMENTED; web production build passed. Full suite: 1533/1534 passed; the one failure is an external Telegram sticker resolver test that also fails when run alone. Android compilation is unverified because Gradle cannot establish a local loopback connection, including with `--no-daemon`.
 - **Branch**: `main`
 - **Changes under verification**:

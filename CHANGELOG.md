@@ -2,6 +2,15 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase106-media-reentry-recovery] - 2026-10-07
+
+### Media and Upload Recovery After App Re-entry (Phase 106)
+- Persisted outgoing uploads now change from an orphaned `UPLOADING` state to `FAILED` with an interruption message when the app is reopened. Source bytes remain process-local, so interrupted sends must be retried by selecting/recording the media again.
+- Ignore expired `blob:` preview URLs after restart. Media download failures stay visible over durable thumbnails and provide a retry action.
+- Sent stickers with attachment IDs reload through authenticated encrypted media retrieval instead of becoming the decorative star fallback.
+- Invalidation also deletes the corresponding IndexedDB entry, preventing a corrupt sticker fallback from reappearing after restart.
+- Verification: full suite initially reported 1536/1537 pass; fixed the grouped-media loading label and verified Phase 36/40/99/106 focused suites (18/18). TypeScript and production Vite build passed. Release manifest generation was skipped to preserve pre-modified release files.
+
 ## [1.0.0-phase104-timeline-stability-and-native-scrolling] - 2026-10-06
 
 ### Timeline Stability, Native Bottom-Anchored Scroller & Elimination of Scroll Jumps (Phase 104)

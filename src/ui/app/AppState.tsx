@@ -102,6 +102,7 @@ import { randomBytes, bytesToBase64, bytesToHex } from '../../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha256.js';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import { MediaCache, DecryptedMedia } from '../utils/mediaCache.ts';
+import { recoverInterruptedUploads } from './messageRecovery.ts';
 import { MediaLogger } from '../utils/mediaLogger.ts';
 import {
   LocalAttachmentPayload,
@@ -545,7 +546,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // 5. Load message history
     const storedMsgs = (await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages')) || {};
-    setMessages(storedMsgs);
+    const recoveredStoredMsgs = recoverInterruptedUploads(storedMsgs);
+    setMessages(recoveredStoredMsgs);
+    if (recoveredStoredMsgs !== storedMsgs) {
+      await store.setAsync(session, 'veil:ui:messages', recoveredStoredMsgs);
+    }
 
     // 6. Update Search Engine Index
     searchEngine.updateIndex(storedContacts, storedConvs, storedMsgs);
@@ -568,7 +573,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setConversations(rehydrated);
         }
         const postSyncMsgs = await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages');
-        if (postSyncMsgs) setMessages(postSyncMsgs);
+        if (postSyncMsgs) {
+          const recoveredPostSyncMsgs = recoverInterruptedUploads(postSyncMsgs);
+          setMessages(recoveredPostSyncMsgs);
+          if (recoveredPostSyncMsgs !== postSyncMsgs) {
+            await store.setAsync(session, 'veil:ui:messages', recoveredPostSyncMsgs);
+          }
+        }
       }
     } catch (_syncErr) {}
 

@@ -1,5 +1,11 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 106 Update
+- **Current Phase**: **PHASE 106 (Media Re-entry Recovery)**
+- **Status**: Implementation complete; TypeScript passes. Full suite had 1536/1537 pass; its sole grouped-media accessible-label failure was fixed and focused Phase 36/40/99/106 suites pass (18/18). Production Vite build passed to temporary output.
+- **Key recovery behavior**: persisted outgoing uploads with no surviving worker become `FAILED` with an interruption reason; old `blob:` previews are ignored; failed durable previews show Retry; encrypted stickers reload via attachment ID; invalidated media is deleted from IndexedDB.
+- **Important limit**: the app currently keeps upload source bytes in process memory only. A send interrupted by process termination cannot resume; the timeline now reports this instead of spinning forever. The user must send the file/recording again.
+
 ## Phase 105 Update
 - **Current Phase**: **PHASE 105 (Media Responsiveness, Voice Player Consistency & Sticker UX)**
 - **Status**: Implementation complete; web build passed; full suite has one external resolver failure; Android compile could not start because Gradle failed to establish loopback.

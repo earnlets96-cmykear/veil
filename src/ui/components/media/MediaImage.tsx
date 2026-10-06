@@ -40,15 +40,12 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
     );
   });
 
-  const durableThumbnail = (attachment.thumbnailUrl && attachment.thumbnailUrl.startsWith('data:'))
-    ? attachment.thumbnailUrl
-    : (attachment.previewUrl && attachment.previewUrl.startsWith('data:'))
-    ? attachment.previewUrl
-    : attachment.thumbnailUrl || null;
+  const durableThumbnail = [attachment.thumbnailUrl, attachment.previewUrl]
+    .find((url) => Boolean(url && !url.startsWith('blob:'))) || null;
 
   // Blob URLs are trusted if in RAM cache, media state, or provided preview
   const activeBlobUrl = media?.blobUrl || null;
-  const displayUrl = activeBlobUrl || durableThumbnail || attachment.previewUrl || (attachment as any).url || null;
+  const displayUrl = activeBlobUrl || durableThumbnail || (attachment as any).url || null;
   const isShowingThumbnail = !activeBlobUrl && Boolean(durableThumbnail);
 
   const [isLoading, setIsLoading] = useState(!media && !displayUrl);
@@ -119,15 +116,14 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
       if (isFetchingRef.current && !forceRetry) return;
 
       if (forceRetry) {
-        MediaCache.invalidate(key);
-        if (currentAtt.objectId) MediaCache.invalidate(currentAtt.objectId);
-        if (currentAtt.attachmentId) MediaCache.invalidate(currentAtt.attachmentId);
+        const cacheKeys = new Set([key, currentAtt.objectId, currentAtt.attachmentId].filter(Boolean) as string[]);
+        await Promise.all(Array.from(cacheKeys, (cacheKey) => MediaCache.invalidate(cacheKey)));
       }
 
-      // Only show full loading shimmer if there is no thumbnail/preview already visible
-      if (isMountedRef.current && !displayUrl) {
+      if (isMountedRef.current && !activeBlobUrl) {
         setIsLoading(true);
         setError(null);
+        setHasImgError(false);
       }
 
       isFetchingRef.current = true;
@@ -147,6 +143,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
         if (isMountedRef.current) {
           setMedia(result);
           setIsLoading(false);
+          setHasImgError(false);
           MediaLogger.log({
             event: 'DECRYPTION_COMPLETED',
             attachmentId: currentAtt.attachmentId,
@@ -199,13 +196,19 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
   const handleMediaError = () => {
     if (!isMountedRef.current) return;
     setHasImgError(true);
-    MediaCache.invalidate(key);
-    if (attachment.objectId) MediaCache.invalidate(attachment.objectId);
-    if (attachment.attachmentId) MediaCache.invalidate(attachment.attachmentId);
+
+    // Sent stickers are encrypted media objects. Their old preview blob is
+    // process-local, so recover the authenticated attachment before trying
+    // Telegram/CDN previews or the decorative fallback sticker.
+    if (isSticker && (attachment.objectId || attachment.attachmentId)) {
+      void fetchAndDecrypt(true);
+      return;
+    }
 
     if (isSticker) {
       const attemptStickerRecovery = async () => {
         try {
+          await MediaCache.invalidate(key);
           const sourceUrl =
             attachment.previewUrl ||
             attachment.localPreviewUrl ||
@@ -311,7 +314,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
         ref={viewportRef}
         className={`veil-media-thumbnail-loading ${className}`.trim()}
         role="progressbar"
-        aria-label="Decrypting media..."
+        aria-label={`Decrypting ${attachment.name || 'media'}...`}
       >
         <div className="veil-media-skeleton-pulse" />
         <div className="veil-media-loading-badge">
@@ -402,12 +405,34 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
         <div className="veil-media-skeleton-pulse" />
       )}
 
-      {isShowingThumbnail && (
+      {isShowingThumbnail && !error && (
         <div
           className="veil-media-loading-badge"
           style={{ position: 'absolute', bottom: '6px', right: '6px', padding: '2px 6px', fontSize: '0.65rem' }}
         >
           <span className="veil-spinner veil-spinner-sm" style={{ width: '10px', height: '10px' }} />
+        </div>
+      )}
+
+      {error && displayUrl && (
+        <div
+          className="veil-media-thumbnail-error"
+          role="alert"
+          style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', background: 'rgba(8, 12, 20, 0.72)', borderRadius: 'inherit', color: 'var(--veil-text-primary)' }}
+        >
+          <span style={{ fontSize: 'var(--veil-text-xs)', textAlign: 'center' }}>Media couldn’t load</span>
+          <button
+            type="button"
+            className="veil-btn veil-btn-secondary veil-btn-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              void fetchAndDecrypt(true);
+            }}
+            style={{ padding: '0.25rem 0.6rem', gap: '4px' }}
+          >
+            <RefreshCwIcon size={14} />
+            <span>Retry</span>
+          </button>
         </div>
       )}
 

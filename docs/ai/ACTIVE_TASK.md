@@ -1,5 +1,17 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 106 — MEDIA RE-ENTRY RECOVERY
+- **Status**: Implemented; TypeScript passes; full suite ran 1536/1537 before one accessibility assertion was fixed; focused Phase 36/40/99/106 suites pass (18/18); production Vite build passes
+- **Branch**: `main`
+
+### Phase 106 Tasks:
+- [x] Recover persisted in-flight outgoing uploads as failed after restart, with a clear interruption reason.
+- [x] Ignore stale blob preview URLs, expose retry after media decryption errors, and fetch sent stickers from their encrypted attachment IDs.
+- [x] Delete invalidated durable media cache entries to prevent corrupt sticker fallback resurrection.
+- [x] Add restart recovery regression coverage.
+- [x] Run the full suite; fix and re-run the sole grouped-media accessible-label failure (focused suites now 16/16 pass).
+- [x] Build the production frontend to a temporary output directory; leave pre-modified release manifests untouched.
+
 ## Active Phase: PHASE 105 — MEDIA RESPONSIVENESS, VOICE PLAYER CONSISTENCY & STICKER UX
 - **Status**: IMPLEMENTED; web build passed; full suite has one external Telegram resolver failure; Android compilation blocked before source compilation by Gradle loopback startup
 - **Branch**: `main`
