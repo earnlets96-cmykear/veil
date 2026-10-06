@@ -4,6 +4,22 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 105] - 2026-10-07
+
+### Performance
+- Avoided a second synchronous SHA-256 pass during uploads and moved the legacy JSON base64 fallback to the cooperative media encoder.
+- Deferred offscreen attachment download and decryption until media is near the chat viewport.
+
+### UI
+- Unified voice seek buffering indicators across the message card and floating audio banner, and aligned notification colors with VEIL's accent.
+- Standardized voice waveform shape, enlarged the emoji drawer, and improved voice-recording gesture guidance and motion.
+- Preserved sticker pack identity for sent stickers and added an add-pack action to the message context menu.
+
+### Verification
+- Added focused media responsiveness and sticker durability coverage (89 focused tests pass).
+- Full suite: 1533/1534 tests passed; the lone failure is the network-dependent Phase 91 Telegram resolver test, which also fails in isolation.
+- Production web build passed. Android compile remains unverified because Gradle cannot establish a loopback connection, including with `--no-daemon`.
+
 ## [Phase 103] - 2026-09-20
 
 ### UI

@@ -1,5 +1,19 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 105 — MEDIA RESPONSIVENESS, VOICE PLAYER CONSISTENCY & STICKER UX
+- **Status**: IMPLEMENTED; web production build passed. Full suite: 1533/1534 passed; the one failure is an external Telegram sticker resolver test that also fails when run alone. Android compilation is unverified because Gradle cannot establish a local loopback connection, including with `--no-daemon`.
+- **Branch**: `main`
+- **Changes under verification**:
+  - Reuse precomputed worker SHA-256 digests on raw media uploads and use the cooperative worker encoder for legacy JSON uploads.
+  - Start media download/decryption only as thumbnails approach the visible chat viewport.
+  - Keep native voice playback in a buffering state during seeks, with synchronized spinners in the message card and floating audio banner.
+  - Use the active VEIL accent and one consistent waveform pattern for voice UI.
+  - Persist imported sticker packs in IndexedDB, preserve pack identity in sent sticker filenames, and offer pack installation from the message menu.
+  - Increase the emoji drawer height and animate recording entry/lock guidance with reduced-motion support.
+  - Verification: 89 focused tests passed; `npm run build` succeeded. Full `npm test` had one failure in `tests/phase91-audio-player-and-stickers.test.tsx` while resolving the external `Zane_fozol_0_9` Telegram sticker pack; its isolated rerun also failed (10/11 tests passed). Gradle `:app:assembleDebug` could not start because of `java.io.IOException: Unable to establish loopback connection`.
+
+## Previous Verified Phase: PHASE 104 — TIMELINE STABILITY & NATIVE BOTTOM-ANCHORED SCROLL ENGINE
+
 ## Current Verified Phase: PHASE 104 — TIMELINE STABILITY & NATIVE BOTTOM-ANCHORED SCROLL ENGINE
 - **Status**: **VERIFIED & OPERATIONAL (100% PASS — ZERO TYPESCRIPT ERRORS, ALL REGRESSION SUITES PASSING, PRODUCTION RELEASE BUILD CLEAN, RELIABLE FLUID 60FPS CHAT UX)**
 - **Branch**: `main`

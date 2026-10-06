@@ -281,7 +281,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         const isSvg = sticker.url.startsWith('data:image/svg') || (blob.type && blob.type.includes('svg'));
         const mimeType = isSvg ? 'image/svg+xml' : 'image/webp';
         const ext = isSvg ? 'svg' : 'webp';
-        const file = new File([blob], `${sticker.id}.sticker.${ext}`, { type: mimeType });
+        const safePackId = sticker.packId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'custom';
+        const file = new File([blob], `${safePackId}__${sticker.id}.sticker.${ext}`, { type: mimeType });
         (file as any).isSticker = true;
         await sendAttachment(conversationId, file, { isSticker: true } as any);
       } catch (err: any) {
@@ -616,12 +617,12 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                   color: isCancelling ? 'var(--veil-danger, #ef4444)' : 'var(--veil-text-secondary, #94a3b8)',
                 }}
               >
-                <span>{isCancelling ? 'Release to cancel' : '‹ Cancel'}</span>
+                <span>{isCancelling ? 'Release to cancel' : 'Slide left to cancel'}</span>
               </div>
             ) : (
-              <div className="veil-recording-locked-hint">
+                <div className="veil-recording-locked-hint" role="status" aria-live="polite">
                 <LockIcon size={13} />
-                <span>Locked</span>
+                  <span>Recording locked · tap send</span>
               </div>
             )}
 

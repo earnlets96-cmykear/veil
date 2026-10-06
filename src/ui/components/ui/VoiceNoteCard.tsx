@@ -20,26 +20,10 @@ export interface VoiceNoteCardProps {
   className?: string;
 }
 
-// Generate deterministic waveform bar heights from messageId
-const generateWaveformBars = (messageId: string | undefined, count: number): number[] => {
-  const bars: number[] = [];
-  // Use a simple hash from messageId for deterministic but varied waveforms
-  let seed = 0;
-  const id = messageId || 'default';
-  for (let i = 0; i < id.length; i++) {
-    seed = ((seed << 5) - seed + id.charCodeAt(i)) | 0;
-  }
-  for (let i = 0; i < count; i++) {
-    // Simple pseudo-random from seed
-    seed = (seed * 16807 + 12345) & 0x7fffffff;
-    const normalized = (seed % 1000) / 1000;
-    // Range from 0.2 to 1.0 to avoid invisible bars
-    bars.push(0.2 + normalized * 0.8);
-  }
-  return bars;
-};
-
 const BAR_COUNT = 40;
+const WAVEFORM_SHAPE = [0.35, 0.52, 0.3, 0.68, 0.44, 0.82, 0.56, 0.38, 0.72, 0.48];
+const generateWaveformBars = (): number[] =>
+  Array.from({ length: BAR_COUNT }, (_, index) => WAVEFORM_SHAPE[index % WAVEFORM_SHAPE.length]);
 
 const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   messageId,
@@ -77,7 +61,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   const SPEED_OPTIONS = [1, 1.5, 2];
 
   // Generate waveform bars once per messageId
-  const waveformBars = useMemo(() => generateWaveformBars(messageId, BAR_COUNT), [messageId]);
+  const waveformBars = useMemo(generateWaveformBars, []);
 
   // Auto-subscribe to VoicePlayer events for this messageId
   useEffect(() => {
@@ -657,16 +641,16 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
               position: 'absolute',
               left: `${effectiveProgress}%`,
               top: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: isScrubbing ? '8px' : '4px',
-              height: isScrubbing ? '24px' : '18px',
+              width: '6px',
+              height: '20px',
               borderRadius: '9999px',
               backgroundColor: 'var(--veil-accent-primary, #14b8a6)',
               boxShadow: isScrubbing
                 ? '0 0 10px var(--veil-accent-primary, #14b8a6), 0 0 2px #ffffff'
                 : '0 0 4px rgba(20, 184, 166, 0.7)',
               pointerEvents: 'none',
-              transition: isScrubbing ? 'transform 0.1s ease, width 0.15s ease, height 0.15s ease' : 'left 0.08s linear',
+              transform: isScrubbing ? 'translate(-50%, -50%) scale(1.2)' : 'translate(-50%, -50%)',
+              transition: isScrubbing ? 'transform 0.15s ease-out' : 'left 0.08s linear',
               zIndex: 5,
             }}
           />

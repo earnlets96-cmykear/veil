@@ -2837,7 +2837,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 const createRes = await cloudClient.createAttachment(createParams);
                 objectId = createRes.attachment.objectId;
-                await cloudClient.uploadAttachment(objectId, fileBytes, onProgress);
+                await cloudClient.uploadAttachment(objectId, fileBytes, onProgress, ciphertextHash);
               };
 
               const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);

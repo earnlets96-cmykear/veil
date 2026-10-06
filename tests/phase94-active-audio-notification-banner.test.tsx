@@ -190,9 +190,10 @@ describe('Phase 94 — CSS Design System Verification', () => {
     expect(cssSource).toContain('z-index: 15');
   });
 
-  it('defines glowing circular play button styles', () => {
+  it('defines theme-matched circular play button styles', () => {
     expect(cssSource).toContain('.veil-active-audio-btn-play');
-    expect(cssSource).toContain('box-shadow: 0 0 16px rgba(168, 85, 247, 0.45)');
+    expect(cssSource).toContain('background: var(--veil-accent-primary, #14b8a6)');
+    expect(cssSource).toContain('box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35)');
   });
 
   it('defines 4-bar equalizer with staggered keyframe animations', () => {

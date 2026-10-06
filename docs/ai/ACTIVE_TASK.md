@@ -1,6 +1,21 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 104 — TIMELINE STABILITY & NATIVE BOTTOM-ANCHORED SCROLL ENGINE
+## Active Phase: PHASE 105 — MEDIA RESPONSIVENESS, VOICE PLAYER CONSISTENCY & STICKER UX
+- **Status**: IMPLEMENTED; web build passed; full suite has one external Telegram resolver failure; Android compilation blocked before source compilation by Gradle loopback startup
+- **Branch**: `main`
+
+### Phase 105 Tasks:
+- [x] Reuse the worker-computed media hash for upload headers and cooperatively encode the legacy JSON fallback.
+- [x] Defer media retrieval and decryption until thumbnails approach the viewport.
+- [x] Preserve native play intent while ExoPlayer buffers during seek; expose a shared loading state to the message card and audio banner.
+- [x] Match the audio notification accent to the VEIL theme and use a consistent waveform shape.
+- [x] Increase emoji drawer height, make recording gesture guidance explicit and animated, and encode sticker pack identity so recipients can add packs from the message menu.
+- [x] Add Phase 105 regressions for upload hashing/encoding, media deferral, imported pack durability, sticker pack actions, and voice loading UI.
+- [x] Run the full suite (1533/1534 passed); isolate the one failing external Telegram resolver test (10/11 pass when rerun alone).
+- [x] Complete production web build.
+- [ ] Android debug compilation remains unverified because Gradle cannot establish its local loopback connection, including with `--no-daemon`.
+
+## Previous Phase: PHASE 104 — TIMELINE STABILITY & NATIVE BOTTOM-ANCHORED SCROLL ENGINE
 - **Status**: COMPLETE & VERIFIED (TypeScript 0 errors, Vitest passing, Release build clean)
 - **Branch**: `main`
 

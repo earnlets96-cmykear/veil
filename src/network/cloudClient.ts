@@ -9,8 +9,9 @@
  */
 
 import type { CloudSpaceEntity, CloudMessageEntity, CloudAttachmentEntity, DeviceEntity, RecoveryStateEntity } from '../server/cloud/database/types.ts';
-import { base64ToBytes, bytesToBase64, bytesToHex } from '../crypto/utils.ts';
+import { base64ToBytes, bytesToHex } from '../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha256.js';
+import { AttachmentPipeline } from '../attachments/attachmentPipeline.ts';
 
 export interface CloudClientConfig {
   baseUrl: string; // e.g. "http://127.0.0.1:8787"
@@ -310,11 +311,14 @@ export class CloudClient {
   public async uploadAttachment(
     objectId: string,
     rawCiphertext: Uint8Array,
-    onProgress?: (loaded: number, total: number) => void
+    onProgress?: (loaded: number, total: number) => void,
+    ciphertextHash?: string
   ): Promise<void> {
     this.requireAuthenticatedSession();
     const timeoutMs = Math.max(180000, Math.ceil(rawCiphertext.length / 50000) * 1000);
-    const computedHash = bytesToHex(sha256(rawCiphertext));
+    // Callers that already hash on a worker can reuse that digest and keep a
+    // second full-buffer SHA-256 off the UI thread.
+    const computedHash = ciphertextHash || bytesToHex(sha256(rawCiphertext));
 
     // Try high-performance raw binary upload first
     let rawUploadSucceeded = false;
@@ -403,7 +407,7 @@ export class CloudClient {
 
     if (!rawUploadSucceeded) {
       // Fallback to standard base64 JSON upload
-      const ciphertextBase64 = bytesToBase64(rawCiphertext);
+      const ciphertextBase64 = await AttachmentPipeline.bytesToBase64Async(rawCiphertext);
       await this.request('/v1/cloud/attachments/upload', 'POST', { objectId, ciphertextBase64 }, timeoutMs);
       if (onProgress) onProgress(rawCiphertext.length, rawCiphertext.length);
     }

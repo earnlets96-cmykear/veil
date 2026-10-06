@@ -162,7 +162,12 @@ class VeilNativeMediaPlugin : Plugin() {
                 val currentPos = player.currentPosition
 
                 val data = JSObject().apply {
-                    put("state", if (isPlaying) "playing" else "paused")
+                    val state = when {
+                        isPlaying -> "playing"
+                        player.playWhenReady && player.playbackState == Player.STATE_BUFFERING -> "buffering"
+                        else -> "paused"
+                    }
+                    put("state", state)
                     put("isPlaying", isPlaying)
                     put("currentPositionMs", currentPos)
                     put("durationMs", duration)

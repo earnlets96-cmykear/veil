@@ -58,6 +58,10 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const isMountedRef = useRef(true);
   const stickerRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [isNearViewport, setIsNearViewport] = useState(() =>
+    typeof window === 'undefined' || typeof IntersectionObserver === 'undefined'
+  );
 
   const isSticker = Boolean(
     (attachment as any).isSticker ||
@@ -76,6 +80,30 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
       }
     };
   }, []);
+
+  // Decrypt only media near the active viewport. ConversationView keeps a
+  // bounded history window mounted, so eager fetches here can still start
+  // dozens of downloads and image/video decodes at once.
+  useEffect(() => {
+    if (isNearViewport) return;
+    const target = viewportRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      setIsNearViewport(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '480px 0px' }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [isNearViewport]);
 
   const attachmentRef = useRef(attachment);
   useEffect(() => {
@@ -157,13 +185,15 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
       return;
     }
 
+    if (!isNearViewport) return;
+
     if (attachment.objectId || attachment.attachmentId) {
       fetchAndDecrypt();
     } else if (!durableThumbnail) {
       setError('Attachment lacks objectId or attachmentId for cloud retrieval');
       setIsLoading(false);
     }
-  }, [key, attachment.objectId, attachment.attachmentId, durableThumbnail, fetchAndDecrypt]);
+  }, [key, attachment.objectId, attachment.attachmentId, durableThumbnail, fetchAndDecrypt, isNearViewport]);
 
   // Handle broken/stale blob image or video load failure
   const handleMediaError = () => {
@@ -278,6 +308,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
   if (isLoading && !displayUrl) {
     return (
       <div
+        ref={viewportRef}
         className={`veil-media-thumbnail-loading ${className}`.trim()}
         role="progressbar"
         aria-label="Decrypting media..."
@@ -324,6 +355,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
   return (
     <div
+      ref={viewportRef}
       className={`veil-media-thumbnail-wrapper ${onClick ? 'veil-media-thumbnail-clickable' : ''} ${className}`.trim()}
       onClick={onClick}
       role={onClick ? 'button' : undefined}

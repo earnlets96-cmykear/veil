@@ -214,7 +214,7 @@ export class VoiceRecorder {
       encryptedMetadata: JSON.stringify(metadataPayload),
     });
 
-    await cloudClient.uploadAttachment(attachment.objectId, audioBytes, onProgress);
+    await cloudClient.uploadAttachment(attachment.objectId, audioBytes, onProgress, ciphertextHash);
 
     return {
       durationSeconds,

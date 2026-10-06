@@ -27,6 +27,7 @@ import {
   ExternalLinkIcon,
 } from '../icons/index.ts';
 import { VoicePlayer, ActiveTrackMetadata } from '../../../attachments/voicePlayer.ts';
+import { Spinner } from './Spinner.tsx';
 
 export interface ActiveAudioBannerProps {
   onJumpToMessage?: (messageId: string, conversationId?: string) => void;
@@ -174,10 +175,13 @@ export const ActiveAudioBanner: React.FC<ActiveAudioBannerProps> = ({
           type="button"
           className="veil-active-audio-btn-play"
           onClick={handleTogglePlay}
-          aria-label={activeTrack.isPlaying ? 'Pause audio' : 'Play audio'}
-          title={activeTrack.isPlaying ? 'Pause' : 'Play'}
+          aria-label={activeTrack.isLoading ? 'Loading audio' : activeTrack.isPlaying ? 'Pause audio' : 'Play audio'}
+          title={activeTrack.isLoading ? 'Loading audio' : activeTrack.isPlaying ? 'Pause' : 'Play'}
+          disabled={activeTrack.isLoading}
         >
-          {activeTrack.isPlaying ? (
+          {activeTrack.isLoading ? (
+            <Spinner size="sm" aria-label="Loading audio" />
+          ) : activeTrack.isPlaying ? (
             <PauseIcon size={20} color="#ffffff" />
           ) : (
             <PlayIcon size={20} color="#ffffff" style={{ marginLeft: '2px' }} />

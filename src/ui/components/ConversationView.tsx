@@ -26,6 +26,7 @@ import type { UIMessage } from '../app/types.ts';
 import { useVisualViewport } from '../hooks/useVisualViewport.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
+import { telegramStickerService } from '../../media/telegramStickerService.ts';
 import { BackButtonManager } from '../utils/backButtonManager.ts';
 import { CHAT_BACK_EDGE_PX, shouldCompleteConversationBackSwipe } from '../utils/mobileGesturePhysics.ts';
 import {
@@ -2414,6 +2415,30 @@ export const ConversationView: React.FC = () => {
             >
               <DownloadIcon size={16} />
               <span>Save to Storage</span>
+            </button>
+          )}
+
+          {contextMenu.message.attachment?.name?.includes('__') &&
+            contextMenu.message.attachment?.name?.includes('.sticker.') && (
+            <button
+              type="button"
+              className="veil-context-item"
+              onClick={async () => {
+                const target = contextMenu.message!;
+                const packId = target.attachment?.name?.split('__')[0];
+                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                if (!packId) return;
+                try {
+                  const pack = await telegramStickerService.fetchTelegramPack(packId);
+                  await telegramStickerService.installStickerPack(pack);
+                  showToast({ type: 'success', message: `Added ${pack.title} sticker pack` });
+                } catch (err: any) {
+                  showToast({ type: 'error', message: err?.message || 'Could not add sticker pack' });
+                }
+              }}
+            >
+              <StarIcon size={16} />
+              <span>Add sticker pack</span>
             </button>
           )}
 

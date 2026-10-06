@@ -25,6 +25,7 @@ export interface ActiveTrackMetadata {
   duration: number;
   currentTime: number;
   isPlaying: boolean;
+  isLoading?: boolean;
   playbackRate: number;
   isMuted: boolean;
 }
@@ -262,6 +263,7 @@ export class VoicePlaybackManager {
   public notifyActiveTrack(): void {
     if (this.activeTrackMeta) {
       this.activeTrackMeta.isPlaying = this.currentStatus === 'playing';
+      this.activeTrackMeta.isLoading = this.currentStatus === 'loading';
       this.activeTrackMeta.playbackRate = this.currentPlaybackRate;
       this.activeTrackMeta.isMuted = this.currentIsMuted;
       this.activeTrackMeta.currentTime = this.getCurrentTime();
@@ -289,6 +291,7 @@ export class VoicePlaybackManager {
     }
     if (this.activeTrackMeta && (!id || id === this.activeTrackMeta.id)) {
       this.activeTrackMeta.isPlaying = status === 'playing';
+      this.activeTrackMeta.isLoading = status === 'loading';
       this.activeTrackMeta.currentTime = currentTime;
       if (duration > 0) this.activeTrackMeta.duration = duration;
       this.notifyActiveTrack();

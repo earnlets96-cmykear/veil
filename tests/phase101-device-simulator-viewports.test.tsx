@@ -15,7 +15,7 @@
  * 5. Voice-message UI, failure states, and debounced retries
  * 6. Context menu sizing and viewport containment
  * 7. Android hardware back event interception (veil:backbutton)
- * 8. Sticker drawer sizing constraint (min(270px, 38vh))
+ * 8. Sticker drawer sizing constraint (min(320px, 44vh))
  * 9. Reply banner persistence during drawer toggle
  * 10. Media picker shimmer skeleton loading state
  * 11. Settings verification prompt viewport geometry
@@ -51,7 +51,7 @@ describe('Phase 101: Device Simulator & Mobile Viewports Validation', () => {
       expect(simulatedViewport.width).toBe(360);
       expect(simulatedViewport.height).toBe(800);
 
-      // Verify 38vh calculation for sticker drawer
+      // Verify 44vh calculation for sticker drawer
       const maxDrawerHeight = Math.min(270, Math.floor(800 * 0.38));
       expect(maxDrawerHeight).toBeLessThanOrEqual(270);
       expect(maxDrawerHeight).toBe(270); // 304 clamped to 270
@@ -227,10 +227,10 @@ describe('Phase 101: Device Simulator & Mobile Viewports Validation', () => {
   });
 
   describe('Check 8: Sticker Drawer Sizing Constraint', () => {
-    it('enforces min(270px, 38vh) height constraint on mobile viewports', () => {
+    it('enforces min(320px, 44vh) height constraint on mobile viewports', () => {
       const css = fs.readFileSync(getPath('src/styles/veil-components.css'), 'utf8');
 
-      expect(css).toContain('height: min(270px, 38vh);');
+      expect(css).toContain('height: min(320px, 44vh);');
     });
   });
 
