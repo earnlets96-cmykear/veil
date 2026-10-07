@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 117 Update — Confirmed Local Chat Deletion
+- Sidebar conversation rows now have a dedicated overflow action for Pin/Unpin and Delete chat. Delete asks for confirmation and clarifies that deletion is limited to the active Space; contacts, group membership, and other participants' copies remain.
+- Deletion writes encrypted `veil:ui:deleted_conversations` tombstones before changing visible state, then removes UI/direct/group history, pending outbound envelopes, and pending media outbox jobs. Recovery merge filters rows at or before the tombstone while retaining later messages.
+- Added `tests/phase117-delete-chat.test.ts`. Delete-chat, Phase 31 recovery, Phase 111 outbound recovery, and P0 stability passed (13 tests); `npm run typecheck` and `git diff --check` passed. Phase 29 recovery integration tests are blocked by sandbox-denied loopback relay connections.
+- No cryptographic protocol or wire format was changed. Android/device interaction remains unvalidated.
+- Preserve unrelated pre-existing files: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 116 Update — Android Safe Area & Inbound Delivery Recovery
 - Android now reserves at least 24 CSS pixels above app content when the native WebView reports a zero safe-area inset; larger reported cutouts still win.
 - Inbound sync no longer ACKs messages with missing or failed handlers. Persisted pending envelopes are replayed on sync/re-entry; duplicate WebSocket deliveries are only acknowledged after processing; overlapping syncs cannot process one envelope concurrently. AppState now propagates undecryptable payload failures unless the existing legacy JSON fallback recognizes them.

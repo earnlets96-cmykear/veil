@@ -2,6 +2,18 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 117] - 2026-10-08
+
+### Added
+- Added a separate chat-row overflow menu with Pin/Unpin and a confirmed Delete chat action.
+- Added encrypted per-Space conversation tombstones so older recovery snapshots cannot restore deleted chats. Newer messages can create the conversation again.
+- Deletion clears this Space's UI/direct/group histories and pending outbound/media jobs while preserving contacts, group membership, and recipients' copies.
+
+### Verification
+- Delete-chat, Phase 31 recovery, Phase 111 outbound recovery, and P0 stability suites: 13 tests passed.
+- `npm run typecheck` and `git diff --check` passed.
+- Phase 29 recovery integration tests could not connect to local loopback relay servers in this sandbox.
+
 ## [Phase 116] - 2026-10-07
 
 ### Fixed

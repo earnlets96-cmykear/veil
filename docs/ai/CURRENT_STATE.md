@@ -1,5 +1,11 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 117 — CONFIRMED LOCAL CHAT DELETION
+- **Status**: Implemented; encrypted deletion tombstone, local history/queue cleanup, recovery filtering, and sidebar confirmation are in place. Focused regressions and TypeScript pass. Android/device interaction has not been separately exercised.
+- **Behavior**: Delete chat removes that conversation and its Space-local message history, unsent envelopes, and pending media jobs. It preserves the contact, group membership/key state, and other participants' copies. Timestamped tombstones suppress older recovery snapshots while allowing messages newer than deletion to form a new chat.
+- **Verification**: `tests/phase117-delete-chat.test.ts`, Phase 31 recovery, Phase 111 outbound recovery, and P0 stability suites pass (13 tests); `npm run typecheck` passes; `git diff --check` passes. Phase 29 recovery integration tests remain blocked because loopback relay connections are denied in the sandbox.
+- **Scope**: No cryptographic protocol or wire format changes.
+
 ## Current Phase: PHASE 116 — ANDROID SAFE AREA & INBOUND DELIVERY RECOVERY
 - **Status**: Implemented; focused regressions and TypeScript pass. Local relay integration tests cannot connect to loopback servers in this environment, and Android device layout remains to be validated on affected devices.
 - **Root causes**: Android WebView can report a zero top safe-area inset while drawing under the status bar. Inbound sync acknowledged envelopes even when no handler existed or processing failed; queued failures were never retried. The app's decrypt fallback also swallowed undecryptable-payload errors, making the network layer treat them as successfully handled. Overlapping syncs could process the same queued payload concurrently.

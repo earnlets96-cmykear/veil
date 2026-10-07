@@ -331,6 +331,12 @@ export class GroupManager {
     return Array.isArray(raw) ? raw : [];
   }
 
+  /** Remove a group's message history without changing its membership or key state. */
+  public async deleteGroupMessageHistory(session: SpaceSession, groupId: string): Promise<void> {
+    this.assertSession(session);
+    await this.store.deleteAsync(session, `${GROUP_MESSAGES_PREFIX}${groupId}`);
+  }
+
   public loadGroupState(session: SpaceSession, groupId: string): GroupState | null {
     this.assertSession(session);
     return this.store.get<GroupState>(session, `${GROUP_STATE_PREFIX}${groupId}`);

@@ -1,5 +1,15 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 117 — CONFIRMED LOCAL CHAT DELETION
+- **Status**: Implemented and focused verified; Phase 29 local-relay recovery integration remains sandbox-blocked.
+- [x] Add a separate conversation-row action menu with Pin/Unpin and Delete chat.
+- [x] Confirm local deletion and explain that contacts/group membership and recipients' copies remain.
+- [x] Persist encrypted per-Space deletion tombstones before changing visible state.
+- [x] Remove Space-local UI/direct/group message history and queued outbound/media work.
+- [x] Filter recovery snapshots against deletion timestamps without suppressing later messages.
+- [x] Add recovery/tombstone regressions and run focused suites plus TypeScript.
+- [ ] Validate menu behavior and chat restoration on Android devices.
+
 ## Active Phase: PHASE 116 — ANDROID SAFE AREA & INBOUND DELIVERY RECOVERY
 - **Status**: Implemented and focused verified; local relay integration tests are blocked by sandbox loopback networking, and Android device validation is outstanding.
 - [x] Apply a safe top inset on Android WebView when `env(safe-area-inset-top)` is zero.

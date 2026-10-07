@@ -31,6 +31,7 @@ import { PrekeyManager } from '../ratchet/prekeys.ts';
 import type { PrekeyBundle } from '../ratchet/types.ts';
 import type { NetworkManager } from '../network/networkManager.ts';
 import type { DirectoryClient } from '../network/directoryClient.ts';
+import { isConversationDeletedAt, mergeConversationTombstones } from '../sync/conversationTombstones.ts';
 
 export interface IdentityBackupPayload {
   version: 1;
@@ -962,6 +963,14 @@ export class AccountManager {
       deletedAt,
     }));
 
+    const localConversationTombstones = localMap.get('veil:ui:deleted_conversations');
+    const remoteConversationTombstones = remoteMap.get('veil:ui:deleted_conversations');
+    const mergedConversationTombstones = mergeConversationTombstones(
+      localConversationTombstones ? decryptRec<any[]>(localConversationTombstones) || [] : [],
+      remoteConversationTombstones ? decryptRec<any[]>(remoteConversationTombstones) || [] : []
+    );
+    const deletedConversationAt = new Map(mergedConversationTombstones.map((item) => [item.conversationId, item.deletedAt]));
+
     // Gather avatar deletion tombstone from local and remote
     const localAvatarTombstoneRec = localMap.get('veil:avatar:tombstone');
     const remoteAvatarTombstoneRec = remoteMap.get('veil:avatar:tombstone');
@@ -991,6 +1000,11 @@ export class AccountManager {
         mergedRecords.push(
           encryptRec(key, mergedTombstonesList, Date.now())
         );
+        continue;
+      }
+
+      if (key === 'veil:ui:deleted_conversations') {
+        mergedRecords.push(encryptRec(key, mergedConversationTombstones, Date.now()));
         continue;
       }
 
@@ -1213,7 +1227,63 @@ export class AccountManager {
       }
     }
 
-    return mergedRecords;
+    // Filter stale chat rows even when a record existed on only one device or
+    // passed through a generic record merge branch. Later messages are retained.
+    const mergedUiMessagesRecord = mergedRecords.find((record) => record.key === 'veil:ui:messages');
+    const mergedUiMessages = mergedUiMessagesRecord
+      ? decryptRec<Record<string, any[]>>(mergedUiMessagesRecord) || {}
+      : {};
+    return mergedRecords.map((record) => {
+      const value = decryptRec<any>(record);
+      if (value === null) return record;
+      let filtered = value;
+      let changed = false;
+
+      if (record.key === 'veil:ui:conversations' && Array.isArray(value)) {
+        filtered = value.flatMap((conversation: any) => {
+          const deletedAt = deletedConversationAt.get(conversation?.id);
+          if (deletedAt === undefined || !isConversationDeletedAt({ conversationId: conversation.id, deletedAt }, Number(conversation.timestamp) || 0)) {
+            return [conversation];
+          }
+          const laterMessages = (mergedUiMessages[conversation.id] || [])
+            .filter((message) => Number(message?.timestamp) > deletedAt)
+            .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+          if (laterMessages.length === 0) {
+            changed = true;
+            return [];
+          }
+          changed = true;
+          const latest = laterMessages[laterMessages.length - 1];
+          return [{ ...conversation, timestamp: Number(latest.timestamp) || conversation.timestamp, lastMessage: latest.text ?? conversation.lastMessage }];
+        });
+      } else if (record.key === 'veil:ui:messages' && value && typeof value === 'object') {
+        filtered = Object.fromEntries(Object.entries(value).map(([conversationId, rows]) => {
+          const deletedAt = deletedConversationAt.get(conversationId);
+          if (deletedAt === undefined || !Array.isArray(rows)) return [conversationId, rows];
+          const kept = (rows as any[]).filter((message) => Number(message?.timestamp) > deletedAt);
+          if (kept.length !== (rows as any[]).length) changed = true;
+          return [conversationId, kept];
+        }));
+      } else if (record.key.startsWith('veil:messages:conv:') || record.key.startsWith('veil:group:messages:')) {
+        const conversationId = record.key.slice(record.key.lastIndexOf(':') + 1);
+        const deletedAt = deletedConversationAt.get(conversationId);
+        if (deletedAt !== undefined && Array.isArray(value)) {
+          filtered = value.filter((message: any) => Number(message?.timestamp) > deletedAt);
+          changed = filtered.length !== value.length;
+        }
+      } else if (record.key === 'net_outbound_queue' || record.key === 'veil:media:outbox:v1') {
+        if (Array.isArray(value)) {
+          filtered = value.filter((item: any) => {
+            const deletedAt = deletedConversationAt.get(item?.conversationId);
+            const keep = deletedAt === undefined || Number(item?.createdAt || item?.updatedAt || 0) > deletedAt;
+            if (!keep) changed = true;
+            return keep;
+          });
+        }
+      }
+
+      return changed ? encryptRec(record.key, filtered, Math.max(record.updatedAt, Date.now())) : record;
+    });
   }
 }
 

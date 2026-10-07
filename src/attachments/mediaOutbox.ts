@@ -77,4 +77,16 @@ export class MediaOutbox {
       }
     }
   }
+
+  async removeConversation(session: SpaceSession, conversationId: string): Promise<void> {
+    const jobs = await this.list(session);
+    const removed = jobs.filter((job) => job.conversationId === conversationId);
+    if (removed.length === 0) return;
+    await this.store.setAsync(session, OUTBOX_KEY, jobs.filter((job) => job.conversationId !== conversationId));
+    for (const job of removed) {
+      if (job.attachment.attachmentId) {
+        await MediaCipherCache.delete(session.spaceId, job.attachment.attachmentId);
+      }
+    }
+  }
 }

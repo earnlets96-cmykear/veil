@@ -650,6 +650,12 @@ export class ConversationManager {
     return Array.isArray(raw) ? raw : [];
   }
 
+  /** Remove only this Space's persisted message history for a conversation. */
+  public async deleteConversationHistory(session: SpaceSession, conversationId: string): Promise<void> {
+    this.assertSession(session);
+    await this.store.deleteAsync(session, `${MESSAGE_HISTORY_PREFIX}${conversationId}`);
+  }
+
   private appendMessage(session: SpaceSession, conversationId: string, msg: StoredMessage): void {
     const messages = this.getMessages(session, conversationId);
     messages.push(msg);

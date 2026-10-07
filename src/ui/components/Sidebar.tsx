@@ -44,7 +44,9 @@ import {
   SearchIcon,
   MessageSquareIcon,
   CloseIcon,
+  MoreVerticalIcon,
 } from './icons/index.ts';
+import { Modal } from './ui/Modal.tsx';
 import type { UIConversation, UIMessage } from '../app/types.ts';
 
 function formatConversationTime(timestamp?: number): string {
@@ -136,6 +138,7 @@ interface SidebarConversationItemProps {
   contactAvatar?: string;
   onSelect: (id: string) => void;
   onTogglePin: (id: string, isPinned?: boolean) => void;
+  onDelete: (conversation: UIConversation) => void;
 }
 
 const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
@@ -146,37 +149,48 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
   contactAvatar,
   onSelect,
   onTogglePin,
+  onDelete,
 }) => {
   const isOutgoing = !!latestMsg?.isOutgoing;
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div
       className={`veil-conversation-item ${isSelected ? 'active' : ''}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => onSelect(conv.id)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onTogglePin(conv.id, conv.isPinned);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect(conv.id);
-        }
-      }}
       style={{
         display: 'flex',
         alignItems: 'center',
-        padding: '0.75rem 0.85rem',
+        padding: '0.25rem 0.4rem 0.25rem 0.25rem',
         borderRadius: '16px',
-        cursor: 'pointer',
+        position: 'relative',
         marginBottom: '4px',
         backgroundColor: isSelected ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
         border: isSelected ? '1px solid rgba(20, 184, 166, 0.25)' : '1px solid transparent',
         transition: 'background 0.15s ease',
       }}
     >
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Open chat with ${conv.name}`}
+        className="veil-conversation-select"
+        onClick={() => onSelect(conv.id)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onSelect(conv.id);
+          }
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onTogglePin(conv.id, conv.isPinned);
+        }}
+        style={{
+          display: 'flex', alignItems: 'center', flex: 1, minWidth: 0,
+          padding: '0.5rem 0.5rem', border: 0, background: 'transparent',
+          color: 'inherit', textAlign: 'left', cursor: 'pointer', font: 'inherit',
+        }}
+      >
       <Avatar
         name={conv.name}
         imageUrl={conv.avatar || contactAvatar}
@@ -241,6 +255,22 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
           )}
         </div>
       </div>
+      </div>
+      <button
+        type="button"
+        aria-label={`More actions for ${conv.name}`}
+        aria-expanded={menuOpen}
+        onClick={(event) => { event.stopPropagation(); setMenuOpen((open) => !open); }}
+        style={{ width: 44, height: 44, flex: '0 0 44px', border: 0, borderRadius: 12, background: 'transparent', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+      >
+        <MoreVerticalIcon size={18} />
+      </button>
+      {menuOpen && (
+        <div role="menu" aria-label={`Actions for ${conv.name}`} style={{ position: 'absolute', zIndex: 30, right: 8, top: 'calc(100% - 4px)', minWidth: 176, padding: 6, borderRadius: 12, border: '1px solid rgba(148,163,184,.2)', background: '#151b26', boxShadow: '0 12px 32px rgba(0,0,0,.4)' }}>
+          <button type="button" role="menuitem" onClick={() => { onTogglePin(conv.id, conv.isPinned); setMenuOpen(false); }} style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', border: 0, borderRadius: 8, padding: '0 12px', background: 'transparent', color: '#e2e8f0', cursor: 'pointer' }}>{conv.isPinned ? 'Unpin chat' : 'Pin chat'}</button>
+          <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDelete(conv); }} style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', border: 0, borderRadius: 8, padding: '0 12px', background: 'transparent', color: '#f87171', cursor: 'pointer' }}>Delete chat</button>
+        </div>
+      )}
     </div>
   );
 });
@@ -269,6 +299,7 @@ export const Sidebar: React.FC = () => {
     messages,
     pinConversation,
     unpinConversation,
+    deleteConversation,
   } = useApp();
 
   const handleSidebarJumpToMessage = useCallback((messageId: string, conversationId?: string) => {
@@ -287,6 +318,9 @@ export const Sidebar: React.FC = () => {
   const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UIConversation | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletingChat, setIsDeletingChat] = useState(false);
 
   const debounceTimerRef = useRef<any>(null);
 
@@ -352,6 +386,20 @@ export const Sidebar: React.FC = () => {
       pinConversation(id);
     }
   }, [unpinConversation, pinConversation]);
+
+  const confirmDeleteChat = useCallback(async () => {
+    if (!deleteTarget || isDeletingChat) return;
+    setIsDeletingChat(true);
+    setDeleteError(null);
+    try {
+      await deleteConversation(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (_error) {
+      setDeleteError('Could not save this deletion. The chat is still here; please try again.');
+    } finally {
+      setIsDeletingChat(false);
+    }
+  }, [deleteTarget, deleteConversation, isDeletingChat]);
 
   const pendingIncoming = contactRequests.filter((r) => r.isIncoming && r.status === 'INCOMING_PENDING');
 
@@ -889,6 +937,7 @@ export const Sidebar: React.FC = () => {
                     contactAvatar={contactAvatar}
                     onSelect={handleSelectConversation}
                     onTogglePin={handleTogglePin}
+                    onDelete={(conversation) => { setDeleteError(null); setDeleteTarget(conversation); }}
                   />
                 );
               })
@@ -926,6 +975,21 @@ export const Sidebar: React.FC = () => {
       >
         <PlusIcon size={24} strokeWidth={2.5} />
       </button>
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => { if (!isDeletingChat) { setDeleteTarget(null); setDeleteError(null); } }}
+        title="Delete chat"
+        closeOnBackdrop={!isDeletingChat}
+        closeOnEscape={!isDeletingChat}
+      >
+        <p>Delete the chat with {deleteTarget?.name} and its history from this Space?</p>
+        <p style={{ color: '#94a3b8' }}>Your contact, group membership, and other participants’ copies will remain.</p>
+        {deleteError && <p role="alert" style={{ color: '#f87171' }}>{deleteError}</p>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+          <Button variant="secondary" disabled={isDeletingChat} onClick={() => { setDeleteTarget(null); setDeleteError(null); }}>Cancel</Button>
+          <Button variant="danger" isLoading={isDeletingChat} onClick={confirmDeleteChat}>Delete chat</Button>
+        </div>
+      </Modal>
     </div>
   );
 };

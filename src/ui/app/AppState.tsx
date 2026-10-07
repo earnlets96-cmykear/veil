@@ -121,6 +121,7 @@ import { ThumbnailGenerator } from '../../attachments/thumbnailGenerator.ts';
 import { presenceManager } from '../../presence/presenceManager.ts';
 import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
 import { DeletedMessageTombstone } from '../../storage/types.ts';
+import { mergeConversationTombstones } from '../../sync/conversationTombstones.ts';
 import {
   deleteRemotePushToken,
   registerForRemotePushToken,
@@ -259,6 +260,7 @@ export interface AppContextType {
   sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string, options?: { forwarded?: boolean; forwardedFrom?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
   deleteMessageForEveryone: (conversationId: string, messageId: string) => Promise<void>;
   deleteMessagesLocally: (conversationId: string, messageIds: string[]) => Promise<void>;
   retryFailedMessage: (conversationId: string, messageId: string) => Promise<void>;
@@ -3749,6 +3751,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, contacts, conversations, messages, scheduleCloudSync]
   );
 
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    if (!activeSession || !conversationId) throw new Error('No active Space is available');
+    sessionController.recordUserActivity();
+
+    const deletedAt = Date.now();
+    const existing = (await store.getAsync<Array<{ conversationId: string; deletedAt: number }>>(
+      activeSession,
+      'veil:ui:deleted_conversations'
+    )) || [];
+    const tombstones = mergeConversationTombstones(existing, [{ conversationId, deletedAt }]);
+    // This is the durability boundary: if it fails, preserve the visible chat.
+    await store.setAsync(activeSession, 'veil:ui:deleted_conversations', tombstones);
+
+    const nextConversations = conversations.filter((conversation) => conversation.id !== conversationId);
+    const nextMessages = { ...messages };
+    delete nextMessages[conversationId];
+
+    // The tombstone is authoritative. Cleanup remains Space-local and cannot
+    // remove contacts, group membership, or another participant's history.
+    const cleanup = await Promise.allSettled([
+      store.setAsync(activeSession, 'veil:ui:conversations', nextConversations),
+      store.setAsync(activeSession, 'veil:ui:messages', nextMessages),
+      convManager.deleteConversationHistory(activeSession, conversationId),
+      groupManager.deleteGroupMessageHistory(activeSession, conversationId),
+      netManager.getQueue().removeOutboundForConversation(activeSession, conversationId),
+      mediaOutbox.removeConversation(activeSession, conversationId),
+    ]);
+
+    setConversations(nextConversations);
+    setMessages(nextMessages);
+    searchEngine.updateIndex(contacts, nextConversations, nextMessages);
+    if (activeChatId === conversationId) {
+      setActiveChatId(null);
+      setReplyTargetState(null);
+      replyTargetRef.current = null;
+    }
+    scheduleCloudSync(activeSession);
+
+    if (cleanup.some((result) => result.status === 'rejected')) {
+      console.warn('[VEIL] Chat deletion was recorded, but some local cleanup will retry during recovery.');
+    }
+  }, [activeSession, activeChatId, contacts, conversations, messages, scheduleCloudSync]);
+
   const deleteMessageForEveryone = useCallback(
     async (conversationId: string, messageId: string) => {
       if (!activeSession) return;
@@ -5017,6 +5062,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sendVoiceMessage,
       setSearchQuery,
       deleteMessageLocally,
+      deleteConversation,
       deleteMessageForEveryone,
       deleteMessagesLocally,
       retryFailedMessage,
@@ -5114,6 +5160,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sendVoiceMessage,
       setSearchQuery,
       deleteMessageLocally,
+      deleteConversation,
       deleteMessageForEveryone,
       deleteMessagesLocally,
       retryFailedMessage,
