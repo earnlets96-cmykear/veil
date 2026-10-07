@@ -4,6 +4,19 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 112] - 2026-10-07
+
+### Fixed
+- Kept the emoji/sticker drawer open after sticker selection and send.
+- Avoided dead app-origin sticker requests on hosted/Capacitor builds by using the configured relay directly; enabled HTTP cache reuse for sticker assets.
+- Updated regression coverage for sticker relay routing and verified privacy-filtered browser notification dispatch.
+
+### Known limitation
+- Android notification delivery is not wired: the app has no native local-notification plugin or push registration, and the web dispatcher does not request notification permission.
+
+### Verification
+- 5 focused suites passed (54 tests); `npx tsc --noEmit` passed.
+
 ## [Phase 111] - 2026-10-07
 
 ### Fixed

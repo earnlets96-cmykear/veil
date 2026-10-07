@@ -1,5 +1,13 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 112 — STICKER LOADING PATH & NOTIFICATION DELIVERY REVIEW
+- **Status**: Sticker fixes implemented and focused verified; Android notification delivery requires a native notification integration.
+- [x] Keep the emoji/sticker drawer open after sending a sticker.
+- [x] Route sticker file and proxy requests to the configured relay before dead app-origin paths; use the HTTP cache for sticker assets.
+- [x] Verify privacy-filtered browser notification dispatch when permission is granted.
+- [ ] Add Android native notification delivery, permission request, and background push registration before claiming Android notifications work.
+- [x] Run focused sticker and notification regressions plus TypeScript check.
+
 ## Active Phase: PHASE 111 — STICKER RESPONSE VALIDATION & OUTBOUND RECOVERY
 - **Status**: Implemented and verified; 8 focused suites / 84 tests pass, TypeScript and production web build pass.
 - [x] Reject HTML/error bodies served with HTTP 200 and continue sticker image proxy fallbacks.

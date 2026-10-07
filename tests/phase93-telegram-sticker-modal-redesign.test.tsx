@@ -76,12 +76,12 @@ describe('Phase 93: Reliable Sticker Blob Dispatching & Proxy Support', () => {
     'utf-8'
   );
 
-  it('telegramStickerService implements fetchStickerBlob with direct, data, and proxy fallbacks', () => {
+  it('telegramStickerService implements direct, data, and relay proxy fallbacks', () => {
     expect(stickerServiceSource).toContain('public async fetchStickerBlob(');
     expect(stickerServiceSource).toContain('options: { allowSyntheticFallback?: boolean } = {}');
     expect(stickerServiceSource).toContain("url.startsWith('data:')");
-    expect(stickerServiceSource).toContain('/api/telegram-stickers/proxy?url=');
     expect(stickerServiceSource).toContain('/v1/stickers/proxy?url=');
+    expect(stickerServiceSource).toContain("cache: 'force-cache'");
   });
 
   it('fetchStickerBlob successfully resolves data:image/svg+xml into binary Blob', async () => {

@@ -531,17 +531,31 @@ class TelegramStickerService {
     const relayHttpUrl =
       (typeof window !== 'undefined' && window.localStorage?.getItem('veil_custom_relay_url')) ||
       PRODUCTION_RELAY_URL;
+    const relayOrigin = (() => {
+      try {
+        return relayHttpUrl ? new URL(relayHttpUrl).origin : '';
+      } catch {
+        return '';
+      }
+    })();
+    const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const relayIsSameOrigin = Boolean(relayOrigin && appOrigin === relayOrigin);
 
-    // 3. Try Local Dev Server / Relay Sticker Resolver Endpoint
+    // 3. Try the resolver in the same origin only when the relay actually is
+    // this app's origin. Capacitor's https://localhost and hosted frontends
+    // cannot serve relay routes, so use the configured relay first there.
     try {
-      const endpoints = [
+      const localEndpoints = [
         `/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`,
         `/v1/stickers/${encodeURIComponent(packName)}${queryParam}`,
       ];
+      const endpoints: string[] = relayIsSameOrigin || !relayHttpUrl ? [...localEndpoints] : [];
       if (relayHttpUrl) {
         const cleanRelay = relayHttpUrl.replace(/\/+$/, '');
         endpoints.push(`${cleanRelay}/v1/stickers/${encodeURIComponent(packName)}${queryParam}`);
-        endpoints.push(`${cleanRelay}/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`);
+        if (relayIsSameOrigin) {
+          endpoints.push(`${cleanRelay}/api/telegram-stickers/${encodeURIComponent(packName)}${queryParam}`);
+        }
       }
       if (PRODUCTION_RELAY_URL && PRODUCTION_RELAY_URL !== relayHttpUrl) {
         const cleanProd = PRODUCTION_RELAY_URL.replace(/\/+$/, '');
@@ -729,23 +743,25 @@ class TelegramStickerService {
     const relayHttpUrl =
       (typeof window !== 'undefined' && window.localStorage?.getItem('veil_custom_relay_url')) ||
       PRODUCTION_RELAY_URL;
-
-    // 3. Same-origin or relative endpoints (e.g. /api/telegram-stickers/file?file_id=...)
-    if (url.startsWith('/')) {
+    const relayOrigin = (() => {
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        const blob = await this.readImageResponse(res);
-        if (blob) {
-          this.blobCache.set(url, blob);
-          return blob;
-        }
-      } catch {}
+        return relayHttpUrl ? new URL(relayHttpUrl).origin : '';
+      } catch {
+        return '';
+      }
+    })();
+    const appOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const relayIsSameOrigin = Boolean(relayOrigin && appOrigin === relayOrigin);
 
-      // Retry via configured relay server
-      if (relayHttpUrl) {
+    // 3. Relative file endpoints. Hosted and Capacitor clients have a different
+    // origin from the relay, so go straight to the relay instead of waiting on a
+    // known-missing app-origin route first.
+    if (url.startsWith('/')) {
+      const candidates =
+        relayIsSameOrigin || !relayHttpUrl ? [url] : [`${relayHttpUrl.replace(/\/+$/, '')}${url}`];
+      for (const candidate of candidates) {
         try {
-          const remoteUrl = `${relayHttpUrl.replace(/\/+$/, '')}${url}`;
-          const res = await fetch(remoteUrl, { signal: AbortSignal.timeout(8000) });
+          const res = await fetch(candidate, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
           const blob = await this.readImageResponse(res);
           if (blob) {
             this.blobCache.set(url, blob);
@@ -758,7 +774,7 @@ class TelegramStickerService {
     // 4. External URLs: Direct fetch with short timeout
     if (url.startsWith('http://') || url.startsWith('https://')) {
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
+        const res = await fetch(url, { cache: 'force-cache', signal: AbortSignal.timeout(3500) });
         const blob = await this.readImageResponse(res);
         if (blob) {
           this.blobCache.set(url, blob);
@@ -766,33 +782,16 @@ class TelegramStickerService {
         }
       } catch {}
 
-      // 5. Multi-tier proxy fallback:
-      // A. Relative proxies on current origin
-      const localProxies = [
-        `/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
-        `/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
-      ];
-      for (const ep of localProxies) {
-        try {
-          const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
-          const blob = await this.readImageResponse(res);
-          if (blob) {
-            this.blobCache.set(url, blob);
-            return blob;
-          }
-        } catch {}
-      }
-
-      // B. Configured relay server proxies
+      // 5. The relay proxy handles CORS and hotlink restrictions. Relative app
+      // origin proxy URLs are skipped: in native/hosted builds they are a dead end.
       if (relayHttpUrl) {
         const cleanRelay = relayHttpUrl.replace(/\/+$/, '');
         const relayProxies = [
           `${cleanRelay}/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
-          `${cleanRelay}/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
         ];
         for (const ep of relayProxies) {
           try {
-            const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+            const res = await fetch(ep, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
             const blob = await this.readImageResponse(res);
             if (blob) {
               this.blobCache.set(url, blob);
@@ -807,11 +806,10 @@ class TelegramStickerService {
         const cleanProd = PRODUCTION_RELAY_URL.replace(/\/+$/, '');
         const prodProxies = [
           `${cleanProd}/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
-          `${cleanProd}/api/telegram-stickers/proxy?url=${encodeURIComponent(url)}`,
         ];
         for (const ep of prodProxies) {
           try {
-            const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
+            const res = await fetch(ep, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
             const blob = await this.readImageResponse(res);
             if (blob) {
               this.blobCache.set(url, blob);

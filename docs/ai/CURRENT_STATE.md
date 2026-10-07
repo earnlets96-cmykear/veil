@@ -1,5 +1,11 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 112 — STICKER LOADING PATH & NOTIFICATION DELIVERY REVIEW
+- **Status**: Sticker drawer and relay loading fixes implemented; focused verification and TypeScript pass. Android notification delivery remains incomplete.
+- **Changes**: Kept the emoji drawer open after sticker selection. Sticker manifests and image fallback now use the configured relay directly when the app and relay origins differ, skip dead app-origin proxy hops, and allow browser HTTP caching. Notification dispatcher is verified for browser contexts with granted permission and privacy filtering.
+- **Verification**: 5 focused suites pass (54 tests); `npx tsc --noEmit` passes. Android delivery is not implemented: the project only has the browser `Notification` API dispatcher, no Capacitor notification plugin or push registration, and no permission request flow.
+- **Scope**: Sticker transport and notification diagnosis only; no cryptographic protocol or identity changes.
+
 ## Current Phase: PHASE 111 — STICKER RESPONSE VALIDATION & OUTBOUND RECOVERY
 - **Status**: Implemented; focused verification, TypeScript, and production web build pass.
 - **Changes**: Sticker fetch rejects non-image responses even when upstream returns HTTP 200 and continues to the configured proxy. Empty-inbox sync now still flushes queued outgoing envelopes; queued text is shown as queued rather than as an endless sending spinner.

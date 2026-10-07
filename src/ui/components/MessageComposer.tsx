@@ -262,7 +262,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const handleSelectSticker = useCallback(
     async (sticker: StickerItem) => {
       try {
-        setIsEmojiDrawerOpen(false);
         const blob = await telegramStickerService.fetchStickerBlob(sticker.url, { allowSyntheticFallback: false });
         const isSvg = sticker.url.startsWith('data:image/svg') || (blob.type && blob.type.includes('svg'));
         const mimeType = isSvg ? 'image/svg+xml' : 'image/webp';
