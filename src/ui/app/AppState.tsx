@@ -11,6 +11,7 @@ import { EncryptedSpaceStore } from '../../storage/spaceStore.ts';
 import { IndexedDBStorageAdapter } from '../../storage/indexedDbAdapter.ts';
 import { SpaceIdentityManager } from '../../identity/manager.ts';
 import { NetworkManager } from '../../network/networkManager.ts';
+import { parseLegacyInboundPayload } from '../../network/legacyInboundPayload.ts';
 import { SessionController } from './sessionController.ts';
 import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyReference } from './types.ts';
 import { Capacitor } from '@capacitor/core';
@@ -1433,43 +1434,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             console.error('[VEIL-UI] Inbound wire payload decryption error:', wireErr?.name || 'Error', wireErr?.message || wireErr);
           }
           // Fallback to raw JSON if payload was legacy/unencrypted
-          try {
-            const parsed = JSON.parse(payload);
-            if (parsed && parsed.conversationId && (parsed.text || parsed.attachment || parsed.voice)) {
-              const isBlocked = (await contactRequestManager.isBlocked(session, parsed.senderId)) ||
-                (await contactRequestManager.isBlocked(session, parsed.conversationId));
-              if (isBlocked) return;
+          const parsed = parseLegacyInboundPayload(payload);
+          if (parsed) {
+            const isBlocked = (await contactRequestManager.isBlocked(session, parsed.senderId)) ||
+              (await contactRequestManager.isBlocked(session, parsed.conversationId));
+            if (isBlocked) return;
 
-              const incomingMsg: UIMessage = {
-                id: parsed.id || `msg_${Date.now()}`,
-                conversationId: parsed.conversationId,
-                senderId: parsed.senderId || 'peer',
-                text: parsed.text || '',
-                isOutgoing: false,
-                timestamp: Date.now(),
-                status: 'DELIVERED_TO_RECIPIENT',
-                attachment: parsed.attachment,
-                voice: parsed.voice,
-                replyTo: parsed.replyTo,
-              };
+            const incomingMsg: UIMessage = {
+              id: parsed.id || `msg_${Date.now()}`,
+              conversationId: parsed.conversationId,
+              senderId: parsed.senderId || 'peer',
+              text: parsed.text || '',
+              isOutgoing: false,
+              timestamp: Date.now(),
+              status: 'DELIVERED_TO_RECIPIENT',
+              attachment: parsed.attachment,
+              voice: parsed.voice,
+              replyTo: parsed.replyTo,
+            };
 
-              setMessages((prev) => {
-                const list = prev[parsed.conversationId] || [];
-                const updated = { ...prev, [parsed.conversationId]: [...list, incomingMsg] };
-                store.setAsync(session, 'veil:ui:messages', updated);
-                searchEngine.updateIndex(storedContacts, storedConvs, updated);
-                return updated;
-              });
+            setMessages((prev) => {
+              const list = prev[parsed.conversationId] || [];
+              const updated = { ...prev, [parsed.conversationId]: [...list, incomingMsg] };
+              store.setAsync(session, 'veil:ui:messages', updated);
+              searchEngine.updateIndex(storedContacts, storedConvs, updated);
+              return updated;
+            });
 
-              notificationDispatcher.dispatch({
-                id: incomingMsg.id,
-                conversationId: incomingMsg.conversationId,
-                senderName: parsed.senderName || 'Peer',
-                text: parsed.text,
-                timestamp: Date.now(),
-              });
-            }
-          } catch (_e) {}
+            notificationDispatcher.dispatch({
+              id: incomingMsg.id,
+              conversationId: incomingMsg.conversationId,
+              senderName: parsed.senderName || 'Peer',
+              text: parsed.text,
+              timestamp: Date.now(),
+            });
+          } else {
+            // Let NetworkManager retain the envelope and retry instead of ACKing a failed decrypt.
+            throw wireErr;
+          }
         }
       });
       setNetworkState('connected');

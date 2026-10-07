@@ -2,6 +2,20 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 116] - 2026-10-07
+
+### Fixed
+- Reserved status-bar space in Android WebView even when its safe-area environment value is zero; larger device cutouts remain respected.
+- Corrected inbound ACK behavior so a relay message is not discarded before app processing succeeds. Pending inbound envelopes are replayed after retry/re-entry, failed decrypts are no longer silently accepted as legacy messages, overlapping syncs share one in-flight processor, and acknowledged queue entries are cleaned up.
+
+### Verification
+- Phase 116 delivery and viewport regressions plus Phase 84 mobile viewport tests: 12 passed.
+- `npm run typecheck` passed.
+- Relay-backed delivery suites were attempted but cannot open loopback connections in this sandbox. Android device testing remains outstanding.
+
+### Release gates
+- Independent security review, explicit dual sign-off, and physical Android validation are required before deployment.
+
 ## [Phase 115] - 2026-10-07
 
 ### Fixed

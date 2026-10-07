@@ -691,6 +691,7 @@ This document records all architectural decisions made across the VEIL project l
 - **Decision**: Implement the **ACK-after-persistence** invariant: inbound envelopes are enqueued to `EnvelopeQueue`, processed by Double Ratchet, and committed to local history before an ACK is dispatched to the relay. A rolling cache of processed envelope IDs deduplicates retransmissions.
 - **Reason**: Prevents message loss from client crashes during receipt and ensures clean user experience under duplicate delivery.
 - **Consequences**: Fault-tolerant message reception and state consistency.
+- **Implementation clarification (2026-10-07)**: An envelope remains unacknowledged while app processing is missing or fails. The client replays its persisted pending ciphertext after sync/re-entry, serializes duplicate work by envelope ID, and acknowledges only after processing and the encrypted processed-ID commit succeed. See `docs/ai/THREAT_MODEL_DELIVERY_RECOVERY.md`; post-RC independent audit and dual sign-off remain release gates.
 
 ---
 

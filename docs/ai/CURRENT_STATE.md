@@ -1,5 +1,12 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 116 — ANDROID SAFE AREA & INBOUND DELIVERY RECOVERY
+- **Status**: Implemented; focused regressions and TypeScript pass. Local relay integration tests cannot connect to loopback servers in this environment, and Android device layout remains to be validated on affected devices.
+- **Root causes**: Android WebView can report a zero top safe-area inset while drawing under the status bar. Inbound sync acknowledged envelopes even when no handler existed or processing failed; queued failures were never retried. The app's decrypt fallback also swallowed undecryptable-payload errors, making the network layer treat them as successfully handled. Overlapping syncs could process the same queued payload concurrently.
+- **Changes**: Reserve a 24px minimum Android top inset while preserving larger WebView-reported cutout insets. Only ACK processed envelopes; replay persisted pending envelopes on sync/reconnect; retain failed payloads for retry; prevent duplicate concurrent processing; remove locally queued records after acknowledged delivery. Unsupported ciphertext failures now propagate to the delivery queue while recognized legacy messages retain their fallback.
+- **Verification**: Phase 116 regressions and mobile viewport tests pass (12 tests); `npm run typecheck` passes. Relay-backed ACK and intermittent-delivery suites were attempted but blocked because sandbox networking rejects local loopback connections.
+- **Governance**: Delivery changes enforce the existing ACK-after-persistence decision and do not alter cryptography or wire format. Treat as transport-security-sensitive under the post-RC freeze: independent security review and dual sign-off are still required before deployment. Physical Android validation is also outstanding.
+
 ## Current Phase: PHASE 115 — TOUCH CONTEXT MENU DISMISSAL
 - **Status**: Implemented and verified with focused gesture regressions and TypeScript check.
 - **Root causes**: Android touch interaction emits `pointerdown` before `touchstart`; closing the menu during pointerdown removed capture listeners before touchstart could be absorbed. The delayed native `contextmenu` from the same long-press could then be mistaken for an outside interaction and dismiss the newly-opened app menu.

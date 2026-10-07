@@ -261,6 +261,11 @@ button.veil-pill {
    GLOBAL RESET & ACCESSIBLE FOCUS
    ========================================================================= */
 
+:root.veil-android-native {
+  /* Android WebView may return a zero safe-area inset while drawing edge-to-edge. */
+  --veil-safe-top: max(env(safe-area-inset-top, 0px), 24px);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

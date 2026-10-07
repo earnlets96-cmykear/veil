@@ -121,11 +121,26 @@ export class EnvelopeQueue {
     }
   }
 
+  public async removeAcknowledgedInbound(session: SpaceSession, envelopeIds: string[]): Promise<void> {
+    if (envelopeIds.length === 0) return;
+    const acknowledged = new Set(envelopeIds);
+    const queue = (await this.store.getAsync<QueuedInboundEnvelope[]>(session, KEY_INBOUND_QUEUE)) || [];
+    const remaining = queue.filter((item) => item.status !== 'PROCESSED' || !acknowledged.has(item.envelopeId));
+    if (remaining.length !== queue.length) {
+      await this.store.setAsync(session, KEY_INBOUND_QUEUE, remaining);
+    }
+  }
+
   public async isDuplicate(session: SpaceSession, envelopeId: string): Promise<boolean> {
     const processedIds = (await this.store.getAsync<string[]>(session, KEY_PROCESSED_IDS)) || [];
     if (processedIds.includes(envelopeId)) return true;
 
     const queue = (await this.store.getAsync<QueuedInboundEnvelope[]>(session, KEY_INBOUND_QUEUE)) || [];
     return queue.some(i => i.envelopeId === envelopeId);
+  }
+
+  public async isProcessed(session: SpaceSession, envelopeId: string): Promise<boolean> {
+    const processedIds = (await this.store.getAsync<string[]>(session, KEY_PROCESSED_IDS)) || [];
+    return processedIds.includes(envelopeId);
   }
 }

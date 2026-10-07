@@ -42,6 +42,7 @@ export class NetworkManager {
   // Active WebSocket transports keyed by spaceId
   private activeWsTransports = new Map<string, WebSocketTransport>();
   private messageHandlers = new Map<string, (payload: string) => Promise<void>>();
+  private inboundProcessing = new Set<string>();
   private stateListeners: ((state: NetworkState) => void)[] = [];
   private lastKnownState: NetworkState = 'offline';
   public onOutboundFlushed?: (flushed: { queueId: string; messageId?: string; conversationId?: string }) => void;
@@ -354,14 +355,14 @@ export class NetworkManager {
 
     try {
       const fetchRes = await this.http.fetchEnvelopes(binding.mailboxId, binding.capabilityToken);
-      if (fetchRes.envelopes.length === 0) {
-        await this.flushOutboundQueue(session);
-        return 0;
-      }
-
       const ackIds: string[] = [];
 
       for (const env of fetchRes.envelopes) {
+        if (await this.queue.isProcessed(session, env.envelopeId)) {
+          ackIds.push(env.envelopeId);
+          continue;
+        }
+
         const queueId = bytesToHex(randomBytes(16));
         const inbound: QueuedInboundEnvelope = {
           queueId,
@@ -374,29 +375,30 @@ export class NetworkManager {
         };
 
         // 1. Enqueue inbound locally with deduplication
-        const isNew = await this.queue.enqueueInbound(session, inbound);
-        if (isNew && handler) {
-          try {
-            // 2. Deliver to E2EE decryptor
-            await handler(env.payload);
-            await this.queue.markInboundProcessed(session, queueId);
-            totalProcessed++;
-            if (typeof console !== 'undefined' && console.debug) {
-              console.debug(`[VEIL-NET] Inbound (poll): envId=${env.envelopeId.slice(0, 8)}, mailbox=${maskMailbox(env.mailboxId)}, persisted=true`);
-            }
-          } catch (err: any) {
-            console.error(`[VEIL-NET] Inbound (poll) processing error for envId=${env.envelopeId.slice(0, 8)}:`, err?.name || 'Error', err?.message || err);
-          }
-        }
-
-        ackIds.push(env.envelopeId);
+        await this.queue.enqueueInbound(session, inbound);
       }
 
-      // 3. ACK-after-persistence: Acknowledge processed envelopes to relay
-      if (ackIds.length > 0) {
-        await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, ackIds);
+      // Replay locally persisted envelopes after a previous processing failure or app restart.
+      if (handler) {
+        const pending = await this.queue.listPendingInbound(session);
+        for (const inbound of pending) {
+          if (await this.processQueuedInbound(session, inbound, handler)) {
+            ackIds.push(inbound.envelopeId);
+            totalProcessed++;
+            if (typeof console !== 'undefined' && console.debug) {
+              console.debug(`[VEIL-NET] Inbound (poll): envId=${inbound.envelopeId.slice(0, 8)}, mailbox=${maskMailbox(inbound.mailboxId)}, persisted=true`);
+            }
+          }
+        }
+      }
+
+      // ACK only after application processing has committed locally. Leave queued failures on relay.
+      const uniqueAckIds = [...new Set(ackIds)];
+      if (uniqueAckIds.length > 0) {
+        await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, uniqueAckIds);
+        await this.queue.removeAcknowledgedInbound(session, uniqueAckIds);
         if (typeof console !== 'undefined' && console.debug) {
-          console.debug(`[VEIL-NET] ACKed ${ackIds.length} envelopes via HTTP for mailbox=${maskMailbox(binding.mailboxId)}`);
+          console.debug(`[VEIL-NET] ACKed ${uniqueAckIds.length} envelopes via HTTP for mailbox=${maskMailbox(binding.mailboxId)}`);
         }
       }
 
@@ -438,34 +440,60 @@ export class NetworkManager {
 
     // 1. Persist to local queue (deduplicating)
     const isNew = await this.queue.enqueueInbound(session, inbound);
+    let queuedEnvelope = inbound;
     if (!isNew) {
-      // Already processed duplicate -> ACK immediately to purge relay
-      wsTransport?.sendAck([envelope.envelopeId]);
-      return;
+      // A queued duplicate still needs processing; only completed envelopes may be acknowledged.
+      if (await this.queue.isProcessed(session, envelope.envelopeId)) {
+        wsTransport?.sendAck([envelope.envelopeId]);
+        return;
+      }
+
+      const pending = (await this.queue.listPendingInbound(session))
+        .find((item) => item.envelopeId === envelope.envelopeId);
+      const handler = this.messageHandlers.get(session.spaceId);
+      if (!pending || !handler || !(await this.processQueuedInbound(session, pending, handler))) return;
+      queuedEnvelope = pending;
+    } else {
+      const handler = this.messageHandlers.get(session.spaceId);
+      if (!handler || !(await this.processQueuedInbound(session, inbound, handler))) return;
     }
 
-    const handler = this.messageHandlers.get(session.spaceId);
-    if (handler) {
-      try {
-        // 2. Process through E2EE cryptographic layer
-        await handler(envelope.payload);
-        await this.queue.markInboundProcessed(session, queueId);
-
-        // 3. ACK to relay ONLY after safe local processing
-        const ackedViaWs = wsTransport?.sendAck([envelope.envelopeId]);
-        if (!ackedViaWs) {
-          const binding = await this.getMailboxBinding(session);
-          if (binding) {
-            await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, [envelope.envelopeId]);
-          }
+    // 3. ACK to relay only after the handler and encrypted queue commit both succeed.
+    try {
+      const ackedViaWs = wsTransport?.sendAck([envelope.envelopeId]);
+      if (!ackedViaWs) {
+        const binding = await this.getMailboxBinding(session);
+        if (binding) {
+          await this.http.ackEnvelopes(binding.mailboxId, binding.capabilityToken, [envelope.envelopeId]);
         }
-        await this.queue.markInboundAcknowledged(session, queueId);
-        if (typeof console !== 'undefined' && console.debug) {
-          console.debug(`[VEIL-NET] Inbound (ws): envId=${envelope.envelopeId.slice(0, 8)}, mailbox=${maskMailbox(envelope.mailboxId)}, persisted=true, acked=true`);
-        }
-      } catch (err: any) {
-        console.error(`[VEIL-NET] Inbound (ws) processing error for envId=${envelope.envelopeId.slice(0, 8)}:`, err?.name || 'Error', err?.message || err);
       }
+      await this.queue.markInboundAcknowledged(session, queuedEnvelope.queueId);
+      if (typeof console !== 'undefined' && console.debug) {
+        console.debug(`[VEIL-NET] Inbound (ws): envId=${envelope.envelopeId.slice(0, 8)}, mailbox=${maskMailbox(envelope.mailboxId)}, persisted=true, acked=true`);
+      }
+    } catch (err: any) {
+      console.error(`[VEIL-NET] Inbound ACK failed for envId=${envelope.envelopeId.slice(0, 8)}:`, err?.name || 'Error', err?.message || err);
+    }
+  }
+
+  private async processQueuedInbound(
+    session: SpaceSession,
+    inbound: QueuedInboundEnvelope,
+    handler: (payload: string) => Promise<void>
+  ): Promise<boolean> {
+    if (await this.queue.isProcessed(session, inbound.envelopeId)) return true;
+    if (this.inboundProcessing.has(inbound.envelopeId)) return false;
+
+    this.inboundProcessing.add(inbound.envelopeId);
+    try {
+      await handler(inbound.payload);
+      await this.queue.markInboundProcessed(session, inbound.queueId);
+      return true;
+    } catch (err: any) {
+      console.error(`[VEIL-NET] Inbound processing error for envId=${inbound.envelopeId.slice(0, 8)}:`, err?.name || 'Error', err?.message || err);
+      return false;
+    } finally {
+      this.inboundProcessing.delete(inbound.envelopeId);
     }
   }
 

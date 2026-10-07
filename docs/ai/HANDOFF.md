@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 116 Update — Android Safe Area & Inbound Delivery Recovery
+- Android now reserves at least 24 CSS pixels above app content when the native WebView reports a zero safe-area inset; larger reported cutouts still win.
+- Inbound sync no longer ACKs messages with missing or failed handlers. Persisted pending envelopes are replayed on sync/re-entry; duplicate WebSocket deliveries are only acknowledged after processing; overlapping syncs cannot process one envelope concurrently. AppState now propagates undecryptable payload failures unless the existing legacy JSON fallback recognizes them.
+- Added `tests/phase116-delivery-and-safe-area.test.ts`. Focused Phase 116 + Phase 84 suites pass (12 tests); `npm run typecheck` passes. Relay-backed delivery suites fail to connect to loopback servers in this sandbox. Validate on a physical Android device.
+- This enforces the existing ACK-after-persistence decision without changing crypto or wire format. Because delivery lifecycle is security-sensitive after RC, independent review and dual sign-off are still required before deployment.
+- Preserve unrelated existing changes: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 115 Update — Touch Context Menu Dismissal
 - Fixed the mobile dismissal race: touch pointerdown no longer unmounts capture listeners before touchstart can be absorbed. Delayed native contextmenu is now swallowed while the app menu is open, preventing it from dismissing the menu opened by the same hold; the nested text bubble filters touch-generated events too.
 - Mouse/non-touch pointer dismissal and desktop right-click remain supported.

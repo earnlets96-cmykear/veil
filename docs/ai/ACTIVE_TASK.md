@@ -1,5 +1,16 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 116 — ANDROID SAFE AREA & INBOUND DELIVERY RECOVERY
+- **Status**: Implemented and focused verified; local relay integration tests are blocked by sandbox loopback networking, and Android device validation is outstanding.
+- [x] Apply a safe top inset on Android WebView when `env(safe-area-inset-top)` is zero.
+- [x] Do not ACK an envelope until app processing and encrypted queue state commit succeed.
+- [x] Retry persisted inbound envelopes after failures/re-entry; do not ACK queued duplicates.
+- [x] Prevent overlapping syncs from processing the same envelope concurrently.
+- [x] Propagate failed decryption when legacy fallback cannot recognize the payload.
+- [x] Add focused delivery and viewport regressions; run TypeScript validation.
+- [ ] Validate status bar inset and inbound retry behavior on affected Android devices.
+- [ ] Complete independent security review and dual sign-off before deploying transport lifecycle changes under the post-RC freeze.
+
 ## Active Phase: PHASE 115 — TOUCH CONTEXT MENU DISMISSAL
 - **Status**: Implemented and verified.
 - [x] Reproduce the mobile touch event-ordering race in a regression test.
