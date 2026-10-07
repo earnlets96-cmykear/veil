@@ -1,5 +1,11 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 111 Update — Sticker Responses & Outbound Queue
+- Fixed sticker fetches to reject non-image HTTP 200 bodies and continue through image proxies.
+- Fixed `syncMailbox` to flush queued outbound envelopes after an empty successful fetch; queued message status now reflects `QUEUED`.
+- Dedicated regressions reproduce both failures and pass after fixes. 8 focused suites / 84 tests pass; TypeScript and production Vite build pass.
+- Existing local-relay integration tests cannot open loopback sockets in this sandbox (`EACCES`).
+
 ## Phase 110 Update — Dedicated Sticker Pack Viewer
 - Pack-linked sticker taps now open the dedicated pack preview, not the generic media viewer.
 - The message action menu offers both “View Sticker Pack” and “Add sticker pack”. The preview can install the pack from its own CTA.

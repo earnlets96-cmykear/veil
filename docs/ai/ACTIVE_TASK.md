@@ -1,5 +1,12 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 111 — STICKER RESPONSE VALIDATION & OUTBOUND RECOVERY
+- **Status**: Implemented and verified; 8 focused suites / 84 tests pass, TypeScript and production web build pass.
+- [x] Reject HTML/error bodies served with HTTP 200 and continue sticker image proxy fallbacks.
+- [x] Flush persisted outgoing envelopes after successful sync even when no inbound envelopes exist.
+- [x] Display queued text messages as queued rather than indefinitely sending.
+- [x] Run focused regressions, TypeScript, and production web build; record sandbox-blocked network integration tests.
+
 ## Active Phase: PHASE 110 — DEDICATED STICKER PACK VIEWER
 - **Status**: Implemented; focused regression and TypeScript checks pass.
 - [x] Route pack-linked sticker taps to the sticker pack preview rather than the generic media viewer.

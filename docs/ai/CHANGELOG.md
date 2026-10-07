@@ -4,6 +4,16 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 111] - 2026-10-07
+
+### Fixed
+- Ignore HTML/error bodies mislabeled as successful sticker fetches so the real image proxy can be tried.
+- Flush queued outgoing envelopes on successful reconnect sync even when there are no inbound messages.
+- Show queued messages as queued instead of leaving them in an endless sending state.
+
+### Verification
+- 8 focused suites / 84 tests pass; TypeScript and production Vite build pass. Existing integration suites requiring local relay loopback fail in this sandbox with `EACCES`.
+
 ## [Phase 110] - 2026-10-07
 
 ### UI

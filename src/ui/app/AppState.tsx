@@ -2558,7 +2558,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               }
 
               if (sendRes.status !== 'SENT_TO_RELAY') {
-                deliveryStatus = 'SENDING';
+                deliveryStatus = sendRes.status === 'QUEUED' ? 'QUEUED' : 'SENDING';
               }
             }
 

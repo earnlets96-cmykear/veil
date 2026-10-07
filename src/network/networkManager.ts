@@ -340,7 +340,10 @@ export class NetworkManager {
 
     try {
       const fetchRes = await this.http.fetchEnvelopes(binding.mailboxId, binding.capabilityToken);
-      if (fetchRes.envelopes.length === 0) return 0;
+      if (fetchRes.envelopes.length === 0) {
+        await this.flushOutboundQueue(session);
+        return 0;
+      }
 
       const ackIds: string[] = [];
 

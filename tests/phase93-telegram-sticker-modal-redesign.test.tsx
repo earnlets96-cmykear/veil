@@ -77,7 +77,8 @@ describe('Phase 93: Reliable Sticker Blob Dispatching & Proxy Support', () => {
   );
 
   it('telegramStickerService implements fetchStickerBlob with direct, data, and proxy fallbacks', () => {
-    expect(stickerServiceSource).toContain('async fetchStickerBlob(url: string): Promise<Blob>');
+    expect(stickerServiceSource).toContain('public async fetchStickerBlob(');
+    expect(stickerServiceSource).toContain('options: { allowSyntheticFallback?: boolean } = {}');
     expect(stickerServiceSource).toContain("url.startsWith('data:')");
     expect(stickerServiceSource).toContain('/api/telegram-stickers/proxy?url=');
     expect(stickerServiceSource).toContain('/v1/stickers/proxy?url=');
@@ -92,7 +93,7 @@ describe('Phase 93: Reliable Sticker Blob Dispatching & Proxy Support', () => {
 
   it('MessageComposer handleSelectSticker uses telegramStickerService.fetchStickerBlob', () => {
     expect(composerSource).toContain('import { StickerItem, telegramStickerService }');
-    expect(composerSource).toContain('const blob = await telegramStickerService.fetchStickerBlob(sticker.url);');
+    expect(composerSource).toContain('fetchStickerBlob(sticker.url, { allowSyntheticFallback: false })');
   });
 
   it('vite.config.ts and relayServer.ts provide /api/telegram-stickers/proxy endpoint with CORS headers', () => {

@@ -1,5 +1,11 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 111 — STICKER RESPONSE VALIDATION & OUTBOUND RECOVERY
+- **Status**: Implemented; focused verification, TypeScript, and production web build pass.
+- **Changes**: Sticker fetch rejects non-image responses even when upstream returns HTTP 200 and continues to the configured proxy. Empty-inbox sync now still flushes queued outgoing envelopes; queued text is shown as queued rather than as an endless sending spinner.
+- **Verification**: 8 focused suites pass (84 tests); `npx tsc --noEmit` passes; production Vite build passes with existing mixed-import and large-chunk warnings. Local-relay integration tests are blocked by sandbox loopback `EACCES`.
+- **Scope**: Sticker transport and outbound queue behavior; no cryptographic protocol or identity changes.
+
 ## Current Phase: PHASE 110 — DEDICATED STICKER PACK VIEWER
 - **Status**: Implemented; focused regressions pass and TypeScript passes.
 - **Changes**: Pack-linked sticker taps now open the sticker pack preview instead of the generic media viewer. Message actions also offer a distinct “View Sticker Pack” option alongside “Add sticker pack”. The preview retains the add-to-VEIL action.

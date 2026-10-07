@@ -652,6 +652,30 @@ class TelegramStickerService {
     return blob;
   }
 
+  private async readImageResponse(response: Response): Promise<Blob | null> {
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (blob.size === 0) return null;
+
+    const contentType = (response.headers?.get?.('content-type') || blob.type).split(';')[0].trim().toLowerCase();
+    if (contentType.startsWith('image/')) return blob;
+    if (contentType.startsWith('text/') || contentType === 'application/json') return null;
+
+    const header = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+    const isPng = header.length >= 8 && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47;
+    const isJpeg = header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+    const isGif = header.length >= 4 && header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x38;
+    const isWebp = header.length >= 12 && String.fromCharCode(...header.slice(0, 4)) === 'RIFF' && String.fromCharCode(...header.slice(8, 12)) === 'WEBP';
+    if (isPng) return new Blob([blob], { type: 'image/png' });
+    if (isJpeg) return new Blob([blob], { type: 'image/jpeg' });
+    if (isGif) return new Blob([blob], { type: 'image/gif' });
+    if (isWebp) return new Blob([blob], { type: 'image/webp' });
+
+    const textPrefix = await blob.slice(0, 128).text().catch(() => '');
+    if (/<svg[\s>]/i.test(textPrefix)) return new Blob([blob], { type: 'image/svg+xml' });
+    return null;
+  }
+
   /**
    * Fetches a sticker image as a binary Blob, handling data URLs, on-demand server file proxies,
    * direct CDN requests, multi-tier proxy relays, and an optional legacy synthetic fallback.
@@ -681,9 +705,11 @@ class TelegramStickerService {
     if (url.startsWith('data:')) {
       try {
         const res = await fetch(url);
-        const blob = await res.blob();
-        this.blobCache.set(url, blob);
-        return blob;
+        const blob = await this.readImageResponse(res);
+        if (blob) {
+          this.blobCache.set(url, blob);
+          return blob;
+        }
       } catch {
         // Fall through
       }
@@ -693,8 +719,8 @@ class TelegramStickerService {
     if (url.startsWith('blob:')) {
       try {
         const res = await fetch(url);
-        const blob = await res.blob();
-        return blob;
+        const blob = await this.readImageResponse(res);
+        if (blob) return blob;
       } catch {
         // Fall through
       }
@@ -708,8 +734,8 @@ class TelegramStickerService {
     if (url.startsWith('/')) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (res.ok) {
-          const blob = await res.blob();
+        const blob = await this.readImageResponse(res);
+        if (blob) {
           this.blobCache.set(url, blob);
           return blob;
         }
@@ -720,8 +746,8 @@ class TelegramStickerService {
         try {
           const remoteUrl = `${relayHttpUrl.replace(/\/+$/, '')}${url}`;
           const res = await fetch(remoteUrl, { signal: AbortSignal.timeout(8000) });
-          if (res.ok) {
-            const blob = await res.blob();
+          const blob = await this.readImageResponse(res);
+          if (blob) {
             this.blobCache.set(url, blob);
             return blob;
           }
@@ -733,8 +759,8 @@ class TelegramStickerService {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
-        if (res.ok) {
-          const blob = await res.blob();
+        const blob = await this.readImageResponse(res);
+        if (blob) {
           this.blobCache.set(url, blob);
           return blob;
         }
@@ -749,8 +775,8 @@ class TelegramStickerService {
       for (const ep of localProxies) {
         try {
           const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
-          if (res.ok) {
-            const blob = await res.blob();
+          const blob = await this.readImageResponse(res);
+          if (blob) {
             this.blobCache.set(url, blob);
             return blob;
           }
@@ -767,8 +793,8 @@ class TelegramStickerService {
         for (const ep of relayProxies) {
           try {
             const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
-            if (res.ok) {
-              const blob = await res.blob();
+            const blob = await this.readImageResponse(res);
+            if (blob) {
               this.blobCache.set(url, blob);
               return blob;
             }
@@ -786,8 +812,8 @@ class TelegramStickerService {
         for (const ep of prodProxies) {
           try {
             const res = await fetch(ep, { signal: AbortSignal.timeout(6000) });
-            if (res.ok) {
-              const blob = await res.blob();
+            const blob = await this.readImageResponse(res);
+            if (blob) {
               this.blobCache.set(url, blob);
               return blob;
             }
