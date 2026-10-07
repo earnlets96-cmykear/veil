@@ -11,21 +11,27 @@
  * - Ephemeral Memory: Decrypted audio buffers are revoked when playback completes or space locks.
  */
 
-import { encryptXChaCha20Poly1305, decryptXChaCha20Poly1305 } from '../crypto/aead.ts';
-import { randomBytes, bytesToBase64, base64ToBytes, bytesToHex } from '../crypto/utils.ts';
-import { sha256 } from '@noble/hashes/sha256.js';
+import { decryptXChaCha20Poly1305 } from '../crypto/aead.ts';
+import { randomBytes, base64ToBytes, bytesToHex } from '../crypto/utils.ts';
 import type { CloudClient } from '../network/cloudClient.ts';
 import type { SpaceSession } from '../spaces/session.ts';
 import { makeWebmSeekable, makeWebmSeekableSync, hasWebmCues, hasValidWebmIndex } from './webmFix.ts';
+import { prepareMediaUpload } from './mediaTransfer.ts';
+import { AttachmentPipeline } from './attachmentPipeline.ts';
+import type { LocalAttachmentPayload } from './types.ts';
 
 export interface VoiceRecordingMetadata {
   durationSeconds: number;
   mimeType: string;
   sizeBytes: number;
   objectId: string;
+  attachmentId?: string;
   ciphertextHash: string;
   encryptionKeyBase64: string;
   nonceBase64: string;
+  chunkCount?: number;
+  chunkSize?: number;
+  sha256Hash?: string;
   spaceId?: string;
 }
 
@@ -181,7 +187,8 @@ export class VoiceRecorder {
       groupId?: string;
       conversationId?: string;
     },
-    onProgress?: (loaded: number, total: number) => void
+    onProgress?: (loaded: number, total: number) => void,
+    onPrepared?: (prepared: { attachment: LocalAttachmentPayload & { encryptionKeyBase64: string; ciphertextHash: string }; ciphertext: Uint8Array }) => Promise<void>
   ): Promise<VoiceRecordingMetadata> {
     let audioBytes = rawAudioBytes;
     if (mimeType.includes('webm') && !hasValidWebmIndex(audioBytes)) {
@@ -190,7 +197,12 @@ export class VoiceRecorder {
       } catch (_e) {}
     }
     const attachmentId = `voice_${Date.now()}_${bytesToHex(randomBytes(6))}`;
-    const ciphertextHash = bytesToHex(sha256(audioBytes));
+    const prepared = await prepareMediaUpload(audioBytes, {
+      name: `voice_${attachmentId}.${mimeType.includes('webm') ? 'webm' : 'audio'}`,
+      mimeType,
+      attachmentId,
+    });
+    await onPrepared?.(prepared);
 
     const metadataPayload: any = { durationSeconds, mimeType, spaceId: session.spaceId };
     if (recipientAuth?.recipientAccountId) metadataPayload.recipientAccountId = recipientAuth.recipientAccountId;
@@ -203,8 +215,10 @@ export class VoiceRecorder {
     const { attachment } = await cloudClient.createAttachment({
       attachmentId,
       spaceId: session.spaceId,
-      ciphertextSize: audioBytes.length,
-      ciphertextHash,
+      ciphertextSize: prepared.ciphertext.length,
+      ciphertextHash: prepared.attachment.ciphertextHash,
+      chunkCount: prepared.attachment.chunkCount,
+      chunkSize: prepared.attachment.chunkSize,
       recipientAccountId: recipientAuth?.recipientAccountId,
       recipientUsername: recipientAuth?.recipientUsername,
       recipientIdentityId: recipientAuth?.recipientIdentityId,
@@ -214,16 +228,20 @@ export class VoiceRecorder {
       encryptedMetadata: JSON.stringify(metadataPayload),
     });
 
-    await cloudClient.uploadAttachment(attachment.objectId, audioBytes, onProgress, ciphertextHash);
+    await cloudClient.uploadAttachment(attachment.objectId, prepared.ciphertext, onProgress, prepared.attachment.ciphertextHash);
 
     return {
       durationSeconds,
       mimeType,
       sizeBytes: audioBytes.length,
       objectId: attachment.objectId,
-      ciphertextHash,
-      encryptionKeyBase64: '',
+      attachmentId,
+      ciphertextHash: prepared.attachment.ciphertextHash || '',
+      encryptionKeyBase64: prepared.attachment.encryptionKeyBase64 || '',
       nonceBase64: '',
+      chunkCount: prepared.attachment.chunkCount,
+      chunkSize: prepared.attachment.chunkSize,
+      sha256Hash: prepared.attachment.sha256Hash,
       spaceId: session.spaceId,
     };
   }
@@ -268,6 +286,9 @@ export class VoiceRecorder {
         mimeType: meta.mimeType || 'audio/webm',
         sizeBytes: meta.sizeBytes,
         encryptionKeyBase64: meta.encryptionKeyBase64,
+        chunkCount: meta.chunkCount,
+        chunkSize: meta.chunkSize,
+        sha256Hash: meta.sha256Hash,
       };
       const cached = await MediaCache.getOrFetch(attachmentPayload, session, cloudClient, onProgress);
       if (cached && cached.data) {
@@ -301,16 +322,29 @@ export class VoiceRecorder {
 
     try {
       const key = base64ToBytes(meta.encryptionKeyBase64);
-      const nonce = base64ToBytes(meta.nonceBase64);
       let plaintextBytes: Uint8Array;
+      let chunks: any[] | null = null;
       try {
-        const canonicalAad = new TextEncoder().encode('VEIL-VOICE-v1');
-        plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes, canonicalAad);
-      } catch (_e1) {
+        const parsed = JSON.parse(new TextDecoder().decode(rawBytes));
+        if (Array.isArray(parsed)) chunks = parsed;
+      } catch (_e) {}
+
+      if (chunks?.length) {
+        plaintextBytes = await AttachmentPipeline.decryptProgressiveAsync({
+          attachmentId: meta.objectId,
+          name: `voice_${meta.objectId}.webm`,
+          mimeType: meta.mimeType || 'audio/webm',
+          sizeBytes: meta.sizeBytes,
+          chunkCount: meta.chunkCount || chunks.length,
+          chunkSize: meta.chunkSize || 64 * 1024,
+          sha256Hash: meta.sha256Hash || '',
+        }, chunks, key);
+      } else {
+        const nonce = base64ToBytes(meta.nonceBase64);
         try {
+          plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes, new TextEncoder().encode('VEIL-VOICE-v1'));
+        } catch (_e1) {
           plaintextBytes = decryptXChaCha20Poly1305(key, nonce, rawBytes);
-        } catch (_e2) {
-          plaintextBytes = rawBytes;
         }
       }
       if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasValidWebmIndex(plaintextBytes)) {
@@ -321,14 +355,7 @@ export class VoiceRecorder {
       const blob = new Blob([plaintextBytes as any], { type: meta.mimeType || 'audio/webm' });
       return URL.createObjectURL(blob);
     } catch (_err) {
-      let finalBytes = rawBytes;
-      if ((meta.mimeType?.includes('webm') || !meta.mimeType) && !hasValidWebmIndex(finalBytes)) {
-        try {
-          finalBytes = makeWebmSeekableSync(finalBytes, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
-        } catch (_e) {}
-      }
-      const blob = new Blob([finalBytes as any], { type: meta.mimeType || 'audio/webm' });
-      return URL.createObjectURL(blob);
+      throw new Error('Voice message failed authentication');
     }
   }
 

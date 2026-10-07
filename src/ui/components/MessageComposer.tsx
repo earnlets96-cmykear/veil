@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
-import { useApp, resolveReplyReference } from '../app/AppState.tsx';
+import { useComposer, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { Button, IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
 import { StickerItem, telegramStickerService } from '../../media/telegramStickerService.ts';
@@ -27,6 +27,7 @@ import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
 import { PermissionsModal } from './PermissionsModal.tsx';
 import { BackButtonManager } from '../utils/backButtonManager.ts';
+import { useTextareaAutoResize } from '../hooks/useTextareaAutoResize.ts';
 
 import type { UIMessage } from '../app/types.ts';
 
@@ -53,7 +54,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     myProfile,
     contacts,
     conversations,
-  } = useApp();
+  } = useComposer();
   const { showToast } = useToast();
 
   const activeConv = conversations.find((c) => c.id === conversationId);
@@ -77,6 +78,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useTextareaAutoResize(textareaRef, text);
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const recordStartTimeRef = useRef<number>(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -87,9 +89,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     if (!text.trim()) return;
     const msgText = text.trim();
     setText('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
 
     // If editing, confirm the edit instead of sending a new message
     if (editingMessage && onConfirmEdit) {
@@ -112,8 +111,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
         }
       }, 50);
     }
@@ -129,11 +126,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
-    // Auto-grow textarea up to 140px max height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
-    }
   };
 
   // Stage files for pre-send preview modal
@@ -190,8 +182,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
           } catch {
             // Ignore if setSelectionRange is not supported
           }
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
         }
       }, 0);
       return nextText;
@@ -213,8 +203,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             } catch {
               // Ignore
             }
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
           }
         }, 0);
         return nextText;
@@ -241,8 +229,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             } catch {
               // Ignore
             }
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
           }
         }, 0);
         return nextText;

@@ -1,6 +1,16 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Phase: PHASE 106 — MEDIA RE-ENTRY RECOVERY
+## Current Phase: PHASE 107 — ENCRYPTED MEDIA RESUME & CHAT RESPONSIVENESS
+- **Status**: Implementation complete; focused verification and production build pass. Full-suite execution is limited by sandbox-blocked local relay/health endpoints and external network lookups. Security audit and dual sign-off remain deployment gates.
+- **Changes under verification**:
+  - Restored existing authenticated XChaCha chunk encryption for outgoing files and voice notes; workers are preferred for all payload sizes.
+  - Persisted outgoing ciphertext in a Space-partitioned cache and retry keys/metadata in `EncryptedSpaceStore`; resume the same message after Space unlock.
+  - Replaced decrypted IndexedDB media records with a ciphertext-only cache and legacy plaintext database deletion.
+  - Moved textarea measurements out of input/emoji handlers and split the composer context from upload progress updates.
+  - **Verification**: `npx tsc --noEmit` passes; 5 focused suites pass (17 tests); production `vite build` passes to a temporary output directory. Full Vitest run: 319 files passed and 105 failed (1,325 tests passed, 217 failed, 6 skipped); failures include sandbox `EACCES` on local relay/health endpoints and unavailable external services.
+  - Threat model: `docs/ai/THREAT_MODEL_MEDIA.md`; decision: ADR-126. Independent audit and explicit dual sign-off remain required before deployment.
+
+## Previous Phase: PHASE 106 — MEDIA RE-ENTRY RECOVERY
 - **Status**: IMPLEMENTED; TypeScript check passed. Full suite: 1536/1537 passed; the sole failure was an accessibility label omission in a grouped-media loading placeholder, fixed and verified in a focused rerun. Production Vite build passed to a temporary output directory.
 - **Changes under verification**:
   - Convert persisted outgoing uploads to a clear failed state after app restart because their process-local upload workers and original file/recording buffers no longer exist.

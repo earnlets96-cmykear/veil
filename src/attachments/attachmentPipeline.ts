@@ -17,7 +17,7 @@ import {
 import { MediaWorkerPool } from './mediaWorkerPool.ts';
 
 export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KiB
-export const FAST_PATH_THRESHOLD_BYTES = 128 * 1024; // 128 KiB: fast path on UI thread for small payloads
+export const FAST_PATH_THRESHOLD_BYTES = 0; // All payload sizes use a worker when supported.
 
 /**
  * Calculates bounded optimal chunk size based on payload byte length.
@@ -239,7 +239,7 @@ export class AttachmentPipeline {
     const totalBytes = data.length;
     const pool = MediaWorkerPool.getInstance();
 
-    if (totalBytes < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+    if (!pool.isWorkerSupported()) {
       return this.chunkAndEncrypt(data, name, mimeType, encryptionKey, chunkSize, existingAttachmentId);
     }
 
@@ -273,7 +273,7 @@ export class AttachmentPipeline {
   ): Promise<Uint8Array> {
     const pool = MediaWorkerPool.getInstance();
 
-    if ((metadata.sizeBytes || 0) < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+    if (!pool.isWorkerSupported()) {
       return this.decryptAndReassemble(metadata, chunks, encryptionKey);
     }
 
@@ -304,7 +304,7 @@ export class AttachmentPipeline {
   ): Promise<Uint8Array> {
     const pool = MediaWorkerPool.getInstance();
 
-    if ((metadata.sizeBytes || 0) < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+    if (!pool.isWorkerSupported()) {
       return this.decryptProgressive(metadata, chunks, encryptionKey, onPlayableChunk);
     }
 
@@ -338,7 +338,7 @@ export class AttachmentPipeline {
   public static async computeSha256Async(data: Uint8Array): Promise<string> {
     const pool = MediaWorkerPool.getInstance();
 
-    if (data.length < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+    if (!pool.isWorkerSupported()) {
       return bytesToHex(sha256(data));
     }
 
@@ -361,7 +361,7 @@ export class AttachmentPipeline {
   public static async bytesToBase64Async(data: Uint8Array): Promise<string> {
     const pool = MediaWorkerPool.getInstance();
 
-    if (data.length < FAST_PATH_THRESHOLD_BYTES || !pool.isWorkerSupported()) {
+    if (!pool.isWorkerSupported()) {
       return bytesToBase64(data);
     }
 

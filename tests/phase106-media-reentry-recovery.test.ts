@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { recoverInterruptedUploads } from '../src/ui/app/messageRecovery.ts';
 import { MediaCacheManager } from '../src/ui/utils/mediaCache.ts';
+import { MediaCipherCacheManager } from '../src/ui/utils/mediaCipherCache.ts';
+import { SpaceSession } from '../src/spaces/session.ts';
+import { bytesToHex } from '../src/crypto/utils.ts';
+import { sha256 } from '@noble/hashes/sha256.js';
 
 describe('media and upload recovery after app re-entry', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -63,21 +67,14 @@ describe('media and upload recovery after app re-entry', () => {
     vi.stubGlobal('indexedDB', new IDBFactory());
     vi.stubGlobal('IDBKeyRange', IDBKeyRange);
     const cache = new MediaCacheManager();
-    const db = await (cache as any).getIDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction('media', 'readwrite');
-      tx.objectStore('media').put({ id: 'sticker-object', data: new Uint8Array([1]), mimeType: 'image/svg+xml', name: 'sticker.webp' });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+    const cipherCache = new MediaCipherCacheManager();
+    const session = new SpaceSession('sticker-space', 'Sticker Space', false, new Uint8Array(32).fill(3));
+    const ciphertext = new Uint8Array([1, 2, 3]);
+    const hash = bytesToHex(sha256(ciphertext));
+    await cipherCache.put(session.spaceId, 'sticker-object', ciphertext, hash);
 
-    await cache.invalidate('sticker-object');
-    const stored = await new Promise((resolve) => {
-      const req = db.transaction('media', 'readonly').objectStore('media').get('sticker-object');
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(undefined);
-    });
-    expect(stored).toBeUndefined();
-    db.close();
+    await cache.invalidate('sticker-object', session, 'sticker-object');
+    expect(await cipherCache.get(session.spaceId, 'sticker-object', hash)).toBeNull();
+    session.destroy();
   });
 });

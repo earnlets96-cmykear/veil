@@ -86,6 +86,10 @@ export interface UIMessage {
     ciphertextHash: string;
     encryptionKeyBase64: string;
     nonceBase64: string;
+    attachmentId?: string;
+    chunkCount?: number;
+    chunkSize?: number;
+    sha256Hash?: string;
   };
   replyTo?: ReplyReference;
   privacy?: {

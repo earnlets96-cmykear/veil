@@ -36,11 +36,27 @@ describe('VEIL Phase 102C: Media Crypto Worker & Non-Blocking Performance', () =
     vi.restoreAllMocks();
   });
 
-  it('verifies FAST_PATH_THRESHOLD_BYTES is set to 128 KiB', () => {
-    expect(FAST_PATH_THRESHOLD_BYTES).toBe(128 * 1024);
+  it('prefers a worker for every payload size when the browser supports workers', async () => {
+    expect(FAST_PATH_THRESHOLD_BYTES).toBe(0);
+    const pool = MediaWorkerPool.getInstance();
+    vi.spyOn(pool, 'isWorkerSupported').mockReturnValue(true);
+    const executeSpy = vi.spyOn(pool, 'execute').mockImplementation((_type, payload) => ({
+      requestId: 'test-request',
+      promise: Promise.resolve(AttachmentPipeline.chunkAndEncrypt(
+        new Uint8Array(payload.data),
+        payload.name,
+        payload.mimeType,
+        new Uint8Array(payload.encryptionKey),
+        payload.chunkSize,
+        payload.existingAttachmentId
+      )) as any,
+    }));
+
+    await AttachmentPipeline.chunkAndEncryptAsync(new Uint8Array([1, 2, 3]), 'voice.webm', 'audio/webm', encKey);
+    expect(executeSpy).toHaveBeenCalledWith('CHUNK_AND_ENCRYPT', expect.any(Object), expect.any(Array));
   });
 
-  it('small-media fast path executes synchronously without worker overhead for payloads < 128 KiB', async () => {
+  it('uses the synchronous compatibility path when Web Workers are unavailable', async () => {
     const smallPayload = randomBytes(32 * 1024); // 32 KiB < 128 KiB
     const pool = MediaWorkerPool.getInstance();
     const executeSpy = vi.spyOn(pool, 'execute');

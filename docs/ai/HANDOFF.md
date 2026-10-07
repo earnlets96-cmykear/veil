@@ -1,5 +1,13 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 107 Update
+- **Current Phase**: **PHASE 107 (Encrypted Media Resume & Chat Responsiveness)**
+- **Status**: Implementation complete. Five focused suites (17 tests), `npx tsc --noEmit`, and production Vite build pass. Full suite: 319 files passed, 105 failed (1,325 tests passed, 217 failed, 6 skipped); many failures require local relay/health endpoints rejected by sandbox `EACCES` or external network services.
+- **Root causes fixed**: outgoing attachments and voice were uploaded as raw bytes with empty media keys; decrypted images/videos were written to IndexedDB; small media still used synchronous crypto; textarea input synchronously read `scrollHeight`; composer consumed high-frequency upload progress through the broad AppState context.
+- **Recovery**: ciphertext is persisted in the Space-partitioned cache and retry metadata/keys through `EncryptedSpaceStore` before upload. On unlock, AppState retries the same message ID using the stored ciphertext. Space lock retains ciphertext but clears decrypted RAM and Blob URLs.
+- **Security governance**: ADR-126 and `docs/ai/THREAT_MODEL_MEDIA.md` document the restoration. Independent security audit and dual sign-off are mandatory before deployment.
+- **Governance**: Independent security audit and explicit dual sign-off are still required before deployment. Preserve existing unrelated modified release files and `business-card/`.
+
 ## Phase 106 Update
 - **Current Phase**: **PHASE 106 (Media Re-entry Recovery)**
 - **Status**: Implementation complete; TypeScript passes. Full suite had 1536/1537 pass; its sole grouped-media accessible-label failure was fixed and focused Phase 36/40/99/106 suites pass (18/18). Production Vite build passed to temporary output.

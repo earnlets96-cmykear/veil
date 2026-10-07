@@ -1354,6 +1354,21 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: Guarantees deterministic, collision-free multi-account coexistence on a single device, eliminates account masking, and secures account recovery lifecycles.
 - **Consequences**: Multiple accounts with identical passwords can safely coexist on the same client device without overwriting or hijacking each other. Recovery snapshots reliably restore all spaces and records.
 
+## ADR-126: Restore Encrypted Media Uploads and Ciphertext-Only Re-entry Cache
+
+- **Date**: 2026-10-07
+- **Status**: Accepted for implementation; independent audit and dual sign-off required before deployment.
+- **Context**: A previous media responsiveness change bypassed the existing attachment encryption pipeline. New image, video, and voice uploads reached cloud object storage as raw bytes and carried empty media keys. The old media IndexedDB cache also persisted decrypted image/video bytes, while upload retries depended on source buffers that existed only in process memory.
+- **Decision**:
+  1. Prepare every outgoing attachment and voice note with the existing `AttachmentPipeline` XChaCha20-Poly1305 chunk format and reusable worker whenever workers are supported. Keep synchronous execution only as a compatibility fallback when no worker is available.
+  2. Persist retry ciphertext in the Space-partitioned ciphertext cache and key-bearing job metadata through `EncryptedSpaceStore` before any upload request.
+  3. After Space unlock, retry incomplete media using the persisted job and the same visible message ID. Remove the job only after the encrypted message envelope has been handed to the existing durable network queue.
+  4. Persist downloaded ciphertext only. Verify its advertised ciphertext hash before reuse, decrypt through the existing worker-backed pipeline, and remove the legacy plaintext `veil_media_cache` database during upgrade.
+  5. Preserve read compatibility for existing messages that have no media encryption key; newly sent media must always include authenticated encryption metadata.
+- **Reason**: Keeps file content confidential from relays and disk inspection while avoiding repeated downloads and allowing interrupted sends to recover after app re-entry.
+- **Consequences**: Local IndexedDB stores the encrypted attachment object plus ciphertext-only cache entries. Media keys stay in the encrypted Space record and E2EE envelope. Space lock clears plaintext RAM entries and Blob URLs but retains reusable ciphertext.
+- **Security review**: See `docs/ai/THREAT_MODEL_MEDIA.md`. The implementation remains frozen from deployment until adversarial suites, independent security audit, and explicit dual sign-off are complete.
+
 
 
 

@@ -1,6 +1,21 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 106 — MEDIA RE-ENTRY RECOVERY
+## Active Phase: PHASE 107 — ENCRYPTED MEDIA RESUME & CHAT RESPONSIVENESS
+- **Status**: Implementation complete; focused tests, TypeScript, and production Vite build pass. Full suite has environment/network failures; post-RC audit/sign-off required before deployment.
+- **Branch**: `main` (pre-existing unrelated worktree edits remain unstaged)
+
+### Phase 107 Tasks:
+- [x] Restore authenticated media encryption before attachment and voice uploads using existing XChaCha chunk infrastructure.
+- [x] Persist retry ciphertext separately from media keys; encrypt key-bearing retry metadata with `EncryptedSpaceStore`.
+- [x] Resume interrupted uploads after Space unlock under the same visible message ID.
+- [x] Replace decrypted IndexedDB media cache with a Space-partitioned ciphertext cache and remove the legacy plaintext cache.
+- [x] Prefer worker transforms for all payload sizes when Web Workers are supported.
+- [x] Defer composer textarea measurement to one animation frame and isolate it from media progress context updates.
+- [x] Add threat model, ADR, and media/cache/recovery regression tests.
+- [x] Run complete Vitest suite and production frontend build; record observed results (full suite blocked by sandbox local-network permissions and external service availability).
+- [ ] Obtain independent security audit and dual sign-off before deployment.
+
+## Previous Phase: PHASE 106 — MEDIA RE-ENTRY RECOVERY
 - **Status**: Implemented; TypeScript passes; full suite ran 1536/1537 before one accessibility assertion was fixed; focused Phase 36/40/99/106 suites pass (18/18); production Vite build passes
 - **Branch**: `main`
 

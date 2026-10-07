@@ -33,6 +33,9 @@ This document outlines mandatory, permanent security invariants for all develope
    - Sensitive key buffers (`Uint8Array`) must be explicitly wiped / zeroized (`buffer.fill(0)`) when closing a Space or upon user lock/panic lock.
 4. **KEY HIERARCHY SEPARATION**:
    - Storage keys, ratchet identity keys, and transport authentication tokens must be derived using domain-separated HKDF strings (`"veil-v1-storage"`, `"veil-v1-identity"`, etc.) so that compromising one subkey does not compromise others.
+5. **MEDIA CACHE BOUNDARY**:
+   - Outgoing files and voice notes must be encrypted with the existing authenticated attachment pipeline before upload.
+   - Durable media caches may store ciphertext only. Media keys and retry metadata must remain inside `EncryptedSpaceStore`; decrypted media stays in bounded runtime memory and is cleared on Space lock.
 
 ---
 

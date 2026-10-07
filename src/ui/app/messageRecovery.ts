@@ -1,11 +1,11 @@
 import type { UIMessage } from './types.ts';
 
-const INTERRUPTED_UPLOAD_ERROR = 'Upload was interrupted when the app closed. Please send it again.';
+const INTERRUPTED_UPLOAD_ERROR = 'Upload paused when the app closed. Its saved encrypted copy will resume after Space unlock.';
 
 /**
- * Outgoing uploads are owned by the live AppState worker and cannot survive a
- * process restart. Turn persisted in-flight states into an actionable failure
- * so the timeline never shows an upload spinner with no worker behind it.
+ * Mark stale timeline transfer indicators as retryable after a process restart.
+ * The encrypted media outbox in AppState restores the saved ciphertext after
+ * Space unlock and retries the same visible message without reselecting media.
  */
 export function recoverInterruptedUploads(
   messagesByConversation: Record<string, UIMessage[]>

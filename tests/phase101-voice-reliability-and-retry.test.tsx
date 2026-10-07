@@ -166,11 +166,12 @@ describe('Phase 101: Voice Reliability & Debounced Retry', () => {
       const appStatePath = path.resolve(__dirname, '../src/ui/app/AppState.tsx');
       const appStateContent = fs.readFileSync(appStatePath, 'utf8').replace(/\r\n/g, '\n');
 
-      // 1. Verify voice note retry returns if not cached, never falling through
-      expect(appStateContent).toMatch(/if\s*\(targetMsg\.voice\)[\s\S]*?sendVoiceMessage[\s\S]*?return;[\s\S]*?Original audio is no longer in memory[\s\S]*?return;/);
+      // 1. Recover voice media from the authenticated outbox after the RAM cache is gone.
+      expect(appStateContent).toMatch(/if\s*\(targetMsg\.voice\)[\s\S]*?restoreOutboxFile[\s\S]*?sendVoiceMessage[\s\S]*?return;/);
 
-      // 2. Verify attachment retry returns if not cached, never falling through
-      expect(appStateContent).toMatch(/if\s*\(targetMsg\.attachment[\s\S]*?sendAttachments[\s\S]*?return;[\s\S]*?Original attachment data is no longer in memory[\s\S]*?return;/);
+      // 2. Recover attachments from the authenticated outbox rather than requiring re-selection.
+      expect(appStateContent).toMatch(/if\s*\(targetMsg\.attachment[\s\S]*?restoreOutboxFile[\s\S]*?sendAttachments[\s\S]*?return;/);
+      expect(appStateContent).toContain('await retryFailedMessage(item.conversationId, messageId)');
 
       // 3. Verify standard text retry guards against placeholder text
       expect(appStateContent).toContain("targetMsg.text === 'Voice Message'");

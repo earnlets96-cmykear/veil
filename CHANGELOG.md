@@ -2,6 +2,16 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase107-encrypted-media-resume] - 2026-10-07
+
+### Encrypted Media Recovery and Composer Responsiveness (Phase 107)
+- Restore the existing XChaCha20-Poly1305 attachment pipeline for files and voice notes; relay object storage receives ciphertext, and the media key remains in the E2EE envelope.
+- Persist retry ciphertext in a Space-partitioned IndexedDB cache and key-bearing transfer metadata in `EncryptedSpaceStore`. On Space unlock, retry interrupted media under the original message ID without asking the user to pick or record it again.
+- Cache downloaded media as ciphertext only, verify cache hashes, and remove the former `veil_media_cache` database containing decrypted image/video bytes.
+- Use the existing media worker for all payload sizes when workers are available; keep synchronous fallback only for runtimes without workers.
+- Coalesce textarea resize work into animation frames and keep upload progress out of the composer context so media progress does not rerender the typing field.
+- Add `docs/ai/THREAT_MODEL_MEDIA.md`, ADR-126, and restart, encryption, cache, and composer regressions. Independent security audit and dual sign-off remain required before deployment.
+
 ## [1.0.0-phase106-media-reentry-recovery] - 2026-10-07
 
 ### Media and Upload Recovery After App Re-entry (Phase 106)

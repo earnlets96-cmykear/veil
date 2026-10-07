@@ -117,7 +117,11 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
       if (forceRetry) {
         const cacheKeys = new Set([key, currentAtt.objectId, currentAtt.attachmentId].filter(Boolean) as string[]);
-        await Promise.all(Array.from(cacheKeys, (cacheKey) => MediaCache.invalidate(cacheKey)));
+        await Promise.all(Array.from(cacheKeys, (cacheKey) => MediaCache.invalidate(
+          cacheKey,
+          activeSession,
+          currentAtt.objectId || currentAtt.attachmentId
+        )));
       }
 
       if (isMountedRef.current && !activeBlobUrl) {
@@ -208,7 +212,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
     if (isSticker) {
       const attemptStickerRecovery = async () => {
         try {
-          await MediaCache.invalidate(key);
+          await MediaCache.invalidate(key, activeSession, attachment.objectId || attachment.attachmentId);
           const sourceUrl =
             attachment.previewUrl ||
             attachment.localPreviewUrl ||

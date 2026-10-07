@@ -16,6 +16,7 @@ import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyRefer
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { base64ToBytes } from '../../crypto/utils.ts';
+import { zeroize } from '../../crypto/memory.ts';
 import { spacePinManager } from '../../privacy/pinManager.ts';
 import { themeManager } from '../utils/themeManager.ts';
 import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
@@ -79,6 +80,9 @@ import { Contact, InvitationPayload, VerificationStatus } from '../../contacts/t
 import { ContactManager } from '../../contacts/contactManager.ts';
 import { InvitationManager } from '../../contacts/invitationManager.ts';
 import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
+import { prepareMediaUpload } from '../../attachments/mediaTransfer.ts';
+import { MediaOutbox } from '../../attachments/mediaOutbox.ts';
+import type { MediaUploadJob } from '../../attachments/mediaOutbox.ts';
 import { NotificationDispatcher } from '../../notifications/notificationDispatcher.ts';
 import { LocalSearchEngine } from '../../search/searchEngine.ts';
 import { SearchResult } from '../../search/types.ts';
@@ -121,6 +125,7 @@ import { DeletedMessageTombstone } from '../../storage/types.ts';
 const storageAdapter = new IndexedDBStorageAdapter();
 const vault = new SpaceVaultManager();
 const store = new EncryptedSpaceStore(storageAdapter);
+const mediaOutbox = new MediaOutbox(store);
 const idMgr = new SpaceIdentityManager();
 const appConfig = ConfigManager.getConfig();
 const netManager = new NetworkManager(store, {
@@ -153,6 +158,37 @@ const accountManager = new AccountManager(
 );
 const syncEngine = new SyncEngine(store, cloudClient);
 const groupManager = new GroupManager(store, idMgr);
+
+async function restoreOutboxFile(session: SpaceSession, job: MediaUploadJob): Promise<File> {
+  const attachment = job.attachment;
+  if (!attachment.encryptionKeyBase64 || !attachment.sha256Hash || !attachment.chunkCount || !attachment.chunkSize) {
+    throw new Error('Saved upload is missing authenticated decryption metadata');
+  }
+  const ciphertext = await mediaOutbox.getCiphertext(session, job);
+  if (!ciphertext) throw new Error('Saved encrypted upload is unavailable');
+  const chunks = JSON.parse(new TextDecoder().decode(ciphertext));
+  if (!Array.isArray(chunks) || chunks.length !== attachment.chunkCount) {
+    throw new Error('Saved encrypted upload is incomplete');
+  }
+  const key = base64ToBytes(attachment.encryptionKeyBase64);
+  try {
+    const plaintext = await AttachmentPipeline.decryptProgressiveAsync({
+      attachmentId: attachment.attachmentId,
+      name: attachment.name,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      chunkCount: attachment.chunkCount,
+      chunkSize: attachment.chunkSize,
+      sha256Hash: attachment.sha256Hash,
+    }, chunks, key);
+    const fileBytes = plaintext.buffer.slice(plaintext.byteOffset, plaintext.byteOffset + plaintext.byteLength) as ArrayBuffer;
+    const file = new File([fileBytes], attachment.name, { type: attachment.mimeType });
+    plaintext.fill(0);
+    return file;
+  } finally {
+    zeroize(key);
+  }
+}
 
 export function normalizeUsername(u: string): string {
   return (u || '').trim().toLowerCase().replace(/^@/, '');
@@ -212,9 +248,9 @@ export interface AppContextType {
   selectConversation: (id: string | null) => void;
   setReplyTarget: (msg: UIMessage | null) => void;
   sendMessage: (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
-  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }) => Promise<void>;
-  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }) => Promise<void>;
-  sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
+  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
+  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
+  sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string, options?: { forwarded?: boolean; forwardedFrom?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
   deleteMessageForEveryone: (conversationId: string, messageId: string) => Promise<void>;
@@ -275,6 +311,14 @@ export interface AppContextType {
 
 export const AppContext = createContext<AppContextType | null>(null);
 
+export type ComposerContextType = Pick<
+  AppContextType,
+  'sendMessage' | 'sendAttachment' | 'sendAttachments' | 'sendVoiceMessage' |
+  'replyTarget' | 'setReplyTarget' | 'myProfile' | 'contacts' | 'conversations'
+>;
+
+export const ComposerContext = createContext<ComposerContextType | null>(null);
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
@@ -323,6 +367,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cloudCredentials = useRef(new Map<string, string>());
   const activeCredentialsRef = useRef(new Map<string, { passphrase?: string; username?: string }>());
+  const autoResumedMediaSpaceRef = useRef<string | null>(null);
   const syncTimeoutRef = useRef<any>(null);
   const searchIndexTimeoutRef = useRef<any>(null);
 
@@ -1407,6 +1452,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const handleOnline = async () => {
       if (activeSession && activeSession.isActive()) {
         try {
+          autoResumedMediaSpaceRef.current = null;
           await netManager.reconnect(activeSession);
           await loadSpaceData(activeSession);
           const pending = await store.getAsync<SignedProfileDocument>(activeSession, 'veil:pending:profile_sync');
@@ -2577,7 +2623,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       files: File[],
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }
     ) => {
       if (!activeSession || files.length === 0) return;
 
@@ -2589,7 +2635,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       sessionController.recordUserActivity();
-      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const msgId = options?.retryMessageId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const freshContacts = await contactManager.listContacts(activeSession);
       const targetContact =
@@ -2704,9 +2750,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setMessages((prev) => {
         const list = prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || [];
         const updated = { ...prev };
-        for (const k of keys) {
-          updated[k] = [...list, pendingMsg];
-        }
+        const existingIndex = list.findIndex((message) => message.id === msgId);
+        const nextList = existingIndex >= 0
+          ? list.map((message) => message.id === msgId ? pendingMsg : message)
+          : [...list, pendingMsg];
+        for (const k of keys) updated[k] = nextList;
         store.setAsync(activeSession, 'veil:ui:messages', updated);
         return updated;
       });
@@ -2751,7 +2799,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             for (const k of keys) {
               updated[k] = list;
             }
-            if (status === 'SENT' || status === 'FAILED') {
+            if (status === 'SENT' || status === 'SENT_TO_RELAY' || status === 'SENDING' || status === 'FAILED') {
               store.setAsync(activeSession, 'veil:ui:messages', updated);
             }
             return updated;
@@ -2795,7 +2843,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 sizeBytes: currentAtt.sizeBytes,
               });
 
-              const ciphertextHash = await AttachmentPipeline.computeSha256Async(fileBytes);
+              const prepared = await prepareMediaUpload(fileBytes, {
+                name: currentAtt.name,
+                mimeType: currentAtt.mimeType,
+                attachmentId: currentAtt.attachmentId,
+              });
+              activeAttachments[idx] = {
+                ...currentAtt,
+                ...prepared.attachment,
+                state: 'UPLOADING',
+              };
+              await mediaOutbox.enqueue(activeSession, {
+                jobId: currentAtt.attachmentId,
+                messageId: msgId,
+                conversationId,
+                kind: 'attachment',
+                attachment: prepared.attachment,
+                state: 'READY',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              }, prepared.ciphertext);
+              const replacedJobId = options?.retryJobIds?.[idx];
+              if (replacedJobId && replacedJobId !== currentAtt.attachmentId) {
+                await mediaOutbox.remove(activeSession, replacedJobId);
+              }
 
               if (!cloudClient.hasAuthenticatedSession()) {
                 await ensureCloudSession(activeSession);
@@ -2809,10 +2880,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const createParams: any = {
                   attachmentId: currentAtt.attachmentId,
                   spaceId: activeSession.spaceId,
-                  ciphertextSize: fileBytes.length,
-                  ciphertextHash,
-                  chunkCount: 1,
-                  chunkSize: fileBytes.length,
+                  ciphertextSize: prepared.ciphertext.length,
+                  ciphertextHash: prepared.attachment.ciphertextHash,
+                  chunkCount: prepared.attachment.chunkCount,
+                  chunkSize: prepared.attachment.chunkSize,
                   conversationId,
                   groupId: isGroup ? conversationId : undefined,
                   encryptedMetadata: JSON.stringify({
@@ -2848,7 +2919,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
                 const createRes = await cloudClient.createAttachment(createParams);
                 objectId = createRes.attachment.objectId;
-                await cloudClient.uploadAttachment(objectId, fileBytes, onProgress, ciphertextHash);
+                await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
+                  state: 'UPLOADING',
+                  attachment: { ...prepared.attachment, objectId },
+                });
+                await cloudClient.uploadAttachment(objectId, prepared.ciphertext, onProgress, prepared.attachment.ciphertextHash);
               };
 
               const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);
@@ -2892,7 +2967,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               RuntimeDiagnostics.upload('uploadCompleted', {
                 attachmentId: currentAtt.attachmentId,
                 objectId,
-                uploadedBytes: fileBytes.length,
+                uploadedBytes: prepared.ciphertext.length,
               });
 
               MediaLogger.log({
@@ -2920,11 +2995,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 name: currentAtt.name,
                 mimeType: currentAtt.mimeType,
                 sizeBytes: fileBytes.length,
-                chunkCount: 1,
-                chunkSize: fileBytes.length,
-                sha256Hash: ciphertextHash,
-                ciphertextHash,
-                encryptionKeyBase64: '',
+                chunkCount: prepared.attachment.chunkCount,
+                chunkSize: prepared.attachment.chunkSize,
+                sha256Hash: prepared.attachment.sha256Hash,
+                ciphertextHash: prepared.attachment.ciphertextHash,
+                encryptionKeyBase64: prepared.attachment.encryptionKeyBase64,
                 previewUrl: localPreview,
                 localPreviewUrl: localPreview,
                 thumbnailUrl: durableThumb,
@@ -2932,6 +3007,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 allowSave,
                 allowForward,
               };
+              await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
+                state: 'UPLOADING',
+                attachment: activeAttachments[idx],
+              });
 
               MediaCache.set(objectId, {
                 id: objectId,
@@ -2950,6 +3029,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 return next;
               });
               hasAnyError = true;
+              await mediaOutbox.update(activeSession, currentAtt.attachmentId, { state: 'FAILED' }).catch(() => {});
               activeAttachments[idx] = {
                 ...currentAtt,
                 state: 'FAILED' as const,
@@ -3084,6 +3164,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             });
 
             updateTimeline(activeAttachments, 'SENT_TO_RELAY');
+            await mediaOutbox.removeMessage(activeSession, msgId);
           } catch (wireErr: any) {
             RuntimeDiagnostics.wire('wireFailed', {
               msgId,
@@ -3107,7 +3188,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       file: File,
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }
     ) => {
       return sendAttachments(conversationId, [file], options);
     },
@@ -3120,7 +3201,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       durationSeconds: number,
       audioBlob: Blob,
       mimeType: string,
-      options?: { forwarded?: boolean; forwardedFrom?: string }
+      options?: { forwarded?: boolean; forwardedFrom?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }
     ) => {
       if (!activeSession) return;
 
@@ -3133,7 +3214,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       sessionController.recordUserActivity();
 
-      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const msgId = options?.retryMessageId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const freshContacts = await contactManager.listContacts(activeSession);
       let targetContact = freshContacts.find((c) => c.identityId === conversationId) || contacts.find((c) => c.identityId === conversationId);
@@ -3186,9 +3267,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setMessages((prev) => {
         const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []);
         const updated = { ...prev };
-        for (const k of keys) {
-          updated[k] = [...list, pendingMsg];
-        }
+        const existingIndex = list.findIndex((message) => message.id === msgId);
+        const nextList = existingIndex >= 0
+          ? list.map((message) => message.id === msgId ? pendingMsg : message)
+          : [...list, pendingMsg];
+        for (const k of keys) updated[k] = nextList;
         store.setAsync(activeSession, 'veil:ui:messages', updated);
         return updated;
       });
@@ -3245,7 +3328,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               groupId: isGroup ? conversationId : undefined,
               conversationId,
             },
-            onVoiceProgress
+            onVoiceProgress,
+            async ({ attachment, ciphertext }) => {
+              await mediaOutbox.enqueue(activeSession, {
+                jobId: attachment.attachmentId,
+                messageId: msgId,
+                conversationId,
+                kind: 'voice',
+                attachment,
+                state: 'READY',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              }, ciphertext);
+              for (const retryJobId of options?.retryJobIds || []) {
+                if (retryJobId) await mediaOutbox.remove(activeSession, retryJobId);
+              }
+            }
           );
 
           if (voiceMeta?.objectId) {
@@ -3404,6 +3502,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             store.setAsync(activeSession, 'veil:ui:messages', updated);
             return updated;
           });
+          await mediaOutbox.removeMessage(activeSession, msgId);
         } catch (voiceErr) {
           setUploadProgress((prev) => {
             const next = { ...prev };
@@ -3682,19 +3781,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const convMessages = messages[conversationId] || [];
       const targetMsg = convMessages.find((m) => m.id === messageId);
       if (!targetMsg || !activeSession) return;
+      const outboxJobs = (await mediaOutbox.list(activeSession)).filter((job) => job.messageId === messageId);
 
       // 1. Handle voice note retry
       if (targetMsg.voice) {
+        const voiceJob = outboxJobs.find((job) => job.kind === 'voice');
         const cached =
           MediaCache.get(targetMsg.voice.objectId) ||
           MediaCache.get(targetMsg.id) ||
           (targetMsg.voice.ciphertextHash ? MediaCache.get(targetMsg.voice.ciphertextHash) : undefined);
-        if (cached && cached.data && cached.data.length > 0) {
-          const audioBlob = new Blob([cached.data as any], { type: targetMsg.voice.mimeType || 'audio/webm' });
-          await deleteMessageLocally(conversationId, messageId);
+        if ((cached && cached.data && cached.data.length > 0) || voiceJob) {
+          const restored = cached?.data?.length ? null : await restoreOutboxFile(activeSession, voiceJob!);
+          const audioBlob = cached?.data?.length
+            ? new Blob([cached.data as any], { type: targetMsg.voice.mimeType || 'audio/webm' })
+            : new Blob([restored!], { type: targetMsg.voice.mimeType || 'audio/webm' });
           await sendVoiceMessage(conversationId, targetMsg.voice.durationSeconds, audioBlob, targetMsg.voice.mimeType || 'audio/webm', {
             forwarded: targetMsg.forwarded,
             forwardedFrom: targetMsg.forwardedFrom,
+            retryMessageId: messageId,
+            retryJobIds: voiceJob ? [voiceJob.jobId] : [],
           });
           return;
         } else {
@@ -3704,7 +3809,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               new CustomEvent('veil:toast', {
                 detail: {
                   type: 'error',
-                  message: 'Original audio is no longer in memory. Please record a new voice note.',
+                    message: 'Saved encrypted upload could not be recovered. Record a new voice note to replace it.',
                 },
               })
             );
@@ -3717,17 +3822,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (targetMsg.attachment || targetMsg.attachments) {
         const att = targetMsg.attachment || targetMsg.attachments?.[0];
         if (att) {
-          const key = att.objectId || att.attachmentId || att.name;
-          const cached = MediaCache.get(key) || MediaCache.get(targetMsg.id);
-          if (cached && cached.data && cached.data.length > 0) {
-            const file = new File([cached.data as any], att.name, { type: att.mimeType || 'application/octet-stream' });
-            await deleteMessageLocally(conversationId, messageId);
-            await sendAttachments(conversationId, [file], {
+          const originalAttachments = targetMsg.attachments?.length ? targetMsg.attachments : [att];
+          const jobs = originalAttachments.map((item) => outboxJobs.find((job) => job.attachment.attachmentId === item.attachmentId));
+          const files: File[] = [];
+          for (let index = 0; index < originalAttachments.length; index += 1) {
+            const item = originalAttachments[index];
+            const key = item.objectId || item.attachmentId || item.name;
+            const cached = MediaCache.get(key) || MediaCache.get(targetMsg.id);
+            if (cached?.data?.length) {
+              files.push(new File([cached.data as any], item.name, { type: item.mimeType || 'application/octet-stream' }));
+            } else if (jobs[index]) {
+              files.push(await restoreOutboxFile(activeSession, jobs[index]!));
+            } else {
+              break;
+            }
+          }
+          if (files.length === originalAttachments.length) {
+            await sendAttachments(conversationId, files, {
               allowSave: att.allowSave,
               allowForward: att.allowForward,
               forwarded: targetMsg.forwarded,
               forwardedFrom: targetMsg.forwardedFrom,
               caption: targetMsg.text && targetMsg.text !== 'Photo' && targetMsg.text !== 'Video' && targetMsg.text !== 'Attachment' ? targetMsg.text : undefined,
+              retryMessageId: messageId,
+              retryJobIds: jobs.map((job) => job?.jobId),
             });
             return;
           } else {
@@ -3737,7 +3855,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 new CustomEvent('veil:toast', {
                   detail: {
                     type: 'error',
-                    message: 'Original attachment data is no longer in memory. Please re-attach the file.',
+                    message: 'Saved encrypted upload could not be recovered. Re-attach the file to replace it.',
                   },
                 })
               );
@@ -3764,6 +3882,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     },
     [activeSession, messages, deleteMessageLocally, sendMessage, sendVoiceMessage, sendAttachments]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeSession) {
+      autoResumedMediaSpaceRef.current = null;
+      return;
+    }
+    if (autoResumedMediaSpaceRef.current === activeSession.spaceId) return;
+
+    void (async () => {
+      const jobs = await mediaOutbox.list(activeSession);
+      if (cancelled) return;
+      if (jobs.length === 0) {
+        autoResumedMediaSpaceRef.current = activeSession.spaceId;
+        return;
+      }
+
+      const pending = new Map<string, { conversationId: string; status: UIMessage['status'] }>();
+      for (const job of jobs) {
+        const message = (messages[job.conversationId] || []).find((item) => item.id === job.messageId);
+        if (message) pending.set(job.messageId, { conversationId: job.conversationId, status: message.status });
+      }
+      if (pending.size === 0) return; // Wait until the Space message history has finished loading.
+      autoResumedMediaSpaceRef.current = activeSession.spaceId;
+
+      for (const [messageId, item] of pending) {
+        if (cancelled) return;
+        if (item.status === 'UPLOADING' || item.status === 'FAILED') {
+          await retryFailedMessage(item.conversationId, messageId).catch(() => {});
+        } else {
+          await mediaOutbox.removeMessage(activeSession, messageId).catch(() => {});
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeSession, messages, retryFailedMessage]);
 
   const editMessage = useCallback(
     async (conversationId: string, messageId: string, newText: string) => {
@@ -4730,6 +4885,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, [activeModal, activeChatId, searchQuery]);
 
+  const composerValue = React.useMemo<ComposerContextType>(
+    () => ({
+      sendMessage,
+      sendAttachment,
+      sendAttachments,
+      sendVoiceMessage,
+      replyTarget,
+      setReplyTarget,
+      myProfile,
+      contacts,
+      conversations,
+    }),
+    [sendMessage, sendAttachment, sendAttachments, sendVoiceMessage, replyTarget, setReplyTarget, myProfile, contacts, conversations]
+  );
+
   const value = React.useMemo<AppContextType>(
     () => ({
       storageReady,
@@ -4923,13 +5093,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ]
   );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <ComposerContext.Provider value={composerValue}>{children}</ComposerContext.Provider>
+    </AppContext.Provider>
+  );
 };
 
 export function useApp(): AppContextType {
   const context = useContext(AppContext);
   if (!context) {
     throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+}
+
+export function useComposer(): ComposerContextType {
+  const context = useContext(ComposerContext);
+  if (!context) {
+    throw new Error('useComposer must be used within an AppProvider');
   }
   return context;
 }

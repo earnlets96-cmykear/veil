@@ -16,6 +16,7 @@ import { base64ToBytes } from '../../crypto/utils.ts';
 import { CloudClient } from '../../network/cloudClient.ts';
 import { SpaceSession } from '../../spaces/session.ts';
 import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
+import { MediaCipherCache } from './mediaCipherCache.ts';
 
 export interface DecryptedMedia {
   id: string;
@@ -35,6 +36,7 @@ export interface AttachmentPayload {
   chunkCount?: number;
   chunkSize?: number;
   sha256Hash?: string;
+  ciphertextHash?: string;
   encryptionKeyBase64?: string;
   previewUrl?: string;
   localPreviewUrl?: string;
@@ -50,7 +52,6 @@ export class MediaCacheManager {
   private entries = new Map<string, DecryptedMedia>();
   private aliasMap = new Map<string, string>();
   private inFlight = new Map<string, Promise<DecryptedMedia>>();
-  private idbInstance: IDBDatabase | null = null;
 
   public static isAudioMedia(mimeType?: string, name?: string): boolean {
     if (mimeType && mimeType.startsWith('audio/')) {
@@ -83,89 +84,6 @@ export class MediaCacheManager {
     return this.aliasMap.size;
   }
 
-  private async getIDB(): Promise<IDBDatabase | null> {
-    if (this.idbInstance) return this.idbInstance;
-    if (typeof indexedDB === 'undefined') return null;
-    return new Promise((resolve) => {
-      try {
-        const req = indexedDB.open('veil_media_cache', 1);
-        req.onupgradeneeded = () => {
-          if (!req.result.objectStoreNames.contains('media')) {
-            req.result.createObjectStore('media', { keyPath: 'id' });
-          }
-        };
-        req.onsuccess = () => {
-          this.idbInstance = req.result;
-          resolve(this.idbInstance);
-        };
-        req.onerror = () => resolve(null);
-      } catch (_e) {
-        resolve(null);
-      }
-    });
-  }
-
-  private async getFromIDB(key: string): Promise<DecryptedMedia | null> {
-    try {
-      const db = await this.getIDB();
-      if (!db) return null;
-      return new Promise((resolve) => {
-        try {
-          const tx = db.transaction('media', 'readonly');
-          const store = tx.objectStore('media');
-          const req = store.get(key);
-          req.onsuccess = () => {
-            const val = req.result;
-            if (val && val.data) {
-              if (MediaCacheManager.isAudioMedia(val.mimeType, val.name)) {
-                resolve(null);
-                return;
-              }
-              const dataBytes = val.data instanceof Uint8Array ? val.data : new Uint8Array(val.data);
-              const blobUrl = AttachmentPipeline.createEphemeralBlobUrl(dataBytes, val.mimeType || 'application/octet-stream');
-              resolve({
-                id: val.id,
-                blobUrl,
-                data: dataBytes,
-                mimeType: val.mimeType,
-                name: val.name,
-                sizeBytes: dataBytes.length,
-              });
-            } else {
-              resolve(null);
-            }
-          };
-          req.onerror = () => resolve(null);
-        } catch (_e) {
-          resolve(null);
-        }
-      });
-    } catch (_e) {
-      return null;
-    }
-  }
-
-  private async saveToIDB(key: string, item: DecryptedMedia): Promise<void> {
-    // HARD RULE: Voice/audio data must remain strictly RAM-only and NEVER written to IDB
-    if (MediaCacheManager.isAudioMedia(item.mimeType, item.name)) {
-      return;
-    }
-    try {
-      const db = await this.getIDB();
-      if (!db) return;
-      const tx = db.transaction('media', 'readwrite');
-      const store = tx.objectStore('media');
-      store.put({
-        id: key,
-        data: item.data,
-        mimeType: item.mimeType,
-        name: item.name,
-        sizeBytes: item.sizeBytes,
-        timestamp: Date.now(),
-      });
-    } catch (_e) {}
-  }
-
   /**
    * Retrieves a cached decrypted media object or fetches and decrypts it on demand.
    * Never treats stale persisted blob URLs as valid unless actively in RAM cache.
@@ -183,8 +101,6 @@ export class MediaCacheManager {
     ].filter(Boolean) as string[];
 
     const primaryKey = candidateKeys[0] || attachment.name;
-    const isAudio = MediaCacheManager.isAudioMedia(attachment.mimeType, attachment.name);
-
     // 1. Return from in-memory RAM cache if actively decrypted in this session
     for (const key of candidateKeys) {
       const cached = this.get(key);
@@ -203,21 +119,6 @@ export class MediaCacheManager {
     // 3. Start asynchronous cloud download and AEAD decryption with timeout guard
     const fetchPromise = (async (): Promise<DecryptedMedia> => {
       try {
-        // Check durable IndexedDB cache for non-audio (survives app restart without re-downloading)
-        if (!isAudio) {
-          for (const key of candidateKeys) {
-            const persisted = await this.getFromIDB(key);
-            if (persisted && persisted.blobUrl) {
-              const canonicalId = persisted.id || primaryKey;
-              this.entries.set(canonicalId, persisted);
-              for (const k of candidateKeys) {
-                this.aliasMap.set(k, canonicalId);
-              }
-              return persisted;
-            }
-          }
-        }
-
         const objectId = attachment.objectId || attachment.attachmentId;
         if (!objectId) {
           throw new Error('Attachment lacks objectId or attachmentId for cloud retrieval');
@@ -233,10 +134,23 @@ export class MediaCacheManager {
 
         const downloadAndDecrypt = async (): Promise<DecryptedMedia> => {
           RuntimeDiagnostics.download('downloadStarted', { objectId, attachmentId: attachment.attachmentId });
-          const rawCiphertext = onProgress
+          const cachedCiphertext = session && attachment.ciphertextHash
+            ? await MediaCipherCache.get(session.spaceId, objectId, attachment.ciphertextHash)
+            : null;
+          const rawCiphertext = cachedCiphertext || (onProgress
             ? await cloudClient.downloadAttachment(objectId, onProgress)
-            : await cloudClient.downloadAttachment(objectId);
+            : await cloudClient.downloadAttachment(objectId));
           RuntimeDiagnostics.download('downloadCompleted', { objectId, bytes: rawCiphertext.length });
+
+          if (session && attachment.ciphertextHash && !cachedCiphertext) {
+            try {
+              await MediaCipherCache.put(session.spaceId, objectId, rawCiphertext, attachment.ciphertextHash);
+            } catch (cacheError: any) {
+              if (cacheError?.message === 'Refusing to cache media with an invalid ciphertext hash') {
+                throw cacheError;
+              }
+            }
+          }
 
           let plaintextBytes: Uint8Array;
 
@@ -301,11 +215,6 @@ export class MediaCacheManager {
           if (mediaItem.name) this.aliasMap.set(mediaItem.name, primaryKey);
 
           this.enforceLruLimit();
-
-          // Save to durable IndexedDB ONLY ONCE under canonical key, NEVER for audio
-          if (!isAudio) {
-            this.saveToIDB(primaryKey, mediaItem).catch(() => {});
-          }
 
           return mediaItem;
         };
@@ -458,14 +367,9 @@ export class MediaCacheManager {
   /**
    * Explicitly invalidates a key and revokes its Blob URL (used on error or re-fetch retry).
    */
-  public async invalidate(key: string): Promise<void> {
+  public async invalidate(key: string, session?: SpaceSession | null, objectId?: string): Promise<void> {
     const canonicalId = this.aliasMap.get(key) || key;
     const item = this.entries.get(canonicalId);
-    const persistedKeys = new Set<string>([key, canonicalId]);
-    if (item?.id) persistedKeys.add(item.id);
-    for (const [alias, targetId] of this.aliasMap.entries()) {
-      if (targetId === canonicalId) persistedKeys.add(alias);
-    }
     if (item) {
       if (item.blobUrl && typeof URL !== 'undefined') {
         try {
@@ -487,28 +391,17 @@ export class MediaCacheManager {
       this.inFlight.delete(canonicalId);
     }
 
-    // A corrupt cached thumbnail (including a legacy synthetic sticker) must
-    // not be resurrected from IndexedDB after its in-memory entry is invalidated.
-    const db = await this.getIDB().catch(() => null);
-    if (!db) return;
-    await new Promise<void>((resolve) => {
-      try {
-        const tx = db.transaction('media', 'readwrite');
-        const store = tx.objectStore('media');
-        for (const persistedKey of persistedKeys) store.delete(persistedKey);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-        tx.onabort = () => resolve();
-      } catch (_e) {
-        resolve();
-      }
-    });
+    // Durable cache contains only verified ciphertext and is partitioned by Space.
+    // It remains useful after app re-entry and does not contain decrypted data.
+    if (session && objectId) {
+      await MediaCipherCache.delete(session.spaceId, objectId);
+    }
   }
 
   /**
    * Clears and revokes all ephemeral media blobs from memory.
    */
-  public clear(wipeDurable = false): void {
+  public clear(_wipeDurable = false): void {
     for (const item of this.entries.values()) {
       if (item.blobUrl && typeof URL !== 'undefined') {
         try {
@@ -520,12 +413,6 @@ export class MediaCacheManager {
     this.aliasMap.clear();
     this.inFlight.clear();
 
-    if (wipeDurable && this.idbInstance) {
-      try {
-        const tx = this.idbInstance.transaction('media', 'readwrite');
-        tx.objectStore('media').clear();
-      } catch (_e) {}
-    }
   }
 }
 

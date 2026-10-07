@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ConversationView } from '../src/ui/components/ConversationView.tsx';
-import { AppContext, AppContextType } from '../src/ui/app/AppState.tsx';
+import { AppContext, AppContextType, ComposerContext } from '../src/ui/app/AppState.tsx';
 import { ToastProvider } from '../src/ui/components/ui/Toast.tsx';
 import type { UIConversation, UIMessage } from '../src/ui/app/types.ts';
 import type { Contact } from '../src/contacts/types.ts';
@@ -87,7 +87,9 @@ function renderWithContext(contextValue: AppContextType): string {
   return renderToStaticMarkup(
     <ToastProvider>
       <AppContext.Provider value={contextValue}>
-        <ConversationView />
+        <ComposerContext.Provider value={contextValue}>
+          <ConversationView />
+        </ComposerContext.Provider>
       </AppContext.Provider>
     </ToastProvider>
   );
