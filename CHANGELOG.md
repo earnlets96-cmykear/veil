@@ -2,6 +2,14 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase114-android-background-push] - 2026-10-07
+
+### Android background notifications
+- Added opt-in Firebase Cloud Messaging delivery using generic data-only payloads and a native fixed-text alert.
+- Added capability-authenticated token management, durable relay storage, one-mailbox-per-device-token mapping, and user-facing provider disclosure.
+- Added setup instructions in `docs/PUSH_NOTIFICATIONS.md` and metadata analysis in `docs/ai/THREAT_MODEL_PUSH.md`.
+- Verification: 10 push-focused tests and TypeScript check pass. Android build and device verification still require Firebase configuration. Security audit and dual sign-off remain deployment requirements.
+
 ## [1.0.0-phase107-encrypted-media-resume] - 2026-10-07
 
 ### Encrypted Media Recovery and Composer Responsiveness (Phase 107)

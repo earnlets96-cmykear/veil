@@ -52,6 +52,7 @@ export interface SendEnvelopeRequest {
   mailboxId: string;
   payload: string; // Base64 ciphertext <= 64 KiB
   ttlSeconds?: number;
+  notifyRecipient?: boolean; // One-bit opt-in hint; no content or identity fields
 }
 
 export interface SendEnvelopeResponse {

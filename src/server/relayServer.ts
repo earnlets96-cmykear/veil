@@ -49,6 +49,7 @@ import type { IObjectStorage } from './cloud/storage/types.ts';
 import { LocalDiskObjectStorage } from './cloud/storage/localDiskObjectStorage.ts';
 import { CloudHandler } from './cloud/cloudHandler.ts';
 import { TelegramStickerResolver } from './stickers/telegramStickerResolver.ts';
+import { FirebasePushSendError, createFirebasePushSenderFromEnvironment, type FirebasePushSender } from './push/firebasePushSender.ts';
 
 export class RelayServer {
   private config: RelayServerConfig;
@@ -64,12 +65,14 @@ export class RelayServer {
   private cleanupTimer?: NodeJS.Timeout;
   private startTime: number = Date.now();
   private isShuttingDown = false;
+  private pushSender: FirebasePushSender | null;
 
   constructor(
     config: Partial<RelayServerConfig> = {},
     store?: IRelayStore,
     cloudDb?: ICloudDatabase,
-    objectStorage?: IObjectStorage
+    objectStorage?: IObjectStorage,
+    pushSender: FirebasePushSender | null = createFirebasePushSenderFromEnvironment()
   ) {
     this.config = { ...DEFAULT_RELAY_CONFIG, ...config };
     this.store = store || new MemoryRelayStore();
@@ -78,6 +81,7 @@ export class RelayServer {
     this.cloudHandler = new CloudHandler(this.cloudDb, this.objectStorage);
     this.logger = new PrivacyLogger(this.config.logLevel);
     this.rateLimiter = new RateLimiter(this.config.rateLimitWindowMs, this.config.maxRequestsPerWindow);
+    this.pushSender = pushSender;
   }
 
   /**
@@ -243,6 +247,18 @@ export class RelayServer {
       if (method === 'POST' && url === '/v1/envelopes/ack') {
         const body = await this.readJsonBody<AckEnvelopesRequest>(req);
         await this.handleAckEnvelopes(body, res);
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/push/register') {
+        const body = await this.readJsonBody<{ mailboxId: string; capabilityToken: string; token: string }>(req);
+        await this.handlePushToken(body, res, false);
+        return;
+      }
+
+      if (method === 'POST' && url === '/v1/push/unregister') {
+        const body = await this.readJsonBody<{ mailboxId: string; capabilityToken: string; token: string }>(req);
+        await this.handlePushToken(body, res, true);
         return;
       }
 
@@ -463,6 +479,10 @@ export class RelayServer {
       this.sendError(res, 'BAD_REQUEST', 'Missing mailboxId or payload in request body', 400);
       return;
     }
+    if (body.notifyRecipient !== undefined && typeof body.notifyRecipient !== 'boolean') {
+      this.sendError(res, 'BAD_REQUEST', 'Invalid notification hint', 400);
+      return;
+    }
 
     const payloadBytes = Buffer.byteLength(body.payload, 'utf8');
     if (payloadBytes > this.config.maxEnvelopeSizeBytes) {
@@ -504,6 +524,12 @@ export class RelayServer {
       this.wsHandler.pushEnvelope(envelope);
     }
 
+    // The relay never reads the ciphertext for notification formatting. FCM
+    // receives a fixed generic alert; a push failure never delays envelope ACK.
+    if (this.pushSender && body.notifyRecipient === true) {
+      void this.dispatchBackgroundPush(body.mailboxId);
+    }
+
     const response: SendEnvelopeResponse = {
       protocolVersion: RELAY_PROTOCOL_VERSION,
       envelopeId: envelope.envelopeId,
@@ -514,6 +540,69 @@ export class RelayServer {
 
     res.statusCode = 201;
     res.end(JSON.stringify(response));
+  }
+
+  private async handlePushToken(
+    body: { mailboxId?: string; capabilityToken?: string; token?: string },
+    res: ServerResponse,
+    remove: boolean
+  ): Promise<void> {
+    if (!body?.mailboxId || !body.capabilityToken || !body.token) {
+      this.sendError(res, 'BAD_REQUEST', 'Missing mailbox authorization or push token', 400);
+      return;
+    }
+    if (body.token.length > 4096 || body.token.trim() !== body.token || /[\u0000-\u001f\u007f]/.test(body.token)) {
+      this.sendError(res, 'BAD_REQUEST', 'Invalid push token', 400);
+      return;
+    }
+
+    const mailbox = await this.store.getMailbox(body.mailboxId);
+    if (!mailbox || mailbox.expiresAt <= Date.now()) {
+      this.sendError(res, 'NOT_FOUND', 'Mailbox not found or expired', 404);
+      return;
+    }
+    const tokenHash = bytesToHex(sha256(new TextEncoder().encode(body.capabilityToken)));
+    if (tokenHash !== mailbox.capabilityHash) {
+      this.sendError(res, 'UNAUTHORIZED', 'Invalid capability token for requested mailbox', 401);
+      return;
+    }
+    if (!remove && !this.pushSender) {
+      this.sendError(res, 'STORAGE_UNAVAILABLE', 'Background push delivery is not configured on this relay', 503);
+      return;
+    }
+
+    if (remove) {
+      await this.store.removePushToken(body.mailboxId, body.token);
+    } else {
+      const existing = await this.store.listPushTokens(body.mailboxId);
+      if (!existing.includes(body.token) && existing.length >= 8) {
+        this.sendError(res, 'FORBIDDEN', 'This mailbox has reached its device notification limit', 403);
+        return;
+      }
+      await this.store.registerPushToken(body.mailboxId, body.token);
+    }
+
+    res.statusCode = 200;
+    res.end(JSON.stringify({ success: true }));
+  }
+
+  private async dispatchBackgroundPush(mailboxId: string): Promise<void> {
+    if (!this.pushSender) return;
+    try {
+      const tokens = await this.store.listPushTokens(mailboxId);
+      for (const token of tokens) {
+        try {
+          await this.pushSender.send(token);
+        } catch (error) {
+          if (error instanceof FirebasePushSendError && error.invalidToken) {
+            await this.store.removePushToken(mailboxId, token);
+          }
+          // Provider failures are intentionally not logged with tokens or body.
+        }
+      }
+    } catch {
+      // Message delivery is durable independently of best-effort push alerts.
+    }
   }
 
   private async handleFetchEnvelopes(body: FetchEnvelopesRequest, res: ServerResponse): Promise<void> {

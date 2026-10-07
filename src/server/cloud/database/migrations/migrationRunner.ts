@@ -207,6 +207,24 @@ export const RELAY_AND_DIRECTORY_MIGRATION: Migration = {
   `,
 };
 
+export const RELAY_PUSH_TOKEN_MIGRATION: Migration = {
+  id: '003_relay_push_tokens',
+  name: 'Relay Push Token Registration',
+  version: 3,
+  description: 'Stores opt-in Android push tokens per opaque mailbox and removes them with mailbox expiry',
+  upSql: `
+    CREATE TABLE IF NOT EXISTS relay_push_tokens (
+      token_hash VARCHAR(64) PRIMARY KEY,
+      mailbox_id VARCHAR(64) NOT NULL,
+      token TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      FOREIGN KEY (mailbox_id) REFERENCES relay_mailboxes(mailbox_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_relay_push_tokens_mailbox ON relay_push_tokens(mailbox_id);
+  `,
+};
+
 export class MigrationRunner {
   private appliedMigrations = new Set<string>();
 
@@ -214,7 +232,7 @@ export class MigrationRunner {
    * Returns all available migrations in order.
    */
   public getMigrations(): Migration[] {
-    return [INITIAL_SCHEMA_MIGRATION, RELAY_AND_DIRECTORY_MIGRATION];
+    return [INITIAL_SCHEMA_MIGRATION, RELAY_AND_DIRECTORY_MIGRATION, RELAY_PUSH_TOKEN_MIGRATION];
   }
 
   /**

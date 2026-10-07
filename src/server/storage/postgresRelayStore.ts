@@ -9,6 +9,8 @@ import { PostgresClient } from '../cloud/database/postgresClient.ts';
 import type { IRelayStore } from './relayStore.ts';
 import type { RelayEnvelope, MailboxRecord, DirectorySearchResult } from '../types.ts';
 import type { SignedProfileDocument } from '../../identity/profile.ts';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '../../crypto/utils.ts';
 
 export class PostgresRelayStore implements IRelayStore {
   private pg: PostgresClient;
@@ -75,6 +77,32 @@ export class PostgresRelayStore implements IRelayStore {
     const sql = `DELETE FROM relay_mailboxes WHERE mailbox_id = $1`;
     const res = await this.pg.query(sql, [mailboxId]);
     return (res.rowCount ?? 0) > 0;
+  }
+
+  public async registerPushToken(mailboxId: string, token: string): Promise<void> {
+    this.assertInit();
+    const tokenHash = bytesToHex(sha256(new TextEncoder().encode(token)));
+    await this.pg.query(
+      `INSERT INTO relay_push_tokens (token_hash, mailbox_id, token, created_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (token_hash) DO UPDATE SET mailbox_id = EXCLUDED.mailbox_id, token = EXCLUDED.token, created_at = EXCLUDED.created_at`,
+      [tokenHash, mailboxId, token, Date.now()]
+    );
+  }
+
+  public async removePushToken(mailboxId: string, token: string): Promise<void> {
+    this.assertInit();
+    const tokenHash = bytesToHex(sha256(new TextEncoder().encode(token)));
+    await this.pg.query(`DELETE FROM relay_push_tokens WHERE mailbox_id = $1 AND token_hash = $2`, [mailboxId, tokenHash]);
+  }
+
+  public async listPushTokens(mailboxId: string): Promise<string[]> {
+    this.assertInit();
+    const result = await this.pg.query<{ token: string }>(
+      `SELECT token FROM relay_push_tokens WHERE mailbox_id = $1`,
+      [mailboxId]
+    );
+    return result.rows.map((row) => row.token);
   }
 
   public async saveEnvelope(envelope: RelayEnvelope): Promise<void> {

@@ -120,6 +120,11 @@ import { ThumbnailGenerator } from '../../attachments/thumbnailGenerator.ts';
 import { presenceManager } from '../../presence/presenceManager.ts';
 import { RuntimeDiagnostics } from '../../debug/runtimeDiagnostics.ts';
 import { DeletedMessageTombstone } from '../../storage/types.ts';
+import {
+  deleteRemotePushToken,
+  registerForRemotePushToken,
+  requestNativeNotificationPermission,
+} from '../../notifications/nativeNotificationBridge.ts';
 
 // Singleton Backend Instances
 const storageAdapter = new IndexedDBStorageAdapter();
@@ -302,6 +307,8 @@ export interface AppContextType {
   idMgr: SpaceIdentityManager;
   store: EncryptedSpaceStore;
   notificationDispatcher: NotificationDispatcher;
+  enableBackgroundPushNotifications: () => Promise<void>;
+  disableBackgroundPushNotifications: () => Promise<void>;
   contactRequestManager: ContactRequestManager;
   directoryClient: DirectoryClient;
   cloudClient: CloudClient;
@@ -430,6 +437,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     },
     [activeSession, muteSettings, scheduleCloudSync]
   );
+
+  const enableBackgroundPushNotifications = useCallback(async () => {
+    if (!activeSession) throw new Error('Unlock a Space before enabling background alerts');
+    if (Capacitor.getPlatform() !== 'android') throw new Error('Background push is currently available in the Android app');
+    if (notificationDispatcher.getPrivacyMode() === 'SILENT_COUNTER') {
+      throw new Error('Switch from Silent Counter notification privacy before enabling background alerts');
+    }
+
+    const permission = await requestNativeNotificationPermission();
+    if (permission !== 'granted') throw new Error('Allow VEIL notifications in Android settings first');
+    const token = await registerForRemotePushToken();
+    await netManager.registerPushToken(activeSession, token);
+    await store.setAsync(activeSession, 'veil:notifications:push-token', token);
+    if (typeof window !== 'undefined') window.localStorage.setItem('veil:background-push-enabled', 'true');
+  }, [activeSession]);
+
+  const disableBackgroundPushNotifications = useCallback(async () => {
+    if (typeof window !== 'undefined') window.localStorage.removeItem('veil:background-push-enabled');
+    let failure: unknown;
+    if (activeSession && Capacitor.getPlatform() === 'android') {
+      try {
+        const token = await store.getAsync<string>(activeSession, 'veil:notifications:push-token');
+        if (token) await netManager.unregisterPushToken(activeSession, token);
+      } catch (error) {
+        failure = error;
+      }
+      try { await store.deleteAsync(activeSession, 'veil:notifications:push-token'); } catch {}
+      try {
+        await deleteRemotePushToken();
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure) throw new Error('Could not fully unregister background alerts from the relay');
+  }, [activeSession]);
 
   const ensureCloudSession = useCallback(
     async (session: SpaceSession, forceReauth = false, customPassword?: string): Promise<boolean> => {
@@ -631,6 +673,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 7. Ensure Mailbox, Prekey pool, and Directory registration are initialized
     try {
       const binding = await netManager.getOrCreateMailbox(session);
+      if (
+        Capacitor.getPlatform() === 'android' &&
+        typeof window !== 'undefined' &&
+        window.localStorage.getItem('veil:background-push-enabled') === 'true'
+      ) {
+        try {
+          const token = await registerForRemotePushToken();
+          await netManager.registerPushToken(session, token);
+          await store.setAsync(session, 'veil:notifications:push-token', token);
+        } catch {
+          // Push setup is optional and must not block Space startup or message sync.
+        }
+      }
       if (!prekeyManager.getSignedPrekeyPublic(session)) {
         prekeyManager.generateSignedPrekey(session);
       }
@@ -2506,7 +2561,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   } catch (_dErr) {}
                 }
                 if (mailbox) {
-                  await netManager.sendEnvelope(activeSession, mailbox, groupPayload).catch(() => {});
+                  await netManager.sendEnvelope(activeSession, mailbox, groupPayload, undefined, { notifyRecipient: true }).catch(() => {});
                 }
               }
             } else {
@@ -2539,6 +2594,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               let sendRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                 messageId: msgId,
                 conversationId,
+                notifyRecipient: true,
               });
 
               if (sendRes.status === 'QUEUED' && (sendRes.errorMessage?.includes('404') || sendRes.errorMessage?.includes('expired') || sendRes.errorMessage?.includes('not found') || !targetContact?.mailboxId)) {
@@ -2549,6 +2605,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     const retryRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                       messageId: msgId,
                       conversationId,
+                      notifyRecipient: true,
                     });
                     if (retryRes.status === 'SENT_TO_RELAY') {
                       sendRes = retryRes;
@@ -3098,7 +3155,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   } catch (_dErr) {}
                 }
                 if (mailbox) {
-                  await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload).catch(() => {});
+                  await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload, undefined, { notifyRecipient: true }).catch(() => {});
                 }
               }
             } else {
@@ -3131,6 +3188,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               let sendRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                 messageId: msgId,
                 conversationId,
+                notifyRecipient: true,
               });
 
               if (sendRes.status === 'QUEUED' && (sendRes.errorMessage?.includes('404') || sendRes.errorMessage?.includes('expired') || sendRes.errorMessage?.includes('not found') || !targetContact?.mailboxId)) {
@@ -3141,6 +3199,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     const retryRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                       messageId: msgId,
                       conversationId,
+                      notifyRecipient: true,
                     });
                     if (retryRes.status === 'SENT_TO_RELAY') {
                       sendRes = retryRes;
@@ -3393,7 +3452,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 } catch (_dErr) {}
               }
               if (mailbox) {
-                await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload).catch(() => {});
+                await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload, undefined, { notifyRecipient: true }).catch(() => {});
               }
             }
           } else {
@@ -3468,6 +3527,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             let sendRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
               messageId: msgId,
               conversationId,
+              notifyRecipient: true,
             });
 
             if (sendRes.status === 'QUEUED' && (sendRes.errorMessage?.includes('404') || sendRes.errorMessage?.includes('expired') || sendRes.errorMessage?.includes('not found') || !targetContact?.mailboxId)) {
@@ -3478,6 +3538,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   const retryRes = await netManager.sendEnvelope(activeSession, effectiveMailboxId, wirePayloadBase64, undefined, {
                     messageId: msgId,
                     conversationId,
+                    notifyRecipient: true,
                   });
                   if (retryRes.status === 'SENT_TO_RELAY') {
                     sendRes = retryRes;
@@ -4990,6 +5051,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       idMgr,
       store,
       notificationDispatcher,
+      enableBackgroundPushNotifications,
+      disableBackgroundPushNotifications,
       contactRequestManager,
       directoryClient,
       cloudClient,
@@ -5085,6 +5148,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       idMgr,
       store,
       notificationDispatcher,
+      enableBackgroundPushNotifications,
+      disableBackgroundPushNotifications,
       contactRequestManager,
       directoryClient,
       cloudClient,

@@ -1,5 +1,15 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 114 Update — Android Background Push
+- Implemented opt-in Android FCM background alerts with a data-only `kind=message` payload. Only text/media/voice sends include a one-bit `notifyRecipient` hint; read receipts/control envelopes do not trigger pushes. Native code ignores server-supplied display content and shows fixed generic text.
+- Added capability-authenticated token register/unregister endpoints, relay store persistence (memory/file/PostgreSQL migration), FCM HTTP v1 service-account OAuth, token cleanup, and one-mailbox-per-device-token reassignment.
+- Added Settings disclosure and enable/disable control. Silent Counter automatically turns push off. Push remains disabled until the user opts in.
+- Added `docs/PUSH_NOTIFICATIONS.md`, `docs/ai/THREAT_MODEL_PUSH.md`, ADR-127, phase docs, and `tests/phase114-push-delivery.test.ts`.
+- Verification: push-focused suites passed (10 tests), related notification/sticker suites passed (9 tests), and `npm run typecheck` passed. Full suite was interrupted with widespread sandbox loopback/recovery endpoint failures and no final summary. Gradle/device validation remains outstanding due daemon loopback restrictions.
+- External activation still needs Firebase app config at `android/app/google-services.json` plus relay env `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_JSON`. The service-account key must stay server-side.
+- Production deployment remains gated on independent security review, explicit dual sign-off, Firebase setup, and physical Android validation.
+- Preserve unrelated existing edits: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, `business-card/`. The interrupted full test run also left untracked `.veil_persist_regression_temp/` and `.veil_test_sql_recovery_suite/`; inspect before cleanup.
+
 ## Phase 111 Update — Sticker Responses & Outbound Queue
 - Fixed sticker fetches to reject non-image HTTP 200 bodies and continue through image proxies.
 - Fixed `syncMailbox` to flush queued outbound envelopes after an empty successful fetch; queued message status now reflects `QUEUED`.

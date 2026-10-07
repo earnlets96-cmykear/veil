@@ -2,6 +2,23 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 114] - 2026-10-07
+
+### Added
+- Added opt-in Android background push with Firebase Messaging, capability-authenticated relay token registration, persistent token storage, and FCM HTTP v1 delivery.
+- Push messages contain only a generic event; Android renders constant notification text and the client retrieves encrypted messages through its normal mailbox sync.
+- Enforced a single mailbox association per device token; added explicit Settings disclosure and automatic disablement in Silent Counter mode.
+- Added ADR-127, `docs/ai/THREAT_MODEL_PUSH.md`, and Firebase/relay setup instructions.
+
+### Verification
+- Push registration, privacy payload, offline retry, and FCM service suites: 10 tests passed.
+- `npm run typecheck` passed.
+- Full `npm test` was interrupted after repeat sandbox-denied local relay/recovery server failures; no full-suite completion claim.
+- Android Gradle/device verification remains outstanding; Firebase configuration is absent.
+
+### Release gates
+- Independent security review, explicit dual sign-off, and physical Android validation are required before deployment.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Phase 113] - 2026-10-07

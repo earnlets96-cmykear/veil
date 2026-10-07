@@ -15,17 +15,20 @@ export class PersistentFileRelayStore implements IRelayStore {
   private baseDir: string;
   private mailboxesFile: string;
   private profilesFile: string;
+  private pushTokensFile: string;
   private envelopesDir: string;
   private mailboxes = new Map<string, MailboxRecord>();
   private envelopes = new Map<string, Map<string, RelayEnvelope>>();
   private profilesByUsername = new Map<string, SignedProfileDocument>();
   private profilesByIdentity = new Map<string, SignedProfileDocument>();
+  private pushTokens = new Map<string, Set<string>>();
   private initialized = false;
 
   constructor(baseDir = path.join(process.cwd(), '.veil_relay_data')) {
     this.baseDir = baseDir;
     this.mailboxesFile = path.join(baseDir, 'mailboxes.json');
     this.profilesFile = path.join(baseDir, 'profiles.json');
+    this.pushTokensFile = path.join(baseDir, 'push-tokens.json');
     this.envelopesDir = path.join(baseDir, 'envelopes');
   }
 
@@ -57,6 +60,15 @@ export class PersistentFileRelayStore implements IRelayStore {
         for (const prof of list) {
           this.profilesByUsername.set(prof.username, prof);
           this.profilesByIdentity.set(prof.identityId, prof);
+        }
+      } catch (_e) {}
+    }
+
+    if (fs.existsSync(this.pushTokensFile)) {
+      try {
+        const saved = JSON.parse(fs.readFileSync(this.pushTokensFile, 'utf8')) as Record<string, string[]>;
+        for (const [mailboxId, tokens] of Object.entries(saved)) {
+          if (Array.isArray(tokens)) this.pushTokens.set(mailboxId, new Set(tokens.filter((token) => typeof token === 'string')));
         }
       } catch (_e) {}
     }
@@ -99,6 +111,7 @@ export class PersistentFileRelayStore implements IRelayStore {
     this.assertInit();
     const existed = this.mailboxes.delete(mailboxId);
     this.envelopes.delete(mailboxId);
+    this.pushTokens.delete(mailboxId);
 
     const mbFile = path.join(this.envelopesDir, `${mailboxId}.json`);
     if (fs.existsSync(mbFile)) {
@@ -108,7 +121,33 @@ export class PersistentFileRelayStore implements IRelayStore {
     }
 
     await this.persistMailboxes();
+    await this.persistPushTokens();
     return existed;
+  }
+
+  public async registerPushToken(mailboxId: string, token: string): Promise<void> {
+    this.assertInit();
+    for (const [ownerMailboxId, tokens] of this.pushTokens) {
+      tokens.delete(token);
+      if (tokens.size === 0) this.pushTokens.delete(ownerMailboxId);
+    }
+    const tokens = this.pushTokens.get(mailboxId) ?? new Set<string>();
+    tokens.add(token);
+    this.pushTokens.set(mailboxId, tokens);
+    await this.persistPushTokens();
+  }
+
+  public async removePushToken(mailboxId: string, token: string): Promise<void> {
+    this.assertInit();
+    const tokens = this.pushTokens.get(mailboxId);
+    tokens?.delete(token);
+    if (tokens?.size === 0) this.pushTokens.delete(mailboxId);
+    await this.persistPushTokens();
+  }
+
+  public async listPushTokens(mailboxId: string): Promise<string[]> {
+    this.assertInit();
+    return [...(this.pushTokens.get(mailboxId) ?? [])];
   }
 
   public async saveEnvelope(envelope: RelayEnvelope): Promise<void> {
@@ -301,6 +340,7 @@ export class PersistentFileRelayStore implements IRelayStore {
     this.envelopes.clear();
     this.profilesByUsername.clear();
     this.profilesByIdentity.clear();
+    this.pushTokens.clear();
     if (fs.existsSync(this.baseDir)) {
       try {
         fs.rmSync(this.baseDir, { recursive: true, force: true });
@@ -321,6 +361,15 @@ export class PersistentFileRelayStore implements IRelayStore {
     const tmp = `${this.profilesFile}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
     fs.renameSync(tmp, this.profilesFile);
+  }
+
+  private async persistPushTokens(): Promise<void> {
+    const record = Object.fromEntries(
+      Array.from(this.pushTokens, ([mailboxId, tokens]) => [mailboxId, Array.from(tokens)])
+    );
+    const tmp = `${this.pushTokensFile}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(record), 'utf8');
+    fs.renameSync(tmp, this.pushTokensFile);
   }
 
   private async persistMailboxEnvelopes(mailboxId: string): Promise<void> {

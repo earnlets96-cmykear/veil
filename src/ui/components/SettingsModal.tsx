@@ -16,6 +16,7 @@ import { useApp } from '../app/AppState.tsx';
 import { NotificationPrivacyMode } from '../../notifications/types.ts';
 import {
   getNotificationPermissionStatus,
+  isNativeNotificationPlatform,
   NotificationPermissionStatus,
   openNativeNotificationSettings,
   requestNativeNotificationPermission,
@@ -91,6 +92,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     idMgr,
     store,
     notificationDispatcher,
+    enableBackgroundPushNotifications,
+    disableBackgroundPushNotifications,
     exportMyInvitation,
     myProfile,
     privacySettings,
@@ -223,6 +226,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     return 'comfortable';
   });
   const [cacheCleared, setCacheCleared] = useState(false);
+  const [backgroundPushEnabled, setBackgroundPushEnabled] = useState(() =>
+    typeof window !== 'undefined' && window.localStorage.getItem('veil:background-push-enabled') === 'true'
+  );
 
   React.useEffect(() => {
     if (activeCategory !== 'notifications') return;
@@ -246,10 +252,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     });
   };
 
+  const handleEnableBackgroundPush = async () => {
+    try {
+      await enableBackgroundPushNotifications();
+      setBackgroundPushEnabled(true);
+      showToast({ type: 'success', message: 'Background message alerts are enabled for this device.' });
+    } catch (error) {
+      showToast({ type: 'error', message: getErrorMessage(error, 'Could not enable background alerts. Check Firebase setup and relay availability.') });
+    }
+  };
+
+  const handleDisableBackgroundPush = async () => {
+    try {
+      await disableBackgroundPushNotifications();
+      setBackgroundPushEnabled(false);
+      showToast({ type: 'success', message: 'Background message alerts are disabled.' });
+    } catch (error) {
+      setBackgroundPushEnabled(false);
+      showToast({ type: 'error', message: getErrorMessage(error, 'Background alerts may still be registered on the relay.') });
+    }
+  };
+
   const handleNotificationPrivacyChange = (mode: NotificationPrivacyMode) => {
     setNotifLevel(mode);
     notificationDispatcher?.setPrivacyMode(mode);
     try { localStorage.setItem('veil:notifications:privacy-mode', mode); } catch {}
+    if (mode === 'SILENT_COUNTER' && backgroundPushEnabled) {
+      setBackgroundPushEnabled(false);
+      void disableBackgroundPushNotifications().catch(() => {});
+    }
   };
 
   const handleTestNotification = async () => {
@@ -960,6 +991,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                   </Button>
                 </div>
               </div>
+              {isNativeNotificationPlatform() && (
+                <div className="veil-card" style={{ marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                    Alerts while VEIL is closed
+                  </h3>
+                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                    Uses Google Firebase push delivery. Google receives this device’s push token and delivery timing; the relay sees which encrypted sends may alert. Alerts contain only generic text, never message content. Background alerts are routed to one Space at a time on this device.
+                  </p>
+                  <Button
+                    variant={backgroundPushEnabled ? 'secondary' : 'primary'}
+                    onClick={() => void (backgroundPushEnabled ? handleDisableBackgroundPush() : handleEnableBackgroundPush())}
+                  >
+                    {backgroundPushEnabled ? 'Disable Background Alerts' : 'Enable Background Alerts'}
+                  </Button>
+                </div>
+              )}
               <div className="veil-card">
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
                   Notification Privacy Mode

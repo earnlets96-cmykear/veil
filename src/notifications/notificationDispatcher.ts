@@ -109,6 +109,11 @@ export class NotificationDispatcher {
     const payload = this.prepareNotification(event);
     if (!payload) return false;
 
+    // When Android is backgrounded and remote push is enabled, let the native
+    // Firebase service be the one alert. This avoids duplicate local + remote
+    // notifications if the WebSocket happens to remain alive in the background.
+    if (this.shouldDeferToBackgroundPush()) return false;
+
     if (isNativeNotificationPlatform()) {
       if (await getNotificationPermissionStatus() !== 'granted') return false;
       try {
@@ -132,5 +137,16 @@ export class NotificationDispatcher {
       }
     }
     return false;
+  }
+
+  private shouldDeferToBackgroundPush(): boolean {
+    if (!isNativeNotificationPlatform() || typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+      return false;
+    }
+    try {
+      return localStorage.getItem('veil:background-push-enabled') === 'true';
+    } catch {
+      return false;
+    }
   }
 }

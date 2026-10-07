@@ -12,6 +12,9 @@ export interface IRelayStore {
   createMailbox(record: MailboxRecord): Promise<void>;
   getMailbox(mailboxId: string): Promise<MailboxRecord | null>;
   deleteMailbox(mailboxId: string): Promise<boolean>;
+  registerPushToken(mailboxId: string, token: string): Promise<void>;
+  removePushToken(mailboxId: string, token: string): Promise<void>;
+  listPushTokens(mailboxId: string): Promise<string[]>;
   saveEnvelope(envelope: RelayEnvelope): Promise<void>;
   getEnvelope(mailboxId: string, envelopeId: string): Promise<RelayEnvelope | null>;
   listEnvelopes(mailboxId: string, limit: number): Promise<RelayEnvelope[]>;

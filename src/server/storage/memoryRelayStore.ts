@@ -14,6 +14,7 @@ export class MemoryRelayStore implements IRelayStore {
   private envelopes = new Map<string, Map<string, RelayEnvelope>>();
   private profilesByUsername = new Map<string, SignedProfileDocument>();
   private profilesByIdentity = new Map<string, SignedProfileDocument>();
+  private pushTokens = new Map<string, Set<string>>();
   private initialized = false;
 
   public async init(): Promise<void> {
@@ -39,7 +40,31 @@ export class MemoryRelayStore implements IRelayStore {
     this.assertInit();
     const existed = this.mailboxes.delete(mailboxId);
     this.envelopes.delete(mailboxId);
+    this.pushTokens.delete(mailboxId);
     return existed;
+  }
+
+  public async registerPushToken(mailboxId: string, token: string): Promise<void> {
+    this.assertInit();
+    for (const [ownerMailboxId, tokens] of this.pushTokens) {
+      tokens.delete(token);
+      if (tokens.size === 0) this.pushTokens.delete(ownerMailboxId);
+    }
+    const tokens = this.pushTokens.get(mailboxId) ?? new Set<string>();
+    tokens.add(token);
+    this.pushTokens.set(mailboxId, tokens);
+  }
+
+  public async removePushToken(mailboxId: string, token: string): Promise<void> {
+    this.assertInit();
+    const tokens = this.pushTokens.get(mailboxId);
+    tokens?.delete(token);
+    if (tokens?.size === 0) this.pushTokens.delete(mailboxId);
+  }
+
+  public async listPushTokens(mailboxId: string): Promise<string[]> {
+    this.assertInit();
+    return [...(this.pushTokens.get(mailboxId) ?? [])];
   }
 
   public async saveEnvelope(envelope: RelayEnvelope): Promise<void> {
@@ -98,6 +123,7 @@ export class MemoryRelayStore implements IRelayStore {
       if (mb.expiresAt <= now) {
         this.mailboxes.delete(id);
         this.envelopes.delete(id);
+        this.pushTokens.delete(id);
         expiredMailboxes++;
       }
     }
@@ -216,6 +242,7 @@ export class MemoryRelayStore implements IRelayStore {
     this.envelopes.clear();
     this.profilesByUsername.clear();
     this.profilesByIdentity.clear();
+    this.pushTokens.clear();
     this.initialized = false;
   }
 

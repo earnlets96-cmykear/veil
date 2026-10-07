@@ -1,5 +1,16 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 114 — OPT-IN ANDROID BACKGROUND PUSH
+- **Status**: Client and relay push path implemented; provider/app credentials and device validation remain outstanding.
+- [x] Add generic FCM HTTP v1 sender with service-account access-token exchange and no sensitive provider error logging.
+- [x] Add capability-authenticated push token registration/removal and durable in-memory, file, and PostgreSQL storage.
+- [x] Keep one installation token associated with at most one mailbox; make push opt-in and disclose provider metadata in Settings.
+- [x] Add Android Firebase Messaging service that renders a fixed generic notification from a data-only push payload.
+- [x] Add push threat model, ADR-127, setup documentation, and positive/negative focused regressions.
+- [ ] Create Firebase project configuration, install `google-services.json`, and provide relay-only FCM credentials.
+- [ ] Compile the Android app and validate background, process-death, token rotation, permission, and Space-switch behavior on a device.
+- [ ] Complete the independent security review and explicit dual sign-off required by the post-RC security freeze before production deployment.
+
 ## Active Phase: PHASE 113 — ANDROID NOTIFICATION DELIVERY
 - **Status**: Native local notifications, permission prompt, settings access, and a test action implemented; TypeScript and focused tests pass. Native compilation blocked by Gradle daemon loopback failure.
 - [x] Register an Android Capacitor notification plugin and create a private notification channel.

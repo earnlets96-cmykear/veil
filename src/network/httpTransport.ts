@@ -52,10 +52,10 @@ export class HttpTransport {
     });
   }
 
-  public async sendEnvelope(mailboxId: string, payload: string, ttlSeconds?: number): Promise<SendEnvelopeResponse> {
+  public async sendEnvelope(mailboxId: string, payload: string, ttlSeconds?: number, notifyRecipient = false): Promise<SendEnvelopeResponse> {
     return this.request<SendEnvelopeResponse>('/v1/envelopes', {
       method: 'POST',
-      body: JSON.stringify({ mailboxId, payload, ttlSeconds }),
+      body: JSON.stringify({ mailboxId, payload, ttlSeconds, ...(notifyRecipient ? { notifyRecipient: true } : {}) }),
     });
   }
 
@@ -78,6 +78,20 @@ export class HttpTransport {
     return this.request<AckEnvelopesResponse>('/v1/envelopes/ack', {
       method: 'POST',
       body: JSON.stringify({ mailboxId, capabilityToken, envelopeIds }),
+    });
+  }
+
+  public async registerPushToken(mailboxId: string, capabilityToken: string, token: string): Promise<void> {
+    await this.request<{ success: boolean }>('/v1/push/register', {
+      method: 'POST',
+      body: JSON.stringify({ mailboxId, capabilityToken, token }),
+    });
+  }
+
+  public async unregisterPushToken(mailboxId: string, capabilityToken: string, token: string): Promise<void> {
+    await this.request<{ success: boolean }>('/v1/push/unregister', {
+      method: 'POST',
+      body: JSON.stringify({ mailboxId, capabilityToken, token }),
     });
   }
 

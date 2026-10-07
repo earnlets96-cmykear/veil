@@ -61,6 +61,19 @@ export class NetworkManager {
     return this.queue;
   }
 
+  public async registerPushToken(session: SpaceSession, token: string): Promise<void> {
+    this.assertSession(session);
+    const binding = await this.getOrCreateMailbox(session);
+    await this.http.registerPushToken(binding.mailboxId, binding.capabilityToken, token);
+  }
+
+  public async unregisterPushToken(session: SpaceSession, token: string): Promise<void> {
+    this.assertSession(session);
+    const binding = await this.getMailboxBinding(session);
+    if (!binding || binding.expiresAt <= Date.now()) return;
+    await this.http.unregisterPushToken(binding.mailboxId, binding.capabilityToken, token);
+  }
+
   public getConfig(): NetworkConfig {
     return this.config;
   }
@@ -141,7 +154,7 @@ export class NetworkManager {
     targetMailboxId: string,
     payload: string,
     ttlSeconds?: number,
-    metadata?: { messageId?: string; conversationId?: string }
+    metadata?: { messageId?: string; conversationId?: string; notifyRecipient?: boolean }
   ): Promise<QueuedOutboundEnvelope> {
     this.assertSession(session);
 
@@ -157,6 +170,7 @@ export class NetworkManager {
       retryCount: 0,
       messageId: metadata?.messageId,
       conversationId: metadata?.conversationId,
+      notifyRecipient: metadata?.notifyRecipient,
     };
 
     // 1. Always persist to encrypted outbound queue first (crash safety)
@@ -165,7 +179,7 @@ export class NetworkManager {
     // 2. Attempt immediate dispatch over HTTP
     try {
       await this.queue.updateOutboundStatus(session, queueId, 'SENDING');
-      await this.http.sendEnvelope(targetMailboxId, payload, ttlSeconds);
+      await this.http.sendEnvelope(targetMailboxId, payload, ttlSeconds, metadata?.notifyRecipient);
       
       // Successfully accepted by relay -> remove from outbound queue
       await this.queue.removeOutbound(session, queueId);
@@ -205,7 +219,7 @@ export class NetworkManager {
     for (const item of pending) {
       try {
         await this.queue.updateOutboundStatus(session, item.queueId, 'SENDING');
-        await this.http.sendEnvelope(item.mailboxId, item.payload, item.ttlSeconds);
+        await this.http.sendEnvelope(item.mailboxId, item.payload, item.ttlSeconds, item.notifyRecipient);
         await this.queue.removeOutbound(session, item.queueId);
         flushedCount++;
         if (this.onOutboundFlushed) {

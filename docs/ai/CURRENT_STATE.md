@@ -1,5 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 114 — OPT-IN ANDROID BACKGROUND PUSH
+- **Status**: Client registration, capability-authenticated relay registration, persistent token storage, FCM HTTP v1 sender, and generic native alert handler are implemented. TypeScript and focused tests pass. Android Gradle compilation/device behavior are not yet verified; Firebase project config and relay service-account credentials are not present.
+- **Changes**: Push is off until the user opts in from Settings. Only user-visible text/media/voice envelopes carry a one-bit notification hint; control envelopes do not trigger a push. The FCM payload contains only `kind=message`; Android renders a fixed generic alert and syncs the encrypted mailbox after relaunch. One installation token can map to one mailbox at a time, avoiding simultaneous cross-Space linkage. `SILENT_COUNTER` disables push.
+- **Verification**: Push-focused suites pass (10 tests); related notification/sticker suites pass (9 tests); `npm run typecheck` passes. Full `npm test` was started and interrupted after confirming broad failures on sandbox-denied loopback/recovery servers; it did not produce a final suite summary. Gradle/device checks remain blocked on the daemon loopback restriction and Firebase setup.
+- **Setup**: Follow `docs/PUSH_NOTIFICATIONS.md`. `android/app/google-services.json`, `FCM_PROJECT_ID`, and relay-only `FCM_SERVICE_ACCOUNT_JSON` are required to activate delivery.
+- **Security governance**: ADR-127 and `docs/ai/THREAT_MODEL_PUSH.md` document the provider metadata trade-off. Independent security review, explicit dual sign-off, and physical Android validation are mandatory before deployment.
+- **Scope**: Notification metadata and delivery only; no cryptographic protocol, identity key, or message content changes.
+
 ## Current Phase: PHASE 113 — ANDROID NOTIFICATION DELIVERY
 - **Status**: Native local notifications and an in-app permission/test flow are implemented. Android compilation is blocked before source compilation by Gradle's `Unable to establish loopback connection` error.
 - **Changes**: Registered a Capacitor notification plugin, added Android 13 runtime permission handling, a private lock-screen notification channel, notification settings deep-link, and a Settings test notification. Notification privacy modes now update the dispatcher and persist; Silent Counter suppresses system alerts.

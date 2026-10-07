@@ -1369,7 +1369,14 @@ This document records all architectural decisions made across the VEIL project l
 - **Consequences**: Local IndexedDB stores the encrypted attachment object plus ciphertext-only cache entries. Media keys stay in the encrypted Space record and E2EE envelope. Space lock clears plaintext RAM entries and Blob URLs but retains reusable ciphertext.
 - **Security review**: See `docs/ai/THREAT_MODEL_MEDIA.md`. The implementation remains frozen from deployment until adversarial suites, independent security audit, and explicit dual sign-off are complete.
 
+## ADR-127: Opt-In Android Background Push via Firebase Cloud Messaging
 
+- **Date**: 2026-10-07
+- **Status**: Accepted for implementation; production use is gated on Firebase setup, independent security review, and explicit dual sign-off.
+- **Context**: Android suspends or terminates the app process and WebSocket. Local notifications cannot alert a user when no process receives the relay event. The existing relay stores encrypted envelopes and sends WebSocket events only to live subscribers.
+- **Decision**: Add opt-in FCM data-only Android push. User-visible text/media/voice sends carry a one-bit `notifyRecipient` hint so the relay avoids pushing for control envelopes; the relay sends only `{ kind: "message" }`. Native code ignores remote display text and renders fixed generic notification copy. Push registration and removal require the target mailbox capability. Tokens are unique across relay mailboxes: registering the same token for another Space moves its single mailbox association instead of linking multiple Spaces concurrently. Settings discloses Google token/timing visibility and the relay's one-bit notification hint. The FCM service-account credential stays on the relay, never in the app or repository.
+- **Reason**: Provide Android background alerts while leaving end-to-end encrypted message retrieval and decryption in the client.
+- **Consequences**: FCM is an explicit opt-in exception to the zero-third-party-service default. Relay storage learns the current token-to-mailbox association and which envelope sends are user-visible; Google sees the app token and push timing but no mailbox identifier or message content. Background alerts follow one Space per device at a time. Message persistence is independent of provider success. `SILENT_COUNTER` disables push. Production release requires a documented threat model, adversarial tests, physical-device validation, explicit dual sign-off, and independent security audit.
 
 
 

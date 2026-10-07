@@ -19,6 +19,7 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
+import com.google.firebase.messaging.FirebaseMessaging
 
 @CapacitorPlugin(
     name = "VeilNotifications",
@@ -61,6 +62,32 @@ class VeilNotificationsPlugin : Plugin() {
             call.resolve()
         } catch (error: Exception) {
             call.reject("Unable to open notification settings", error)
+        }
+    }
+
+    @PluginMethod
+    fun registerForPush(call: PluginCall) {
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (!task.isSuccessful || task.result.isNullOrBlank()) {
+                    call.reject("Background push registration is unavailable")
+                } else {
+                    call.resolve(JSObject().put("token", task.result))
+                }
+            }
+        } catch (error: Exception) {
+            call.reject("Background push registration is unavailable")
+        }
+    }
+
+    @PluginMethod
+    fun deletePushToken(call: PluginCall) {
+        try {
+            FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener { task ->
+                if (task.isSuccessful) call.resolve() else call.reject("Unable to disable background push")
+            }
+        } catch (error: Exception) {
+            call.reject("Unable to disable background push")
         }
     }
 

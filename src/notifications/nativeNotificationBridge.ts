@@ -11,6 +11,8 @@ interface VeilNotificationsPlugin {
   requestPermission(): Promise<NativeNotificationResult>;
   show(options: { id: string; title: string; body: string }): Promise<void>;
   openSettings(): Promise<void>;
+  registerForPush(): Promise<{ token: string }>;
+  deletePushToken(): Promise<void>;
 }
 
 const nativeNotifications = registerPlugin<VeilNotificationsPlugin>('VeilNotifications');
@@ -51,4 +53,15 @@ export const showNativeNotification = async (payload: {
   body: string;
 }): Promise<void> => {
   await nativeNotifications.show(payload);
+};
+
+export const registerForRemotePushToken = async (): Promise<string> => {
+  if (!isNativeNotificationPlatform()) throw new Error('Background push is available only in the Android app');
+  const result = await nativeNotifications.registerForPush();
+  if (!result.token) throw new Error('Android push registration returned no token');
+  return result.token;
+};
+
+export const deleteRemotePushToken = async (): Promise<void> => {
+  if (isNativeNotificationPlatform()) await nativeNotifications.deletePushToken();
 };

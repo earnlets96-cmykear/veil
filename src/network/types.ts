@@ -48,6 +48,7 @@ export interface QueuedOutboundEnvelope {
   errorMessage?: string;
   messageId?: string;
   conversationId?: string;
+  notifyRecipient?: boolean;
 }
 
 export interface QueuedInboundEnvelope {
