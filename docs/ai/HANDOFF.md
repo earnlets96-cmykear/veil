@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 118 Update — Sticker Cache, Avatar Consistency & Shared Media
+- Sticker image bytes are cached in a bounded IndexedDB store (300 assets / 64 MiB maximum) using a SHA-256 URL digest as the record key; raw URLs are not stored as identifiers. In-flight fetches are deduplicated and direct/relay image routes are raced.
+- Shared avatars now render through a clipped `<img>` with `object-fit: cover`, and keep deterministic initials/group fallbacks visible if image loading fails. Direct conversation headers and message peers resolve the current contact avatar before legacy conversation fields.
+- Shared-media entries flatten both `attachment` and `attachments`; grouped photos/files now appear in their corresponding tabs. The gallery asks MediaImage for the authenticated full-resolution source.
+- Added `tests/phase118-sticker-avatar-gallery.test.tsx` and updated legacy assertions for the current avatar, relay route, and drawer sizing behavior. Nine focused sticker/media/avatar/gallery suites pass (84 tests); `npm run typecheck` and `git diff --check` pass.
+- No cryptographic protocol or wire format changes. Android device validation is outstanding.
+
 ## Phase 117 Update — Confirmed Local Chat Deletion
 - Sidebar conversation rows now have a dedicated overflow action for Pin/Unpin and Delete chat. Delete asks for confirmation and clarifies that deletion is limited to the active Space; contacts, group membership, and other participants' copies remain.
 - Deletion writes encrypted `veil:ui:deleted_conversations` tombstones before changing visible state, then removes UI/direct/group history, pending outbound envelopes, and pending media outbox jobs. Recovery merge filters rows at or before the tombstone while retaining later messages.

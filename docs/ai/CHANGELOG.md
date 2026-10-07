@@ -2,6 +2,16 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 118] - 2026-10-08
+
+### Fixed
+- Persisted sticker image assets in a bounded IndexedDB cache, keyed by a digest so source URLs and embedded tokens are not stored as cache identifiers. Warm sticker loads reuse cached bytes after re-entry.
+- Standardized avatar image rendering and fallback behavior; direct conversations now prefer the current contact photo over stale conversation metadata.
+- Made the shared-media gallery include grouped attachments in both media and file tabs, and load authenticated full-resolution images instead of presenting blurred thumbnails as the final gallery image.
+
+### Verification
+- Added sticker-cache, avatar, and grouped-gallery regressions; 9 focused suites pass (84 tests), TypeScript passes, and `git diff --check` passes.
+
 ## [Phase 117] - 2026-10-08
 
 ### Added

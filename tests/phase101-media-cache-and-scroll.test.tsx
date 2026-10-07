@@ -80,7 +80,7 @@ describe('Phase 101: Media Cache, Timeline Scroll & CSS Geometry', () => {
       const css = fs.readFileSync(cssPath, 'utf8');
 
       expect(css).toContain('.veil-emoji-drawer-open {');
-      expect(css).toMatch(/height:\s*min\(320px,\s*44vh\)/);
+      expect(css).toMatch(/height:\s*min\(400px,\s*52dvh\)/);
     });
 
     it('verifies media loading placeholder matches container dimensions to prevent layout shifts', () => {

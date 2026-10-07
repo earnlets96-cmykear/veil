@@ -48,6 +48,7 @@ import {
 } from './icons/index.ts';
 import { Modal } from './ui/Modal.tsx';
 import type { UIConversation, UIMessage } from '../app/types.ts';
+import { resolveConversationAvatar } from '../utils/avatarPresentation.ts';
 
 function formatConversationTime(timestamp?: number): string {
   if (!timestamp) return '';
@@ -193,7 +194,7 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
       >
       <Avatar
         name={conv.name}
-        imageUrl={conv.avatar || contactAvatar}
+        imageUrl={resolveConversationAvatar(conv, contactAvatar)}
         size="md"
         isGroup={conv.type === 'group'}
         aria-label={`${conv.name} avatar`}

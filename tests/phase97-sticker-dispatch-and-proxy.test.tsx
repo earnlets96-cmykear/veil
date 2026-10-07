@@ -79,7 +79,7 @@ describe('Phase 97: Sticker Dispatch Reliability & Fallback Synthesis', () => {
       }
 
       // Proxy endpoint succeeds
-      if (urlStr.startsWith('/api/telegram-stickers/proxy?url=') || urlStr.startsWith('/v1/stickers/proxy?url=')) {
+      if (urlStr.startsWith('/api/telegram-stickers/proxy?url=') || urlStr.includes('/v1/stickers/proxy?url=')) {
         return new Response(mockStickerData, {
           status: 200,
           headers: { 'Content-Type': 'image/webp' },

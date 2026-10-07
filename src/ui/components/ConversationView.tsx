@@ -23,6 +23,7 @@ import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
 import type { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/types.ts';
 import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
+import { resolveConversationAvatar } from '../utils/avatarPresentation.ts';
 import { useVisualViewport } from '../hooks/useVisualViewport.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
@@ -2067,7 +2068,7 @@ export const ConversationView: React.FC = () => {
             >
               <Avatar
                 name={conversationName}
-                imageUrl={activeConversation?.avatar || activeContact?.avatar}
+                imageUrl={resolveConversationAvatar(activeConversation, activeContact?.avatar)}
                 size="md"
                 isGroup={activeConversation?.type === 'group'}
               />
@@ -2292,7 +2293,7 @@ export const ConversationView: React.FC = () => {
                 onToggleVoice={handleToggleVoice}
                 onSeekVoice={handleSeekVoice}
                 onRetry={handleRetryMessage}
-                peerAvatar={activeConversation?.avatar || activeConversation?.avatarUrl}
+                peerAvatar={resolveConversationAvatar(activeConversation, activeContact?.avatar)}
                 onReactionClick={handleReactionClick}
               />
             );
@@ -2844,7 +2845,7 @@ export const ConversationView: React.FC = () => {
                       }}
                     >
                       <Avatar
-                        src={conv.avatar || conv.avatarUrl}
+                        src={resolveConversationAvatar(conv, contacts.find((contact) => contact.identityId === conv.id)?.avatar)}
                         seed={conv.id}
                         name={conv.name}
                         size={36}

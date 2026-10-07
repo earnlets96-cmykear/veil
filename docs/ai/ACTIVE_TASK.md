@@ -1,5 +1,14 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 118 — STICKER CACHE, AVATAR CONSISTENCY & SHARED MEDIA
+- **Status**: Implemented and focused verified; Android device validation remains outstanding.
+- [x] Cache successful sticker images in bounded IndexedDB storage and reuse them after app re-entry.
+- [x] Resolve direct-contact avatars from current contact data and render image/fallback consistently.
+- [x] Include grouped attachments in Photos & Videos and Files gallery tabs.
+- [x] Prefer authenticated full-resolution media in the shared-media gallery.
+- [x] Add regressions and update affected legacy UI expectations.
+- [ ] Validate sticker cold/warm load, avatar consistency, full-resolution gallery photos, and files on Android devices.
+
 ## Active Phase: PHASE 117 — CONFIRMED LOCAL CHAT DELETION
 - **Status**: Implemented and focused verified; Phase 29 local-relay recovery integration remains sandbox-blocked.
 - [x] Add a separate conversation-row action menu with Pin/Unpin and Delete chat.

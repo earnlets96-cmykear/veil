@@ -20,7 +20,7 @@ export const StickerImage: React.FC<StickerImageProps> = ({
   imageClassName = '',
   loading = 'lazy',
 }) => {
-  const [source, setSource] = useState(url);
+  const [source, setSource] = useState('');
   const [status, setStatus] = useState<ImageStatus>(url ? 'loading' : 'error');
   const proxyAttemptedRef = useRef(false);
   const requestIdRef = useRef(0);
@@ -29,14 +29,31 @@ export const StickerImage: React.FC<StickerImageProps> = ({
   useEffect(() => {
     const requestId = ++requestIdRef.current;
     proxyAttemptedRef.current = false;
-    setSource(url);
+    setSource(url.startsWith('data:') || url.startsWith('blob:') ? url : '');
     setStatus(url ? 'loading' : 'error');
     if (activeBlobUrlRef.current) {
       URL.revokeObjectURL(activeBlobUrlRef.current);
       activeBlobUrlRef.current = null;
     }
 
+    let cancelled = false;
+    if (url && !url.startsWith('data:') && !url.startsWith('blob:')) {
+      void telegramStickerService.getCachedStickerBlob(url).then((cached) => {
+        if (cancelled || requestId !== requestIdRef.current) return;
+        if (cached) {
+          const blobUrl = URL.createObjectURL(cached);
+          activeBlobUrlRef.current = blobUrl;
+          setSource(blobUrl);
+        } else {
+          setSource(url);
+        }
+      }).catch(() => {
+        if (!cancelled && requestId === requestIdRef.current) setSource(url);
+      });
+    }
+
     return () => {
+      cancelled = true;
       if (requestIdRef.current === requestId) requestIdRef.current += 1;
       if (activeBlobUrlRef.current) {
         URL.revokeObjectURL(activeBlobUrlRef.current);
@@ -73,7 +90,7 @@ export const StickerImage: React.FC<StickerImageProps> = ({
         <span className="veil-sticker-image-unavailable" role="img" aria-label={`${alt} unavailable`}>
           <ImageIcon size={20} />
         </span>
-      ) : (
+      ) : source ? (
         <img
           key={source}
           src={source}
@@ -84,7 +101,7 @@ export const StickerImage: React.FC<StickerImageProps> = ({
           onLoad={() => setStatus('loaded')}
           onError={() => void handleError()}
         />
-      )}
+      ) : null}
     </span>
   );
 };

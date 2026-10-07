@@ -5,7 +5,7 @@
  * space avatars, and privacy-preserving presence indicators with SVG group icon.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { UsersIcon } from '../icons/index.ts';
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -37,6 +37,8 @@ export const Avatar: React.FC<AvatarProps> = ({
 }) => {
   const effectiveName = name || seed || 'User';
   const effectiveImageUrl = imageUrl || src;
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const showImage = Boolean(effectiveImageUrl && failedImageUrl !== effectiveImageUrl);
   const isNumericSize = typeof size === 'number';
   const sizeClass = isNumericSize ? '' : `veil-avatar-${size}`;
   const shapeClass = isSquare || isGroup ? 'veil-avatar-square' : '';
@@ -85,25 +87,34 @@ export const Avatar: React.FC<AvatarProps> = ({
       className={`veil-avatar ${sizeClass} ${shapeClass} ${className}`.trim()}
       style={{
         ...numericStyle,
-        background: effectiveImageUrl ? 'none' : getGradient(effectiveName, isGroup),
-        backgroundImage: effectiveImageUrl ? `url(${effectiveImageUrl})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        background: showImage ? 'none' : getGradient(effectiveName, isGroup),
+        overflow: 'hidden',
       }}
       role="img"
       aria-label={ariaLabel || (isGroup ? 'Group Avatar' : 'Peer Avatar')}
     >
-      {!effectiveImageUrl && (
-        <span aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', visibility: showImage ? 'hidden' : 'visible' }}>
           {isGroup ? <UsersIcon size={getGroupIconSize()} color="#ffffff" /> : getInitials(effectiveName)}
-        </span>
+      </span>
+
+      {showImage && (
+        <img
+          className="veil-avatar-image"
+          src={effectiveImageUrl}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailedImageUrl(effectiveImageUrl || null)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center' }}
+        />
       )}
 
       {status && (
         <span
           className={`veil-avatar-status veil-avatar-status-${status}`}
           aria-hidden="true"
+          style={{ zIndex: 2 }}
         />
       )}
     </div>

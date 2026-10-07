@@ -39,8 +39,10 @@ describe('Track 3: Contact Avatar Propagation & Chat Privacy', () => {
       <Avatar name="Alice Security" imageUrl={avatarUrl} size="md" />
     );
 
-    expect(html).toContain('background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)');
-    expect(html).not.toContain('<span aria-hidden="true"'); // No initials text span when image is present
+    expect(html).toContain('<img');
+    expect(html).toContain('src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="');
+    expect(html).toContain('class="veil-avatar-image"');
+    expect(html).toContain('object-fit:cover');
   });
 
   it('2. renders deterministic initials fallback when avatar is absent', () => {
@@ -48,7 +50,7 @@ describe('Track 3: Contact Avatar Propagation & Chat Privacy', () => {
       <Avatar name="Bob Developer" size="md" />
     );
 
-    expect(html).not.toContain('background-image');
+    expect(html).not.toContain('<img');
     expect(html).toContain('B'); // Initials fallback
     expect(html).toContain('veil-avatar-md');
   });
@@ -58,7 +60,7 @@ describe('Track 3: Contact Avatar Propagation & Chat Privacy', () => {
       <Avatar name="Secret Project Group" isGroup={true} size="md" />
     );
 
-    expect(html).not.toContain('background-image');
+    expect(html).not.toContain('<img');
     expect(html).toContain('<svg');
     expect(html).toContain('veil-avatar-square');
   });
@@ -412,7 +414,7 @@ describe('Track 3: Contact Avatar Propagation & Chat Privacy', () => {
     // Verify modal header & contact info
     expect(html).toContain('Verify Identity');
     expect(html).toContain('Dan');
-    expect(html).toContain('background-image:url(https://veil.secure/dan.jpg)');
+    expect(html).toContain('src="https://veil.secure/dan.jpg"');
 
     // Verify Chat Privacy & Media Permissions section
     expect(html).toContain('Chat Privacy &amp; Media Permissions');

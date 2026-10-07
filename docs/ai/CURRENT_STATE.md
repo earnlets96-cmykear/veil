@@ -1,5 +1,11 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 118 — STICKER CACHE, AVATAR CONSISTENCY & SHARED MEDIA
+- **Status**: Implemented and focused verified; Android device validation remains outstanding.
+- **Changes**: Sticker images now use a bounded IndexedDB asset cache (300 assets / 64 MiB) keyed by SHA-256 URL digests, deduplicate concurrent downloads, and race direct/relay fetch paths. Avatar images render consistently with `object-fit: cover` and a deterministic fallback, while direct chats prefer the latest contact avatar. The gallery flattens singular and grouped attachments for media and files tabs and requests authenticated full-resolution media for gallery photos.
+- **Verification**: 9 focused sticker, media, avatar, and gallery suites pass (84 tests); `npm run typecheck` and `git diff --check` pass. Android device validation remains outstanding.
+- **Scope**: UI/media cache changes only; no cryptographic protocol or wire format changes.
+
 ## Current Phase: PHASE 117 — CONFIRMED LOCAL CHAT DELETION
 - **Status**: Implemented; encrypted deletion tombstone, local history/queue cleanup, recovery filtering, and sidebar confirmation are in place. Focused regressions and TypeScript pass. Android/device interaction has not been separately exercised.
 - **Behavior**: Delete chat removes that conversation and its Space-local message history, unsent envelopes, and pending media jobs. It preserves the contact, group membership/key state, and other participants' copies. Timestamped tombstones suppress older recovery snapshots while allowing messages newer than deletion to form a new chat.

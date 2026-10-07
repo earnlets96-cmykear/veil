@@ -342,6 +342,9 @@ class TelegramStickerService {
   private inMemoryPacks = new Map<string, StickerPack>();
   private blobCache = new Map<string, Blob>();
   private syntheticFallbacks = new WeakSet<Blob>();
+  private inFlightBlobs = new Map<string, Promise<Blob>>();
+  private readonly assetLimit = 300;
+  private readonly assetByteLimit = 64 * 1024 * 1024;
 
   constructor() {
     // Populate in-memory map with built-in packs immediately
@@ -356,10 +359,13 @@ class TelegramStickerService {
 
     return new Promise((resolve) => {
       try {
-        const req = indexedDB.open('veil_stickers_db', 1);
+        const req = indexedDB.open('veil_stickers_db', 2);
         req.onupgradeneeded = () => {
           if (!req.result.objectStoreNames.contains('packs')) {
             req.result.createObjectStore('packs', { keyPath: 'id' });
+          }
+          if (!req.result.objectStoreNames.contains('assets')) {
+            req.result.createObjectStore('assets', { keyPath: 'cacheKey' });
           }
         };
         req.onsuccess = () => {
@@ -367,10 +373,90 @@ class TelegramStickerService {
           resolve(this.idbInstance);
         };
         req.onerror = () => resolve(null);
+        req.onblocked = () => resolve(null);
       } catch {
         resolve(null);
       }
     });
+  }
+
+  private async readCachedAsset(url: string): Promise<Blob | null> {
+    const cacheKey = await this.assetCacheKey(url);
+    if (!cacheKey) return null;
+    const db = await this.getIDB();
+    if (!db || !db.objectStoreNames.contains('assets')) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction('assets', 'readwrite');
+        const assets = tx.objectStore('assets');
+        const request = assets.get(cacheKey);
+        request.onsuccess = () => {
+          const entry = request.result as { blob?: Blob } | undefined;
+          if (!entry?.blob || entry.blob.size === 0) return resolve(null);
+          assets.put({ ...entry, accessedAt: Date.now() });
+          resolve(entry.blob);
+        };
+        request.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  private async persistAsset(url: string, blob: Blob): Promise<void> {
+    if (!url || !blob.size || blob.size > this.assetByteLimit || this.syntheticFallbacks.has(blob)) return;
+    const cacheKey = await this.assetCacheKey(url);
+    if (!cacheKey) return;
+    const db = await this.getIDB();
+    if (!db || !db.objectStoreNames.contains('assets')) return;
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction('assets', 'readwrite');
+        const assets = tx.objectStore('assets');
+        const all = assets.getAll();
+        all.onsuccess = () => {
+          const entries = (all.result || []) as Array<{ cacheKey: string; blob?: Blob; accessedAt?: number }>;
+          const retained = entries.filter((entry) => entry.cacheKey !== cacheKey);
+          const oldestFirst = [...retained].sort((a, b) => (a.accessedAt || 0) - (b.accessedAt || 0));
+          let retainedBytes = retained.reduce((total, entry) => total + (entry.blob?.size || 0), 0);
+          let retainedCount = retained.length;
+          while (
+            oldestFirst.length > 0 &&
+            (retainedCount >= this.assetLimit || retainedBytes + blob.size > this.assetByteLimit)
+          ) {
+            const oldest = oldestFirst.shift()!;
+            assets.delete(oldest.cacheKey);
+            retainedCount -= 1;
+            retainedBytes -= oldest.blob?.size || 0;
+          }
+          assets.put({ cacheKey, blob, accessedAt: Date.now() });
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  private async assetCacheKey(url: string): Promise<string | null> {
+    try {
+      const subtle = globalThis.crypto?.subtle;
+      if (!subtle) return null;
+      const digest = await subtle.digest('SHA-256', new TextEncoder().encode(url));
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    } catch {
+      return null;
+    }
+  }
+
+  private async rememberAsset(url: string, blob: Blob): Promise<Blob> {
+    this.blobCache.set(url, blob);
+    // Persist before reporting a successful load so closing/re-entering VEIL
+    // cannot lose a sticker that has already appeared in the picker.
+    await this.persistAsset(url, blob);
+    return blob;
   }
 
   /**
@@ -690,6 +776,57 @@ class TelegramStickerService {
     return null;
   }
 
+  /** Race a direct CDN request with the configured relay proxy; the first valid
+   * image wins so a slow CORS/CDN timeout does not block sticker rendering. */
+  private async fetchFirstValidImage(candidates: string[]): Promise<Blob | null> {
+    const urls = Array.from(new Set(candidates.filter(Boolean)));
+    if (urls.length === 0) return null;
+    const controller = new AbortController();
+    let settled = false;
+    let remaining = urls.length;
+    const launchTimers: ReturnType<typeof setTimeout>[] = [];
+
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        launchTimers.forEach(clearTimeout);
+        controller.abort();
+        resolve(null);
+      }, 5000);
+
+      const finish = (blob: Blob | null) => {
+        remaining -= 1;
+        if (blob && !settled) {
+          settled = true;
+          clearTimeout(timeout);
+          launchTimers.forEach(clearTimeout);
+          controller.abort();
+          resolve(blob);
+        } else if (remaining === 0 && !settled) {
+          settled = true;
+          clearTimeout(timeout);
+          resolve(null);
+        }
+      };
+
+      const start = (candidate: string) => {
+        void (async () => {
+          try {
+            const response = await fetch(candidate, { cache: 'force-cache', signal: controller.signal });
+            finish(await this.readImageResponse(response));
+          } catch {
+            finish(null);
+          }
+        })();
+      };
+      urls.forEach((candidate, index) => {
+        if (index === 0) start(candidate);
+        else launchTimers.push(setTimeout(() => { if (!settled) start(candidate); }, index * 120));
+      });
+    });
+  }
+
   /**
    * Fetches a sticker image as a binary Blob, handling data URLs, on-demand server file proxies,
    * direct CDN requests, multi-tier proxy relays, and an optional legacy synthetic fallback.
@@ -698,6 +835,30 @@ class TelegramStickerService {
   public async fetchStickerBlob(
     url: string,
     options: { allowSyntheticFallback?: boolean } = {}
+  ): Promise<Blob> {
+    const inFlightKey = `${url}\u0000${options.allowSyntheticFallback === false ? 'strict' : 'fallback'}`;
+    const inFlight = this.inFlightBlobs.get(inFlightKey);
+    if (inFlight) return inFlight;
+    const request = this.fetchStickerBlobUncached(url, options);
+    this.inFlightBlobs.set(inFlightKey, request);
+    try {
+      return await request;
+    } finally {
+      if (this.inFlightBlobs.get(inFlightKey) === request) this.inFlightBlobs.delete(inFlightKey);
+    }
+  }
+
+  public async getCachedStickerBlob(url: string): Promise<Blob | null> {
+    const memory = this.blobCache.get(url);
+    if (memory && !this.syntheticFallbacks.has(memory)) return memory;
+    const persisted = await this.readCachedAsset(url);
+    if (persisted) this.blobCache.set(url, persisted);
+    return persisted;
+  }
+
+  private async fetchStickerBlobUncached(
+    url: string,
+    options: { allowSyntheticFallback?: boolean }
   ): Promise<Blob> {
     if (!url) {
       if (options.allowSyntheticFallback === false) {
@@ -715,14 +876,19 @@ class TelegramStickerService {
       this.blobCache.delete(url);
     }
 
+    const persisted = await this.readCachedAsset(url);
+    if (persisted) {
+      this.blobCache.set(url, persisted);
+      return persisted;
+    }
+
     // 1. Data URLs (SVG / WebP data strings)
     if (url.startsWith('data:')) {
       try {
         const res = await fetch(url);
         const blob = await this.readImageResponse(res);
         if (blob) {
-          this.blobCache.set(url, blob);
-          return blob;
+          return await this.rememberAsset(url, blob);
         }
       } catch {
         // Fall through
@@ -734,7 +900,7 @@ class TelegramStickerService {
       try {
         const res = await fetch(url);
         const blob = await this.readImageResponse(res);
-        if (blob) return blob;
+          if (blob) return await this.rememberAsset(url, blob);
       } catch {
         // Fall through
       }
@@ -757,66 +923,44 @@ class TelegramStickerService {
     // origin from the relay, so go straight to the relay instead of waiting on a
     // known-missing app-origin route first.
     if (url.startsWith('/')) {
-      const candidates =
-        relayIsSameOrigin || !relayHttpUrl ? [url] : [`${relayHttpUrl.replace(/\/+$/, '')}${url}`];
-      for (const candidate of candidates) {
+      const candidates: string[] = [url];
+      if (relayHttpUrl) {
+        const cleanRelay = relayHttpUrl.replace(/\/+$/, '');
         try {
-          const res = await fetch(candidate, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
-          const blob = await this.readImageResponse(res);
-          if (blob) {
-            this.blobCache.set(url, blob);
-            return blob;
-          }
+          const relayFileUrl = new URL(url, `${cleanRelay}/`).toString();
+          if (!relayIsSameOrigin) candidates.push(relayFileUrl);
+          candidates.push(`${cleanRelay}/v1/stickers/proxy?url=${encodeURIComponent(relayFileUrl)}`);
         } catch {}
       }
+      if (PRODUCTION_RELAY_URL && PRODUCTION_RELAY_URL !== relayHttpUrl) {
+        const cleanProd = PRODUCTION_RELAY_URL.replace(/\/+$/, '');
+        try {
+          const prodFileUrl = new URL(url, `${cleanProd}/`).toString();
+          candidates.push(`${cleanProd}/v1/stickers/proxy?url=${encodeURIComponent(prodFileUrl)}`);
+        } catch {}
+      }
+      const blob = await this.fetchFirstValidImage(candidates);
+      if (blob) return await this.rememberAsset(url, blob);
     }
 
     // 4. External URLs: Direct fetch with short timeout
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      try {
-        const res = await fetch(url, { cache: 'force-cache', signal: AbortSignal.timeout(3500) });
-        const blob = await this.readImageResponse(res);
-        if (blob) {
-          this.blobCache.set(url, blob);
-          return blob;
-        }
-      } catch {}
-
       // 5. The relay proxy handles CORS and hotlink restrictions. Relative app
       // origin proxy URLs are skipped: in native/hosted builds they are a dead end.
+      const candidates = [url];
       if (relayHttpUrl) {
         const cleanRelay = relayHttpUrl.replace(/\/+$/, '');
-        const relayProxies = [
-          `${cleanRelay}/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
-        ];
-        for (const ep of relayProxies) {
-          try {
-            const res = await fetch(ep, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
-            const blob = await this.readImageResponse(res);
-            if (blob) {
-              this.blobCache.set(url, blob);
-              return blob;
-            }
-          } catch {}
-        }
+        candidates.push(`${cleanRelay}/v1/stickers/proxy?url=${encodeURIComponent(url)}`);
       }
 
       // C. Production relay fallback if different from relayHttpUrl
       if (PRODUCTION_RELAY_URL && PRODUCTION_RELAY_URL !== relayHttpUrl) {
         const cleanProd = PRODUCTION_RELAY_URL.replace(/\/+$/, '');
-        const prodProxies = [
-          `${cleanProd}/v1/stickers/proxy?url=${encodeURIComponent(url)}`,
-        ];
-        for (const ep of prodProxies) {
-          try {
-            const res = await fetch(ep, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
-            const blob = await this.readImageResponse(res);
-            if (blob) {
-              this.blobCache.set(url, blob);
-              return blob;
-            }
-          } catch {}
-        }
+        candidates.push(`${cleanProd}/v1/stickers/proxy?url=${encodeURIComponent(url)}`);
+      }
+      const blob = await this.fetchFirstValidImage(candidates);
+      if (blob) {
+        return await this.rememberAsset(url, blob);
       }
     }
 
@@ -847,8 +991,7 @@ class TelegramStickerService {
           img.src = url;
         });
         if (canvasBlob) {
-          this.blobCache.set(url, canvasBlob);
-          return canvasBlob;
+          return await this.rememberAsset(url, canvasBlob);
         }
       } catch {}
     }

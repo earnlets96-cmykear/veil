@@ -19,6 +19,7 @@ export interface MediaImageProps {
   alt?: string;
   className?: string;
   isVideo?: boolean;
+  preferFullResolution?: boolean;
 }
 
 const MediaImageComponent: React.FC<MediaImageProps> = ({
@@ -27,6 +28,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
   alt = 'Encrypted media',
   className = '',
   isVideo = false,
+  preferFullResolution = false,
 }) => {
   const { activeSession, cloudClient, ensureCloudSession } = useApp();
   const key = attachment.objectId || attachment.attachmentId || attachment.name;
@@ -45,7 +47,12 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
   // Blob URLs are trusted if in RAM cache, media state, or provided preview
   const activeBlobUrl = media?.blobUrl || null;
-  const displayUrl = activeBlobUrl || durableThumbnail || (attachment as any).url || null;
+  const hasEncryptedSource = Boolean(attachment.objectId || attachment.attachmentId);
+  const displayUrl = activeBlobUrl || (
+    preferFullResolution && hasEncryptedSource
+      ? null
+      : durableThumbnail || (attachment as any).url || null
+  );
   const isShowingThumbnail = !activeBlobUrl && Boolean(durableThumbnail);
 
   const [isLoading, setIsLoading] = useState(!media && !displayUrl);
@@ -329,7 +336,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
     );
   }
 
-  if (error && !displayUrl) {
+    if (error && !displayUrl) {
     if (isSticker) {
       return (
         <div

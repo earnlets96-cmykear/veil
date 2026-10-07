@@ -152,7 +152,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     if (!isPeer) return [];
     const docPhotos = (peerDoc as any)?.profilePhotos as string[] | undefined;
     if (docPhotos && docPhotos.length > 0) return docPhotos;
-    const singleAvatar = peerDoc?.avatar || peerContact?.avatar;
+    const singleAvatar = peerContact?.avatar || peerDoc?.avatar;
     return singleAvatar ? [singleAvatar] : [];
   })();
 

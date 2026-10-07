@@ -5,7 +5,7 @@
  * for browsing all shared media in a conversation.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   CloseIcon,
   ImageIcon,
@@ -22,6 +22,7 @@ import { IconButton } from '../ui/IconButton.tsx';
 import { MediaViewerItem } from './MediaViewer.tsx';
 import { MediaImage } from './MediaImage.tsx';
 import { MediaCache } from '../../utils/mediaCache.ts';
+import { getGalleryAttachmentEntries } from './galleryAttachments.ts';
 
 export interface MediaGalleryModalProps {
   conversationName: string;
@@ -41,36 +42,31 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
   const [activeTab, setActiveTab] = useState<'media' | 'files' | 'voice'>('media');
 
   // Filter conversation messages into categories
-  const mediaMessages = messages.filter(
-    (m) => m.attachment && (m.attachment.mimeType?.startsWith('image/') || m.attachment.mimeType?.startsWith('video/'))
-  );
-
-  const fileMessages = messages.filter(
-    (m) =>
-      m.attachment &&
-      !m.attachment.mimeType?.startsWith('image/') &&
-      !m.attachment.mimeType?.startsWith('video/')
-  );
+  const galleryEntries = useMemo(() => getGalleryAttachmentEntries(messages), [messages]);
+  const mediaEntries = galleryEntries.filter((entry) => entry.category === 'media');
+  const fileEntries = galleryEntries.filter((entry) => entry.category === 'file');
 
   const voiceMessages = messages.filter((m) => m.voice);
 
   const getMediaViewerItems = (): MediaViewerItem[] => {
-    return mediaMessages.map((m) => {
-      const key = m.attachment.objectId || m.attachment.attachmentId || m.attachment.name;
+    return mediaEntries.map(({ message, attachment, attachmentIndex }) => {
+      const key = attachment.objectId || attachment.attachmentId || attachment.name;
       const cached = MediaCache.get(key);
       return {
-        id: m.id,
-        type: m.attachment.mimeType?.startsWith('video/') ? 'video' : 'image',
-        url: cached?.blobUrl || m.attachment.previewUrl || m.attachment.url || '',
-        name: m.attachment.name || 'Attachment',
-        sizeBytes: m.attachment.sizeBytes,
-        mimeType: m.attachment.mimeType,
-        timestamp: m.timestamp,
-        senderName: m.senderName,
+        id: Array.isArray(message.attachments) && message.attachments.length > 1 ? `${message.id}_${attachmentIndex}` : message.id,
+        type: attachment.mimeType?.startsWith('video/') ? 'video' as const : 'image' as const,
+        url: cached?.blobUrl || attachment.previewUrl || attachment.url || '',
+        name: attachment.name || 'Attachment',
+        sizeBytes: attachment.sizeBytes,
+        mimeType: attachment.mimeType,
+        timestamp: message.timestamp,
+        senderName: message.senderName,
+        attachment,
         data: cached?.data,
       };
     });
   };
+  const mediaViewerItems = getMediaViewerItems();
 
   const getFileIcon = (mimeType?: string, name?: string) => {
     const n = (name || '').toLowerCase();
@@ -144,7 +140,7 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
             onClick={() => setActiveTab('media')}
           >
             <ImageIcon size={18} />
-            <span>Photos & Videos ({mediaMessages.length})</span>
+            <span>Photos & Videos ({mediaEntries.length})</span>
           </button>
 
           <button
@@ -153,7 +149,7 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
             onClick={() => setActiveTab('files')}
           >
             <FileIcon size={18} />
-            <span>Files ({fileMessages.length})</span>
+            <span>Files ({fileEntries.length})</span>
           </button>
 
           <button
@@ -171,35 +167,36 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
           {/* 1. Photos & Videos Grid */}
           {activeTab === 'media' && (
             <>
-              {mediaMessages.length === 0 ? (
+              {mediaEntries.length === 0 ? (
                 <div className="veil-gallery-empty">
                   <ImageIcon size={48} color="var(--veil-text-muted)" />
                   <p>No photos or videos shared yet</p>
                 </div>
               ) : (
                 <div className="veil-gallery-grid">
-                  {mediaMessages.map((m, idx) => {
-                    const isVideo = m.attachment.mimeType?.startsWith('video/');
-                    const allItems = getMediaViewerItems();
-                    const item = allItems[idx];
+                  {mediaEntries.map((entry, idx) => {
+                    const { message, attachment } = entry;
+                    const isVideo = attachment.mimeType?.startsWith('video/');
+                    const item = mediaViewerItems[idx];
                     return (
                       <div
-                        key={m.id}
+                        key={item.id}
                         className="veil-gallery-item"
-                        onClick={() => onOpenMedia(item, allItems)}
+                        onClick={() => onOpenMedia(item, mediaViewerItems)}
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            onOpenMedia(item, allItems);
+                            onOpenMedia(item, mediaViewerItems);
                           }
                         }}
                       >
                         <MediaImage
-                          attachment={m.attachment}
+                          attachment={attachment}
                           isVideo={isVideo}
-                          alt={m.attachment.name}
+                          alt={attachment.name}
+                          preferFullResolution
                           className="veil-gallery-thumb-custom"
                         />
                       </div>
@@ -213,28 +210,28 @@ export const MediaGalleryModal: React.FC<MediaGalleryModalProps> = ({
           {/* 2. Files List */}
           {activeTab === 'files' && (
             <>
-              {fileMessages.length === 0 ? (
+              {fileEntries.length === 0 ? (
                 <div className="veil-gallery-empty">
                   <FileIcon size={48} color="var(--veil-text-muted)" />
                   <p>No files or documents shared yet</p>
                 </div>
               ) : (
                 <div className="veil-gallery-list">
-                  {fileMessages.map((m) => (
-                    <div key={m.id} className="veil-gallery-file-row">
+                  {fileEntries.map(({ message, attachment, attachmentIndex }) => (
+                    <div key={`${message.id}_${attachmentIndex}`} className="veil-gallery-file-row">
                       <div className="veil-gallery-file-icon">
-                        {getFileIcon(m.attachment.mimeType, m.attachment.name)}
+                        {getFileIcon(attachment.mimeType, attachment.name)}
                       </div>
                       <div className="veil-gallery-file-info">
-                        <div className="veil-gallery-file-name">{m.attachment.name}</div>
+                        <div className="veil-gallery-file-name">{attachment.name}</div>
                         <div className="veil-gallery-file-meta">
-                          {formatSize(m.attachment.sizeBytes)} • {formatDate(m.timestamp)}
+                          {formatSize(attachment.sizeBytes)} • {formatDate(message.timestamp)}
                         </div>
                       </div>
                       <IconButton
                         icon={<DownloadIcon size={18} />}
-                        onClick={() => onDownloadFile(m)}
-                        aria-label={`Download ${m.attachment.name}`}
+                        onClick={() => onDownloadFile({ ...message, attachment })}
+                        aria-label={`Download ${attachment.name}`}
                         variant="secondary"
                         size="sm"
                       />
