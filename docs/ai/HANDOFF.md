@@ -1,5 +1,11 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 110 Update — Dedicated Sticker Pack Viewer
+- Pack-linked sticker taps now open the dedicated pack preview, not the generic media viewer.
+- The message action menu offers both “View Sticker Pack” and “Add sticker pack”. The preview can install the pack from its own CTA.
+- Verification: 9 focused suites / 69 tests pass; TypeScript and production Vite build pass (existing mixed-import and large-chunk warnings remain).
+- Scope is UI only; no crypto, identity, or protocol code changed.
+
 ## Phase 108 Update — Sticker Loading & Touch Interaction
 - **Status**: Implemented and verified. Focused verification: 8 test files / 66 tests pass; TypeScript passes; production Vite build succeeds.
 - **Sticker loading**: `StickerImage` tries direct loading, then one strict proxy fetch. Failed assets become an explicit unavailable icon. Pack installation no longer schedules bursts of dozens of downloads with eight retries, and strict fetch callers reject synthetic fallback stars.

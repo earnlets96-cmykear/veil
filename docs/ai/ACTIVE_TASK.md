@@ -1,5 +1,12 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 110 — DEDICATED STICKER PACK VIEWER
+- **Status**: Implemented; focused regression and TypeScript checks pass.
+- [x] Route pack-linked sticker taps to the sticker pack preview rather than the generic media viewer.
+- [x] Add a separate “View Sticker Pack” context action while retaining the direct “Add sticker pack” action.
+- [x] Allow the sticker pack preview to open with a pack preloaded and still install it.
+- [x] Run the production web build.
+
 ## Active Phase: PHASE 108 — STICKER LOADING & TOUCH INTERACTION FIXES
 - **Status**: Implemented and focused verified; TypeScript and production web build pass.
 - **Branch**: `main` (existing unrelated user worktree changes preserved)

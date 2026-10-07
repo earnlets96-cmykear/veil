@@ -9,12 +9,14 @@ export interface AddStickerPackModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPackInstalled: (pack: StickerPack) => void;
+  initialPack?: StickerPack | null;
 }
 
 export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
   isOpen,
   onClose,
   onPackInstalled,
+  initialPack = null,
 }) => {
   const [inputUrl, setInputUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +32,19 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
   const featuredPacks = useMemo(() => telegramStickerService.getFeaturedPacks(), []);
 
   // Track installed packs to show "Installed" state
+  useEffect(() => {
+    if (!isOpen) {
+      setPreviewPack(null);
+      setError(null);
+      return;
+    }
+    if (initialPack) {
+      setPreviewPack(initialPack);
+      setInputUrl(initialPack.id);
+      setError(null);
+    }
+  }, [isOpen, initialPack]);
+
   useEffect(() => {
     if (isOpen) {
       telegramStickerService.getInstalledPacks().then((installed) => {

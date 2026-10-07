@@ -1,5 +1,11 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 110 — DEDICATED STICKER PACK VIEWER
+- **Status**: Implemented; focused regressions pass and TypeScript passes.
+- **Changes**: Pack-linked sticker taps now open the sticker pack preview instead of the generic media viewer. Message actions also offer a distinct “View Sticker Pack” option alongside “Add sticker pack”. The preview retains the add-to-VEIL action.
+- **Verification**: 9 focused suites pass (69 tests); `npx tsc --noEmit` passes; production Vite build passes with existing mixed-import and large-chunk warnings.
+- **Scope**: UI only; no cryptographic protocol or identity changes.
+
 ## Current Phase: PHASE 108 — STICKER LOADING & TOUCH INTERACTION FIXES
 - **Status**: Implemented; focused verification, TypeScript, and production web build pass.
 - **Changes**:

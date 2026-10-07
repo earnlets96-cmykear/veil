@@ -27,6 +27,8 @@ import { useVisualViewport } from '../hooks/useVisualViewport.ts';
 import { FileSaver } from '../utils/fileSaver.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
 import { telegramStickerService } from '../../media/telegramStickerService.ts';
+import type { StickerPack } from '../../media/telegramStickerService.ts';
+import { AddStickerPackModal } from './stickers/AddStickerPackModal.tsx';
 import { BackButtonManager } from '../utils/backButtonManager.ts';
 import { CHAT_BACK_EDGE_PX, shouldCompleteConversationBackSwipe } from '../utils/mobileGesturePhysics.ts';
 import {
@@ -116,6 +118,7 @@ interface ConversationMessageRowProps {
   onJumpToMessage: (id: string) => void;
   onOpenGroupedMedia: (msg: UIMessage, idx: number) => void;
   onOpenMedia: (msg: UIMessage) => void;
+  onOpenStickerPack: (msg: UIMessage) => void;
   onDownloadAttachment: (msg: UIMessage) => void;
   onToggleVoice: (msg: UIMessage) => void;
   onSeekVoice: (msg: UIMessage, percent: number) => void;
@@ -150,6 +153,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   onJumpToMessage,
   onOpenGroupedMedia,
   onOpenMedia,
+  onOpenStickerPack,
   onDownloadAttachment,
   onToggleVoice,
   onSeekVoice,
@@ -337,8 +341,10 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const handleSeek = useCallback((percent: number) => onSeekVoice(msg, percent), [onSeekVoice, msg]);
   const handleDownload = useCallback(() => onDownloadAttachment(msg), [onDownloadAttachment, msg]);
   const handleMediaClick = useCallback(() => {
-    if (!isSelectionMode) onOpenMedia(msg);
-  }, [isSelectionMode, onOpenMedia, msg]);
+    if (isSelectionMode) return;
+    if (isSticker) onOpenStickerPack(msg);
+    else onOpenMedia(msg);
+  }, [isSelectionMode, isSticker, onOpenMedia, onOpenStickerPack, msg]);
   const handleGroupedMedia = useCallback((idx: number) => onOpenGroupedMedia(msg, idx), [onOpenGroupedMedia, msg]);
   const handleReplyTriggerAction = useCallback(() => onReplyTrigger(msg), [onReplyTrigger, msg]);
   const handleRetryAction = useCallback(() => {
@@ -891,6 +897,7 @@ export const ConversationView: React.FC = () => {
   // Fullscreen Media Viewer State
   const [viewerItem, setViewerItem] = useState<MediaViewerItem | null>(null);
   const [viewerMediaList, setViewerMediaList] = useState<MediaViewerItem[]>([]);
+  const [stickerPackViewer, setStickerPackViewer] = useState<StickerPack | null>(null);
   const [chatBackOffset, setChatBackOffset] = useState(0);
 
   // Selection Mode State
@@ -1519,6 +1526,27 @@ export const ConversationView: React.FC = () => {
     setViewerMediaList(items);
     setViewerItem(items[currentIdx >= 0 ? currentIdx : 0]);
   }, []);
+
+  const handleOpenStickerPack = useCallback(async (msg: UIMessage) => {
+    setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+    const filename = msg.attachment?.name || '';
+    const packId = filename.includes('__') && filename.includes('.sticker.')
+      ? filename.split('__')[0]
+      : null;
+    if (!packId) {
+      handleOpenMedia(msg);
+      return;
+    }
+
+    try {
+      const installed = await telegramStickerService.getInstalledPacks();
+      const pack = installed.find((candidate) => candidate.id.toLowerCase() === packId.toLowerCase())
+        || await telegramStickerService.fetchTelegramPack(packId);
+      setStickerPackViewer(pack);
+    } catch (err: any) {
+      showToast({ type: 'error', message: err?.message || 'Could not open sticker pack' });
+    }
+  }, [handleOpenMedia, showToast]);
 
   const handleOpenGroupedMedia = useCallback((msg: UIMessage, index: number) => {
     if (!msg.attachments || msg.attachments.length === 0) return;
@@ -2234,6 +2262,7 @@ export const ConversationView: React.FC = () => {
                 onJumpToMessage={handleJumpToMessage}
                 onOpenGroupedMedia={handleOpenGroupedMedia}
                 onOpenMedia={handleOpenMedia}
+                onOpenStickerPack={handleOpenStickerPack}
                 onDownloadAttachment={handleDownloadAttachment}
                 onResolveAudioAttachment={handleResolveAudioAttachment}
                 onToggleVoice={handleToggleVoice}
@@ -2446,26 +2475,36 @@ export const ConversationView: React.FC = () => {
 
           {contextMenu.message.attachment?.name?.includes('__') &&
             contextMenu.message.attachment?.name?.includes('.sticker.') && (
-            <button
-              type="button"
-              className="veil-context-item"
-              onClick={async () => {
-                const target = contextMenu.message!;
-                const packId = target.attachment?.name?.split('__')[0];
-                setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
-                if (!packId) return;
-                try {
-                  const pack = await telegramStickerService.fetchTelegramPack(packId);
-                  await telegramStickerService.installStickerPack(pack);
-                  showToast({ type: 'success', message: `Added ${pack.title} sticker pack` });
-                } catch (err: any) {
-                  showToast({ type: 'error', message: err?.message || 'Could not add sticker pack' });
-                }
-              }}
-            >
-              <StarIcon size={16} />
-              <span>Add sticker pack</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="veil-context-item"
+                onClick={() => handleOpenStickerPack(contextMenu.message!)}
+              >
+                <ImageIcon size={16} />
+                <span>View Sticker Pack</span>
+              </button>
+              <button
+                type="button"
+                className="veil-context-item"
+                onClick={async () => {
+                  const target = contextMenu.message!;
+                  const packId = target.attachment?.name?.split('__')[0];
+                  setContextMenu({ isOpen: false, x: 0, y: 0, message: null });
+                  if (!packId) return;
+                  try {
+                    const pack = await telegramStickerService.fetchTelegramPack(packId);
+                    await telegramStickerService.installStickerPack(pack);
+                    showToast({ type: 'success', message: `Added ${pack.title} sticker pack` });
+                  } catch (err: any) {
+                    showToast({ type: 'error', message: err?.message || 'Could not add sticker pack' });
+                  }
+                }}
+              >
+                <StarIcon size={16} />
+                <span>Add sticker pack</span>
+              </button>
+            </>
           )}
 
           {contextMenu.message.voice && !contextMenu.message.attachment && (
@@ -2875,6 +2914,13 @@ export const ConversationView: React.FC = () => {
           }}
         />
       )}
+
+      <AddStickerPackModal
+        isOpen={Boolean(stickerPackViewer)}
+        initialPack={stickerPackViewer}
+        onClose={() => setStickerPackViewer(null)}
+        onPackInstalled={(pack) => showToast({ type: 'success', message: `Added ${pack.title} sticker pack` })}
+      />
 
       {/* Shared Media Gallery Modal */}
       {showGallery && (

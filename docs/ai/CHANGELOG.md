@@ -4,6 +4,16 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 110] - 2026-10-07
+
+### UI
+- Open pack-linked stickers in their dedicated sticker pack preview instead of the generic media viewer.
+- Added a separate “View Sticker Pack” context action while keeping “Add sticker pack” available.
+- Reused the sticker pack preview with the selected pack preloaded and its install action intact.
+
+### Verification
+- 9 focused suites passed (69 tests); TypeScript and production Vite build passed (existing mixed-import and large-chunk warnings remain).
+
 ## [Phase 108] - 2026-10-07
 
 ### Fixed
