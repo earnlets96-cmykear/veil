@@ -14,6 +14,12 @@
 import React, { useState, useRef, ReactNode } from 'react';
 import { useApp } from '../app/AppState.tsx';
 import { NotificationPrivacyMode } from '../../notifications/types.ts';
+import {
+  getNotificationPermissionStatus,
+  NotificationPermissionStatus,
+  openNativeNotificationSettings,
+  requestNativeNotificationPermission,
+} from '../../notifications/nativeNotificationBridge.ts';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import { MediaCache } from '../utils/mediaCache.ts';
 import { getErrorMessage } from '../../utils/errors.ts';
@@ -201,6 +207,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   const [notifLevel, setNotifLevel] = useState<NotificationPrivacyMode>(
     notificationDispatcher?.getPrivacyMode?.() || 'SENDER_ONLY'
   );
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionStatus>('default');
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showPairingSas, setShowPairingSas] = useState(false);
   const [themeVal, setThemeVal] = useState(() => {
@@ -216,6 +223,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     return 'comfortable';
   });
   const [cacheCleared, setCacheCleared] = useState(false);
+
+  React.useEffect(() => {
+    if (activeCategory !== 'notifications') return;
+    let active = true;
+    void getNotificationPermissionStatus().then((status) => {
+      if (active) setNotificationPermission(status);
+    });
+    return () => { active = false; };
+  }, [activeCategory]);
+
+  const handleEnableNotifications = async () => {
+    const status = await requestNativeNotificationPermission();
+    setNotificationPermission(status);
+    showToast({
+      type: status === 'granted' ? 'success' : 'error',
+      message: status === 'granted'
+        ? 'System notifications are enabled on this device.'
+        : status === 'unsupported'
+          ? 'System notifications are not supported on this device.'
+          : 'Notification permission was not granted. Check this app’s notification settings.',
+    });
+  };
+
+  const handleNotificationPrivacyChange = (mode: NotificationPrivacyMode) => {
+    setNotifLevel(mode);
+    notificationDispatcher?.setPrivacyMode(mode);
+    try { localStorage.setItem('veil:notifications:privacy-mode', mode); } catch {}
+  };
+
+  const handleTestNotification = async () => {
+    const delivered = await notificationDispatcher?.dispatch({
+      id: `settings-test-${Date.now()}`,
+      senderName: 'VEIL',
+      text: 'VEIL notification test',
+      timestamp: Date.now(),
+    });
+    showToast({
+      type: delivered ? 'success' : 'error',
+      message: delivered ? 'Test notification sent.' : 'Could not send a test notification. Check permission and app settings.',
+    });
+  };
 
   const handleSelectTheme = (themeId: string) => {
     setThemeVal(themeId);
@@ -887,23 +935,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
           {/* 5. NOTIFICATIONS SUB-PAGE */}
           {activeCategory === 'notifications' && (
             <div className="veil-settings-subpage">
+              <div className="veil-card" style={{ marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                  System Notifications
+                </h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  Permission status: {notificationPermission}. Allow VEIL to show notifications on this device, then send a test.
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <Button variant="primary" onClick={() => void handleEnableNotifications()}>
+                    Enable Notifications
+                  </Button>
+                  {notificationPermission === 'denied' && (
+                    <Button variant="secondary" onClick={() => void openNativeNotificationSettings()}>
+                      Open Notification Settings
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    disabled={notificationPermission !== 'granted'}
+                    onClick={handleTestNotification}
+                  >
+                    Send Test Notification
+                  </Button>
+                </div>
+              </div>
               <div className="veil-card">
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
                   Notification Privacy Mode
                 </h3>
                 <div className="veil-radio-group">
                   {[
-                    { id: 'full', label: 'Full Preview', desc: 'Shows sender name and message snippet' },
-                    { id: 'sender-only', label: 'Sender Only', desc: 'Shows sender name without message content' },
-                    { id: 'minimal-alert', label: 'Minimal Alert', desc: 'Shows "New encrypted message received"' },
-                    { id: 'silent-counter', label: 'Silent Counter', desc: 'Only updates unread badge counter' },
+                    { id: 'FULL_OBFUSCATED', label: 'Full Preview', desc: 'Shows sender name and message snippet' },
+                    { id: 'SENDER_ONLY', label: 'Sender Only', desc: 'Shows sender name without message content' },
+                    { id: 'HIDDEN', label: 'Minimal Alert', desc: 'Shows "New encrypted message received"' },
+                    { id: 'SILENT_COUNTER', label: 'Silent Counter', desc: 'Only updates unread badge counter' },
                   ].map((mode) => (
                     <label key={mode.id} className="veil-radio-label">
                       <input
                         type="radio"
                         name="notifPrivacy"
                         checked={notifLevel === mode.id}
-                        onChange={() => setNotifLevel(mode.id as NotificationPrivacyMode)}
+                        onChange={() => handleNotificationPrivacyChange(mode.id as NotificationPrivacyMode)}
                       />
                       <div>
                         <div style={{ fontWeight: 600 }}>{mode.label}</div>

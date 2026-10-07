@@ -1,5 +1,14 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 113 — ANDROID NOTIFICATION DELIVERY
+- **Status**: Native local notifications, permission prompt, settings access, and a test action implemented; TypeScript and focused tests pass. Native compilation blocked by Gradle daemon loopback failure.
+- [x] Register an Android Capacitor notification plugin and create a private notification channel.
+- [x] Request Android 13 notification permission and expose app notification settings for denied permissions.
+- [x] Add a Settings test notification and wire selected privacy modes into dispatch.
+- [x] Run focused notification/privacy tests and TypeScript validation.
+- [ ] Configure Firebase, register FCM device tokens, and add authenticated relay-side push sending for delivery after app suspension/termination.
+- [ ] Compile and exercise notifications on a physical Android device or emulator.
+
 ## Active Phase: PHASE 112 — STICKER LOADING PATH & NOTIFICATION DELIVERY REVIEW
 - **Status**: Sticker fixes implemented and focused verified; Android notification delivery requires a native notification integration.
 - [x] Keep the emoji/sticker drawer open after sending a sticker.

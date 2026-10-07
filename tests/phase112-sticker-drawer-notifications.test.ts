@@ -39,23 +39,23 @@ describe('sticker drawer and notification delivery regressions', () => {
     }
   });
 
-  it('dispatches a privacy-filtered system notification when browser permission is granted', () => {
+  it('dispatches a privacy-filtered system notification when browser permission is granted', async () => {
     const notificationMock = vi.fn();
     Object.defineProperty(globalThis, 'Notification', {
       configurable: true,
       value: Object.assign(notificationMock, { permission: 'granted' }),
     });
     const dispatcher = new NotificationDispatcher('SENDER_ONLY');
-    expect(dispatcher.dispatch({ conversationId: 'c1', senderName: 'Sam', text: 'secret message' })).toBe(true);
+    expect(await dispatcher.dispatch({ conversationId: 'c1', senderName: 'Sam', text: 'secret message' })).toBe(true);
     expect(notificationMock).toHaveBeenCalledWith('VEIL', expect.objectContaining({ body: 'New message from Sam' }));
     expect(notificationMock.mock.calls[0]?.[1]?.body).not.toContain('secret message');
   });
 
-  it('does not claim notification delivery when permission is unavailable', () => {
+  it('does not claim notification delivery when permission is unavailable', async () => {
     Object.defineProperty(globalThis, 'Notification', {
       configurable: true,
       value: Object.assign(vi.fn(), { permission: 'default' }),
     });
-    expect(new NotificationDispatcher().dispatch({ conversationId: 'c1', senderName: 'Sam' })).toBe(false);
+    expect(await new NotificationDispatcher().dispatch({ conversationId: 'c1', senderName: 'Sam' })).toBe(false);
   });
 });

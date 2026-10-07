@@ -4,6 +4,20 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 113] - 2026-10-07
+
+### Added
+- Added an Android Capacitor notification bridge with Android 13 permission requests, a private notification channel, and a link to system notification settings.
+- Added a Settings permission status and test notification action.
+- Wired notification privacy choices into dispatch, persisted the selected mode, and implemented Silent Counter suppression.
+
+### Verification
+- 5 focused notification suites passed (11 tests); `npx tsc --noEmit` passed.
+- Android Kotlin compilation is unverified: Gradle failed during daemon startup with `Unable to establish loopback connection`.
+
+### Remaining work
+- Notifications can be shown natively when VEIL is running and receives a message. Delivery after app suspension/termination needs Firebase configuration and relay-side push registration/sending; no `google-services.json` is present.
+
 ## [Phase 112] - 2026-10-07
 
 ### Fixed

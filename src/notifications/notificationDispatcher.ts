@@ -6,6 +6,11 @@
  */
 
 import { NotificationEvent, NotificationPrivacyMode } from './types.ts';
+import {
+  getNotificationPermissionStatus,
+  isNativeNotificationPlatform,
+  showNativeNotification,
+} from './nativeNotificationBridge.ts';
 
 export class NotificationDispatcher {
   private privacyMode: NotificationPrivacyMode = 'SENDER_ONLY';
@@ -13,7 +18,17 @@ export class NotificationDispatcher {
   private mutedConversations = new Set<string>();
 
   constructor(initialMode: NotificationPrivacyMode = 'SENDER_ONLY') {
-    this.privacyMode = initialMode;
+    this.privacyMode = this.readSavedPrivacyMode(initialMode);
+  }
+
+  private readSavedPrivacyMode(fallback: NotificationPrivacyMode): NotificationPrivacyMode {
+    try {
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('veil:notifications:privacy-mode') : null;
+      if (saved === 'HIDDEN' || saved === 'SENDER_ONLY' || saved === 'FULL_OBFUSCATED' || saved === 'SILENT_COUNTER') {
+        return saved;
+      }
+    } catch {}
+    return fallback;
   }
 
   public setMutedConversations(mutedIds: string[] | Set<string>): void {
@@ -65,6 +80,8 @@ export class NotificationDispatcher {
       };
     }
 
+    if (this.privacyMode === 'SILENT_COUNTER') return null;
+
     if (this.privacyMode === 'SENDER_ONLY') {
       const source = event.isGroup ? `${event.groupName || 'Group'}` : event.senderName;
       return {
@@ -86,11 +103,21 @@ export class NotificationDispatcher {
   }
 
   /**
-   * Dispatches via Web Notification API if permitted.
+   * Dispatches through Android's native notification bridge or the browser API.
    */
-  public dispatch(event: NotificationEvent): boolean {
+  public async dispatch(event: NotificationEvent): Promise<boolean> {
     const payload = this.prepareNotification(event);
     if (!payload) return false;
+
+    if (isNativeNotificationPlatform()) {
+      if (await getNotificationPermissionStatus() !== 'granted') return false;
+      try {
+        await showNativeNotification({ id: event.id, ...payload });
+        return true;
+      } catch {
+        return false;
+      }
+    }
 
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {

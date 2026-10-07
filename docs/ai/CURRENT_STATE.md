@@ -1,5 +1,12 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 113 — ANDROID NOTIFICATION DELIVERY
+- **Status**: Native local notifications and an in-app permission/test flow are implemented. Android compilation is blocked before source compilation by Gradle's `Unable to establish loopback connection` error.
+- **Changes**: Registered a Capacitor notification plugin, added Android 13 runtime permission handling, a private lock-screen notification channel, notification settings deep-link, and a Settings test notification. Notification privacy modes now update the dispatcher and persist; Silent Counter suppresses system alerts.
+- **Verification**: 5 notification-focused suites pass (11 tests); `npx tsc --noEmit` passed. Gradle compile was attempted but failed during daemon startup. No `android/app/google-services.json` exists and there is no FCM registration/send integration.
+- **Remaining requirement**: Background delivery after Android suspends or terminates VEIL requires Firebase project configuration, client token registration, and authenticated relay-side FCM sending.
+- **Scope**: Notification UX and native bridge only; no cryptographic protocol or identity changes.
+
 ## Current Phase: PHASE 112 — STICKER LOADING PATH & NOTIFICATION DELIVERY REVIEW
 - **Status**: Sticker drawer and relay loading fixes implemented; focused verification and TypeScript pass. Android notification delivery remains incomplete.
 - **Changes**: Kept the emoji drawer open after sticker selection. Sticker manifests and image fallback now use the configured relay directly when the app and relay origins differ, skip dead app-origin proxy hops, and allow browser HTTP caching. Notification dispatcher is verified for browser contexts with granted permission and privacy filtering.

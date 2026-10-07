@@ -2,7 +2,7 @@
  * Notification Privacy Types for VEIL.
  */
 
-export type NotificationPrivacyMode = 'HIDDEN' | 'SENDER_ONLY' | 'FULL_OBFUSCATED';
+export type NotificationPrivacyMode = 'HIDDEN' | 'SENDER_ONLY' | 'FULL_OBFUSCATED' | 'SILENT_COUNTER';
 
 export interface NotificationEvent {
   id: string;
