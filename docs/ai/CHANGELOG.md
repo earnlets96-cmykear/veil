@@ -4,6 +4,20 @@ All notable changes, architectural decisions, and security milestones across the
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Phase 108] - 2026-10-07
+
+### Fixed
+- Replaced fragile sticker `<img>` loading and unbounded retry loops with a shared proxy-backed loader and a clear unavailable state.
+- Stopped caching or sending decorative synthetic stickers as if they were the requested sticker assets.
+- Prevented message context menus from opening on ordinary taps and canceled long-press while the user scrolls or swipes.
+- Enabled left-swipe reply across voice cards while keeping waveform seeking limited to the waveform.
+
+### UI
+- Increased mobile emoji/sticker drawer height to `min(400px, 52dvh)`.
+
+### Verification
+- 8 focused suites passed (66 tests); `npx tsc --noEmit` passed; production Vite build passed with existing chunk-size and mixed-import warnings.
+
 ## [Phase 105] - 2026-10-07
 
 ### Performance

@@ -1,5 +1,18 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 108 — STICKER LOADING & TOUCH INTERACTION FIXES
+- **Status**: Implemented and focused verified; TypeScript and production web build pass.
+- **Branch**: `main` (existing unrelated user worktree changes preserved)
+
+### Phase 108 Tasks:
+- [x] Use one bounded proxy-backed image loader for sticker picker, pack thumbnails, and add-pack previews; show an explicit unavailable state on failure.
+- [x] Remove pack-wide eager retry/download bursts and prevent synthetic fallback stickers from being accepted by strict media recovery or send paths.
+- [x] Increase emoji/sticker drawer height for phone viewports.
+- [x] Open message actions only from deliberate context gestures; cancel long-press on scroll/swipe and prevent duplicate touch context menus.
+- [x] Enable reply swipe across non-waveform voice-card regions while preserving waveform-only seek gestures.
+- [x] Update regression expectations for bounded loading behavior.
+- [x] Verify focused suites (8 files, 66 tests), TypeScript, and production web build.
+
 ## Active Phase: PHASE 107 — ENCRYPTED MEDIA RESUME & CHAT RESPONSIVENESS
 - **Status**: Implementation complete; focused tests, TypeScript, and production Vite build pass. Full suite has environment/network failures; post-RC audit/sign-off required before deployment.
 - **Branch**: `main` (pre-existing unrelated worktree edits remain unstaged)

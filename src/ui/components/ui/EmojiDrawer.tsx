@@ -21,6 +21,7 @@ import {
   BUILT_IN_STICKER_PACKS,
 } from '../../../media/telegramStickerService.ts';
 import { AddStickerPackModal } from '../stickers/AddStickerPackModal.tsx';
+import { StickerImage } from '../stickers/StickerImage.tsx';
 
 export interface EmojiDrawerProps {
   isOpen: boolean;
@@ -226,52 +227,6 @@ interface StickerGridCellProps {
 }
 
 const StickerGridCell: React.FC<StickerGridCellProps> = ({ sticker, onClick }) => {
-  const [loadStatus, setLoadStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const [resolvedUrl, setResolvedUrl] = useState<string>(sticker.url);
-  const [retryKey, setRetryKey] = useState<number>(0);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-
-  useEffect(() => {
-    setResolvedUrl(sticker.url);
-    setLoadStatus('loading');
-  }, [sticker.url]);
-
-  // Synchronous completion check (handles pre-cached blobs and data URIs instantly)
-  useEffect(() => {
-    if (imgRef.current) {
-      if (imgRef.current.complete) {
-        if (imgRef.current.naturalWidth > 0) {
-          setLoadStatus('loaded');
-        } else if (imgRef.current.src) {
-          setLoadStatus('error');
-        }
-      }
-    }
-  }, [resolvedUrl, retryKey]);
-
-  useEffect(() => {
-    if (loadStatus === 'error') {
-      retryTimeoutRef.current = setTimeout(async () => {
-        try {
-          const blob = await telegramStickerService.fetchStickerBlob(sticker.url);
-          const blobUrl = URL.createObjectURL(blob);
-          setResolvedUrl(blobUrl);
-          setLoadStatus('loading');
-          setRetryKey((k) => k + 1);
-        } catch {
-          setRetryKey((k) => k + 1);
-        }
-      }, 1000);
-    }
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
-    };
-  }, [loadStatus, retryKey, sticker.url]);
-
   return (
     <button
       key={sticker.id}
@@ -282,22 +237,7 @@ const StickerGridCell: React.FC<StickerGridCellProps> = ({ sticker, onClick }) =
       title={sticker.emoji || 'Sticker'}
       aria-label={`Sticker ${sticker.emoji || ''}`}
     >
-      {loadStatus !== 'loaded' && <div className="veil-sticker-skeleton" />}
-      <img
-        ref={imgRef}
-        key={`${resolvedUrl}_${retryKey}`}
-        src={resolvedUrl}
-        alt=""
-        onLoad={() => setLoadStatus('loaded')}
-        onError={() => setLoadStatus('error')}
-        style={{
-          display: loadStatus === 'error' ? 'none' : 'block',
-          opacity: loadStatus === 'loaded' ? 1 : 0,
-          position: loadStatus !== 'loaded' ? 'absolute' : 'static',
-          pointerEvents: loadStatus === 'loaded' ? 'auto' : 'none',
-          transition: 'opacity 0.15s ease',
-        }}
-      />
+      <StickerImage url={sticker.url} alt={sticker.emoji || 'Sticker'} />
     </button>
   );
 };
@@ -309,52 +249,6 @@ interface StickerPackTabButtonProps {
 }
 
 const StickerPackTabButton: React.FC<StickerPackTabButtonProps> = ({ pack, isActive, onSelect }) => {
-  const [loadStatus, setLoadStatus] = useState<'loading' | 'loaded' | 'error'>(pack.thumbnailUrl ? 'loading' : 'loaded');
-  const [resolvedThumb, setResolvedThumb] = useState<string>(pack.thumbnailUrl || '');
-  const [retryKey, setRetryKey] = useState<number>(0);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-
-  useEffect(() => {
-    setResolvedThumb(pack.thumbnailUrl || '');
-    setLoadStatus(pack.thumbnailUrl ? 'loading' : 'loaded');
-  }, [pack.thumbnailUrl]);
-
-  // Synchronous completion check for pack thumbnails
-  useEffect(() => {
-    if (imgRef.current) {
-      if (imgRef.current.complete) {
-        if (imgRef.current.naturalWidth > 0) {
-          setLoadStatus('loaded');
-        } else if (imgRef.current.src) {
-          setLoadStatus('error');
-        }
-      }
-    }
-  }, [resolvedThumb, retryKey]);
-
-  useEffect(() => {
-    if (loadStatus === 'error' && pack.thumbnailUrl) {
-      retryTimeoutRef.current = setTimeout(async () => {
-        try {
-          const blob = await telegramStickerService.fetchStickerBlob(pack.thumbnailUrl);
-          const blobUrl = URL.createObjectURL(blob);
-          setResolvedThumb(blobUrl);
-          setLoadStatus('loading');
-          setRetryKey((k) => k + 1);
-        } catch {
-          setRetryKey((k) => k + 1);
-        }
-      }, 1000);
-    }
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
-    };
-  }, [loadStatus, retryKey, pack.thumbnailUrl]);
-
   return (
     <button
       key={pack.id}
@@ -366,30 +260,12 @@ const StickerPackTabButton: React.FC<StickerPackTabButtonProps> = ({ pack, isAct
       aria-label={pack.title}
     >
       {pack.thumbnailUrl ? (
-        <>
-          {loadStatus !== 'loaded' && (
-            <div
-              className="veil-sticker-skeleton"
-              style={{ width: '22px', height: '22px', borderRadius: '4px' }}
-            />
-          )}
-          <img
-            ref={imgRef}
-            key={`${resolvedThumb}_${retryKey}`}
-            src={resolvedThumb}
-            alt=""
-            className="veil-sticker-pack-thumb"
-            onLoad={() => setLoadStatus('loaded')}
-            onError={() => setLoadStatus('error')}
-            style={{
-              display: loadStatus === 'error' ? 'none' : 'block',
-              opacity: loadStatus === 'loaded' ? 1 : 0,
-              position: loadStatus !== 'loaded' ? 'absolute' : 'static',
-              pointerEvents: loadStatus === 'loaded' ? 'auto' : 'none',
-              transition: 'opacity 0.15s ease',
-            }}
-          />
-        </>
+        <StickerImage
+          url={pack.thumbnailUrl}
+          alt={`${pack.title} sticker pack`}
+          className="veil-sticker-pack-image"
+          imageClassName="veil-sticker-pack-thumb"
+        />
       ) : (
         <span>{'\u{2B50}'}</span>
       )}

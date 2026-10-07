@@ -1,5 +1,16 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 108 — STICKER LOADING & TOUCH INTERACTION FIXES
+- **Status**: Implemented; focused verification, TypeScript, and production web build pass.
+- **Changes**:
+  - Routed sticker picker, pack tabs, and add-pack previews through one bounded direct/proxy loader; failed assets now show an unavailable state rather than broken image glyphs or synthetic star stickers.
+  - Removed eager pack-wide download/retry bursts and made sent-sticker recovery strict and finite.
+  - Enlarged the mobile emoji/sticker drawer to `min(400px, 52dvh)`.
+  - Removed ordinary-tap context-menu activation, canceled long-press as soon as the finger moves, and prevented touch-generated native context menus from double-opening.
+  - Enabled reply swipes across non-waveform voice-card areas while keeping waveform seeking isolated.
+- **Verification**: 8 focused suites pass (66 tests); `npx tsc --noEmit` passes; production Vite build passes. Build reports existing mixed-import and large-chunk warnings.
+- **Scope**: UI/media loading changes only; no cryptographic protocol or identity changes.
+
 ## Current Phase: PHASE 107 — ENCRYPTED MEDIA RESUME & CHAT RESPONSIVENESS
 - **Status**: Implementation complete; focused verification and production build pass. Full-suite execution is limited by sandbox-blocked local relay/health endpoints and external network lookups. Security audit and dual sign-off remain deployment gates.
 - **Changes under verification**:

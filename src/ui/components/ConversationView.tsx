@@ -82,6 +82,8 @@ import {
   MediaInfoData,
 } from './media/index.ts';
 
+const TOUCH_GESTURE_CANCEL_THRESHOLD_PX = 8;
+
 interface ContextMenuState {
   isOpen: boolean;
   x: number;
@@ -158,7 +160,11 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
 }) => {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const swipeOffsetRef = useRef(0);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressPointRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTouchStartAtRef = useRef(0);
+  const suppressNativeContextMenuUntilRef = useRef(0);
   const hasTriggeredHapticRef = useRef(false);
   const swipeRafRef = useRef<number | null>(null);
 
@@ -217,22 +223,49 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   const effectiveUploadPercent = uploadPercent ?? msg.uploadProgress;
   const effectiveUploadLoaded = uploadLoadedBytes;
 
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-voicenote-card, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]')) {
+    const inVoiceCard = Boolean(target?.closest('[data-voice-swipe-surface="true"]'));
+    const isVoiceCardButton = Boolean(inVoiceCard && target?.closest('button'));
+    const ignoredTarget = target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]');
+    if (ignoredTarget && !isVoiceCardButton) {
       return;
     }
     if (e.touches && e.touches.length === 1) {
-      touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      const { clientX: x, clientY: y } = e.touches[0];
+      touchStartRef.current = { x, y };
+      longPressPointRef.current = { x, y };
+      lastTouchStartAtRef.current = Date.now();
     }
+    cancelLongPress();
+    if (isVoiceCardButton) return;
     longPressTimerRef.current = setTimeout(() => {
-      onContextMenu(e as any, msg);
+      longPressTimerRef.current = null;
+      suppressNativeContextMenuUntilRef.current = Date.now() + 800;
+      const point = longPressPointRef.current;
+      const fakeEvent = {
+        preventDefault: () => {},
+        stopPropagation: () => {},
+        clientX: point?.x ?? window.innerWidth / 2,
+        clientY: point?.y ?? window.innerHeight / 2,
+      } as React.MouseEvent;
+      onContextMenu(fakeEvent, msg);
     }, 500);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-voicenote-card, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]')) {
+    const inVoiceCard = Boolean(target?.closest('[data-voice-swipe-surface="true"]'));
+    const isVoiceCardButton = Boolean(inVoiceCard && target?.closest('button'));
+    const ignoredTarget = target?.closest('.veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, [role="slider"], button, input, textarea, a, select, [role="checkbox"], .veil-waveform-container, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]');
+    if (ignoredTarget && !isVoiceCardButton) {
       return;
     }
     if (!touchStartRef.current || !e.touches || e.touches.length !== 1) return;
@@ -240,8 +273,13 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     const deltaX = e.touches[0].clientX - touchStartRef.current.x;
     const deltaY = e.touches[0].clientY - touchStartRef.current.y;
 
+    if (Math.hypot(deltaX, deltaY) >= TOUCH_GESTURE_CANCEL_THRESHOLD_PX) {
+      cancelLongPress();
+    }
+
     // Vertical scroll cancels swipe
     if (Math.abs(deltaY) > Math.abs(deltaX)) {
+      swipeOffsetRef.current = 0;
       if (swipeOffset !== 0) {
         if (swipeRafRef.current !== null) {
           cancelAnimationFrame(swipeRafRef.current);
@@ -254,16 +292,14 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     }
 
     if (deltaX < 0 && !isSelectionMode) {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
       // Elastic resistance: non-linear damping matching Telegram physics
       const elasticOffset = -Math.min(75, Math.pow(Math.abs(deltaX), 0.82) * 1.6);
+      swipeOffsetRef.current = elasticOffset;
       if (swipeRafRef.current !== null) {
         cancelAnimationFrame(swipeRafRef.current);
       }
       swipeRafRef.current = requestAnimationFrame(() => {
+        swipeOffsetRef.current = elasticOffset;
         setSwipeOffset(elasticOffset);
         swipeRafRef.current = null;
       });
@@ -281,17 +317,15 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
   };
 
   const handleTouchEnd = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
+    cancelLongPress();
     if (swipeRafRef.current !== null) {
       cancelAnimationFrame(swipeRafRef.current);
       swipeRafRef.current = null;
     }
-    if (swipeOffset <= -45) {
+    if (swipeOffsetRef.current <= -45) {
       onReplyTrigger(msg);
     }
+    swipeOffsetRef.current = 0;
     if (swipeOffset !== 0) {
       setSwipeOffset(0);
     }
@@ -349,23 +383,15 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
         } ${isHighlighted ? 'veil-message-highlight' : ''} ${
           isContextActive ? 'veil-context-active-message' : ''
         }`}
-        onClick={(e) => {
-          if (isSelectionMode) {
-            onToggleSelect(msg.id);
+        onClick={isSelectionMode ? () => onToggleSelect(msg.id) : undefined}
+        onContextMenu={(e) => {
+          const isRecentTouchContextMenu = Date.now() - lastTouchStartAtRef.current < 900;
+          if (Date.now() < suppressNativeContextMenuUntilRef.current || isRecentTouchContextMenu) {
+            e.preventDefault();
             return;
           }
-          const target = e.target as HTMLElement | null;
-          const isInteractive = target?.closest(
-            'button, a, input, textarea, select, [role="checkbox"], [role="slider"], ' +
-            '.veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, ' +
-            '.veil-waveform-container, .veil-voicenote-card, [data-no-swipe="true"], ' +
-            '.veil-reactions-bar, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox'
-          );
-          if (!isInteractive && (!window.getSelection || window.getSelection()?.toString().length === 0)) {
-            onContextMenu(e, msg);
-          }
+          onContextMenu(e, msg);
         }}
-        onContextMenu={(e) => onContextMenu(e, msg)}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

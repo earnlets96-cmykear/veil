@@ -341,6 +341,7 @@ class TelegramStickerService {
   private idbInstance: IDBDatabase | null = null;
   private inMemoryPacks = new Map<string, StickerPack>();
   private blobCache = new Map<string, Blob>();
+  private syntheticFallbacks = new WeakSet<Blob>();
 
   constructor() {
     // Populate in-memory map with built-in packs immediately
@@ -460,28 +461,9 @@ class TelegramStickerService {
       });
     }
 
-    // Pre-cache stickers in background with 1-second auto-retry on failure
-    if (typeof window !== 'undefined' && Array.isArray(pack.stickers)) {
-      const stickersToCache = pack.stickers.slice(0, 60);
-      const cacheItem = async (stk: StickerItem, retriesLeft = 8) => {
-        if (!stk.url || this.blobCache.has(stk.url)) return;
-        try {
-          const blob = await this.fetchStickerBlob(stk.url);
-          this.blobCache.set(stk.url, blob);
-        } catch {
-          if (retriesLeft > 0) {
-            setTimeout(() => {
-              void cacheItem(stk, retriesLeft - 1);
-            }, 1000);
-          }
-        }
-      };
-      setTimeout(() => {
-        for (const stk of stickersToCache) {
-          void cacheItem(stk);
-        }
-      }, 50);
-    }
+    // Load sticker bytes on demand from the UI. Eagerly retrying dozens of remote
+    // files here caused network bursts and cached synthetic fallback stars as if
+    // they were the original sticker assets.
   }
 
   /**
@@ -665,23 +647,34 @@ class TelegramStickerService {
   <circle cx="256" cy="256" r="236" fill="url(#veilStickerFallbackGlow)" stroke="#14b8a6" stroke-width="8" stroke-dasharray="16 8"/>
   <text x="256" y="295" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="190" text-anchor="middle" dominant-baseline="central">${safeEmoji}</text>
 </svg>`;
-    return new Blob([svg], { type: 'image/svg+xml' });
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    this.syntheticFallbacks.add(blob);
+    return blob;
   }
 
   /**
    * Fetches a sticker image as a binary Blob, handling data URLs, on-demand server file proxies,
-   * direct CDN requests, multi-tier proxy relays, and guaranteed fallback conversion so message
-   * sending never throws or fails.
+   * direct CDN requests, multi-tier proxy relays, and an optional legacy synthetic fallback.
+   * UI and send paths that require the original asset must set allowSyntheticFallback=false.
    */
-  public async fetchStickerBlob(url: string): Promise<Blob> {
+  public async fetchStickerBlob(
+    url: string,
+    options: { allowSyntheticFallback?: boolean } = {}
+  ): Promise<Blob> {
     if (!url) {
+      if (options.allowSyntheticFallback === false) {
+        throw new Error('Sticker image could not be loaded');
+      }
       return this.generateFallbackStickerBlob();
     }
 
     // 0. In-memory blob cache hit
     const cached = this.blobCache.get(url);
     if (cached) {
-      return cached;
+      if (options.allowSyntheticFallback !== false || !this.syntheticFallbacks.has(cached)) {
+        return cached;
+      }
+      this.blobCache.delete(url);
     }
 
     // 1. Data URLs (SVG / WebP data strings)
@@ -836,7 +829,11 @@ class TelegramStickerService {
       } catch {}
     }
 
-    // 7. Guaranteed Fallback: High-Definition Vector SVG Sticker Blob
+    if (options.allowSyntheticFallback === false) {
+      throw new Error('Sticker image could not be loaded');
+    }
+
+    // 7. Legacy fallback for callers that explicitly accept a synthetic sticker image.
     // This ensures message sending never throws or fails due to network/CORS restrictions.
     const resolvedEmoji = this.extractEmojiFromUrl(url) || '\u{2B50}';
     const fallbackBlob = this.generateFallbackStickerBlob(resolvedEmoji);

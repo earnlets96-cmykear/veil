@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
-describe('Phase 99: Sticker Skeleton Loaders, 1s Auto-Refresh & Compact Sizing', () => {
+describe('Phase 99: Sticker Loading & Compact Sizing', () => {
   describe('1. CSS Sizing & Layout Verification', () => {
     const cssPath = path.resolve(__dirname, '../src/styles/veil-components.css');
     const cssContent = fs.readFileSync(cssPath, 'utf-8');
@@ -32,29 +32,27 @@ describe('Phase 99: Sticker Skeleton Loaders, 1s Auto-Refresh & Compact Sizing',
     const drawerPath = path.resolve(__dirname, '../src/ui/components/ui/EmojiDrawer.tsx');
     const drawerContent = fs.readFileSync(drawerPath, 'utf-8');
 
-    it('renders StickerGridCell with veil-sticker-skeleton while loading or in error', () => {
+    it('uses the shared sticker image loader with a skeleton and an explicit unavailable state', () => {
+      const imageContent = fs.readFileSync(path.resolve(__dirname, '../src/ui/components/stickers/StickerImage.tsx'), 'utf-8');
       expect(drawerContent).toContain('const StickerGridCell');
-      expect(drawerContent).toContain('loadStatus !== \'loaded\' && <div className="veil-sticker-skeleton" />');
-      expect(drawerContent).toContain('display: loadStatus === \'error\' ? \'none\' : \'block\'');
-      expect(drawerContent).toContain('opacity: loadStatus === \'loaded\' ? 1 : 0');
-      expect(drawerContent).toContain('if (imgRef.current.complete)');
+      expect(drawerContent).toContain('<StickerImage');
+      expect(imageContent).toContain('veil-sticker-skeleton');
+      expect(imageContent).toContain('veil-sticker-image-unavailable');
     });
 
-    it('implements 1-second auto-retry on sticker image failure in StickerGridCell', () => {
-      expect(drawerContent).toContain('if (loadStatus === \'error\')');
-      expect(drawerContent).toContain('telegramStickerService.fetchStickerBlob(sticker.url)');
-      expect(drawerContent).toContain('1000');
+    it('does not create a timed retry loop for failed sticker images', () => {
+      expect(drawerContent).not.toContain('setRetryKey((k) => k + 1)');
+      expect(drawerContent).not.toContain('setTimeout(attemptStickerRecovery, 1000)');
     });
 
-    it('renders StickerPackTabButton with mini skeleton and 1-second auto-refresh', () => {
+    it('loads sticker pack thumbnails through the shared loader', () => {
       expect(drawerContent).toContain('const StickerPackTabButton');
-      expect(drawerContent).toContain('style={{ width: \'22px\', height: \'22px\', borderRadius: \'4px\' }}');
-      expect(drawerContent).toContain('telegramStickerService.fetchStickerBlob(pack.thumbnailUrl)');
+      expect(drawerContent).toContain('className="veil-sticker-pack-image"');
+      expect(drawerContent).toContain('imageClassName="veil-sticker-pack-thumb"');
     });
 
-    it('clears alt attribute text on sticker image to prevent broken text display', () => {
-      // alt="" prevents browser from painting ugly text alongside broken image icons
-      expect(drawerContent).toContain('alt=""');
+    it('preserves an accessible label for sticker images', () => {
+      expect(drawerContent).toContain('alt={sticker.emoji || \'Sticker\'}');
     });
   });
 
@@ -73,20 +71,21 @@ describe('Phase 99: Sticker Skeleton Loaders, 1s Auto-Refresh & Compact Sizing',
       expect(mediaImageContent).toContain('alt={isSticker ? \'\' : (alt || attachment.name)}');
     });
 
-    it('implements 1-second auto-recovery loop on broken sticker blob', () => {
-      expect(mediaImageContent).toContain('telegramStickerService.fetchStickerBlob(sourceUrl)');
-      expect(mediaImageContent).toContain('stickerRetryTimerRef.current = setTimeout(attemptStickerRecovery, 1000)');
+    it('uses strict sticker recovery and stops in a visible unavailable state', () => {
+      expect(mediaImageContent).toContain('fetchStickerBlob(sourceUrl, { allowSyntheticFallback: false })');
+      expect(mediaImageContent).toContain("setError('Sticker unavailable')");
+      expect(mediaImageContent).not.toContain('stickerRetryTimerRef.current = setTimeout(attemptStickerRecovery, 1000)');
     });
   });
 
-  describe('4. telegramStickerService Pre-Cache Continuous Retry', () => {
+  describe('4. telegramStickerService On-Demand Loading', () => {
     const servicePath = path.resolve(__dirname, '../src/media/telegramStickerService.ts');
     const serviceContent = fs.readFileSync(servicePath, 'utf-8');
 
-    it('includes 1-second auto-retry on background pre-cache failure', () => {
-      expect(serviceContent).toContain('// Pre-cache stickers in background with 1-second auto-retry on failure');
-      expect(serviceContent).toContain('retriesLeft > 0');
-      expect(serviceContent).toContain('1000');
+    it('avoids eager retries that cache decorative fallbacks as real stickers', () => {
+      expect(serviceContent).toContain('Load sticker bytes on demand from the UI');
+      expect(serviceContent).not.toContain('retriesLeft > 0');
+      expect(serviceContent).toContain('allowSyntheticFallback');
     });
   });
 });

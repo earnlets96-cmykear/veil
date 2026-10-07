@@ -391,7 +391,7 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
   return (
     <div
       className={`veil-voicenote-card ${isOutgoing ? 'outgoing' : 'incoming'} ${className}`.trim()}
-      data-no-swipe="true"
+      data-voice-swipe-surface="true"
       role="region"
       aria-label={`${isOutgoing ? 'Sent' : 'Received'} Audio message voice note`}
       style={{
@@ -483,7 +483,6 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
               else if (onPlayToggle) onPlayToggle();
             }}
             onPointerDown={stopAllEvents}
-            onTouchStart={stopAllEvents}
             aria-label="Retry audio note"
             title="Retry audio note"
             style={{
@@ -523,7 +522,6 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
               }
             }}
             onPointerDown={stopAllEvents}
-            onTouchStart={stopAllEvents}
             disabled={isLoading || isUploading}
             aria-label={isUploading ? 'Uploading audio...' : isPlaying ? 'Pause voice message' : 'Play voice message'}
             title={isUploading ? 'Uploading...' : isPlaying ? 'Pause' : 'Play'}
@@ -696,7 +694,6 @@ const VoiceNoteCardComponent: React.FC<VoiceNoteCardProps> = ({
               className="veil-voicenote-speed-btn"
               onClick={handleSpeedCycle}
               onPointerDown={stopAllEvents}
-              onTouchStart={stopAllEvents}
               aria-label={`Playback speed ${playbackSpeed}x`}
               title={`Speed: ${playbackSpeed}x`}
               style={{

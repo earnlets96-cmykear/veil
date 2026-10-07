@@ -212,13 +212,12 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
     if (isSticker) {
       const attemptStickerRecovery = async () => {
         try {
-          await MediaCache.invalidate(key, activeSession, attachment.objectId || attachment.attachmentId);
           const sourceUrl =
             attachment.previewUrl ||
             attachment.localPreviewUrl ||
             (attachment as any).url ||
             attachment.name;
-          const blob = await telegramStickerService.fetchStickerBlob(sourceUrl);
+          const blob = await telegramStickerService.fetchStickerBlob(sourceUrl, { allowSyntheticFallback: false });
           const blobUrl = URL.createObjectURL(blob);
           if (isMountedRef.current) {
             const recoveredStub: DecryptedMedia = {
@@ -237,7 +236,8 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
           }
         } catch {
           if (isMountedRef.current) {
-            stickerRetryTimerRef.current = setTimeout(attemptStickerRecovery, 1000);
+            setError('Sticker unavailable');
+            setIsLoading(false);
           }
         }
       };

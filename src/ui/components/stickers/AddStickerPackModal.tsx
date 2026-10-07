@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Spinner } from '../ui/index.ts';
 import { CloseIcon, KeyIcon, ArrowLeftIcon, CheckIcon } from '../icons/index.ts';
 import { telegramStickerService, StickerPack, StickerItem } from '../../../media/telegramStickerService.ts';
+import { StickerImage } from './StickerImage.tsx';
 
 export interface AddStickerPackModalProps {
   isOpen: boolean;
@@ -203,7 +204,7 @@ export const AddStickerPackModal: React.FC<AddStickerPackModalProps> = ({
                   className="veil-add-sticker-preview-cell"
                   title={stk.emoji || 'Sticker'}
                 >
-                  <img src={stk.url} alt={stk.emoji || 'Sticker'} loading="lazy" />
+                  <StickerImage url={stk.url} alt={stk.emoji || 'Sticker'} />
                 </div>
               ))}
             </div>

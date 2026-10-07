@@ -1,5 +1,15 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 108 Update — Sticker Loading & Touch Interaction
+- **Status**: Implemented and verified. Focused verification: 8 test files / 66 tests pass; TypeScript passes; production Vite build succeeds.
+- **Sticker loading**: `StickerImage` tries direct loading, then one strict proxy fetch. Failed assets become an explicit unavailable icon. Pack installation no longer schedules bursts of dozens of downloads with eight retries, and strict fetch callers reject synthetic fallback stars.
+- **Touch behavior**: regular row taps no longer open message actions; moving at least 8px cancels the long-press timer; touch contextmenu events are de-duplicated. Voice reply swipe is enabled outside the waveform, which retains exclusive seek behavior.
+- **Drawer**: Mobile open height is `min(400px, 52dvh)`.
+- **Modified files**: `ConversationView.tsx`, `VoiceNoteCard.tsx`, `MessageComposer.tsx`, `MediaImage.tsx`, `EmojiDrawer.tsx`, `AddStickerPackModal.tsx`, `StickerImage.tsx`, `telegramStickerService.ts`, sticker/touch regression tests, `veil-components.css`, and phase docs.
+- **Build notes**: Production output was written under the Codex visualization directory, not the repository. Vite reports existing mixed static/dynamic import and large chunk warnings.
+- **Preserve existing unrelated worktree changes**: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, and untracked `business-card/`.
+- **Security scope**: No crypto, identity, or protocol code changed.
+
 ## Phase 107 Update
 - **Current Phase**: **PHASE 107 (Encrypted Media Resume & Chat Responsiveness)**
 - **Status**: Implementation complete. Five focused suites (17 tests), `npx tsc --noEmit`, and production Vite build pass. Full suite: 319 files passed, 105 failed (1,325 tests passed, 217 failed, 6 skipped); many failures require local relay/health endpoints rejected by sandbox `EACCES` or external network services.
