@@ -5,10 +5,10 @@ All notable changes, architectural decisions, and security milestones across the
 ## [Phase 115] - 2026-10-07
 
 ### Fixed
-- Resolved mobile context menu flickering/re-triggering: touch pointerdown no longer unmounts the capture listener before touchstart is absorbed, and touch-generated native contextmenu events are filtered in the nested text bubble handler.
+- Resolved mobile context menu flickering/re-triggering: touch pointerdown no longer unmounts the capture listener before touchstart is absorbed, and delayed native contextmenu events are swallowed at the window listener so they cannot dismiss the newly opened app menu.
 
 ### Verification
-- Context menu, sticker touch gesture, and audio scrubber context isolation suites: 25 tests passed.
+- Context menu, sticker touch gesture, and audio scrubber context isolation suites: 26 tests passed.
 - `npm run typecheck` passed. Impeccable detector found pre-existing side-tab styling and bounce easings at lines 2735, 440, and 479; the changed gesture handler has no detector finding.
 
 ## [Phase 114] - 2026-10-07

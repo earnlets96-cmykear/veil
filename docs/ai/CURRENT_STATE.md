@@ -2,9 +2,9 @@
 
 ## Current Phase: PHASE 115 — TOUCH CONTEXT MENU DISMISSAL
 - **Status**: Implemented and verified with focused gesture regressions and TypeScript check.
-- **Root causes**: Android touch interaction emits `pointerdown` before `touchstart`; closing the menu on pointerdown removed capture listeners before touchstart could be absorbed. Separately, a native touch-generated `contextmenu` on text bubbles bypassed the custom long-press suppression and could compete with the row's timer.
-- **Change**: Touch pointerdown now defers outside dismissal to touchstart, and the nested text bubble filters touch-generated native contextmenu events. Mouse and desktop right-click behavior remain enabled.
-- **Verification**: Context-menu, sticker-touch, and audio-scrubber isolation suites pass (25 tests); `npm run typecheck` passes. Impeccable detector reports existing side-tab styling and two bounce easings elsewhere in the component (lines 2735, 440, 479); no findings on the changed event-handler area.
+- **Root causes**: Android touch interaction emits `pointerdown` before `touchstart`; closing the menu during pointerdown removed capture listeners before touchstart could be absorbed. The delayed native `contextmenu` from the same long-press could then be mistaken for an outside interaction and dismiss the newly-opened app menu.
+- **Change**: Touch pointerdown defers outside dismissal to touchstart. While the app menu is open, delayed native contextmenu events are swallowed without dismissing it; the nested text bubble also filters touch-generated events. Mouse and desktop right-click behavior remain enabled.
+- **Verification**: Context-menu, sticker-touch, and audio-scrubber isolation suites pass (26 tests); `npm run typecheck` passes. Impeccable detector reports existing side-tab styling and two bounce easings elsewhere in the component (lines 2735, 440, 479); no findings on the changed event-handler area.
 - **Scope**: Message-menu gesture behavior only; no media, crypto, identity, or protocol changes.
 
 ## Current Phase: PHASE 114 — OPT-IN ANDROID BACKGROUND PUSH

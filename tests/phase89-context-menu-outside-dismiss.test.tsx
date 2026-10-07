@@ -80,6 +80,16 @@ describe('Phase 89 — Message Context Menu & Reactions Bar Outside-Press Dismis
     expect(nestedContextMenu).toContain('e.stopPropagation()');
   });
 
+  it('does not dismiss an already-open menu for the delayed native contextmenu from the same hold', () => {
+    const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
+    const outsideDismiss = convView.match(/const handleOutsideDismiss = \(e: Event\) => \{([\s\S]*?)\n    \};/)?.[1] || '';
+    const contextMenuGuard = outsideDismiss.match(/if \(e\.type === 'contextmenu'\) \{([\s\S]*?return;)/)?.[1] || '';
+
+    expect(contextMenuGuard).toContain('e.preventDefault()');
+    expect(contextMenuGuard).toContain('e.stopPropagation()');
+    expect(contextMenuGuard).toContain('return');
+  });
+
   it('Menu, floating reaction pill, and emoji picker interactions are preserved', () => {
     const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
 

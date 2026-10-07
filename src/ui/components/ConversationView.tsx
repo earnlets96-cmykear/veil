@@ -1653,6 +1653,17 @@ export const ConversationView: React.FC = () => {
         return;
       }
 
+      // A long-press can dispatch its native contextmenu after our custom timer opens
+      // the menu. Swallow it without treating it as an outside interaction.
+      if (e.type === 'contextmenu') {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        e.stopPropagation();
+        (e as any).stopImmediatePropagation?.();
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       // Allow interactions within context menu, floating reactions pill, or emoji picker modal
       if (

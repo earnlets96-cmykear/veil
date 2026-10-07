@@ -1,9 +1,9 @@
 # HANDOFF.md — AI Agent Session Handoff
 
 ## Phase 115 Update — Touch Context Menu Dismissal
-- Fixed the mobile dismissal race: touch pointerdown no longer unmounts capture listeners before touchstart can be absorbed. The nested text bubble also filters touch-generated native contextmenu events so one hold cannot compete with the custom timer and flicker.
+- Fixed the mobile dismissal race: touch pointerdown no longer unmounts capture listeners before touchstart can be absorbed. Delayed native contextmenu is now swallowed while the app menu is open, preventing it from dismissing the menu opened by the same hold; the nested text bubble filters touch-generated events too.
 - Mouse/non-touch pointer dismissal and desktop right-click remain supported.
-- Regression verification: context menu, sticker touch, and audio scrubber context isolation suites passed (25 tests); `npm run typecheck` passed. Impeccable detector reported only pre-existing side-tab/bounce-easing patterns elsewhere in `ConversationView.tsx` (lines 2735, 440, 479).
+- Regression verification: context menu, sticker touch, and audio scrubber context isolation suites passed (26 tests); `npm run typecheck` passed. Impeccable detector reported only pre-existing side-tab/bounce-easing patterns elsewhere in `ConversationView.tsx` (lines 2735, 440, 479).
 - Scope is UI gesture handling only; no crypto, identity, or message protocol changes.
 
 ## Phase 114 Update — Android Background Push

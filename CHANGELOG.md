@@ -6,8 +6,8 @@ All notable changes to the VEIL project are documented in this file.
 
 ### Message context menu
 - Fixed a touch event ordering race where `pointerdown` dismissed the menu and removed its listeners before the same gesture's `touchstart` could be absorbed. Touch outside dismissal now runs on `touchstart`, preventing a held/scrolling touch from reopening the menu.
-- Suppressed touch-generated native `contextmenu` events inside the text bubble handler, so they cannot race the row's custom long-press timer. Desktop right-click remains enabled.
-- Verification: context menu, sticker touch gesture, and audio scrubber context isolation suites pass (25 tests); typecheck passes.
+- Swallowed delayed native `contextmenu` events at the window listener while the app menu is open, preventing the long-press event from dismissing the menu it just opened. The nested text bubble also filters touch-generated context menus; desktop right-click remains enabled.
+- Verification: context menu, sticker touch gesture, and audio scrubber context isolation suites pass (26 tests); typecheck passes.
 
 ## [1.0.0-phase114-android-background-push] - 2026-10-07
 
