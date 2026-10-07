@@ -71,6 +71,15 @@ describe('Phase 89 — Message Context Menu & Reactions Bar Outside-Press Dismis
     expect(outsideDismiss).toContain("e.type === 'touchstart'");
   });
 
+  it('suppresses the nested native contextmenu after a touch hold to avoid opening twice', () => {
+    const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
+    const nestedContextMenu = convView.match(/const handleContextMenuAction = useCallback\(\(e: React\.MouseEvent\) => \{([\s\S]*?)\n  \}, \[onContextMenu, msg\]\);/)?.[1] || '';
+
+    expect(nestedContextMenu).toContain('suppressNativeContextMenuUntilRef.current');
+    expect(nestedContextMenu).toContain('lastTouchStartAtRef.current');
+    expect(nestedContextMenu).toContain('e.stopPropagation()');
+  });
+
   it('Menu, floating reaction pill, and emoji picker interactions are preserved', () => {
     const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
 

@@ -360,7 +360,14 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     return undefined;
   }, [onResolveAudioAttachment, msg]);
   const handleContextMenuAction = useCallback((e: React.MouseEvent) => {
+    const isRecentTouchContextMenu = Date.now() - lastTouchStartAtRef.current < 900;
+    if (Date.now() < suppressNativeContextMenuUntilRef.current || isRecentTouchContextMenu) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     onContextMenu(e, msg);
+    e.stopPropagation();
   }, [onContextMenu, msg]);
   const handleLongPress = useCallback(() => {
     const el = document.getElementById(`msg-${msg.id}`);
