@@ -2,6 +2,12 @@
 
 All notable changes to the VEIL project are documented in this file.
 
+## [1.0.0-phase115-context-menu-touch-dismiss] - 2026-10-07
+
+### Message context menu
+- Fixed a touch event ordering race where `pointerdown` dismissed the menu and removed its listeners before the same gesture's `touchstart` could be absorbed. Touch outside dismissal now runs on `touchstart`, preventing a held/scrolling touch from reopening the menu.
+- Verification: context menu, sticker touch gesture, and audio scrubber context isolation suites pass (24 tests).
+
 ## [1.0.0-phase114-android-background-push] - 2026-10-07
 
 ### Android background notifications

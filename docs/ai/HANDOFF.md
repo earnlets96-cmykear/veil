@@ -1,5 +1,11 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 115 Update — Touch Context Menu Dismissal
+- Fixed a mobile race where `pointerdown` closed the menu and removed capture listeners before the same physical touch's `touchstart` event could be absorbed. A held touch on a message could therefore start a new long-press and reopen the menu.
+- Touch pointerdown now defers dismissal to touchstart. Mouse/non-touch pointer dismissal and inside-menu interactions are unchanged.
+- Regression verification: context menu, sticker touch, and audio scrubber context isolation suites passed (24 tests); `npm run typecheck` passed. Impeccable detector reported only pre-existing side-tab/bounce-easing patterns elsewhere in `ConversationView.tsx` (lines 2735, 440, 479).
+- Scope is UI gesture handling only; no crypto, identity, or message protocol changes.
+
 ## Phase 114 Update — Android Background Push
 - Implemented opt-in Android FCM background alerts with a data-only `kind=message` payload. Only text/media/voice sends include a one-bit `notifyRecipient` hint; read receipts/control envelopes do not trigger pushes. Native code ignores server-supplied display content and shows fixed generic text.
 - Added capability-authenticated token register/unregister endpoints, relay store persistence (memory/file/PostgreSQL migration), FCM HTTP v1 service-account OAuth, token cleanup, and one-mailbox-per-device-token reassignment.

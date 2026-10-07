@@ -2,6 +2,15 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 115] - 2026-10-07
+
+### Fixed
+- Resolved mobile long-press context menu re-triggering after dismissal: touch pointerdown no longer unmounts the capture listener before touchstart is absorbed.
+
+### Verification
+- Context menu, sticker touch gesture, and audio scrubber context isolation suites: 24 tests passed.
+- `npm run typecheck` passed. Impeccable detector found pre-existing side-tab styling and bounce easings at lines 2735, 440, and 479; the changed gesture handler has no detector finding.
+
 ## [Phase 114] - 2026-10-07
 
 ### Added

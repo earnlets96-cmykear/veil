@@ -1,5 +1,12 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 115 — TOUCH CONTEXT MENU DISMISSAL
+- **Status**: Implemented and verified with focused gesture regressions and TypeScript check.
+- **Root cause**: Android touch interaction emits `pointerdown` before `touchstart`. Closing the menu during pointerdown removed the capture listeners before touchstart, allowing the message row's long-press handler to start again.
+- **Change**: Touch pointerdown now defers outside dismissal to touchstart, which is prevented and stopped before reaching the row. Mouse and non-touch pointer dismissal are unchanged.
+- **Verification**: Context-menu, sticker-touch, and audio-scrubber isolation suites pass (24 tests); `npm run typecheck` passes. Impeccable detector reports existing side-tab styling and two bounce easings elsewhere in the component (lines 2735, 440, 479); no findings on the changed event-handler area.
+- **Scope**: Message-menu gesture behavior only; no media, crypto, identity, or protocol changes.
+
 ## Current Phase: PHASE 114 — OPT-IN ANDROID BACKGROUND PUSH
 - **Status**: Client registration, capability-authenticated relay registration, persistent token storage, FCM HTTP v1 sender, and generic native alert handler are implemented. TypeScript and focused tests pass. Android Gradle compilation/device behavior are not yet verified; Firebase project config and relay service-account credentials are not present.
 - **Changes**: Push is off until the user opts in from Settings. Only user-visible text/media/voice envelopes carry a one-bit notification hint; control envelopes do not trigger a push. The FCM payload contains only `kind=message`; Android renders a fixed generic alert and syncs the encrypted mailbox after relaunch. One installation token can map to one mailbox at a time, avoiding simultaneous cross-Space linkage. `SILENT_COUNTER` disables push.

@@ -1,5 +1,12 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 115 — TOUCH CONTEXT MENU DISMISSAL
+- **Status**: Implemented and verified.
+- [x] Reproduce the mobile touch event-ordering race in a regression test.
+- [x] Defer touch menu dismissal from pointerdown to touchstart so the dismissing gesture cannot start a fresh row long-press.
+- [x] Verify context menu, sticker touch, and audio scrubber context isolation behavior.
+- [x] Run TypeScript check and Impeccable detector; record existing unrelated detector findings.
+
 ## Active Phase: PHASE 114 — OPT-IN ANDROID BACKGROUND PUSH
 - **Status**: Client and relay push path implemented; provider/app credentials and device validation remain outstanding.
 - [x] Add generic FCM HTTP v1 sender with service-account access-token exchange and no sensitive provider error logging.

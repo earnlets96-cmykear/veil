@@ -1640,6 +1640,12 @@ export const ConversationView: React.FC = () => {
     if (!contextMenu.isOpen) return;
 
     const handleOutsideDismiss = (e: Event) => {
+      // Touch browsers emit pointerdown before touchstart. Let touchstart perform the
+      // dismissal so its listener can absorb the gesture before it reaches a message row.
+      if (e.type === 'pointerdown' && (e as PointerEvent).pointerType === 'touch') {
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       // Allow interactions within context menu, floating reactions pill, or emoji picker modal
       if (

@@ -63,6 +63,14 @@ describe('Phase 89 — Message Context Menu & Reactions Bar Outside-Press Dismis
     expect(convView).toContain('setContextMenu({ isOpen: false, x: 0, y: 0, message: null })');
   });
 
+  it('defers touch-pointer dismissal to touchstart so the same gesture cannot reopen the menu', () => {
+    const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
+    const outsideDismiss = convView.match(/const handleOutsideDismiss = \(e: Event\) => \{([\s\S]*?)\n    \};/)?.[1] || '';
+
+    expect(outsideDismiss).toMatch(/e\.type === 'pointerdown'[\s\S]{0,100}\(e as PointerEvent\)\.pointerType === 'touch'[\s\S]{0,80}return/);
+    expect(outsideDismiss).toContain("e.type === 'touchstart'");
+  });
+
   it('Menu, floating reaction pill, and emoji picker interactions are preserved', () => {
     const convView = fs.readFileSync(path.join(rootDir, 'src/ui/components/ConversationView.tsx'), 'utf-8');
 
