@@ -1,5 +1,10 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 119 Update — Shared-Media Caption Focus
+- Fixed caption typing dismissing the mobile keyboard. `MediaPickerModal` passed a new inline `onClose` callback after each caption edit; Modal's effect depended on it, so cleanup restored focus and setup refocused the first button.
+- Modal now calls the latest `onClose` from a ref, while focus lifecycle depends on modal-open state and Escape behavior rather than callback identity.
+- Added `tests/phase119-modal-focus-lifecycle.test.ts`; modal focus, shared-media modal, and UI system suites pass (14 tests), and TypeScript passes. Android keyboard behavior still needs device validation.
+
 ## Phase 118 Update — Sticker Cache, Avatar Consistency & Shared Media
 - Sticker image bytes are cached in a bounded IndexedDB store (300 assets / 64 MiB maximum) using a SHA-256 URL digest as the record key; raw URLs are not stored as identifiers. In-flight fetches are deduplicated and direct/relay image routes are raced.
 - Shared avatars now render through a clipped `<img>` with `object-fit: cover`, and keep deterministic initials/group fallbacks visible if image loading fails. Direct conversation headers and message peers resolve the current contact avatar before legacy conversation fields.

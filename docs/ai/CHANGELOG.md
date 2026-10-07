@@ -2,6 +2,14 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 119] - 2026-10-08
+
+### Fixed
+- Kept the shared-media caption field focused across typing updates by preventing the modal focus effect from restarting whenever its parent creates a new close callback.
+
+### Verification
+- Modal focus and shared-media modal suites pass (14 tests); `npm run typecheck` passes.
+
 ## [Phase 118] - 2026-10-08
 
 ### Fixed

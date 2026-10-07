@@ -34,6 +34,8 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const titleId = useId();
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export const Modal: React.FC<ModalProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (closeOnEscape && e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
 
@@ -69,7 +71,7 @@ export const Modal: React.FC<ModalProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       previousActiveElement.current?.focus();
     };
-  }, [isOpen, closeOnEscape, onClose]);
+  }, [isOpen, closeOnEscape]);
 
   const touchStartOnBackdropRef = useRef(false);
 

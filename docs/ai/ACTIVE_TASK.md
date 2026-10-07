@@ -1,5 +1,12 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 119 — SHARED-MEDIA CAPTION FOCUS
+- **Status**: Implemented and focused verified; Android keyboard behavior remains to be validated on-device.
+- [x] Keep modal focus management stable across controlled caption-input rerenders.
+- [x] Route Escape through the latest close callback without restarting the modal's focus lifecycle.
+- [x] Add a regression for stable modal focus dependencies and verify shared-media modal suites plus TypeScript.
+- [ ] Confirm caption typing keeps the Android keyboard open on a device.
+
 ## Active Phase: PHASE 118 — STICKER CACHE, AVATAR CONSISTENCY & SHARED MEDIA
 - **Status**: Implemented and focused verified; Android device validation remains outstanding.
 - [x] Cache successful sticker images in bounded IndexedDB storage and reuse them after app re-entry.

@@ -1,5 +1,12 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 119 — SHARED-MEDIA CAPTION FOCUS
+- **Status**: Implemented and focused verified; Android keyboard behavior remains to be validated on-device.
+- **Root cause**: MediaPickerModal's inline `onClose` callback changed identity on every caption keystroke. Modal included that callback in its focus effect dependencies, so it restored prior focus and refocused the first modal control after each edit.
+- **Changes**: Modal now stores the latest close callback in a ref and keeps focus/scroll lifecycle tied to the open state and Escape behavior. Caption edits no longer restart focus management.
+- **Verification**: Modal focus regression and shared-media modal suites pass (14 tests); `npm run typecheck` passes.
+- **Scope**: Modal UI lifecycle only; no cryptographic protocol or message behavior changes.
+
 ## Current Phase: PHASE 118 — STICKER CACHE, AVATAR CONSISTENCY & SHARED MEDIA
 - **Status**: Implemented and focused verified; Android device validation remains outstanding.
 - **Changes**: Sticker images now use a bounded IndexedDB asset cache (300 assets / 64 MiB) keyed by SHA-256 URL digests, deduplicate concurrent downloads, and race direct/relay fetch paths. Avatar images render consistently with `object-fit: cover` and a deterministic fallback, while direct chats prefer the latest contact avatar. The gallery flattens singular and grouped attachments for media and files tabs and requests authenticated full-resolution media for gallery photos.
