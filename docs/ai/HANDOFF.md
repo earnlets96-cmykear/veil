@@ -1,5 +1,14 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 122 Update — Mobile Safe Area, Voice Authentication & Chat Menu
+- The fixed mobile home sidebar now anchors below `--veil-safe-top` and above `--veil-safe-bottom`; its previous `inset: 0` escaped body safe-area padding and let the home UI sit under Android system bars.
+- Voice chunk AEAD additional data is the attachment ID, while the relay assigns a different cloud object ID. Playback incorrectly substituted object ID in the media cache and direct decrypt path. Both paths now pass `meta.attachmentId || meta.objectId`, preserving compatibility with older metadata that lacks attachmentId.
+- Sidebar chat-row Pin/Delete menus now close on outside pointer/touch and Escape; pointerdown on the trigger/menu is excluded.
+- Timestamp trace: outgoing direct preview stamps local send time, but the direct wire payload has no timestamp and inbound stored messages are stamped at receipt/decryption. Group payloads do carry a timestamp. Do not alter direct protocol timestamp behavior without an ADR, threat review, adversarial tests, and dual sign-off required by the post-RC freeze.
+- Added `tests/phase122-mobile-shell-voice-menu.test.ts`. Phase 122 (4), Phase 89 (9), and Phase 116 (5) suites pass; TypeScript passes. Relay-backed Phase 29/30/45e voice integration attempts are blocked by sandbox loopback `EACCES`; Android device validation is outstanding.
+- No message wire format, identity, or cryptographic behavior changed; voice chunk decryption now supplies the original existing AAD identifier correctly.
+- Preserve unrelated worktree changes: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 121 Update — Avatar Crop Preview & Output Alignment
 - Fixed the actual profile customizer issue: its preview used the image's intrinsic pixel dimensions while export separately computed a fit scale, so what the user framed could differ from the applied image.
 - Added shared geometry in `src/ui/utils/avatarCropGeometry.ts`. The preview now fits the loaded natural dimensions to cover the crop aperture, and the export uses the same fit/zoom/rotation scale. Panning is clamped to keep the crop covered. Crop failures show an error rather than silently applying the original uncropped image.

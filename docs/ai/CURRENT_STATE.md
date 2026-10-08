@@ -1,5 +1,14 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 122 — MOBILE SAFE AREA, VOICE AUTH & CHAT MENU DISMISSAL
+- **Status**: Source fixes and focused regressions pass; Android device and relay-backed voice integration validation remain outstanding.
+- **Root causes**: The home sidebar is fixed to viewport `inset: 0`, so body safe-area padding cannot move it. Voice chunks use the original `attachmentId` in AEAD additional data, but playback used the cloud's distinct `objectId` for decryption. Chat row action menus had no outside-pointer dismissal listener.
+- **Changes**: The fixed mobile sidebar now honors `--veil-safe-top` and `--veil-safe-bottom`; voice cache and fallback decryption both use `meta.attachmentId || meta.objectId` for backwards compatibility; chat row menus close on outside pointer/touch and Escape.
+- **Timestamp finding**: Outgoing direct-message previews use the sender device's local `Date.now()`, but the direct-message wire object contains no send timestamp; the recipient currently stamps the message at receipt/decryption. Group messages include a sender timestamp. The UI formats epoch timestamps in each device's local timezone. No timestamp wire change was made because direct-message timestamp propagation changes the frozen message protocol and requires an ADR, threat review, adversarial tests, and independent dual sign-off.
+- **Verification**: Phase 122, Phase 89 context-menu, and Phase 116 inset/delivery suites pass; TypeScript passes. Relay-backed Phase 29/30/45e voice integration tests could not connect to loopback servers in this sandbox.
+- **Scope**: Existing wire protocol and cryptographic algorithms unchanged.
+- **Follow-up**: Validate safe-area offset and voice playback on Android; complete relay integration verification outside this sandbox.
+
 ## Current Phase: PHASE 121 — AVATAR CROP PREVIEW & OUTPUT ALIGNMENT
 - **Status**: Implemented and focused verified; physical Android crop validation remains outstanding.
 - **Root cause**: The crop preview displayed the source at its intrinsic size while the export independently calculated a cover scale from natural dimensions. The image users framed on screen could therefore differ in size and framing from the saved profile photo.

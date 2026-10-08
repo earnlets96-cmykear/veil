@@ -2,6 +2,20 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 122] - 2026-10-08
+
+### Fixed
+- Offset the fixed mobile home sidebar by Android top/bottom safe-area insets.
+- Decrypt voice media chunks with the authenticated attachment ID, not the separate cloud object ID, while retaining object-ID fallback for legacy voice metadata.
+- Close chat row Pin/Delete menus on outside pointer/touch and Escape.
+
+### Verification
+- Phase 122, Phase 89, and Phase 116 suites pass; `npm run typecheck` passes.
+- Relay-backed Phase 29/30/45e voice tests were attempted but sandbox loopback connections were denied.
+
+### Timestamp finding
+- Direct incoming messages currently receive a local timestamp at decrypt/receipt because the frozen direct wire payload carries no sender timestamp. Group wire messages carry one. Sender-authenticated timestamp propagation is deferred pending ADR/threat review and post-RC security approvals.
+
 ## [Phase 121] - 2026-10-08
 
 ### Fixed

@@ -1,5 +1,15 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 122 — MOBILE SAFE AREA, VOICE AUTH & CHAT MENU DISMISSAL
+- **Status**: Source fixes and focused regressions pass; Android device validation and relay-backed voice integration remain outstanding.
+- [x] Keep the fixed home sidebar below Android status/navigation safe insets.
+- [x] Decrypt voice chunks using the encryption-bound attachment ID rather than the separate cloud object ID.
+- [x] Dismiss chat row actions on outside pointer/touch and Escape.
+- [x] Trace the direct-message timestamp behavior without changing the frozen wire protocol.
+- [x] Add regressions and run focused viewport, voice, menu, and TypeScript checks.
+- [ ] Validate home safe area, real voice playback, and menu dismissal on Android; rerun relay-backed voice tests outside the loopback-restricted sandbox.
+- [ ] Accurate sender timestamps for direct messages require a separately governed protocol change under the post-RC security freeze.
+
 ## Active Phase: PHASE 121 — AVATAR CROP PREVIEW & OUTPUT ALIGNMENT
 - **Status**: Implemented and focused verified; physical-device crop validation remains outstanding.
 - [x] Use the source image's natural dimensions to cover the crop aperture in the preview.

@@ -154,6 +154,28 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
 }) => {
   const isOutgoing = !!latestMsg?.isOutgoing;
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && (menuRef.current?.contains(target) || menuTriggerRef.current?.contains(target))) return;
+      setMenuOpen(false);
+    };
+    const handleMenuKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    window.addEventListener('keydown', handleMenuKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      window.removeEventListener('keydown', handleMenuKeyDown);
+    };
+  }, [menuOpen]);
 
   return (
     <div
@@ -259,6 +281,7 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
       </div>
       <button
         type="button"
+        ref={menuTriggerRef}
         aria-label={`More actions for ${conv.name}`}
         aria-expanded={menuOpen}
         onClick={(event) => { event.stopPropagation(); setMenuOpen((open) => !open); }}
@@ -267,7 +290,7 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
         <MoreVerticalIcon size={18} />
       </button>
       {menuOpen && (
-        <div role="menu" aria-label={`Actions for ${conv.name}`} style={{ position: 'absolute', zIndex: 30, right: 8, top: 'calc(100% - 4px)', minWidth: 176, padding: 6, borderRadius: 12, border: '1px solid rgba(148,163,184,.2)', background: '#151b26', boxShadow: '0 12px 32px rgba(0,0,0,.4)' }}>
+        <div ref={menuRef} role="menu" aria-label={`Actions for ${conv.name}`} style={{ position: 'absolute', zIndex: 30, right: 8, top: 'calc(100% - 4px)', minWidth: 176, padding: 6, borderRadius: 12, border: '1px solid rgba(148,163,184,.2)', background: '#151b26', boxShadow: '0 12px 32px rgba(0,0,0,.4)' }}>
           <button type="button" role="menuitem" onClick={() => { onTogglePin(conv.id, conv.isPinned); setMenuOpen(false); }} style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', border: 0, borderRadius: 8, padding: '0 12px', background: 'transparent', color: '#e2e8f0', cursor: 'pointer' }}>{conv.isPinned ? 'Unpin chat' : 'Pin chat'}</button>
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onDelete(conv); }} style={{ display: 'block', width: '100%', minHeight: 44, textAlign: 'left', border: 0, borderRadius: 8, padding: '0 12px', background: 'transparent', color: '#f87171', cursor: 'pointer' }}>Delete chat</button>
         </div>

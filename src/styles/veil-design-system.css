@@ -1577,11 +1577,11 @@ body,
   .veil-sidebar {
     width: 100vw !important;
     max-width: none !important;
-    height: 100% !important;
+    height: auto !important;
     display: flex !important;
     flex-direction: column;
     position: fixed;
-    inset: 0;
+    inset: var(--veil-safe-top) 0 var(--veil-safe-bottom);
     z-index: 50;
   }
 

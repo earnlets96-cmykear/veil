@@ -281,7 +281,9 @@ export class VoiceRecorder {
       const { MediaCache } = await import('../ui/utils/mediaCache.ts');
       const attachmentPayload = {
         objectId: meta.objectId,
-        attachmentId: meta.objectId,
+        // Chunk AEAD additional data is bound to the attachment ID. Cloud
+        // object IDs are separate opaque storage handles and must not replace it.
+        attachmentId: meta.attachmentId || meta.objectId,
         name: `voice_${meta.objectId}.webm`,
         mimeType: meta.mimeType || 'audio/webm',
         sizeBytes: meta.sizeBytes,
@@ -331,7 +333,7 @@ export class VoiceRecorder {
 
       if (chunks?.length) {
         plaintextBytes = await AttachmentPipeline.decryptProgressiveAsync({
-          attachmentId: meta.objectId,
+          attachmentId: meta.attachmentId || meta.objectId,
           name: `voice_${meta.objectId}.webm`,
           mimeType: meta.mimeType || 'audio/webm',
           sizeBytes: meta.sizeBytes,
