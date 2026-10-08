@@ -43,6 +43,16 @@ export class EnvelopeQueue {
     await this.store.setAsync(session, KEY_OUTBOUND_QUEUE, filtered);
   }
 
+  public async updateOutboundMailbox(session: SpaceSession, queueId: string, mailboxId: string): Promise<void> {
+    const queue = await this.listOutbound(session);
+    const item = queue.find((entry) => entry.queueId === queueId);
+    if (!item || item.mailboxId === mailboxId) return;
+    item.mailboxId = mailboxId;
+    item.status = 'QUEUED';
+    item.errorMessage = undefined;
+    await this.store.setAsync(session, KEY_OUTBOUND_QUEUE, queue);
+  }
+
   /** Drop only pending envelopes addressed to a conversation deleted in this Space. */
   public async removeOutboundForConversation(session: SpaceSession, conversationId: string): Promise<void> {
     const queue = await this.listOutbound(session);

@@ -102,6 +102,23 @@ export class ContactRequestManager {
     return list.find((r) => r.peerIdentityId === identityId) || null;
   }
 
+  /** Update cached public routing/profile fields only when the signing identity is unchanged. */
+  public async refreshPeerProfile(session: SpaceSession, identityId: string, profile: SignedProfileDocument): Promise<boolean> {
+    if (!verifySignedProfile(profile) || profile.identityId !== identityId) return false;
+    const requests = await this.listRequests(session);
+    const request = requests.find((item) => item.peerIdentityId === identityId);
+    if (!request) return false;
+    const knownSigningKey = request.peerProfile.prekeyBundle.identityDocument.signingPublicKey;
+    const refreshedSigningKey = profile.prekeyBundle.identityDocument.signingPublicKey;
+    if (knownSigningKey !== refreshedSigningKey) return false;
+    request.peerProfile = profile;
+    request.peerUsername = profile.username;
+    request.peerDisplayName = profile.displayName;
+    request.updatedAt = Date.now();
+    await this.store.setAsync(session, REQUESTS_STORAGE_KEY, requests);
+    return true;
+  }
+
   public async listBlocklist(session: SpaceSession): Promise<string[]> {
     const list = await this.store.getAsync<string[]>(session, BLOCKLIST_STORAGE_KEY);
     return list || [];
@@ -168,7 +185,9 @@ export class ContactRequestManager {
       await this.networkManager.sendEnvelope(
         session,
         targetProfile.mailboxId,
-        JSON.stringify(wirePayload)
+        JSON.stringify(wirePayload),
+        undefined,
+        { conversationId: targetProfile.identityId }
       );
     }
 
@@ -221,11 +240,12 @@ export class ContactRequestManager {
       targetIdentityId: session.spaceId ? undefined : undefined, // Sender signed target
     });
 
+    let valid = false;
     try {
       const pubKeyBytes = base64ToBytes(wire.senderProfile.prekeyBundle.identityDocument.signingPublicKey);
       const sigBytes = base64ToBytes(wire.signature);
       // Validate signature
-      const valid = verify(
+      valid = verify(
         pubKeyBytes,
         new TextEncoder().encode(
           JSON.stringify({
@@ -246,6 +266,7 @@ export class ContactRequestManager {
       // Signature parsing failure -> reject
       return null;
     }
+    if (!valid) return null;
 
     // 3. Check if blocked
     if (await this.isBlocked(session, wire.senderProfile.identityId)) {
@@ -323,7 +344,9 @@ export class ContactRequestManager {
       await this.networkManager.sendEnvelope(
         session,
         request.peerProfile.mailboxId,
-        JSON.stringify(responseWire)
+        JSON.stringify(responseWire),
+        undefined,
+        { conversationId: request.peerIdentityId }
       );
     }
 
@@ -426,12 +449,25 @@ export class ContactRequestManager {
       return null;
     }
 
-    const requests = await this.listRequests(session);
-    const request = requests.find(
-      (r) => r.requestId === wire.requestId || r.peerIdentityId === wire.responderProfile.identityId
-    );
+    if (wire.status !== 'ACCEPTED' && wire.status !== 'DECLINED') return null;
+    try {
+      const responderKey = base64ToBytes(wire.responderProfile.prekeyBundle.identityDocument.signingPublicKey);
+      const responseSignature = base64ToBytes(wire.signature);
+      const canonicalResponse = JSON.stringify({
+        requestId: wire.requestId,
+        responderIdentityId: wire.responderProfile.identityId,
+        status: wire.status,
+        respondedAt: wire.respondedAt,
+      });
+      if (!verify(responderKey, new TextEncoder().encode(canonicalResponse), responseSignature)) return null;
+    } catch (_err) {
+      return null;
+    }
 
-    if (!request) return null;
+    const requests = await this.listRequests(session);
+    const request = requests.find((r) => r.requestId === wire.requestId);
+
+    if (!request || request.peerIdentityId !== wire.responderProfile.identityId || request.status !== 'OUTGOING_PENDING') return null;
 
     if (wire.status === 'ACCEPTED') {
       request.status = 'ACCEPTED';
@@ -511,7 +547,9 @@ export class ContactRequestManager {
       await this.networkManager.sendEnvelope(
         session,
         request.peerProfile.mailboxId,
-        JSON.stringify(cancelWire)
+        JSON.stringify(cancelWire),
+        undefined,
+        { conversationId: request.peerIdentityId }
       );
     }
 

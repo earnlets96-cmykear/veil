@@ -7,7 +7,7 @@
  * 3. Verified Contact records include avatar for UI display.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ContactManager } from '../src/contacts/contactManager.ts';
 import { ContactRequestManager } from '../src/contacts/contactRequestManager.ts';
 import { SpaceVaultManager } from '../src/spaces/vault.ts';
@@ -62,7 +62,8 @@ describe('Phase 34: Avatar Propagation', () => {
     const idMgr = new SpaceIdentityManager();
     const prekeyMgr = new PrekeyManager(store, idMgr);
     const contactMgr = new ContactManager(store);
-    const reqMgr = new ContactRequestManager(store, contactMgr, idMgr);
+    const sentEnvelopes = vi.fn().mockResolvedValue({ status: 'SENT_TO_RELAY' });
+    const reqMgr = new ContactRequestManager(store, contactMgr, idMgr, { sendEnvelope: sentEnvelopes } as any);
 
     // Alice Space
     const headerAlice = vault.createSpace({
@@ -72,6 +73,16 @@ describe('Phase 34: Avatar Propagation', () => {
     });
     const sessionAlice = vault.unlockSpace('password123', headerAlice.spaceId);
     idMgr.createIdentity(sessionAlice, store);
+    const aliceLoaded = idMgr.loadIdentity(sessionAlice, store)!;
+    prekeyMgr.generateSignedPrekey(sessionAlice);
+    const aliceProfile = createSignedProfile(
+      aliceLoaded.document.identityId,
+      aliceLoaded.signingPrivateKey,
+      'alice',
+      'Alice Smith',
+      'mbx_alice_1',
+      prekeyMgr.createPrekeyBundle(sessionAlice)
+    );
 
     // Bob Space
     const headerBob = vault.createSpace({
@@ -109,6 +120,16 @@ describe('Phase 34: Avatar Propagation', () => {
       )
     );
 
+    const forgedRequest = await reqMgr.handleInboundRequest(sessionAlice, {
+      type: 'CONTACT_REQUEST',
+      requestId: 'req_forged',
+      senderProfile: bobProfile,
+      sentAt,
+      signature: bytesToBase64(new Uint8Array(64)),
+    });
+    expect(forgedRequest).toBeNull();
+    expect(await reqMgr.listRequests(sessionAlice)).toEqual([]);
+
     // Inbound contact request from Bob into Alice's space
     const inbound = await reqMgr.handleInboundRequest(sessionAlice, {
       type: 'CONTACT_REQUEST',
@@ -120,14 +141,33 @@ describe('Phase 34: Avatar Propagation', () => {
 
     expect(inbound).toBeDefined();
 
+    const refreshedBobProfile = createSignedProfile(
+      bobLoaded.document.identityId,
+      bobLoaded.signingPrivateKey,
+      'bob',
+      'Bob Smith',
+      'mbx_bob_current',
+      bobPrekeyBundle,
+      'data:image/jpeg;base64,BOBNEWAVATAR'
+    );
+    expect(await reqMgr.refreshPeerProfile(sessionAlice, bobLoaded.document.identityId, refreshedBobProfile)).toBe(true);
+
     // Alice accepts request (with optional profile)
-    await reqMgr.acceptRequest(sessionAlice, 'req_001');
+    await reqMgr.acceptRequest(sessionAlice, 'req_001', aliceProfile);
+    expect(sentEnvelopes).toHaveBeenCalledWith(
+      sessionAlice,
+      'mbx_bob_current',
+      expect.stringContaining('CONTACT_RESPONSE'),
+      undefined,
+      { conversationId: bobLoaded.document.identityId }
+    );
 
     // Verify Bob is added to Alice's contacts with his avatar
     const contacts = await contactMgr.listContacts(sessionAlice);
     const bobContact = contacts.find((c) => c.identityId === bobLoaded.document.identityId);
     expect(bobContact).toBeDefined();
-    expect(bobContact?.avatar).toBe(bobAvatar);
+    expect(bobContact?.avatar).toBe('data:image/jpeg;base64,BOBNEWAVATAR');
+    expect(bobContact?.mailboxId).toBe('mbx_bob_current');
   });
 
   it('propagates responder avatar to sender when contact response is received', async () => {
@@ -196,6 +236,17 @@ describe('Phase 34: Avatar Propagation', () => {
       respondedAt: now,
     });
     const sigBytes = sign(aliceLoaded.signingPrivateKey, new TextEncoder().encode(canonicalRes));
+
+    const forgedResponse = await reqMgr.handleInboundResponse(sessionBob, {
+      type: 'CONTACT_RESPONSE',
+      requestId: outgoingReq.requestId,
+      responderProfile: aliceProfile,
+      status: 'ACCEPTED',
+      respondedAt: now,
+      signature: bytesToBase64(new Uint8Array(64)),
+    });
+    expect(forgedResponse).toBeNull();
+    expect(await contactMgr.listContacts(sessionBob)).toEqual([]);
 
     await reqMgr.handleInboundResponse(sessionBob, {
       type: 'CONTACT_RESPONSE',

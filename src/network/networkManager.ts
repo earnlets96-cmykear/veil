@@ -25,6 +25,7 @@ import {
 import { randomBytes, bytesToHex } from '../crypto/utils.ts';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { RelayEnvelope } from '../server/types.ts';
+import type { SignedProfileDocument } from '../identity/profile.ts';
 
 function maskMailbox(mailboxId: string): string {
   if (!mailboxId) return 'unknown';
@@ -43,9 +44,15 @@ export class NetworkManager {
   private activeWsTransports = new Map<string, WebSocketTransport>();
   private messageHandlers = new Map<string, (payload: string) => Promise<void>>();
   private inboundProcessing = new Set<string>();
+  private outboundMailboxResolver?: (
+    session: SpaceSession,
+    recipientIdentityId: string | undefined,
+    queuedItem: QueuedOutboundEnvelope
+  ) => Promise<string | null>;
   private stateListeners: ((state: NetworkState) => void)[] = [];
   private lastKnownState: NetworkState = 'offline';
   public onOutboundFlushed?: (flushed: { queueId: string; messageId?: string; conversationId?: string }) => void;
+  public onRecipientProfileRefreshed?: (profile: SignedProfileDocument) => void;
 
   constructor(store: EncryptedSpaceStore, config: Partial<NetworkConfig> = {}) {
     this.store = store;
@@ -60,6 +67,17 @@ export class NetworkManager {
 
   public getQueue(): EnvelopeQueue {
     return this.queue;
+  }
+
+  /** Resolve a recipient's current signed mailbox after the relay rejects an expired route. */
+  public setOutboundMailboxResolver(
+    resolver: (
+      session: SpaceSession,
+      recipientIdentityId: string | undefined,
+      queuedItem: QueuedOutboundEnvelope
+    ) => Promise<string | null>
+  ): void {
+    this.outboundMailboxResolver = resolver;
   }
 
   public async registerPushToken(session: SpaceSession, token: string): Promise<void> {
@@ -200,8 +218,33 @@ export class NetworkManager {
       await this.queue.updateOutboundStatus(session, queueId, 'QUEUED', err.message);
       item.status = 'QUEUED';
       item.errorMessage = err.message;
+
+      // A dead mailbox is a stale route, not a permanent message failure. Resolve
+      // the recipient by stable identity and retry the exact same E2EE payload.
+      if (this.isMailboxDead(err) && metadata?.conversationId && this.outboundMailboxResolver) {
+        const currentMailbox = await this.resolveCurrentMailbox(session, metadata.conversationId, item);
+        if (currentMailbox && currentMailbox !== targetMailboxId) {
+          await this.queue.updateOutboundMailbox(session, queueId, currentMailbox);
+          item.mailboxId = currentMailbox;
+          try {
+            await this.queue.updateOutboundStatus(session, queueId, 'SENDING');
+            await this.http.sendEnvelope(currentMailbox, payload, ttlSeconds, metadata?.notifyRecipient);
+            await this.queue.removeOutbound(session, queueId);
+            item.status = 'SENT_TO_RELAY';
+            item.errorMessage = undefined;
+            if (this.onOutboundFlushed) {
+              this.onOutboundFlushed({ queueId, messageId: metadata?.messageId, conversationId: metadata?.conversationId });
+            }
+          } catch (retryError: any) {
+            await this.queue.updateOutboundStatus(session, queueId, 'QUEUED', retryError?.message || 'Retry failed');
+            item.errorMessage = retryError?.message || 'Retry failed';
+          }
+        }
+      }
       if (typeof console !== 'undefined' && console.warn) {
-        console.warn(`[VEIL-NET] Outbound failed: queueId=${queueId.slice(0, 8)}, mailbox=${maskMailbox(targetMailboxId)}, error=${err.name}: ${err.message}`);
+        if (item.status !== 'SENT_TO_RELAY') {
+          console.warn(`[VEIL-NET] Outbound failed: queueId=${queueId.slice(0, 8)}, mailbox=${maskMailbox(item.mailboxId)}, error=${err.name}: ${err.message}`);
+        }
       }
     }
 
@@ -234,14 +277,29 @@ export class NetworkManager {
           console.debug(`[VEIL-NET] Outbound flush: queueId=${item.queueId.slice(0, 8)}, mailbox=${maskMailbox(item.mailboxId)}, state=SENT_TO_RELAY`);
         }
       } catch (err: any) {
-        const isMailboxDead =
-          err?.name === 'MailboxRevokedError' ||
-          err?.message?.includes('404') ||
-          err?.message?.includes('not found') ||
-          err?.message?.includes('expired');
-        if (isMailboxDead) {
-          // Target mailbox is invalid or expired; mark this item as FAILED and continue draining remaining queue
-          await this.queue.updateOutboundStatus(session, item.queueId, 'FAILED', err.message);
+        if (this.isMailboxDead(err)) {
+          const currentMailbox = this.outboundMailboxResolver
+            ? await this.resolveCurrentMailbox(session, item.conversationId, item)
+            : null;
+          if (currentMailbox && currentMailbox !== item.mailboxId) {
+            await this.queue.updateOutboundMailbox(session, item.queueId, currentMailbox);
+            try {
+              await this.queue.updateOutboundStatus(session, item.queueId, 'SENDING');
+              await this.http.sendEnvelope(currentMailbox, item.payload, item.ttlSeconds, item.notifyRecipient);
+              await this.queue.removeOutbound(session, item.queueId);
+              flushedCount++;
+              if (this.onOutboundFlushed) {
+                this.onOutboundFlushed({ queueId: item.queueId, messageId: item.messageId, conversationId: item.conversationId });
+              }
+              continue;
+            } catch (retryError: any) {
+              await this.queue.updateOutboundStatus(session, item.queueId, 'QUEUED', retryError?.message || 'Retry failed');
+              continue;
+            }
+          }
+          // Preserve the payload for another attempt after the recipient refreshes
+          // their mailbox/profile; don't turn an expired route into a dropped message.
+          await this.queue.updateOutboundStatus(session, item.queueId, 'QUEUED', err.message);
           continue;
         }
         await this.queue.updateOutboundStatus(session, item.queueId, 'QUEUED', err.message);
@@ -250,6 +308,26 @@ export class NetworkManager {
     }
 
     return flushedCount;
+  }
+
+  private async resolveCurrentMailbox(
+    session: SpaceSession,
+    identityId: string | undefined,
+    item: QueuedOutboundEnvelope
+  ): Promise<string | null> {
+    try {
+      const mailboxId = await this.outboundMailboxResolver?.(session, identityId, item);
+      return mailboxId && mailboxId !== item.mailboxId ? mailboxId : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private isMailboxDead(error: any): boolean {
+    return error?.name === 'MailboxRevokedError' ||
+      error?.message?.includes('404') ||
+      error?.message?.toLowerCase?.().includes('not found') ||
+      error?.message?.toLowerCase?.().includes('expired');
   }
 
   // ===========================================================================

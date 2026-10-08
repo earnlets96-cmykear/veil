@@ -2,6 +2,18 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 123] - 2026-10-09
+
+### Fixed
+- Retry queued messages and contact handshakes against the recipient's current mailbox after the relay reports a stale/expired route. Retries preserve the same E2EE payload and message ID; old queued control messages can recover their peer identity from the saved request record.
+- Refresh verified contact mailbox/avatar details only when the profile still has the known signing key, and update the active chat/list presentation.
+- Reject contact requests with invalid signatures and require a valid, request-bound response signature before accepting or declining a contact.
+
+### Verification
+- Phase 123 stale-route recovery and Phase 34 avatar/contact suites pass (7 tests); TypeScript passes.
+- Relay-backed Phase 37 and Phase 67 tests could not connect to local relay servers in this sandbox. The full suite was attempted and interrupted after repeated loopback/recovery connection failures.
+- Independent security audit, explicit dual sign-off, and Android/two-device relay validation remain required before deployment.
+
 ## [Phase 122] - 2026-10-08
 
 ### Fixed

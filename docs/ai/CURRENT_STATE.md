@@ -1,6 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Phase: PHASE 122 — MOBILE SAFE AREA, VOICE AUTH & CHAT MENU DISMISSAL
+## Current Phase: PHASE 123 — DELIVERY ROUTE RECOVERY & CONTACT HANDSHAKE VERIFICATION
+- **Status**: Implemented and focused verified; relay-backed integration, Android/two-device validation, independent audit, and dual sign-off remain outstanding.
+- **Root causes**: Contact acceptances used the mailbox captured in the original request, even after it expired. Failed direct sends could remain queued against a stale mailbox. Contact request code computed signature validity without enforcing it, and contact responses did not authenticate their response signature.
+- **Changes**: On explicit dead-mailbox responses, retry the same encrypted payload at the current mailbox resolved from the signed directory profile; preserve identity signing-key continuity; persist refreshed mailbox/avatar details and update the active UI. Add identity metadata to message/control queues and infer peer identity for legacy queued contact handshakes. Enforce contact request and response signatures plus request/peer binding.
+- **Verification**: Phase 123 and Phase 34 focused suites pass (7 tests); TypeScript passes. Relay-backed Phase 37/67 tests and broad full-suite relay/recovery tests are blocked by sandbox loopback restrictions.
+- **Governance**: No encryption, ratchet, or wire format change. ADR-128 and `docs/ai/THREAT_MODEL_DELIVERY_RECOVERY.md` document the review. Do not deploy before independent security audit and explicit dual sign-off.
+
+## Previous Phase: PHASE 122 — MOBILE SAFE AREA, VOICE AUTH & CHAT MENU DISMISSAL
 - **Status**: Source fixes and focused regressions pass; Android device and relay-backed voice integration validation remain outstanding.
 - **Root causes**: The home sidebar is fixed to viewport `inset: 0`, so body safe-area padding cannot move it. Voice chunks use the original `attachmentId` in AEAD additional data, but playback used the cloud's distinct `objectId` for decryption. Chat row action menus had no outside-pointer dismissal listener.
 - **Changes**: The fixed mobile sidebar now honors `--veil-safe-top` and `--veil-safe-bottom`; voice cache and fallback decryption both use `meta.attachmentId || meta.objectId` for backwards compatibility; chat row menus close on outside pointer/touch and Escape.

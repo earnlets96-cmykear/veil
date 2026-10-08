@@ -150,6 +150,48 @@ const notificationDispatcher = new NotificationDispatcher('SENDER_ONLY');
 const searchEngine = new LocalSearchEngine();
 const directoryClient = new DirectoryClient(appConfig.relayHttpUrl || 'http://127.0.0.1:8787', appConfig.requestTimeoutMs || 30000);
 const contactRequestManager = new ContactRequestManager(store, contactManager, idMgr, netManager);
+netManager.setOutboundMailboxResolver(async (session, recipientIdentityId, queuedItem) => {
+  let identityId = recipientIdentityId;
+  if (!identityId) {
+    try {
+      const control = JSON.parse(queuedItem.payload);
+      if (control?.requestId) {
+        identityId = (await contactRequestManager.getRequest(session, control.requestId))?.peerIdentityId;
+      }
+    } catch {
+      // Encrypted message payloads are intentionally opaque here; they require queue metadata.
+    }
+  }
+  if (!identityId) return null;
+  const profile = await directoryClient.getProfileByIdentity(identityId);
+  if (!profile || profile.identityId !== identityId || !verifySignedProfile(profile)) return null;
+
+  const [contact, request] = await Promise.all([
+    contactManager.getContact(session, identityId),
+    contactRequestManager.getRequestByPeerIdentity(session, identityId),
+  ]);
+  const knownSigningKey = contact?.signingPublicKey ||
+    request?.peerProfile.prekeyBundle.identityDocument.signingPublicKey;
+  const refreshedSigningKey = profile.prekeyBundle.identityDocument.signingPublicKey;
+  // Never let a directory refresh silently replace a previously trusted identity key.
+  if (!knownSigningKey || knownSigningKey !== refreshedSigningKey) return null;
+
+  if (contact) {
+    await contactManager.updateContact(session, {
+      ...contact,
+      name: profile.displayName || profile.username,
+      accountUsername: profile.username,
+      mailboxId: profile.mailboxId,
+      avatar: profile.avatar,
+      fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+      prekeyBundle: profile.prekeyBundle,
+      keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+    });
+  }
+  if (request) await contactRequestManager.refreshPeerProfile(session, identityId, profile);
+  netManager.onRecipientProfileRefreshed?.(profile);
+  return profile.mailboxId;
+});
 const cloudClient = new CloudClient({
   baseUrl: appConfig.relayHttpUrl || 'http://127.0.0.1:8787',
   requestTimeoutMs: appConfig.requestTimeoutMs || 30000,
@@ -1506,6 +1548,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return unsub;
   }, []);
 
+  useEffect(() => {
+    netManager.onRecipientProfileRefreshed = (profile) => {
+      setContacts((previous) => previous.map((contact) => contact.identityId === profile.identityId
+        ? { ...contact, name: profile.displayName || profile.username, accountUsername: profile.username,
+            mailboxId: profile.mailboxId, avatar: profile.avatar,
+            fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+            prekeyBundle: profile.prekeyBundle,
+            keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey }
+        : contact));
+      setConversations((previous) => previous.map((conversation) => conversation.id === profile.identityId
+        ? { ...conversation, name: profile.displayName || profile.username, avatar: profile.avatar,
+            avatarUrl: profile.avatar, peerDoc: profile.prekeyBundle.identityDocument }
+        : conversation));
+    };
+    return () => { netManager.onRecipientProfileRefreshed = undefined; };
+  }, []);
+
   // Listen for native online/offline browser & Capacitor events
   useEffect(() => {
     const handleOnline = async () => {
@@ -2002,13 +2061,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const member = members[memberId];
           const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
           if (mailbox) {
-            netManager.sendEnvelope(activeSession, mailbox, reactionPayload).catch(() => {});
+            netManager.sendEnvelope(activeSession, mailbox, reactionPayload, undefined, { conversationId: memberId }).catch(() => {});
           }
         }
       } else {
         const targetContact = contacts.find((c) => c.identityId === conversationId);
         const targetMailboxId = targetContact?.mailboxId || conversationId;
-        netManager.sendEnvelope(activeSession, targetMailboxId, reactionPayload).catch(() => {});
+        netManager.sendEnvelope(activeSession, targetMailboxId, reactionPayload, undefined, { conversationId }).catch(() => {});
       }
     },
     [activeSession, contacts, conversations]
@@ -2065,7 +2124,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const member = members[memberId];
         const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
         if (mailbox) {
-          netManager.sendEnvelope(activeSession, mailbox, actionPayload).catch(() => {});
+          netManager.sendEnvelope(activeSession, mailbox, actionPayload, undefined, { conversationId: memberId }).catch(() => {});
         }
       }
     },
@@ -2324,11 +2383,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const member = groupState.members[memberId];
               let mailbox = (member as any)?.mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId;
               if (mailbox) {
-                netManager.sendEnvelope(activeSession, mailbox, receiptPayload).catch(() => {});
+                netManager.sendEnvelope(activeSession, mailbox, receiptPayload, undefined, { conversationId: memberId }).catch(() => {});
               } else {
                 directoryClient.getProfileByIdentity(memberId).then((p) => {
                   if (p?.mailboxId) {
-                    netManager.sendEnvelope(activeSession, p.mailboxId, receiptPayload).catch(() => {});
+                    netManager.sendEnvelope(activeSession, p.mailboxId, receiptPayload, undefined, { conversationId: memberId }).catch(() => {});
                   }
                 }).catch(() => {});
               }
@@ -2350,7 +2409,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               lastInbound.id,
               async (receipt) => {
                 const wirePayload = await convManager.encryptAndPackReceipt(activeSession, doc, receipt);
-                await netManager.sendEnvelope(activeSession, mbxId, wirePayload);
+                await netManager.sendEnvelope(activeSession, mbxId, wirePayload, undefined, { conversationId: contact?.identityId || conversationId });
               },
               myDoc?.identityId || activeSession.spaceId
             );
@@ -2565,7 +2624,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   } catch (_dErr) {}
                 }
                 if (mailbox) {
-                  await netManager.sendEnvelope(activeSession, mailbox, groupPayload, undefined, { notifyRecipient: true }).catch(() => {});
+                  await netManager.sendEnvelope(activeSession, mailbox, groupPayload, undefined, { notifyRecipient: true, conversationId: memberId }).catch(() => {});
                 }
               }
             } else {
@@ -3159,7 +3218,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   } catch (_dErr) {}
                 }
                 if (mailbox) {
-                  await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload, undefined, { notifyRecipient: true }).catch(() => {});
+                  await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload, undefined, { notifyRecipient: true, conversationId: memberId }).catch(() => {});
                 }
               }
             } else {
@@ -3456,7 +3515,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 } catch (_dErr) {}
               }
               if (mailbox) {
-                await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload, undefined, { notifyRecipient: true }).catch(() => {});
+                await netManager.sendEnvelope(activeSession, mailbox, groupWirePayload, undefined, { notifyRecipient: true, conversationId: memberId }).catch(() => {});
               }
             }
           } else {
@@ -3821,13 +3880,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const member = members[memberId];
           const mailbox = (member as any).mailboxId || contacts.find((c) => c.identityId === memberId)?.mailboxId || memberId;
           if (mailbox && memberId !== myIdentityId) {
-            await netManager.sendEnvelope(activeSession, mailbox, deleteWirePayload).catch(() => {});
+            await netManager.sendEnvelope(activeSession, mailbox, deleteWirePayload, undefined, { conversationId: memberId }).catch(() => {});
           }
         }
       } else {
         const targetContact = contacts.find((c) => c.identityId === conversationId);
         const targetMailboxId = targetContact?.mailboxId || conversationId;
-        await netManager.sendEnvelope(activeSession, targetMailboxId, deleteWirePayload).catch(() => {});
+        await netManager.sendEnvelope(activeSession, targetMailboxId, deleteWirePayload, undefined, { conversationId }).catch(() => {});
       }
     },
     [activeSession, conversations, contacts, deleteMessageLocally]
