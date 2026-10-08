@@ -1,5 +1,13 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 121 — AVATAR CROP PREVIEW & OUTPUT ALIGNMENT
+- **Status**: Implemented and focused verified; physical-device crop validation remains outstanding.
+- [x] Use the source image's natural dimensions to cover the crop aperture in the preview.
+- [x] Share identical fit, rotation, zoom, and pan geometry between preview and exported crop.
+- [x] Clamp panning to prevent empty areas from entering the crop and report crop failures instead of applying the uncropped source.
+- [x] Add crop geometry regressions and update the obsolete avatar rendering assertion.
+- [ ] Validate crop behavior on Android with portrait, landscape, rotated, and zoomed photos.
+
 ## Active Phase: PHASE 120 — UNLOCK HYDRATION & PROFILE PHOTO REFRESH
 - **Status**: Implemented and focused verified; Android device timing/profile switching validation remains outstanding.
 - [x] Start cloud session authentication alongside independent local Space reads.

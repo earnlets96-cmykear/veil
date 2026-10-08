@@ -2,6 +2,15 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 121] - 2026-10-08
+
+### Fixed
+- Matched avatar crop preview and exported image sizing by using one natural-dimension-based fit/zoom/rotation geometry. Crop panning can no longer expose empty canvas, and crop failures no longer silently save the original uncropped image.
+
+### Verification
+- Phase 121 crop geometry and Phase 68 cropper/avatar suites pass (10 tests); avatar processing, profile avatar, and unlock suites pass; TypeScript passes.
+- No identity, authentication, cryptographic, or message protocol changes.
+
 ## [Phase 120] - 2026-10-08
 
 ### Improved

@@ -30,7 +30,7 @@ describe('Phase 68 — 1-to-1 Chat Bubble Avatar Omission', () => {
 });
 
 describe('Phase 68 — Avatar Crop Modal & Visual Fidelity', () => {
-  it('Avatar component sets background-size: cover, center position, and no-repeat', () => {
+  it('Avatar component clips image content with cover sizing and centered positioning', () => {
     const html = renderToStaticMarkup(
       <Avatar
         name="Test User"
@@ -40,9 +40,8 @@ describe('Phase 68 — Avatar Crop Modal & Visual Fidelity', () => {
     );
 
     expect(html).toContain('veil-avatar');
-    expect(html).toContain('background-size:cover');
-    expect(html).toContain('background-position:center');
-    expect(html).toContain('background-repeat:no-repeat');
+    expect(html).toContain('object-fit:cover');
+    expect(html).toContain('object-position:center');
   });
 
   it('AvatarCropModal renders viewport, zoom controls, and action buttons', () => {

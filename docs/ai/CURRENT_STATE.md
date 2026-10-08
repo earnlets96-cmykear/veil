@@ -1,5 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 121 — AVATAR CROP PREVIEW & OUTPUT ALIGNMENT
+- **Status**: Implemented and focused verified; physical Android crop validation remains outstanding.
+- **Root cause**: The crop preview displayed the source at its intrinsic size while the export independently calculated a cover scale from natural dimensions. The image users framed on screen could therefore differ in size and framing from the saved profile photo.
+- **Changes**: The preview and exported canvas now use one shared crop geometry based on the loaded image's natural dimensions, crop diameter, zoom, and rotation. Panning is limited to the visible image bounds. Crop failures are surfaced instead of silently applying the original uncropped image. Both ProfileModal and SettingsModal use this shared cropper.
+- **Verification**: Phase 121 crop geometry and Phase 68 cropper/avatar suites pass (10 tests); avatar processing, profile avatar, and unlock regressions also pass; `npm run typecheck` passes.
+- **Scope**: Image presentation and canvas crop only. No identity, authentication, crypto, or message protocol changes.
+- **Follow-up**: Check portrait/landscape and rotated photos on actual Android devices.
+
 ## Current Phase: PHASE 120 — UNLOCK HYDRATION & PROFILE PHOTO REFRESH
 - **Status**: Implemented and focused verified; Android device timing/profile switching validation remains outstanding.
 - **Changes**: Unlock now starts cloud authentication while the independent encrypted local snapshot records load concurrently, allowing local chat state to paint without waiting for remote authentication. Profile viewer documents are keyed to the active peer; fetched profiles must match the selected identity and contact signing key before their avatar is persisted to the Space contact record. Chat list, header, and profile views then share the refreshed avatar.

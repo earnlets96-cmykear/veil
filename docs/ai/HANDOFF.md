@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 121 Update — Avatar Crop Preview & Output Alignment
+- Fixed the actual profile customizer issue: its preview used the image's intrinsic pixel dimensions while export separately computed a fit scale, so what the user framed could differ from the applied image.
+- Added shared geometry in `src/ui/utils/avatarCropGeometry.ts`. The preview now fits the loaded natural dimensions to cover the crop aperture, and the export uses the same fit/zoom/rotation scale. Panning is clamped to keep the crop covered. Crop failures show an error rather than silently applying the original uncropped image.
+- The same AvatarCropModal serves ProfileModal and SettingsModal. Added crop-geometry regressions and corrected a legacy Avatar test that still asserted the former CSS background implementation after avatars moved to `<img object-fit="cover">`.
+- Phase 121, Phase 68, avatar processing, profile avatar, and unlock regression suites pass (35 tests); TypeScript passes. Android portrait/landscape crop validation remains outstanding.
+- No crypto, identity, authentication, or message protocol changes.
+
 ## Phase 120 Update — Unlock Hydration & Profile Photo Refresh
 - AppState begins cloud authentication in parallel with independent encrypted local reads. Contacts, conversations, requests, profile/privacy, mute settings, and messages are fetched with one `Promise.all`, then local UI state is populated before the cloud result gates remote sync. Argon2id, PIN credential checks, encryption, and identity protocols are unchanged.
 - ProfileModal keys fetched profile documents to the active peer so a prior peer's document is ignored immediately after switching. It verifies the expected identity and the contact's known signing key, then persists valid avatar updates in the encrypted contact record so the list and conversation header refresh as well.

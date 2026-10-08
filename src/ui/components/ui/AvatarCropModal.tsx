@@ -10,6 +10,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ZoomInIcon, ZoomOutIcon, RefreshCwIcon, CheckIcon, CloseIcon } from '../icons/index.ts';
 import { processAvatarImage } from '../../utils/avatarProcessor.ts';
+import { calculateAvatarCropLayout, clampAvatarCropPan } from '../../utils/avatarCropGeometry.ts';
 
 export interface AvatarCropModalProps {
   imageSrc: string;
@@ -30,21 +31,16 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [cropError, setCropError] = useState<string | null>(null);
 
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
   const CROP_BOX_SIZE = 260; // Diameter of circular aperture in pixels
-
-  // Load natural dimensions of source image
-  useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      setNaturalSize({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
-    };
-    img.src = imageSrc;
-  }, [imageSrc]);
+  const cropLayout = naturalSize.width > 0 && naturalSize.height > 0
+    ? calculateAvatarCropLayout(naturalSize.width, naturalSize.height, CROP_BOX_SIZE, zoom, rotation)
+    : null;
+  const visiblePan = cropLayout ? clampAvatarCropPan(pan, cropLayout) : pan;
 
   // Keyboard navigation: Escape cancels, Enter applies
   useEffect(() => {
@@ -68,10 +64,11 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setPan({
+    const nextPan = {
       x: e.clientX - dragStart.x,
       y: e.clientY - dragStart.y,
-    });
+    };
+    setPan(cropLayout ? clampAvatarCropPan(nextPan, cropLayout) : nextPan);
   };
 
   const handleMouseUp = () => {
@@ -91,10 +88,11 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || e.touches.length !== 1) return;
-    setPan({
+      const nextPan = {
       x: e.touches[0].clientX - dragStart.x,
       y: e.touches[0].clientY - dragStart.y,
-    });
+      };
+      setPan(cropLayout ? clampAvatarCropPan(nextPan, cropLayout) : nextPan);
   };
 
   const handleTouchEnd = () => {
@@ -116,18 +114,19 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setRotation(0);
+    setCropError(null);
   };
 
   // Export 100% crisp, centered 512x512 crop
   const handleApplyCrop = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setCropError(null);
 
     try {
+      if (!cropLayout || !imageRef.current) throw new Error('The selected photo has not loaded yet');
       if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
-        // Fallback for non-canvas environments
-        onCropComplete(imageSrc);
-        return;
+        throw new Error('Photo cropping is unavailable in this environment');
       }
 
       const canvas = document.createElement('canvas');
@@ -137,8 +136,7 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
-        onCropComplete(imageSrc);
-        return;
+        throw new Error('Photo cropping is unavailable in this environment');
       }
 
       ctx.imageSmoothingEnabled = true;
@@ -154,19 +152,10 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
       // Apply rotation
       ctx.rotate((rotation * Math.PI) / 180);
 
-      // Compute display scale relative to crop aperture
-      const isRotated90 = rotation === 90 || rotation === 270;
-      const effectiveW = isRotated90 ? naturalSize.height : naturalSize.width;
-      const effectiveH = isRotated90 ? naturalSize.width : naturalSize.height;
-
-      // Base scale that covers the crop box
-      const baseScale = Math.max(CROP_BOX_SIZE / (effectiveW || CROP_BOX_SIZE), CROP_BOX_SIZE / (effectiveH || CROP_BOX_SIZE));
-      const totalScale = (baseScale * zoom * OUTPUT_DIM) / CROP_BOX_SIZE;
-
-      // Translate by pan scaled to output canvas
+      // Use the same fit/zoom geometry as the preview to prevent size mismatch.
       const panFactor = OUTPUT_DIM / CROP_BOX_SIZE;
-      let panX = pan.x * panFactor;
-      let panY = pan.y * panFactor;
+      let panX = visiblePan.x * panFactor;
+      let panY = visiblePan.y * panFactor;
 
       // Adjust pan coordinates for rotation
       if (rotation === 90) {
@@ -185,20 +174,7 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
       ctx.translate(panX, panY);
 
       // Draw original image centered
-      const drawW = (naturalSize.width || OUTPUT_DIM) * (totalScale / (OUTPUT_DIM / CROP_BOX_SIZE));
-      const drawH = (naturalSize.height || OUTPUT_DIM) * (totalScale / (OUTPUT_DIM / CROP_BOX_SIZE));
-
-      if (imageRef.current) {
-        ctx.drawImage(imageRef.current, -drawW / 2, -drawH / 2, drawW, drawH);
-      } else {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((res) => {
-          img.onload = res;
-          img.src = imageSrc;
-        });
-        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-      }
+      ctx.drawImage(imageRef.current, -cropLayout.outputWidth / 2, -cropLayout.outputHeight / 2, cropLayout.outputWidth, cropLayout.outputHeight);
 
       ctx.restore();
 
@@ -214,8 +190,7 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
 
       onCropComplete(optimized);
     } catch (_err) {
-      // Fallback
-      onCropComplete(imageSrc);
+      setCropError('Could not crop this photo. Please try another image.');
     } finally {
       setIsProcessing(false);
     }
@@ -318,13 +293,17 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
           <img
             ref={imageRef}
             src={imageSrc}
+            onLoad={(event) => setNaturalSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
             alt="Crop candidate"
             draggable={false}
             style={{
               position: 'absolute',
               top: '50%',
               left: '50%',
-              transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom}) rotate(${rotation}deg)`,
+              width: cropLayout ? `${cropLayout.imageWidth}px` : undefined,
+              height: cropLayout ? `${cropLayout.imageHeight}px` : undefined,
+              visibility: cropLayout ? 'visible' : 'hidden',
+              transform: `translate(calc(-50% + ${visiblePan.x}px), calc(-50% + ${visiblePan.y}px)) rotate(${rotation}deg)`,
               transformOrigin: 'center center',
               maxWidth: 'none',
               maxHeight: 'none',
@@ -350,6 +329,7 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
         <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--veil-text-secondary)', textAlign: 'center' }}>
           Drag to position • Scroll or use slider to resize
         </p>
+        {cropError && <p role="alert" style={{ margin: 0, color: 'var(--veil-danger, #f87171)', fontSize: '0.8rem' }}>{cropError}</p>}
 
         {/* Zoom & Adjustment Controls */}
         <div
@@ -483,7 +463,7 @@ export const AvatarCropModal: React.FC<AvatarCropModalProps> = ({
           <button
             type="button"
             onClick={handleApplyCrop}
-            disabled={isProcessing}
+            disabled={isProcessing || !cropLayout}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
