@@ -1,5 +1,13 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 120 — UNLOCK HYDRATION & PROFILE PHOTO REFRESH
+- **Status**: Implemented and focused verified; Android device timing/profile switching validation remains outstanding.
+- [x] Start cloud session authentication alongside independent local Space reads.
+- [x] Load unlock snapshot records concurrently so network latency does not hold first local paint.
+- [x] Scope fetched peer profile documents to the active profile target, verify the contact signing key, and persist verified avatar refreshes for app-wide use.
+- [x] Add regression tests and run related unlock/avatar suites plus TypeScript.
+- [ ] Validate unlock responsiveness and avatar refresh across chat list, chat header, and profile viewer on Android devices.
+
 ## Active Phase: PHASE 119 — SHARED-MEDIA CAPTION FOCUS
 - **Status**: Implemented and focused verified; Android keyboard behavior remains to be validated on-device.
 - [x] Keep modal focus management stable across controlled caption-input rerenders.

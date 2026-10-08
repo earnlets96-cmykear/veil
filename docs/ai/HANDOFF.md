@@ -1,5 +1,13 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 120 Update — Unlock Hydration & Profile Photo Refresh
+- AppState begins cloud authentication in parallel with independent encrypted local reads. Contacts, conversations, requests, profile/privacy, mute settings, and messages are fetched with one `Promise.all`, then local UI state is populated before the cloud result gates remote sync. Argon2id, PIN credential checks, encryption, and identity protocols are unchanged.
+- ProfileModal keys fetched profile documents to the active peer so a prior peer's document is ignored immediately after switching. It verifies the expected identity and the contact's known signing key, then persists valid avatar updates in the encrypted contact record so the list and conversation header refresh as well.
+- Added `tests/phase120-startup-avatar-refresh.test.ts`; it verifies concurrent local read starts, avatar precedence, profile-document target scoping, and identity matching. Phase 38/67/90/118 and Phase 120 suites pass (24 tests); `npm run typecheck` passes.
+- Android device validation remains outstanding. The attached MP4 could not be opened in this environment; validate actual unlock timing and profile-photo behavior on device.
+- No cryptographic, authentication, identity, or wire-format changes.
+- Preserve unrelated existing worktree changes: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 119 Update — Shared-Media Caption Focus
 - Fixed caption typing dismissing the mobile keyboard. `MediaPickerModal` passed a new inline `onClose` callback after each caption edit; Modal's effect depended on it, so cleanup restored focus and setup refocused the first button.
 - Modal now calls the latest `onClose` from a ref, while focus lifecycle depends on modal-open state and Escape behavior rather than callback identity.

@@ -1,5 +1,12 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 120 — UNLOCK HYDRATION & PROFILE PHOTO REFRESH
+- **Status**: Implemented and focused verified; Android device timing/profile switching validation remains outstanding.
+- **Changes**: Unlock now starts cloud authentication while the independent encrypted local snapshot records load concurrently, allowing local chat state to paint without waiting for remote authentication. Profile viewer documents are keyed to the active peer; fetched profiles must match the selected identity and contact signing key before their avatar is persisted to the Space contact record. Chat list, header, and profile views then share the refreshed avatar.
+- **Verification**: Phase 120, Phase 38 unlock, Phase 67 app-lock timing, Phase 90 avatar/audio, and Phase 118 avatar/gallery suites pass (24 tests); `npm run typecheck` passes.
+- **Security**: Argon2id parameters, credential checks, identity protocols, and encryption remain unchanged. No security architecture or wire-format change.
+- **Follow-up**: Validate unlock and profile-photo behavior on Android, including peer switching and refreshed photos in chat list/header/profile viewer.
+
 ## Current Phase: PHASE 119 — SHARED-MEDIA CAPTION FOCUS
 - **Status**: Implemented and focused verified; Android keyboard behavior remains to be validated on-device.
 - **Root cause**: MediaPickerModal's inline `onClose` callback changed identity on every caption keystroke. Modal included that callback in its focus effect dependencies, so it restored prior focus and refocused the first modal control after each edit.

@@ -2,6 +2,16 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 120] - 2026-10-08
+
+### Improved
+- Start remote cloud authentication while independent encrypted local Space records hydrate concurrently, so the app can paint local state without waiting on the network.
+- Scope fetched peer profile documents to the active identity and verify a contact's signing key before persisting a refreshed avatar. Chat list, conversation, and profile views now share the current encrypted contact photo.
+
+### Verification
+- Unlock/avatar regression and related Phase 38, 67, 90, and 118 suites pass (24 tests); `npm run typecheck` passes.
+- Argon2id and credential/security paths remain unchanged. Android device validation is outstanding.
+
 ## [Phase 119] - 2026-10-08
 
 ### Fixed

@@ -21,6 +21,7 @@ import { zeroize } from '../../crypto/memory.ts';
 import { spacePinManager } from '../../privacy/pinManager.ts';
 import { themeManager } from '../utils/themeManager.ts';
 import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
+import { loadLocalSpaceSnapshot } from './loadLocalSpaceSnapshot.ts';
 
 export function resolveReplyReference(
   target: UIMessage | null,
@@ -272,6 +273,7 @@ export interface AppContextType {
   addContactFromInvitation: (invitation: InvitationPayload) => Promise<void>;
   exportMyInvitation: () => string | null;
   updateContactVerification: (identityId: string, status: VerificationStatus) => Promise<void>;
+  refreshContactProfileAvatar: (profile: SignedProfileDocument) => Promise<void>;
   createGroup: (
     name: string,
     description?: string,
@@ -583,19 +585,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const loadSpaceData = useCallback(async (session: SpaceSession) => {
     notificationDispatcher.setLocked(false);
 
-    // 0. Ensure persistent cloud session is active
-    await ensureCloudSession(session);
+    // Start remote authentication while local records hydrate. The lock screen
+    // can then disappear as soon as the independent encrypted reads complete.
+    const cloudSessionReadyPromise = ensureCloudSession(session).catch(() => false);
+    const snapshot = await loadLocalSpaceSnapshot(session, store, contactManager, contactRequestManager);
+    const {
+      recoverySecurity,
+      contacts: storedContacts,
+      conversations: storedConvs,
+      contactRequests: storedRequests,
+      profile: storedProfile,
+      privacySettings: storedPrivacy,
+      muteSettings: storedMute,
+      messages: storedMsgs,
+    } = snapshot;
 
-    // 0.1 Check post-recovery security requirements
-    const recoverySec = await store.getAsync<{ recoveryPasswordChangeRequired?: boolean }>(session, 'veil:account:recovery_security');
-    setRecoveryPasswordChangeRequired(!!recoverySec?.recoveryPasswordChangeRequired);
-
-    // 1. Load contacts
-    const storedContacts = await contactManager.listContacts(session);
+    setRecoveryPasswordChangeRequired(!!recoverySecurity?.recoveryPasswordChangeRequired);
     setContacts(storedContacts);
 
     // 2. Load active conversations & hydrate contact avatars and canonical group state
-    const storedConvs = (await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations')) || [];
     const hydratedConvs = storedConvs.map((conv) => {
       if (conv.type === 'direct') {
         const contact = storedContacts.find((c) => c.identityId === conv.id);
@@ -615,27 +623,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
     setConversations(hydratedConvs);
 
-    // 3. Load contact requests
-    const storedRequests = await contactRequestManager.listRequests(session);
     setContactRequests(storedRequests);
 
     // 4. Load public profile & privacy settings
-    const storedProfile = (await store.getAsync<SignedProfileDocument>(session, 'veil:user:profile')) || null;
     setMyProfile(storedProfile);
-    const storedPrivacy = (await store.getAsync<UserPrivacySettings>(session, 'veil:user:privacy_settings')) || {
-      phoneVisibility: 'contacts',
-      profileVisibility: 'everyone',
-    };
     setPrivacySettings(storedPrivacy);
 
     // 4.1 Load conversation mute settings
-    const storedMute = (await store.getAsync<Record<string, boolean>>(session, 'veil:contacts:mute_settings')) || {};
     setMuteSettings(storedMute);
     const mutedList = Object.keys(storedMute).filter((id) => storedMute[id]);
     notificationDispatcher.setMutedConversations(mutedList);
 
     // 5. Load message history
-    const storedMsgs = (await store.getAsync<Record<string, UIMessage[]>>(session, 'veil:ui:messages')) || {};
     const recoveredStoredMsgs = recoverInterruptedUploads(storedMsgs);
     setMessages(recoveredStoredMsgs);
     if (recoveredStoredMsgs !== storedMsgs) {
@@ -647,7 +646,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // 6.1 Reconcile with cloud sync engine
     try {
-      if (cloudClient.getSessionToken()) {
+      const cloudSessionReady = await cloudSessionReadyPromise;
+      if (cloudSessionReady && session.isActive() && cloudClient.getSessionToken()) {
         await syncEngine.sync(session);
         const postSyncConvs = await store.getAsync<UIConversation[]>(session, 'veil:ui:conversations');
         if (postSyncConvs) {
@@ -4336,6 +4336,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession]
   );
 
+  const refreshContactProfileAvatar = useCallback(
+    async (profile: SignedProfileDocument): Promise<void> => {
+      if (!activeSession || !profile.avatar) return;
+      const contact = contacts.find((item) => item.identityId === profile.identityId);
+      if (!contact || contact.avatar === profile.avatar) return;
+      if (!verifySignedProfile(profile, contact.signingPublicKey)) return;
+
+      const updatedContact = { ...contact, avatar: profile.avatar };
+      await contactManager.updateContact(activeSession, updatedContact);
+      setContacts((current) => current.map((item) => item.identityId === profile.identityId ? updatedContact : item));
+    },
+    [activeSession, contacts]
+  );
+
   const createGroup = useCallback(
     async (
       name: string,
@@ -5074,6 +5088,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addContactFromInvitation,
       exportMyInvitation,
       updateContactVerification,
+      refreshContactProfileAvatar,
       createGroup,
       addGroupMember,
       removeGroupMember,
@@ -5172,6 +5187,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addContactFromInvitation,
       exportMyInvitation,
       updateContactVerification,
+      refreshContactProfileAvatar,
       createGroup,
       addGroupMember,
       removeGroupMember,

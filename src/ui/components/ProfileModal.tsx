@@ -16,7 +16,9 @@ import { useApp } from '../app/AppState.tsx';
 import { processAvatarImage } from '../utils/avatarProcessor.ts';
 import { getRelationshipState, RelationshipState } from '../../contacts/relationshipHelper.ts';
 import { DirectorySearchResult, SignedProfileDocument } from '../../server/types.ts';
+import { verifySignedProfile } from '../../identity/profile.ts';
 import { getErrorMessage } from '../../utils/errors.ts';
+import { isPeerProfileForIdentity, resolvePeerProfileAvatar, resolvePeerProfileDocument } from '../utils/avatarPresentation.ts';
 import {
   Avatar,
   Badge,
@@ -82,6 +84,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     unblockUser,
     removeContact,
     updateContactMediaPermissions,
+    refreshContactProfileAvatar,
     selectConversation,
     openModal,
     directoryClient,
@@ -120,7 +123,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
       )
     : null;
 
-  const [peerDoc, setPeerDoc] = useState<SignedProfileDocument | null>(null);
+  const peerProfileKey = isPeer
+    ? `${peerId || searchResult?.identityId || peerContact?.identityId || peerConv?.id || ''}|${(
+        peerUsername || searchResult?.username || peerContact?.accountUsername || peerConv?.name || ''
+      ).toLowerCase()}`
+    : '';
+  const [peerProfileState, setPeerProfileState] = useState<{ key: string; document: SignedProfileDocument } | null>(null);
+  const peerDoc = resolvePeerProfileDocument(peerProfileState, peerProfileKey);
   const [loadingPeer, setLoadingPeer] = useState(false);
   const [copiedUsername, setCopiedUsername] = useState(false);
   const [copiedFingerprint, setCopiedFingerprint] = useState(false);
@@ -152,7 +161,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     if (!isPeer) return [];
     const docPhotos = (peerDoc as any)?.profilePhotos as string[] | undefined;
     if (docPhotos && docPhotos.length > 0) return docPhotos;
-    const singleAvatar = peerContact?.avatar || peerDoc?.avatar;
+    const singleAvatar = resolvePeerProfileAvatar(peerDoc?.avatar, peerContact?.avatar);
     return singleAvatar ? [singleAvatar] : [];
   })();
 
@@ -221,18 +230,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
         (effectiveUsername && r.peerUsername.toLowerCase() === effectiveUsername.toLowerCase()))
   );
 
-  // Fetch full profile document for peer if not available
+  // Fetch the profile for this exact peer; a prior peer's cached document is
+  // ignored immediately when the viewer switches targets.
   useEffect(() => {
     if (!isPeer || peerDoc) return;
     let isMounted = true;
+    const requestKey = peerProfileKey;
 
     async function fetchPeerProfile() {
       if (effectiveUsername) {
         setLoadingPeer(true);
         try {
           const fetched = await directoryClient.getProfileByUsername(effectiveUsername);
-          if (isMounted && fetched) {
-            setPeerDoc(fetched);
+          const expectedPeerIdentity = peerContact?.identityId || searchResult?.identityId || peerId;
+          const matchesPeer = isPeerProfileForIdentity(fetched, expectedPeerIdentity);
+          if (isMounted && fetched && matchesPeer && verifySignedProfile(fetched, peerContact?.signingPublicKey)) {
+            setPeerProfileState({ key: requestKey, document: fetched });
+            void refreshContactProfileAvatar(fetched).catch(() => {});
           }
         } catch (_err) {
           // Profile may be direct contact without directory entry
@@ -246,7 +260,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ peerId, peerUsername
     return () => {
       isMounted = false;
     };
-  }, [isPeer, effectiveUsername, directoryClient]);
+  }, [isPeer, peerProfileKey, peerDoc, effectiveUsername, directoryClient, peerContact, searchResult?.identityId, peerId, refreshContactProfileAvatar]);
 
   const rawFingerprint = isPeer
     ? peerDoc?.prekeyBundle?.identityDocument?.fingerprint ||
