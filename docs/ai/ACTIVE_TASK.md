@@ -7,6 +7,9 @@
 - [x] Keep drag visuals out of per-pointer React renders using animation-frame-coalesced CSS variable updates.
 - [x] Remove duplicate recording cancel action and prevent cancel/send action touch releases from bubbling into the parent recording gesture.
 - [x] Move chat row dates and three-dot actions toward the trailing edge without shrinking the 44px menu target.
+- [x] Make Enter send messages in the web composer at all viewport widths while Shift+Enter inserts a newline.
+- [x] Match App Lock delay selectors to the dark settings surface and preserve visible keyboard focus.
+- [x] Verify the App Lock settings suite (5 tests) and TypeScript after the selector styling follow-up.
 - [x] Add regression coverage; five focused suites / 23 tests pass, TypeScript and production build pass.
 - [ ] Validate recording lock/cancel/send, visual motion, and sidebar alignment on physical Android devices.
 - **Full-suite limits**: 341 files pass / 109 fail (1,447 tests pass / 216 fail / 6 skipped); most failures are blocked loopback relay/recovery tests, with unrelated Phase 98/101/112 UI assertions too.

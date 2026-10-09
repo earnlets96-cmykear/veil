@@ -3,6 +3,9 @@
 ## Current Phase: PHASE 127 — COMPOSER RECORDING & CHAT LIST POLISH
 - **Status**: UI refinement implemented; focused tests and production build pass. Physical Android gesture validation remains outstanding.
 - **Changes**: Preserved the floating composer controls while simplifying the input island and focus treatment. Recording gestures now update drag visuals at animation-frame cadence instead of causing a render on every pointer event. Reduced recording motion, honored reduced-motion preferences, retained the existing lock/cancel/send gestures, and removed the duplicate locked-state cancel button. Chat row timestamps and three-dot actions use the trailing edge while keeping the 44px action target.
+- **UI follow-up**: App Lock delay selectors now use VEIL's dark surface, readable text, and visible accent focus ring while retaining native select behavior.
+- **Composer keyboard follow-up**: Web composer sends on Enter at all viewport widths; Shift+Enter inserts a newline.
+- **Follow-up verification**: App Lock settings tests (5) and `npm run typecheck` pass; the Impeccable detector reports only existing findings elsewhere in the shared stylesheet. The full-suite run showed repeated localhost relay/recovery connection failures and did not yield a captured aggregate summary.
 - **Verification**: Five focused suites / 23 tests pass; `npm run typecheck` and `npm run build` pass (existing bundle size and mixed-import warnings remain). Full `npm test`: 341 files passed / 109 failed (1,447 tests passed / 216 failed / 6 skipped), mostly blocked localhost relay/recovery integration tests; unrelated Phase 98/101/112 UI assertions also fail. Impeccable detector reports only pre-existing findings outside edited regions.
 - **Scope**: Presentation and gesture rendering only. No cryptography, identity, Space isolation, relay, or message wire protocol changes.
 

@@ -5,12 +5,15 @@ All notable changes, architectural decisions, and security milestones across the
 ## [Phase 127] - 2026-10-09
 
 ### Improved
+- Updated the web message composer so Enter sends at every viewport width and Shift+Enter inserts a newline.
+- Matched App Lock delay selectors to the dark settings surface with readable text, dark native menus, and a visible keyboard focus ring.
 - Refined the floating composer field and focus ring while preserving its controls and sending behavior.
 - Smoothed voice recording transitions, toned down the animated indicator, honored reduced motion, and coalesced drag visuals to animation frames.
 - Removed the duplicate locked-recording cancel button and isolated action taps from the hold gesture release handler.
 - Aligned chat timestamps and menu actions to the row's trailing edge while retaining a 44px menu target.
 
 ### Verification
+- App Lock settings tests (5) and `npm run typecheck` pass. The full-suite run showed localhost relay/recovery connection failures; its aggregate summary was not captured.
 - Five focused suites / 23 tests pass; `npm run typecheck` and `npm run build` pass. Existing build warnings concern large chunks and mixed static/dynamic imports.
 - Full `npm test`: 341 files passed / 109 failed (1,447 tests passed / 216 failed / 6 skipped), mainly due localhost relay/recovery access restrictions, plus unrelated legacy Phase 98/101/112 assertions.
 - No cryptography, identity, Space isolation, relay, or message wire protocol changes.

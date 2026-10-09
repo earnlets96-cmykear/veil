@@ -5654,3 +5654,17 @@ img.veil-message-sticker-img {
     max-width: min(86vw, 420px);
   }
 }
+.veil-select {
+  color-scheme: var(--veil-scheme, dark);
+  color: var(--veil-text-primary);
+  background-color: var(--veil-bg-surface-elevated);
+  border: 1px solid var(--veil-border);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+}
+
+.veil-select:focus-visible {
+  outline: 2px solid var(--veil-accent-primary);
+  outline-offset: 2px;
+}
