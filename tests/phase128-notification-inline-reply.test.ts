@@ -19,7 +19,10 @@ describe('Phase 128: private Android notification reply', () => {
     expect(plugin).toContain('override fun load()');
     expect(plugin).toContain('acceptReplyIntent(activity.intent)');
     expect(plugin).toContain('acceptReplyIntent(intent)');
+    expect(plugin).toContain('if (intent?.action != REPLY_ACTION) return');
+    expect(plugin).toContain('if (!replyText.isNullOrBlank() && !conversationId.isNullOrBlank() && !spaceId.isNullOrBlank())');
     expect(appState).toContain("addNotificationReplyListener");
+    expect(appState).toContain('if (activeSession.spaceId === reply.spaceId)');
     expect(appState).toContain('sendMessage(reply.conversationId, text)');
     expect(dispatcher).toContain('clearNativeNotifications');
     expect(plugin).toContain('NotificationManagerCompat.from(context).cancelAll()');
@@ -35,6 +38,7 @@ describe('Phase 128: private Android notification reply', () => {
     expect(dispatcher).toContain('...(accentColor ? { accentColor } : {})');
     expect(plugin).toContain('call.getString("accentColor")');
     expect(plugin).toContain('setColor(notificationColor)');
+    expect(plugin).toContain('Regex("^#[0-9a-fA-F]{6}$")');
   });
 
   it('keeps background FCM notifications generic and lock-screen private', () => {

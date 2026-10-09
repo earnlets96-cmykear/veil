@@ -1432,11 +1432,12 @@ This document records all architectural decisions made across the VEIL project l
 - **Context**: The local `FULL_OBFUSCATED` notification formatter already produced a short message preview, but Android notifications did not expose an inline reply action. Some attachment UI paths also continued after cloud session restoration returned false.
 - **Decision**:
   1. Add Android RemoteInput only to local notifications in `FULL_OBFUSCATED` mode that have both a conversation and Space identifier. Keep notification visibility private and leave FCM content generic and non-interactive.
-  2. Route replies through the existing encrypted `sendMessage` function only when the originating Space remains active. Do not store or log RemoteInput text; clear its one-shot intent payload before forwarding it in memory.
+  2. Capture RemoteInput from both the Activity's initial launch intent and later `onNewIntent` deliveries, then route replies through the existing encrypted `sendMessage` function only when the originating Space remains active. Retain the native event until the JavaScript listener attaches. Do not store or log RemoteInput text; clear its one-shot intent payload before forwarding it in memory.
   3. Clear active app notifications when the Space locks or the user changes notification privacy mode.
   4. Require a valid cloud session before attachment-related UI starts network access; preserve server-side authorization as the enforcement boundary.
   5. Prefer a valid audio MIME type from voice metadata over generic cached MIME values.
-  6. Preserve cryptographic primitives, ratchet state, message wire payloads, and FCM payloads.
+  6. Use the current VEIL accent for the Android notification tint when it is a valid six-digit hex color; Android retains control of the system notification surface and text styling.
+  7. Preserve cryptographic primitives, ratchet state, message wire payloads, and FCM payloads.
 - **Reason**: Let a user-selected preview mode support direct replies without weakening the background privacy default or the active Space boundary. Fail closed when local session recovery is unavailable.
 - **Threat model**: See `docs/ai/THREAT_MODEL_NOTIFICATION_REPLIES.md`. Full Preview exposes a short plaintext preview in the unlocked notification shade; Android memory inspection and notification mirroring remain residual OS-level risks.
 - **Release gate**: Validate RemoteInput delivery, lock behavior, Space switching, notification cancellation, and audio playback on physical Android devices. Do not deploy before independent security review, formal security audit, and explicit dual sign-off.
