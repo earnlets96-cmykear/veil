@@ -1475,3 +1475,7 @@
   - Capacitor Android synced (`npx cap sync android`).
   - Android debug APK assembled successfully in 22s (`app-debug.apk`, 4.59 MB).
   - Live production relay test suite passed 100% against `https://veil-rga0.onrender.com`.
+
+## Completed Composer UI Follow-up
+- [x] Make composer send, voice-record, and recording-send actions circular without changing their 44px hit area or behavior.
+- [x] Verify Phase 127 and Phase 129 composer suites (8 tests) and TypeScript.

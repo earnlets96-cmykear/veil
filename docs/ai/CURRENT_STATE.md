@@ -1062,3 +1062,7 @@
 | Step 13: DM Receipts (A->B) | Direct Message & Read | **PASS** | Progression: 1 tick -> 2 gray ticks -> 2 colored ticks (READ) |
 | Step 14: DM Receipts (B->A) | Direct Message & Read | **PASS** | Reverse DM read receipt processed -> 2 colored ticks (READ) |
 | Step 15: Clean Disconnect | WebSocket Transport | **PASS** | Clean teardown without error or lingering sockets |
+
+## Composer Action Button UI Follow-up
+- The send and voice-record action buttons now use circular 44px controls; the existing touch targets and recording gestures are unchanged.
+- Verification: Phase 127 and Phase 129 focused composer suites (8 tests) and `npm run typecheck` pass.

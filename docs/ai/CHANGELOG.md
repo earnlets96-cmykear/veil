@@ -1230,3 +1230,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - AI-Agent Continuity System, architecture documentation, phase prompts, baseline scaffolding.
+
+## [Composer UI Follow-up] - 2026-10-10
+- Changed the composer send and voice-record action buttons to circular shapes while preserving size, focus, and gesture behavior.
+- Verification: Phase 127 and Phase 129 focused suites (8 tests) and TypeScript pass.
