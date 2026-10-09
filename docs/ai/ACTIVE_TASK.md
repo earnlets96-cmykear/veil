@@ -1,6 +1,18 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 126 — SOCIAL VIDEO SHARE & PREVIEW
+## Active Phase: PHASE 127 — COMPOSER RECORDING & CHAT LIST POLISH
+- **Status**: UI changes and focused verification complete; physical Android recording-gesture validation remains open.
+- [x] Preserve the selected floating composer direction and all existing composer controls/behavior.
+- [x] Reduce composer focus intensity and recording animation activity; respect reduced-motion preferences.
+- [x] Keep drag visuals out of per-pointer React renders using animation-frame-coalesced CSS variable updates.
+- [x] Remove duplicate recording cancel action and prevent cancel/send action touch releases from bubbling into the parent recording gesture.
+- [x] Move chat row dates and three-dot actions toward the trailing edge without shrinking the 44px menu target.
+- [x] Add regression coverage; five focused suites / 23 tests pass, TypeScript and production build pass.
+- [ ] Validate recording lock/cancel/send, visual motion, and sidebar alignment on physical Android devices.
+- **Full-suite limits**: 341 files pass / 109 fail (1,447 tests pass / 216 fail / 6 skipped); most failures are blocked loopback relay/recovery tests, with unrelated Phase 98/101/112 UI assertions too.
+- **Scope**: Presentation and gesture rendering only; no cryptography, identity, Space isolation, relay, or message wire protocol changes.
+
+## Previous Phase: PHASE 126 — SOCIAL VIDEO SHARE & PREVIEW
 - **Status**: Implementation and focused verification complete; physical Android validation and post-RC security release gates remain open.
 - [x] Accept Android text share intents from TikTok and Instagram without logging or persisting pending share text.
 - [x] Require an explicit recipient choice and Send action; send only the normalized URL through the existing encrypted message path.

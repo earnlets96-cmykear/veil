@@ -44,7 +44,7 @@
 .veil-sidebar .veil-conversation-item {
   min-height: 64px;
   margin-bottom: 2px !important;
-  padding: 10px 12px !important;
+  padding: 10px 2px 10px 8px !important;
   border: 1px solid transparent !important;
   border-radius: var(--veil-radius-md) !important;
   background: transparent !important;
@@ -68,6 +68,17 @@
 
 .veil-sidebar .veil-conversation-preview {
   color: var(--veil-text-secondary) !important;
+}
+
+.veil-sidebar .veil-conversation-meta {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.veil-sidebar .veil-conversation-time {
+  margin-left: auto;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .veil-sidebar .veil-unread-pill {
@@ -2885,26 +2896,30 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  min-height: 44px;
-  padding: 4px 6px;
+  min-height: 52px;
+  padding: 4px;
   background: var(--veil-bg-surface-elevated, #161b22);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-lg);
   position: relative;
   overflow: visible;
-  gap: 8px;
-  animation: veilRecordingEnter 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  gap: 10px;
+  --record-drag-x: 0px;
+  --record-drag-y: 0px;
+  --record-hint-x: 0px;
+  --record-lock-y: 0px;
+  animation: veilRecordingEnter 120ms ease-out both;
 }
 
 @keyframes veilRecordingEnter {
-  from { opacity: 0; transform: translateY(8px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .veil-recording-trash-btn {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   border: none;
@@ -2912,7 +2927,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color var(--veil-motion-fast), color var(--veil-motion-fast);
   flex-shrink: 0;
 }
 
@@ -2929,12 +2944,11 @@
 }
 
 .veil-recording-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background-color: var(--veil-danger, #ef4444);
-  box-shadow: 0 0 8px var(--veil-danger, #ef4444);
-  animation: veilPulse 1.2s infinite;
+  box-shadow: none;
 }
 
 .veil-recording-timer-text {
@@ -2947,7 +2961,7 @@
 .veil-recording-soundwave {
   display: flex;
   align-items: center;
-  gap: 2.5px;
+  gap: 3px;
   height: 18px;
   flex: 1;
   justify-content: center;
@@ -2955,10 +2969,10 @@
 }
 
 .veil-soundwave-bar {
-  width: 2.5px;
+  width: 3px;
   border-radius: 2px;
   background: var(--veil-accent-primary, #14b8a6);
-  animation: veilWaveformPulse 0.9s ease-in-out infinite alternate;
+  animation: veilWaveformPulse 1.8s ease-in-out infinite alternate;
 }
 
 .veil-soundwave-bar.bar-1 { height: 6px; animation-delay: 0.05s; }
@@ -2971,7 +2985,7 @@
 .veil-soundwave-bar.bar-8 { height: 6px; animation-delay: 0.4s; }
 
 @keyframes veilWaveformPulse {
-  0% { transform: scaleY(0.4); opacity: 0.6; }
+  0% { transform: scaleY(0.78); opacity: 0.78; }
   100% { transform: scaleY(1); opacity: 1; }
 }
 
@@ -2981,6 +2995,7 @@
   color: var(--veil-text-secondary, rgba(255, 255, 255, 0.6));
   user-select: none;
   white-space: nowrap;
+  transform: translateX(var(--record-hint-x, 0px));
 }
 
 .veil-recording-locked-hint {
@@ -2990,7 +3005,6 @@
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--veil-accent-primary, #14b8a6);
-  animation: veilRecordingEnter 160ms ease-out both;
 }
 
 .veil-recording-mic-wrapper {
@@ -3015,32 +3029,42 @@
   color: var(--veil-text-secondary, #cbd5e1);
   white-space: nowrap;
   pointer-events: none;
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transform: translateX(-50%) translateY(var(--record-lock-y, 0px));
+  transition: opacity var(--veil-motion-fast);
   z-index: 10;
-  animation: veilRecordingEnter 180ms ease-out both;
-}
-
-@keyframes veilLockArrowCue {
-  from { opacity: 0.7; transform: translateY(2px); }
-  to { opacity: 1; transform: translateY(-2px); }
+  animation: veilRecordingEnter 120ms ease-out both;
 }
 
 .veil-lock-arrow-bounce {
-  animation: veilLockArrowCue 850ms ease-in-out infinite alternate;
   color: var(--veil-accent-primary, #14b8a6);
 }
 
 .veil-btn-composer-recording-active {
   background: var(--veil-accent-primary, #14b8a6) !important;
-  box-shadow: 0 0 12px rgba(20, 184, 166, 0.5) !important;
+  box-shadow: var(--veil-elevation-1) !important;
+  transform: translate(var(--record-drag-x, 0px), var(--record-drag-y, 0px));
+  transition: transform 160ms ease-out;
+}
+
+.veil-recording-pill.is-dragging .veil-btn-composer-recording-active {
+  transition: none;
+}
+
+.veil-recording-actions {
+  display: flex;
+  align-items: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .veil-recording-pill,
   .veil-recording-locked-hint,
   .veil-recording-lock-pill,
-  .veil-lock-arrow-bounce {
+  .veil-lock-arrow-bounce,
+  .veil-recording-dot,
+  .veil-soundwave-bar,
+  .veil-btn-composer-recording-active {
     animation: none !important;
+    transition: none !important;
   }
 }
 
@@ -5592,15 +5616,16 @@ img.veil-message-sticker-img {
 
 .veil-composer-input-island {
   min-height: 46px;
-  border-radius: var(--veil-radius-lg) !important;
+  border-radius: 999px !important;
   background: var(--veil-surface-panel) !important;
   border-color: var(--veil-border) !important;
   box-shadow: var(--veil-elevation-1);
+  transition: background-color var(--veil-motion-fast), border-color var(--veil-motion-fast), box-shadow var(--veil-motion-fast);
 }
 
 .veil-composer-input-island:focus-within {
   border-color: var(--veil-accent) !important;
-  box-shadow: var(--veil-focus-ring);
+  box-shadow: 0 0 0 2px var(--veil-accent-primary-alpha);
 }
 
 .veil-btn-composer-send {

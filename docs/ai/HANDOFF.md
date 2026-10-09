@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 127 Update — Composer Recording & Chat List Polish
+- Preserved the selected floating-island composer layout and controls. Recording drag visuals are written to CSS variables at animation-frame cadence; only gesture state changes trigger React rendering. The locked recorder has one cancel button, and action releases are prevented from bubbling into the recording gesture.
+- Recording motion is restrained and respects reduced-motion settings. Chat timestamp/menu alignment uses the row trailing edge while preserving the menu's 44px target.
+- Focused Phase 127/108/101 voice/122 shell/37 suites pass (23 tests); `npm run typecheck` and `npm run build` pass. Full suite: 341 files passed / 109 failed (1,447 tests passed / 216 failed / 6 skipped), mostly blocked loopback relay/recovery tests, plus unrelated Phase 98/101/112 UI assertions.
+- Impeccable detector reported only existing warnings outside the edited recording/sidebar selectors. Physical Android interaction validation remains outstanding. No cryptography, identity, Space isolation, relay, or message wire protocol changes.
+- Preserve unrelated pre-existing worktree changes and generated test folders: Android public index, release manifest/checksums, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 124 Update — Notification Settings & App Lock Reliability
 - Notification settings now separate device permission, local foreground privacy, and Android background-push state. Registration status is finite (`off`, `registering`, `ready`, `error`), errors are user-safe/retryable, and FCM notification content stays generic.
 - App Lock now reads validated persisted leave-app, inactivity, and screen-off delays. Legacy settings migrate to canonical values; failed writes roll back. Resume checks gate App UI while pending; foreground inactivity resets on pointer/key/touch events; Android screen-off marker stores only monotonic elapsed time and is consumed once.

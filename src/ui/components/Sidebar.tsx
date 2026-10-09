@@ -226,7 +226,7 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
           <span className="veil-conversation-name" style={{ fontWeight: 600, color: '#f3f4f6', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {conv.name}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <div className="veil-conversation-meta" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
             {conv.isPinned && (
               <span
                 title="Pinned Conversation"

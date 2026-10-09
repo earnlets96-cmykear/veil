@@ -10,7 +10,7 @@
 import React, { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
 import { useComposer, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
-import { Button, IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
+import { IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
 import { StickerItem, telegramStickerService } from '../../media/telegramStickerService.ts';
 import {
   SendIcon,
@@ -66,8 +66,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[] | null>(null);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
@@ -80,10 +80,30 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useTextareaAutoResize(textareaRef, text);
   const recorderRef = useRef<VoiceRecorder | null>(null);
+  const recordingPillRef = useRef<HTMLDivElement | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const dragFrameRef = useRef<number | null>(null);
   const recordStartTimeRef = useRef<number>(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const hapticCancelledRef = useRef<boolean>(false);
   const hapticLockedRef = useRef<boolean>(false);
+
+  const resetRecordingDrag = () => {
+    dragOffsetRef.current = { x: 0, y: 0 };
+    if (dragFrameRef.current !== null) {
+      cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    recordingPillRef.current?.style.setProperty('--record-drag-x', '0px');
+    recordingPillRef.current?.style.setProperty('--record-drag-y', '0px');
+    recordingPillRef.current?.style.setProperty('--record-hint-x', '0px');
+    recordingPillRef.current?.style.setProperty('--record-lock-y', '0px');
+    setIsDragging(false);
+  };
+
+  useEffect(() => () => {
+    if (dragFrameRef.current !== null) cancelAnimationFrame(dragFrameRef.current);
+  }, []);
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -334,7 +354,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     setIsRecording(false);
     setIsLocked(false);
     setRecordSeconds(0);
-    setDragOffset({ x: 0, y: 0 });
+    resetRecordingDrag();
     setIsCancelling(false);
     touchStartRef.current = null;
     hapticCancelledRef.current = false;
@@ -348,7 +368,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       const { audioBlob, durationSeconds, mimeType } = await recorderRef.current.stopRecording();
       setIsRecording(false);
       setIsLocked(false);
-      setDragOffset({ x: 0, y: 0 });
+      resetRecordingDrag();
       setIsCancelling(false);
       await sendVoiceMessage(conversationId, durationSeconds, audioBlob, mimeType);
     } catch (err: any) {
@@ -357,7 +377,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       setIsSending(false);
       setIsRecording(false);
       setIsLocked(false);
-      setDragOffset({ x: 0, y: 0 });
+      resetRecordingDrag();
       setIsCancelling(false);
       recorderRef.current = null;
       touchStartRef.current = null;
@@ -373,7 +393,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     hapticCancelledRef.current = false;
     hapticLockedRef.current = false;
     setIsCancelling(false);
-    setDragOffset({ x: 0, y: 0 });
+    resetRecordingDrag();
     startRecordingFlow();
   };
 
@@ -386,7 +406,19 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
 
     const clampedX = Math.min(0, Math.max(-140, dx));
     const clampedY = Math.min(0, Math.max(-100, dy));
-    setDragOffset({ x: clampedX, y: clampedY });
+    dragOffsetRef.current = { x: clampedX, y: clampedY };
+    if (!isDragging) setIsDragging(true);
+    if (dragFrameRef.current === null) {
+      dragFrameRef.current = requestAnimationFrame(() => {
+        dragFrameRef.current = null;
+        const pill = recordingPillRef.current;
+        if (!pill) return;
+        pill.style.setProperty('--record-drag-x', `${dragOffsetRef.current.x}px`);
+        pill.style.setProperty('--record-drag-y', `${dragOffsetRef.current.y}px`);
+        pill.style.setProperty('--record-hint-x', `${dragOffsetRef.current.x * 0.2}px`);
+        pill.style.setProperty('--record-lock-y', `${dragOffsetRef.current.y * 0.2}px`);
+      });
+    }
 
     // Slide left to cancel threshold: dx < -70px
     if (dx < -70) {
@@ -407,7 +439,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     // Slide up to lock threshold: dy < -60px
     if (dy < -60) {
       setIsLocked(true);
-      setDragOffset({ x: 0, y: 0 });
+      resetRecordingDrag();
       setIsCancelling(false);
       if (!hapticLockedRef.current && typeof navigator !== 'undefined' && navigator.vibrate) {
         try { navigator.vibrate([10, 30, 10]); } catch (_e) {}
@@ -423,7 +455,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
       return;
     }
 
-    if (isCancelling || dragOffset.x < -70) {
+    if (isCancelling || dragOffsetRef.current.x < -70) {
       handleCancelVoice();
       return;
     }
@@ -557,7 +589,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         {isRecording ? (
           /* Live Voice Recording Controls (Screenshot 4) */
           <div
-            className="veil-recording-pill"
+            ref={recordingPillRef}
+            className={`veil-recording-pill${isDragging ? ' is-dragging' : ''}`}
             onTouchMove={handleMicTouchMove}
             onMouseMove={handleMicTouchMove}
             onTouchEnd={handleMicTouchEnd}
@@ -567,6 +600,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             <button
               type="button"
               className="veil-recording-trash-btn"
+              onTouchEnd={(event) => event.stopPropagation()}
+              onMouseUp={(event) => event.stopPropagation()}
               onClick={handleCancelVoice}
               aria-label="Cancel recording"
             >
@@ -598,7 +633,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               <div
                 className="veil-recording-cancel-hint"
                 style={{
-                  transform: `translateX(${dragOffset.x * 0.4}px)`,
                   color: isCancelling ? 'var(--veil-danger, #ef4444)' : 'var(--veil-text-secondary, #94a3b8)',
                 }}
               >
@@ -612,13 +646,16 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             )}
 
             {/* Right Side Mic / Actions */}
-            <div className="veil-recording-mic-wrapper">
+            <div
+              className="veil-recording-mic-wrapper"
+              onTouchEnd={(event) => event.stopPropagation()}
+              onMouseUp={(event) => event.stopPropagation()}
+            >
               {!isLocked && (
                 <div
                   className="veil-recording-lock-pill"
                   style={{
-                    transform: `translateX(-50%) translateY(${dragOffset.y * 0.4}px)`,
-                    opacity: dragOffset.y < -10 ? 1 : 0.85,
+                    opacity: 0.85,
                   }}
                 >
                   <LockIcon size={12} color="var(--veil-accent-primary, #14b8a6)" />
@@ -630,16 +667,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
               )}
 
               {isLocked ? (
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleCancelVoice}
-                    aria-label="Cancel Voice Recording"
-                    style={{ color: 'var(--veil-danger, #ef4444)', padding: '4px 8px' }}
-                  >
-                    <TrashIcon size={15} />
-                  </Button>
+                <div className="veil-recording-actions">
                   <button
                     type="button"
                     className="veil-btn-composer-send"
@@ -654,10 +682,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                 <button
                   type="button"
                   className="veil-btn-composer-send veil-btn-composer-recording-active"
-                  style={{
-                    transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.06)`,
-                    transition: dragOffset.x === 0 && dragOffset.y === 0 ? 'transform 0.2s ease' : 'none',
-                  }}
                   onClick={handleSendVoice}
                   aria-label="Send Voice Recording"
                 >
