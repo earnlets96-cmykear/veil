@@ -1,7 +1,7 @@
 # VEIL Notifications and App Lock Settings Design
 
 **Date:** 2026-10-09
-**Status:** Proposed; initial scope approved by the user, awaiting review of this written specification.
+**Status:** Approved by the user on 2026-10-09.
 **Surface:** Existing VEIL Settings screens and the Android notification shade.
 
 ## Goal
