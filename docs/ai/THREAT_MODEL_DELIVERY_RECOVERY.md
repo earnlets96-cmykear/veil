@@ -53,11 +53,14 @@ This review covers client-side retry of encrypted envelopes when the relay rejec
 | Directory response substitutes a different signing identity | Require a valid signed profile, exact identity ID, and equality with the known signing key before changing route or profile fields. |
 | Forged contact request is stored as incoming | Verify the request signature and reject before persisting relationship state. |
 | Forged acceptance/decline changes local relationship state | Verify response signature, match the pending request ID and peer identity, and reject responses for non-pending requests. |
+| Acceptance substitutes a different key under a reused identity ID | Verify the responder profile using the signing key pinned in the pending request; verify the nested identity document and its identity ID before changing contact state. |
+| A request signature is replayed to another recipient | Require the signed request payload to include this recipient's identity ID and sent timestamp; reject the legacy fallback that omitted both fields. |
 | Network/directory outage causes loss | Keep the outbound item queued and retry on a later mailbox sync; do not log plaintext or credentials. |
 
 ### Residual risks and release gates
 
 - Directory/relay outages can delay delivery; this client cannot deliver while the recipient has no current mailbox or the directory is unreachable.
 - This change does not guarantee recipient-side decryption if the peer's ratchet/prekey state is already out of sync. That needs a separate protocol investigation and its security governance.
-- Relay-backed integration and physical-device validation could not be completed in the current sandbox.
-- Before deployment, run positive/negative profile-continuity and retry tests, obtain an independent security audit, and record explicit dual sign-off under the post-RC security freeze.
+- The initial independent review identified responder-key substitution and recipient-unbound legacy request-signature acceptance; the implementation now rejects both and has adversarial regressions. Follow-up review is pending.
+- Physical-device validation remains outstanding. Relay-backed Phase 37/67 integration passed with local relay access.
+- Before deployment, complete follow-up independent review, formal security audit, and explicit dual sign-off under the post-RC security freeze.

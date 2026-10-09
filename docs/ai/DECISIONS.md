@@ -1382,16 +1382,16 @@ This document records all architectural decisions made across the VEIL project l
 ## ADR-128: Identity-Bound Mailbox Recovery and Contact Handshake Verification
 
 - **Date**: 2026-10-09
-- **Status**: Implemented for review; independent security audit and explicit dual sign-off are required before deployment.
+- **Status**: Implemented; initial independent review findings were fixed and adversarial regressions pass. Follow-up review, formal security audit, and explicit dual sign-off are required before deployment.
 - **Context**: Contact acceptances were routed to the mailbox captured in an old signed request. Direct-message retries could also remain bound to an expired mailbox. `sendEnvelope` persists transient failures, but the retry record did not resolve the recipient's current route. Contact-request signature verification computed a result without enforcing it, while response processing trusted a signed profile without verifying the response signature.
 - **Decision**:
   1. When the relay rejects a recipient mailbox as expired, resolve the peer's latest signed directory profile by stable identity and retry the same already-encrypted payload at its current mailbox.
   2. Require the refreshed profile to preserve the previously stored signing key; update profile/routing fields and persist the refreshed avatar for list and chat views.
   3. Include recipient identity metadata in queued contact and message envelopes. For older queued contact handshakes without metadata, resolve the peer from the saved request ID in the local encrypted request record.
-  4. Enforce contact-request signatures and verify acceptance/decline response signatures and identity/request binding before changing relationship state.
+  4. Enforce recipient-bound contact-request signatures and verify acceptance/decline signatures against the signing key pinned in the pending request. Validate the response profile's identity document, identity ID, and request binding before changing relationship state.
   5. Do not modify encryption, ratchet state, ciphertext format, or message wire fields.
 - **Reason**: A stale route should not strand an otherwise valid encrypted message or contact acceptance. Identity continuity checks prevent a directory refresh from silently substituting a different signing identity.
-- **Security review**: See `docs/ai/THREAT_MODEL_DELIVERY_RECOVERY.md`. Focused adversarial and route-recovery regressions are required. The implementation remains unavailable for production deployment until an independent security audit and explicit dual sign-off are recorded.
+- **Security review**: See `docs/ai/THREAT_MODEL_DELIVERY_RECOVERY.md`. Initial review found a changed-key response could reuse the peer identity ID, and the legacy request-signature fallback did not bind recipient or time. Both paths are now rejected and covered by adversarial tests. The implementation remains unavailable for production deployment until follow-up independent review, formal security audit, and explicit dual sign-off are recorded.
 
 
 

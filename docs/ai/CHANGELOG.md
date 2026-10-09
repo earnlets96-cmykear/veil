@@ -7,12 +7,12 @@ All notable changes, architectural decisions, and security milestones across the
 ### Fixed
 - Retry queued messages and contact handshakes against the recipient's current mailbox after the relay reports a stale/expired route. Retries preserve the same E2EE payload and message ID; old queued control messages can recover their peer identity from the saved request record.
 - Refresh verified contact mailbox/avatar details only when the profile still has the known signing key, and update the active chat/list presentation.
-- Reject contact requests with invalid signatures and require a valid, request-bound response signature before accepting or declining a contact.
+- Reject contact requests with invalid or recipient-unbound signatures and require a valid response signature from the signing key pinned in the pending request before accepting or declining a contact. Validate the profile's identity document before changing relationship state.
+- Added adversarial regressions for a response that substitutes a signing key while reusing an identity ID, and for a request signature that omits recipient binding.
 
 ### Verification
-- Phase 123 stale-route recovery and Phase 34 avatar/contact suites pass (7 tests); TypeScript passes.
-- Relay-backed Phase 37 and Phase 67 tests could not connect to local relay servers in this sandbox. The full suite was attempted and interrupted after repeated loopback/recovery connection failures.
-- Independent security audit, explicit dual sign-off, and Android/two-device relay validation remain required before deployment.
+- Phase 123/34/37/67 suites pass (11 tests); a broader Phase 23/24/33/34/37/67/123 contact and delivery regression run passes (26 tests across 10 files); `npm run typecheck` passes. Relay-backed tests passed when run with loopback access.
+- Initial independent review found two handshake-validation issues; both now have failing-before/fixed-after adversarial regressions. Follow-up independent review, formal security audit, explicit dual sign-off, and Android/two-device relay validation remain required before deployment.
 
 ## [Phase 122] - 2026-10-08
 

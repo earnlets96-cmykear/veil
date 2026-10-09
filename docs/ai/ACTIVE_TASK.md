@@ -1,13 +1,15 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
 ## Active Phase: PHASE 123 — DELIVERY ROUTE RECOVERY & CONTACT HANDSHAKE VERIFICATION
-- **Status**: Implemented and focused verified; relay-backed integration, Android/two-device validation, independent audit, and dual sign-off remain outstanding.
+- **Status**: Implementation and 11 focused/relay-backed tests pass. Two findings from initial independent review were fixed; follow-up review, Android/two-device validation, and formal audit/sign-off remain outstanding.
 - [x] Resolve expired recipient mailboxes by signed profile identity and retry the same persisted E2EE payload.
 - [x] Preserve the known peer signing key when refreshing mailbox/avatar data, and update active chat/list views.
 - [x] Recover older queued contact handshakes from saved request IDs when routing metadata is absent.
-- [x] Enforce contact request/response signatures and response request/peer binding.
-- [x] Add route recovery and forged-handshake regressions; run focused suites and TypeScript.
-- [ ] Run relay-backed cross-client delivery tests outside the loopback-restricted sandbox and validate on Android/two devices.
+- [x] Enforce recipient-bound contact request signatures, responder key continuity, nested identity-document validity, and response request/peer binding.
+- [x] Add route recovery, forged-handshake, key-substitution, and target-unbound signature regressions; run focused suites, relay-backed tests, and TypeScript.
+- [x] Run relay-backed Phase 37/67 cross-client delivery tests with local relay access.
+- [ ] Validate route recovery and delivery on Android/two devices.
+- [ ] Complete follow-up independent review of the amended contact-handshake checks.
 - [ ] Obtain independent security audit and explicit dual sign-off before deployment, as required by the post-RC freeze.
 
 ## Previous Phase: PHASE 122 — MOBILE SAFE AREA, VOICE AUTH & CHAT MENU DISMISSAL

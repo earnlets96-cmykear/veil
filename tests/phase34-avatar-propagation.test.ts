@@ -263,4 +263,95 @@ describe('Phase 34: Avatar Propagation', () => {
     expect(aliceContact).toBeDefined();
     expect(aliceContact?.avatar).toBe(aliceAvatar);
   });
+
+  it('rejects a contact response that reuses the peer identity id with a different signing key', async () => {
+    const store = new EncryptedSpaceStore(new MemoryStorageAdapter());
+    const vault = new SpaceVaultManager();
+    const idMgr = new SpaceIdentityManager();
+    const prekeyMgr = new PrekeyManager(store, idMgr);
+    const contactMgr = new ContactManager(store);
+    const reqMgr = new ContactRequestManager(store, contactMgr, idMgr);
+
+    const aliceHeader = vault.createSpace({ name: 'Alice', password: 'password123', kdfParams: { timeCost: 1, memoryCost: 1024, parallelism: 1 } });
+    const sessionAlice = vault.unlockSpace('password123', aliceHeader.spaceId);
+    idMgr.createIdentity(sessionAlice, store);
+    const alice = idMgr.loadIdentity(sessionAlice, store)!;
+    prekeyMgr.generateSignedPrekey(sessionAlice);
+    const aliceProfile = createSignedProfile(alice.document.identityId, alice.signingPrivateKey, 'alice', 'Alice', 'mbx_alice', prekeyMgr.createPrekeyBundle(sessionAlice));
+
+    const bobHeader = vault.createSpace({ name: 'Bob', password: 'password123', kdfParams: { timeCost: 1, memoryCost: 1024, parallelism: 1 } });
+    const sessionBob = vault.unlockSpace('password123', bobHeader.spaceId);
+    idMgr.createIdentity(sessionBob, store);
+    const bob = idMgr.loadIdentity(sessionBob, store)!;
+    prekeyMgr.generateSignedPrekey(sessionBob);
+    const bobProfile = createSignedProfile(bob.document.identityId, bob.signingPrivateKey, 'bob', 'Bob', 'mbx_bob', prekeyMgr.createPrekeyBundle(sessionBob));
+
+    const request = await reqMgr.sendContactRequest(sessionBob, bobProfile, aliceProfile);
+    const impostorProfile = createSignedProfile(
+      alice.document.identityId,
+      bob.signingPrivateKey,
+      'alice',
+      'Alice',
+      'mbx_impostor',
+      bobProfile.prekeyBundle
+    );
+    const respondedAt = Date.now();
+    const responseSignature = sign(bob.signingPrivateKey, new TextEncoder().encode(JSON.stringify({
+      requestId: request.requestId,
+      responderIdentityId: alice.document.identityId,
+      status: 'ACCEPTED',
+      respondedAt,
+    })));
+
+    const result = await reqMgr.handleInboundResponse(sessionBob, {
+      type: 'CONTACT_RESPONSE',
+      requestId: request.requestId,
+      responderProfile: impostorProfile,
+      status: 'ACCEPTED',
+      respondedAt,
+      signature: bytesToBase64(responseSignature),
+    });
+
+    expect(result).toBeNull();
+    expect((await reqMgr.getRequest(sessionBob, request.requestId))?.status).toBe('OUTGOING_PENDING');
+    expect(await contactMgr.listContacts(sessionBob)).toEqual([]);
+  });
+
+  it('rejects legacy contact request signatures that do not bind the recipient and timestamp', async () => {
+    const store = new EncryptedSpaceStore(new MemoryStorageAdapter());
+    const vault = new SpaceVaultManager();
+    const idMgr = new SpaceIdentityManager();
+    const prekeyMgr = new PrekeyManager(store, idMgr);
+    const contactMgr = new ContactManager(store);
+    const reqMgr = new ContactRequestManager(store, contactMgr, idMgr);
+
+    const aliceHeader = vault.createSpace({ name: 'Alice', password: 'password123', kdfParams: { timeCost: 1, memoryCost: 1024, parallelism: 1 } });
+    const sessionAlice = vault.unlockSpace('password123', aliceHeader.spaceId);
+    idMgr.createIdentity(sessionAlice, store);
+
+    const bobHeader = vault.createSpace({ name: 'Bob', password: 'password123', kdfParams: { timeCost: 1, memoryCost: 1024, parallelism: 1 } });
+    const sessionBob = vault.unlockSpace('password123', bobHeader.spaceId);
+    idMgr.createIdentity(sessionBob, store);
+    const bob = idMgr.loadIdentity(sessionBob, store)!;
+    prekeyMgr.generateSignedPrekey(sessionBob);
+    const bobProfile = createSignedProfile(bob.document.identityId, bob.signingPrivateKey, 'bob', 'Bob', 'mbx_bob', prekeyMgr.createPrekeyBundle(sessionBob));
+
+    const sentAt = Date.now();
+    const requestId = 'req_unbound_legacy';
+    const weakSignature = sign(bob.signingPrivateKey, new TextEncoder().encode(JSON.stringify({
+      requestId,
+      senderIdentityId: bob.document.identityId,
+    })));
+
+    const result = await reqMgr.handleInboundRequest(sessionAlice, {
+      type: 'CONTACT_REQUEST',
+      requestId,
+      senderProfile: bobProfile,
+      sentAt,
+      signature: bytesToBase64(weakSignature),
+    });
+
+    expect(result).toBeNull();
+    expect(await reqMgr.listRequests(sessionAlice)).toEqual([]);
+  });
 });

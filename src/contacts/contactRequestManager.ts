@@ -13,6 +13,7 @@ import { NetworkManager } from '../network/networkManager.ts';
 import { sign, verify } from '../identity/signing.ts';
 import { bytesToBase64, base64ToBytes, randomBytes, bytesToHex } from '../crypto/utils.ts';
 import { SpaceIdentityManager } from '../identity/manager.ts';
+import { verifyIdentityDocument } from '../identity/document.ts';
 
 export type ContactRequestStatus =
   | 'OUTGOING_PENDING'
@@ -229,17 +230,15 @@ export class ContactRequestManager {
     }
 
     // 1. Verify sender profile signature
-    if (!verifySignedProfile(wire.senderProfile)) {
+    const senderIdentityDocument = wire.senderProfile.prekeyBundle?.identityDocument;
+    if (!verifySignedProfile(wire.senderProfile) ||
+        !senderIdentityDocument ||
+        senderIdentityDocument.identityId !== wire.senderProfile.identityId ||
+        !verifyIdentityDocument(senderIdentityDocument)) {
       return null; // Reject forged sender profile
     }
 
     // 2. Verify request signature
-    const canonicalReq = JSON.stringify({
-      requestId: wire.requestId,
-      senderIdentityId: wire.senderProfile.identityId,
-      targetIdentityId: session.spaceId ? undefined : undefined, // Sender signed target
-    });
-
     let valid = false;
     try {
       const pubKeyBytes = base64ToBytes(wire.senderProfile.prekeyBundle.identityDocument.signingPublicKey);
@@ -256,7 +255,7 @@ export class ContactRequestManager {
           })
         ),
         sigBytes
-      ) || verify(pubKeyBytes, new TextEncoder().encode(canonicalReq), sigBytes);
+        );
 
       // Verify timestamp freshness (within 7 days)
       if (Date.now() - wire.sentAt > 7 * 24 * 60 * 60 * 1000) {
@@ -444,14 +443,23 @@ export class ContactRequestManager {
       return null;
     }
 
-    // 1. Verify responder profile signature
-    if (!verifySignedProfile(wire.responderProfile)) {
+    if (wire.status !== 'ACCEPTED' && wire.status !== 'DECLINED') return null;
+
+    const requests = await this.listRequests(session);
+    const request = requests.find((r) => r.requestId === wire.requestId);
+    if (!request || request.peerIdentityId !== wire.responderProfile.identityId || request.status !== 'OUTGOING_PENDING') return null;
+
+    const pinnedSigningKey = request.peerProfile.prekeyBundle.identityDocument.signingPublicKey;
+    const responderIdentityDocument = wire.responderProfile.prekeyBundle?.identityDocument;
+    if (!verifySignedProfile(wire.responderProfile, pinnedSigningKey) ||
+        !responderIdentityDocument ||
+        responderIdentityDocument.identityId !== wire.responderProfile.identityId ||
+        !verifyIdentityDocument(responderIdentityDocument)) {
       return null;
     }
 
-    if (wire.status !== 'ACCEPTED' && wire.status !== 'DECLINED') return null;
     try {
-      const responderKey = base64ToBytes(wire.responderProfile.prekeyBundle.identityDocument.signingPublicKey);
+      const responderKey = base64ToBytes(pinnedSigningKey);
       const responseSignature = base64ToBytes(wire.signature);
       const canonicalResponse = JSON.stringify({
         requestId: wire.requestId,
@@ -463,11 +471,6 @@ export class ContactRequestManager {
     } catch (_err) {
       return null;
     }
-
-    const requests = await this.listRequests(session);
-    const request = requests.find((r) => r.requestId === wire.requestId);
-
-    if (!request || request.peerIdentityId !== wire.responderProfile.identityId || request.status !== 'OUTGOING_PENDING') return null;
 
     if (wire.status === 'ACCEPTED') {
       request.status = 'ACCEPTED';

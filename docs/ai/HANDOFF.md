@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 123 Update — Mailbox Recovery & Contact Handshake Security Review
+- Independent review found that an accepted contact response could use a different signing key under the pending peer identity ID; a legacy request verifier also accepted signatures that did not bind the recipient or timestamp.
+- Contact responses now require the pending request's pinned signing key, a valid nested identity document whose identity ID matches the profile, and a valid response signature. Inbound contact requests now require a valid matching identity document and only accept the full recipient/time-bound signature form.
+- Added adversarial tests for both findings. Phase 34/123/37/67 suites pass (11 tests); broader Phase 23/24/33/34/37/67/123 contact and delivery regressions pass (26 tests across 10 files) with local relay permission; `npm run typecheck` passes.
+- Initial peer review rejected sign-off and the findings were addressed. Follow-up peer review, formal independent security audit, explicit dual sign-off, and Android/two-device validation remain required before deployment. No crypto primitive, ratchet, or message ciphertext format changed.
+- Preserve unrelated pre-existing worktree changes: `android/app/src/main/assets/public/index.html`, `release/v1.0.0/checksums.sha256`, `release/v1.0.0/manifest.json`, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 122 Update — Mobile Safe Area, Voice Authentication & Chat Menu
 - The fixed mobile home sidebar now anchors below `--veil-safe-top` and above `--veil-safe-bottom`; its previous `inset: 0` escaped body safe-area padding and let the home UI sit under Android system bars.
 - Voice chunk AEAD additional data is the attachment ID, while the relay assigns a different cloud object ID. Playback incorrectly substituted object ID in the media cache and direct decrypt path. Both paths now pass `meta.attachmentId || meta.objectId`, preserving compatibility with older metadata that lacks attachmentId.
