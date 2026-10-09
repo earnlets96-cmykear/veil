@@ -49,54 +49,57 @@ self.onmessage = async (event: MessageEvent) => {
         const { data, name, mimeType, encryptionKey: keyRaw, chunkSize, existingAttachmentId } = payload;
         const key = new Uint8Array(keyRaw);
         const dataBytes = new Uint8Array(data);
-        const attachmentId = existingAttachmentId || `att_${bytesToHex(randomBytes(8))}`;
-        const totalBytes = dataBytes.length;
-        const effectiveChunkSize = chunkSize || getOptimalChunkSize(totalBytes);
-        const chunkCount = Math.max(1, Math.ceil(totalBytes / effectiveChunkSize));
-        const fullHash = bytesToHex(sha256(dataBytes));
+        try {
+          const attachmentId = existingAttachmentId || `att_${bytesToHex(randomBytes(8))}`;
+          const totalBytes = dataBytes.length;
+          const effectiveChunkSize = chunkSize || getOptimalChunkSize(totalBytes);
+          const chunkCount = Math.max(1, Math.ceil(totalBytes / effectiveChunkSize));
+          const fullHash = bytesToHex(sha256(dataBytes));
 
-        const metadata: AttachmentMetadata = {
-          attachmentId,
-          name,
-          mimeType,
-          sizeBytes: totalBytes,
-          chunkCount,
-          chunkSize: effectiveChunkSize,
-          sha256Hash: fullHash,
-        };
+          const metadata: AttachmentMetadata = {
+            attachmentId,
+            name,
+            mimeType,
+            sizeBytes: totalBytes,
+            chunkCount,
+            chunkSize: effectiveChunkSize,
+            sha256Hash: fullHash,
+          };
 
-        const chunks: EncryptedAttachmentChunk[] = [];
+          const chunks: EncryptedAttachmentChunk[] = [];
 
-        for (let i = 0; i < chunkCount; i++) {
-          if (cancelledRequests.has(requestId)) {
-            cancelledRequests.delete(requestId);
-            zeroize(key);
-            return;
+          for (let i = 0; i < chunkCount; i++) {
+            if (cancelledRequests.has(requestId)) {
+              cancelledRequests.delete(requestId);
+              return;
+            }
+
+            const start = i * effectiveChunkSize;
+            const end = Math.min(start + effectiveChunkSize, totalBytes);
+            const slice = dataBytes.subarray(start, end);
+
+            const aad = new TextEncoder().encode(`${attachmentId}:${i}:${chunkCount}`);
+            const encResult = encryptXChaCha20Poly1305(key, slice, aad);
+
+            chunks.push({
+              attachmentId,
+              chunkIndex: i,
+              totalChunks: chunkCount,
+              ciphertext: bytesToBase64(encResult.ciphertext),
+              nonce: bytesToBase64(encResult.nonce),
+            });
           }
 
-          const start = i * effectiveChunkSize;
-          const end = Math.min(start + effectiveChunkSize, totalBytes);
-          const slice = dataBytes.subarray(start, end);
-
-          const aad = new TextEncoder().encode(`${attachmentId}:${i}:${chunkCount}`);
-          const encResult = encryptXChaCha20Poly1305(key, slice, aad);
-
-          chunks.push({
-            attachmentId,
-            chunkIndex: i,
-            totalChunks: chunkCount,
-            ciphertext: bytesToBase64(encResult.ciphertext),
-            nonce: bytesToBase64(encResult.nonce),
+          (self as any).postMessage({
+            type: 'SUCCESS',
+            requestId,
+            result: { metadata, chunks },
           });
+        } finally {
+          zeroize(key);
+          zeroize(dataBytes);
         }
 
-        zeroize(key);
-
-        (self as any).postMessage({
-          type: 'SUCCESS',
-          requestId,
-          result: { metadata, chunks },
-        });
         break;
       }
 

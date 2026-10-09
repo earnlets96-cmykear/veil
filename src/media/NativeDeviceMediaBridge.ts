@@ -20,7 +20,7 @@ export interface DeviceMediaPage {
 export interface NativeDeviceMediaPluginInterface {
   requestRecentMediaPermission(): Promise<{ status: DeviceMediaPermissionStatus }>;
   listRecentMedia(options: { cursor?: string; limit: number; types: DeviceMediaType[] }): Promise<DeviceMediaPage>;
-  readMedia(options: { uri: string }): Promise<{ name: string; mimeType: string; sizeBytes: number; base64Data: string }>;
+  readMediaChunk(options: { uri: string; offset: number; length: number }): Promise<{ name: string; mimeType: string; sizeBytes: number; base64Data: string }>;
   pickDocuments(): Promise<{ items: DeviceMediaItem[] }>;
   captureMedia(): Promise<{ items: DeviceMediaItem[] }>;
   saveToGallery(options: { filename: string; mimeType: string; base64Data: string }): Promise<{ uri: string; location: string }>;
@@ -76,10 +76,10 @@ export class NativeDeviceMediaBridge {
     };
   }
 
-  public async readMedia(uri: string): Promise<{ name: string; mimeType: string; sizeBytes: number; base64Data: string }> {
+  public async readMediaChunk(uri: string, offset: number, length: number): Promise<{ name: string; mimeType: string; sizeBytes: number; base64Data: string }> {
     if (!this.isNative()) throw new Error('Device media is unavailable on the web');
-    const read = this.adapter?.readMedia || NativeDeviceMedia.readMedia;
-    return read({ uri });
+    const read = this.adapter?.readMediaChunk || NativeDeviceMedia.readMediaChunk;
+    return read({ uri, offset, length });
   }
 
   /**
@@ -108,9 +108,26 @@ export class NativeDeviceMediaBridge {
   }
 
   public async fileFromUri(uri: string): Promise<File> {
-    const media = await this.readMedia(uri);
-    const bytes = base64ToBytes(media.base64Data);
-    return new File([bytes as unknown as BlobPart], media.name, { type: media.mimeType });
+    const chunkSize = 1024 * 1024;
+    const parts: Uint8Array[] = [];
+    let metadata: { name: string; mimeType: string; sizeBytes: number } | undefined;
+    for (let offset = 0; !metadata || offset < metadata.sizeBytes; offset += chunkSize) {
+      const response = await this.readMediaChunk(uri, offset, chunkSize);
+      metadata ||= {
+        name: response.name,
+        mimeType: response.mimeType,
+        sizeBytes: response.sizeBytes,
+      };
+      if (response.sizeBytes !== metadata.sizeBytes || response.base64Data.length > Math.ceil(chunkSize * 4 / 3) + 8) {
+        throw new Error('Selected media returned an invalid chunk');
+      }
+      const bytes = base64ToBytes(response.base64Data);
+      const expectedLength = Math.min(chunkSize, metadata.sizeBytes - offset);
+      if (bytes.length !== expectedLength) throw new Error('Selected media ended before all chunks were read');
+      parts.push(bytes);
+    }
+    if (!metadata) throw new Error('Selected media could not be read');
+    return new File(parts as unknown as BlobPart[], metadata.name, { type: metadata.mimeType });
   }
 
   public async pickDocuments(): Promise<DeviceMediaItem[]> {

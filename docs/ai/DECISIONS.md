@@ -1457,6 +1457,21 @@ This document records all architectural decisions made across the VEIL project l
 - **Threat model**: Updated `docs/ai/THREAT_MODEL_SOCIAL_VIDEO_PREVIEWS.md` records the in-view egress and residual platform visibility. No cryptographic primitive, identity, Space boundary, relay, or message wire protocol changes.
 - **Release gate**: Verify in-view/offscreen request behavior, response validation, player isolation/error fallback, Space cache clearing, and Android rendering. Independent security review, formal audit, and explicit dual sign-off remain required before deployment.
 
+## ADR-133: Local My Vault, Empty Group Creation, and Bounded Video Selection
+
+- **Date**: 2026-10-10
+- **Status**: Implemented for evaluation; Android device validation, independent security review, formal audit, and explicit dual sign-off remain required before deployment.
+- **Context**: The active identity could be found through ordinary directory search and then treated like a peer, causing contact requests and messages to route back through the relay. The existing encrypted group creation implementation was not reachable from the New Chat flow, and its modal required selecting a member before creating a group. Android recent-video selection copied the complete media object into a native byte array and a full Base64 response before the web upload path made additional copies.
+- **Decision**:
+  1. Present a Space-local **My Vault** destination for the active identity. Persist its text messages through the existing encrypted Space store, and return before directory lookup, ratchet setup, relay delivery, or recovery-vault sync. Reject self-directed contact requests in the app-state action and filter the active identity from discovery/group-member results.
+  2. Expose the existing group creation modal from New Chat and permit a named, creator-only group. The creator can invite members later through the existing group details flow. Sender Key, roster, and group message protocols remain unchanged.
+  3. Replace whole-file native recent-media reads with sequential 1 MiB range reads. Preserve the selected `File` and existing encrypted attachment wire format. After encryption, zeroize the main-thread plaintext buffer, the worker's plaintext copy, and the temporary key bytes; do not keep another complete plaintext copy in `MediaCache`.
+  4. Preserve existing group member search, attachment authorization, local encrypted outbox retry, and Space lifecycle boundaries.
+- **Reason**: Make self-directed notes private to the active Space, make group creation discoverable and allow creation before invitations, and reduce Android memory spikes caused by duplicate whole-video representations.
+- **Consequences**: My Vault messages are local-only and do not sync to other devices or trigger notifications. Android media still exists as plaintext in volatile memory while the selected `File` is being encrypted; device memory limits remain relevant. The media wire representation and encryption primitives are unchanged.
+- **Threat model**: See `docs/ai/THREAT_MODEL_SELF_VAULT_AND_MEDIA.md`. Tests cover local-only self routing, self-request rejection, bounded native video reads, key isolation, and ciphertext behavior.
+- **Release gate**: Because the project is post-RC, do not deploy until Android build/device validation, independent security review, formal security audit, and explicit dual sign-off are complete.
+
 
 
 

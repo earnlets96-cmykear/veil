@@ -23,6 +23,8 @@ export const NewChatModal: React.FC = () => {
     directoryClient,
     closeModal,
     openModal,
+    myProfile,
+    selectConversation,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'search' | 'invite'>('search');
@@ -57,7 +59,7 @@ export const NewChatModal: React.FC = () => {
       try {
         const results = await searchDirectory(q);
         if (isMounted) {
-          setSearchResults(results);
+          setSearchResults(results.filter((result) => result.identityId !== myProfile?.identityId));
           setIsSearching(false);
         }
       } catch (err: any) {
@@ -72,7 +74,7 @@ export const NewChatModal: React.FC = () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [searchUsername, searchDirectory]);
+  }, [searchUsername, searchDirectory, myProfile?.identityId]);
 
   const handleSendRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,6 +254,27 @@ export const NewChatModal: React.FC = () => {
           <div className="veil-modal-body">
             {!selectedUser ? (
               <>
+                {myProfile?.identityId && (
+                  <button
+                    type="button"
+                    className="veil-btn veil-btn-secondary"
+                    style={{ width: '100%', marginBottom: '0.75rem' }}
+                    onClick={() => {
+                      selectConversation(myProfile.identityId);
+                      closeModal();
+                    }}
+                  >
+                    Open My Vault
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="veil-btn veil-btn-secondary"
+                  style={{ width: '100%', marginBottom: '0.75rem' }}
+                  onClick={() => openModal({ type: 'newGroup' })}
+                >
+                  Create a group
+                </button>
                 <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-xs)', marginBottom: '0.75rem' }}>
                   Search for other VEIL users by their public handle.
                 </p>

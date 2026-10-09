@@ -26,6 +26,7 @@ import { consumePendingScreenOffElapsedMs } from '../../privacy/nativeAppLockBri
 import { themeManager } from '../utils/themeManager.ts';
 import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
 import { loadLocalSpaceSnapshot } from './loadLocalSpaceSnapshot.ts';
+import { isSelfVaultIdentity } from '../utils/selfVault.ts';
 
 export function resolveReplyReference(
   target: UIMessage | null,
@@ -2511,7 +2512,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setActiveChatId(id);
       if (id && activeSession) {
         setConversations((prev) => {
-          if (prev.some((c) => c.id === id)) return prev;
+          const myIdentityDoc = myProfile || idMgr.getPublicDocument(activeSession, store);
+          if (prev.some((c) => c.id === id)) {
+            if (!isSelfVaultIdentity(id, myIdentityDoc?.identityId)) return prev;
+            const updated = prev.map((conversation) => conversation.id === id
+              ? { ...conversation, name: 'My Vault', avatar: undefined, avatarUrl: undefined }
+              : conversation);
+            store.setAsync(activeSession, 'veil:ui:conversations', updated);
+            return updated;
+          }
+          if (isSelfVaultIdentity(id, myIdentityDoc?.identityId)) {
+            const vaultConversation: UIConversation = {
+              id,
+              type: 'direct',
+              name: 'My Vault',
+              avatarSeed: id,
+              unreadCount: 0,
+              peerDoc: idMgr.getPublicDocument(activeSession, store) || undefined,
+            };
+            const updated = [vaultConversation, ...prev];
+            store.setAsync(activeSession, 'veil:ui:conversations', updated);
+            return updated;
+          }
           const contact = contacts.find((c) => c.identityId === id);
           if (contact) {
             const newConv: UIConversation = {
@@ -2535,7 +2557,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       sessionController.recordUserActivity();
     },
-    [activeSession, contacts, markConversationAsRead]
+    [activeSession, contacts, markConversationAsRead, myProfile]
   );
 
   const setSearchQuery = useCallback((query: string) => {
@@ -2559,8 +2581,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => {
       if (!activeSession || !text.trim()) return;
 
+      const myIdentityId = myProfile?.identityId || idMgr.getPublicDocument(activeSession, store)?.identityId || activeSession.spaceId;
+      const isSelfVault = isSelfVaultIdentity(conversationId, myIdentityId);
+
       // Phase 55 P0-2: In-memory block check (0ms overhead)
-      const isBlocked = contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
+      const isBlocked = !isSelfVault && contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
       if (isBlocked) {
         throw new Error('Cannot send message: this user is blocked. Unblock them to resume messaging.');
       }
@@ -2568,7 +2593,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sessionController.recordUserActivity();
       const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      let targetContact = contacts.find((c) => c.identityId === conversationId || c.name === conversationId);
+      let targetContact = isSelfVault ? undefined : contacts.find((c) => c.identityId === conversationId || c.name === conversationId);
 
       const activeReply = resolveReplyReference(
         replyTargetRef.current || replyTarget,
@@ -2583,7 +2608,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         text: text.trim(),
         isOutgoing: true,
         timestamp: Date.now(),
-        status: 'SENDING',
+        status: isSelfVault ? 'PROCESSED' : 'SENDING',
         replyTo: activeReply,
         forwarded: options?.forwarded,
         forwardedFrom: options?.forwardedFrom,
@@ -2603,11 +2628,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       setConversations((prev) => {
         const updated = prev.map((c) =>
-          c.id === conversationId ? { ...c, lastMessage: text.trim(), timestamp: Date.now() } : c
+          c.id === conversationId ? { ...c, name: isSelfVault ? 'My Vault' : c.name, lastMessage: text.trim(), timestamp: Date.now() } : c
         );
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
+
+      // Notes addressed to this identity stay in the encrypted Space store.
+      // They never enter contact lookup, ratchet encryption, relay delivery,
+      // or cloud synchronization.
+      if (isSelfVault) return;
 
       // Background encryption and network transmission (non-blocking for UI thread)
       (async () => {
@@ -3085,25 +3115,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
 
               const fileBytes = new Uint8Array(await file.arrayBuffer());
+              const plaintextSizeBytes = fileBytes.length;
 
               // Yield before SHA-256 computation
               await new Promise((resolve) => setTimeout(resolve, 0));
 
-              // Pre-cache staging bytes for immediate inline rendering
-              MediaCache.set(currentAtt.attachmentId, {
-                id: currentAtt.attachmentId,
-                blobUrl: currentAtt.previewUrl || URL.createObjectURL(file),
-                data: fileBytes,
-                mimeType: currentAtt.mimeType,
-                name: currentAtt.name,
-                sizeBytes: currentAtt.sizeBytes,
-              });
-
-              const prepared = await prepareMediaUpload(fileBytes, {
-                name: currentAtt.name,
-                mimeType: currentAtt.mimeType,
-                attachmentId: currentAtt.attachmentId,
-              });
+              let prepared: Awaited<ReturnType<typeof prepareMediaUpload>>;
+              try {
+                prepared = await prepareMediaUpload(fileBytes, {
+                  name: currentAtt.name,
+                  mimeType: currentAtt.mimeType,
+                  attachmentId: currentAtt.attachmentId,
+                });
+              } finally {
+                // The preview already uses the selected File's object URL. Do not
+                // retain another full plaintext copy after encryption completes.
+                fileBytes.fill(0);
+              }
               activeAttachments[idx] = {
                 ...currentAtt,
                 ...prepared.attachment,
@@ -3140,7 +3168,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   encryptedMetadata: JSON.stringify({
                     name: currentAtt.name,
                     mimeType: currentAtt.mimeType,
-                    sizeBytes: fileBytes.length,
+                    sizeBytes: plaintextSizeBytes,
                     conversationId,
                     groupId: isGroup ? conversationId : undefined,
                     batchGroupId,
@@ -3182,7 +3210,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               RuntimeDiagnostics.upload('uploadStarted', {
                 attachmentId: currentAtt.attachmentId,
                 mimeType: currentAtt.mimeType,
-                sizeBytes: fileBytes.length,
+                sizeBytes: plaintextSizeBytes,
               });
 
               try {
@@ -3229,13 +3257,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
               let localPreview = currentAtt.previewUrl;
               if (!localPreview && (currentAtt.mimeType.startsWith('image/') || currentAtt.mimeType.startsWith('video/'))) {
-                localPreview = URL.createObjectURL(new Blob([fileBytes], { type: currentAtt.mimeType }));
+                localPreview = URL.createObjectURL(file);
               }
 
               let durableThumb: string | undefined = (currentAtt as any).thumbnailUrl;
               if (!durableThumb && currentAtt.mimeType.startsWith('image/')) {
                 try {
-                  durableThumb = await ThumbnailGenerator.generateImageThumbnail(new Blob([fileBytes], { type: currentAtt.mimeType }), 48);
+                  durableThumb = await ThumbnailGenerator.generateImageThumbnail(file, 48);
                 } catch (_tErr) {}
               }
 
@@ -3245,7 +3273,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 groupId: batchGroupId,
                 name: currentAtt.name,
                 mimeType: currentAtt.mimeType,
-                sizeBytes: fileBytes.length,
+                sizeBytes: plaintextSizeBytes,
                 chunkCount: prepared.attachment.chunkCount,
                 chunkSize: prepared.attachment.chunkSize,
                 sha256Hash: prepared.attachment.sha256Hash,
@@ -3261,15 +3289,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
                 state: 'UPLOADING',
                 attachment: activeAttachments[idx],
-              });
-
-              MediaCache.set(objectId, {
-                id: objectId,
-                blobUrl: localPreview || '',
-                data: fileBytes,
-                mimeType: currentAtt.mimeType,
-                name: currentAtt.name,
-                sizeBytes: fileBytes.length,
               });
 
               updateTimeline(activeAttachments, 'UPLOADING');
@@ -5003,6 +5022,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const targetProfile = await directoryClient.getProfileByUsername(targetUsername);
       if (!targetProfile) {
         throw new Error(`User @${targetUsername} not found`);
+      }
+      const myIdentityId = myProfile?.identityId || idMgr.getPublicDocument(activeSession, store)?.identityId;
+      if (isSelfVaultIdentity(targetProfile.identityId, myIdentityId)) {
+        throw new Error('Cannot send a contact request to yourself. Open My Vault instead.');
       }
 
       let profileToSend = myProfile;

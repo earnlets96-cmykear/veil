@@ -13,29 +13,33 @@ export async function prepareMediaUpload(
   input: { name: string; mimeType: string; attachmentId: string }
 ): Promise<PreparedMediaUpload> {
   const encryptionKey = randomBytes(32);
-  const { metadata, chunks } = await AttachmentPipeline.chunkAndEncryptAsync(
-    plaintext,
-    input.name,
-    input.mimeType,
-    encryptionKey,
-    undefined,
-    input.attachmentId
-  );
-  const ciphertext = new TextEncoder().encode(JSON.stringify(chunks));
-  const ciphertextHash = await AttachmentPipeline.computeSha256Async(ciphertext);
+  try {
+    const { metadata, chunks } = await AttachmentPipeline.chunkAndEncryptAsync(
+      plaintext,
+      input.name,
+      input.mimeType,
+      encryptionKey,
+      undefined,
+      input.attachmentId
+    );
+    const ciphertext = new TextEncoder().encode(JSON.stringify(chunks));
+    const ciphertextHash = await AttachmentPipeline.computeSha256Async(ciphertext);
 
-  return {
-    attachment: {
-      attachmentId: metadata.attachmentId,
-      name: metadata.name,
-      mimeType: metadata.mimeType,
-      sizeBytes: metadata.sizeBytes,
-      chunkCount: metadata.chunkCount,
-      chunkSize: metadata.chunkSize,
-      sha256Hash: metadata.sha256Hash,
-      ciphertextHash,
-      encryptionKeyBase64: bytesToBase64(encryptionKey),
-    },
-    ciphertext,
-  };
+    return {
+      attachment: {
+        attachmentId: metadata.attachmentId,
+        name: metadata.name,
+        mimeType: metadata.mimeType,
+        sizeBytes: metadata.sizeBytes,
+        chunkCount: metadata.chunkCount,
+        chunkSize: metadata.chunkSize,
+        sha256Hash: metadata.sha256Hash,
+        ciphertextHash,
+        encryptionKeyBase64: bytesToBase64(encryptionKey),
+      },
+      ciphertext,
+    };
+  } finally {
+    encryptionKey.fill(0);
+  }
 }

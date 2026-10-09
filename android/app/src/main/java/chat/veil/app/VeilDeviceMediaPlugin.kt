@@ -280,28 +280,53 @@ class VeilDeviceMediaPlugin : Plugin() {
     }
 
     @PluginMethod
-    fun readMedia(call: PluginCall) {
+    fun readMediaChunk(call: PluginCall) {
         val rawUri = call.getString("uri")
-        if (rawUri.isNullOrBlank()) {
-            call.reject("uri is required")
+        val offset = call.getLong("offset") ?: 0L
+        val requestedLength = call.getInt("length") ?: (1024 * 1024)
+        if (rawUri.isNullOrBlank() || offset < 0 || requestedLength !in 1..(1024 * 1024)) {
+            call.reject("uri, valid offset, and bounded length are required")
             return
         }
         try {
             val uri = Uri.parse(rawUri)
-            val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
-                val output = ByteArrayOutputStream()
-                input.copyTo(output)
-                output.toByteArray()
-            } ?: throw IllegalStateException("Selected media cannot be opened")
             val metadata = metadataFor(uri)
+            if (offset > metadata.sizeBytes) {
+                call.reject("Media chunk offset is outside the selected file")
+                return
+            }
+            val remaining = (metadata.sizeBytes - offset).coerceAtLeast(0).coerceAtMost(requestedLength.toLong()).toInt()
+            val chunk = ByteArray(remaining)
+            val input = context.contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("Selected media cannot be opened")
+            val bytesRead = input.use { stream ->
+                var skipped = 0L
+                while (skipped < offset) {
+                    val step = stream.skip(offset - skipped)
+                    if (step <= 0L) {
+                        if (stream.read() == -1) throw IllegalStateException("Selected media ended before requested chunk")
+                        skipped++
+                    } else {
+                        skipped += step
+                    }
+                }
+                var written = 0
+                while (written < chunk.size) {
+                    val read = stream.read(chunk, written, chunk.size - written)
+                    if (read < 0) break
+                    written += read
+                }
+                written
+            }
+            if (bytesRead != remaining) throw IllegalStateException("Selected media ended before requested chunk")
             call.resolve(JSObject().apply {
                 put("name", metadata.name)
                 put("mimeType", metadata.mimeType)
-                put("sizeBytes", bytes.size)
-                put("base64Data", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                put("sizeBytes", metadata.sizeBytes)
+                put("base64Data", Base64.encodeToString(chunk, Base64.NO_WRAP))
             })
         } catch (error: Exception) {
-            call.reject("Unable to read selected media", error)
+            call.reject("Unable to read selected media chunk", error)
         }
     }
 

@@ -24,7 +24,7 @@ interface SelectedMember {
 }
 
 export const NewGroupModal: React.FC = () => {
-  const { createGroup, closeModal, contacts, searchDirectory, directoryClient } = useApp();
+  const { createGroup, closeModal, contacts, searchDirectory, directoryClient, myProfile } = useApp();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +50,7 @@ export const NewGroupModal: React.FC = () => {
       try {
         const localMatches: SelectedMember[] = contacts
           .filter((c) => {
+            if (c.identityId === myProfile?.identityId) return false;
             const matchName = c.name?.toLowerCase().includes(q.toLowerCase());
             const matchUser = c.accountUsername?.toLowerCase().includes(q.toLowerCase());
             return matchName || matchUser;
@@ -66,7 +67,7 @@ export const NewGroupModal: React.FC = () => {
         let directoryMatches: SelectedMember[] = [];
         try {
           const results = await searchDirectory(q);
-          directoryMatches = results.map((r) => ({
+          directoryMatches = results.filter((r) => r.identityId !== myProfile?.identityId).map((r) => ({
             identityId: r.identityId,
             username: r.username,
             displayName: r.displayName || r.username,
@@ -97,7 +98,7 @@ export const NewGroupModal: React.FC = () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [searchQuery, contacts, searchDirectory]);
+  }, [searchQuery, contacts, searchDirectory, myProfile?.identityId]);
 
   const handleAddMember = async (member: SelectedMember) => {
     if (selectedMembers.some((m) => m.identityId === member.identityId || m.username === member.username)) {
@@ -134,7 +135,7 @@ export const NewGroupModal: React.FC = () => {
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || selectedMembers.length === 0 || isSubmitting) return;
+    if (!name.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -188,7 +189,7 @@ export const NewGroupModal: React.FC = () => {
         <form onSubmit={handleCreateGroup}>
           <div className="veil-modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
             <p style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)', marginBottom: '1rem' }}>
-              Group messages use Sender Key ratchets with forward secrecy and cryptographic isolation.
+              Group messages use Sender Key ratchets with forward secrecy and cryptographic isolation. Add members now or later.
             </p>
 
             {error && (
@@ -457,7 +458,7 @@ export const NewGroupModal: React.FC = () => {
 
           <div className="veil-modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 'var(--veil-text-xs)', color: selectedMembers.length === 0 ? 'var(--veil-danger)' : 'var(--veil-text-secondary)' }}>
-              {selectedMembers.length === 0 ? 'Select at least 1 member' : `${selectedMembers.length} member${selectedMembers.length === 1 ? '' : 's'} selected`}
+              {selectedMembers.length === 0 ? 'You can invite members after creating the group' : `${selectedMembers.length} member${selectedMembers.length === 1 ? '' : 's'} selected`}
             </span>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <Button type="button" variant="secondary" onClick={closeModal}>
@@ -466,7 +467,7 @@ export const NewGroupModal: React.FC = () => {
               <Button
                 type="submit"
                 variant="primary"
-                disabled={!name.trim() || selectedMembers.length === 0}
+                disabled={!name.trim()}
                 loading={isSubmitting}
               >
                 <UsersIcon size={16} />
