@@ -1,6 +1,12 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
-## Current Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
+## Current Phase: PHASE 126 — SOCIAL VIDEO SHARE & PREVIEW
+- **Status**: Android share intake, explicit recipient selection, and in-chat preview/playback are implemented; focused source tests and TypeScript pass. Physical Android build/playback and post-RC security gates remain outstanding.
+- **Changes**: Android `ACTION_SEND` text links from TikTok and Instagram open a recipient chooser and send through the existing encrypted-message path. Supported video URLs in messages render an opt-in provider preview, thumbnail when provider metadata supplies one, sandboxed in-app player, and Open original fallback. TikTok short links and Instagram share/Reel URLs are normalized safely.
+- **Verification**: Five focused Phase 126 suites pass (28 tests); `npm run typecheck` passes. Full `npm test` was attempted and reports widespread loopback relay/recovery connection failures plus unrelated Phase 87 and Phase 112 failures. Android Gradle stops before compilation because the sandbox cannot establish a loopback connection.
+- **Security**: ADR-130 and `docs/ai/THREAT_MODEL_SOCIAL_VIDEO_PREVIEWS.md` document explicit client-side preview egress and adversarial coverage. No cryptography, identity, Space isolation, message wire format, or relay protocol changes. Independent security review, formal audit, dual sign-off, and device validation are release gates.
+
+## Previous Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
 - **Status**: Implemented; focused theme tests, TypeScript, and desktop/phone browser review pass.
 - **Changes**: The appearance settings now group curated palettes into Minimal, Nature, and Expressive collections; add Porcelain; expose independent accent, chat background, bubble shape, and font size controls; show a live sample conversation; and provide reset-to-defaults. Chat backgrounds include quiet, solid, fine dots, waves, orbit, and organic treatments, rendered locally in CSS and adapted for dark, light, and Porcelain surfaces.
 - **Verification**: `tests/theme-accent-system.test.ts` passes (10 tests); `npm run typecheck` passes. Desktop and 390px phone previews verified preset selection, background controls, and reset behavior. Impeccable detector reports only pre-existing findings outside the new appearance styles. Full `npm test` baseline: 336 files passed, 108 failed; failures are primarily blocked relay/recovery loopback networking (`EACCES` / `fetch failed`), with other unrelated failures also present.

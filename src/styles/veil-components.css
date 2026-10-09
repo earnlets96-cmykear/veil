@@ -3044,6 +3044,275 @@
   }
 }
 
+/* --- External video sharing and previews --- */
+.veil-social-share-overlay {
+  z-index: var(--veil-z-modal, 1000);
+  padding: max(1rem, var(--veil-safe-top, 0px)) 1rem max(1rem, var(--veil-safe-bottom, 0px));
+}
+
+.veil-social-share-dialog {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 30rem);
+  max-height: min(84dvh, 44rem);
+  overflow: auto;
+  padding: 1.1rem;
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md, 12px);
+  background: var(--veil-bg-surface);
+  color: var(--veil-text-primary);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.42);
+}
+
+.veil-social-share-header,
+.veil-social-share-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.veil-social-share-header h2 {
+  margin: 0;
+  color: var(--veil-text-primary);
+  font-size: 1.1rem;
+}
+
+.veil-social-share-header p,
+.veil-social-share-empty,
+.veil-social-share-error {
+  margin: 0.3rem 0 0;
+  color: var(--veil-text-muted);
+  font-size: var(--veil-text-sm, 0.875rem);
+}
+
+.veil-social-share-header button,
+.veil-social-share-cancel,
+.veil-social-share-send {
+  min-height: 42px;
+  border: 1px solid var(--veil-border-strong);
+  border-radius: var(--veil-radius-sm, 8px);
+  padding: 0.55rem 0.85rem;
+  background: var(--veil-bg-surface-elevated);
+  color: var(--veil-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.veil-social-share-send {
+  border-color: var(--veil-accent-primary);
+  background: var(--veil-accent-primary);
+  color: #ffffff;
+  font-weight: 650;
+}
+
+.veil-social-share-send:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.veil-social-share-header button:focus-visible,
+.veil-social-share-cancel:focus-visible,
+.veil-social-share-send:focus-visible,
+.veil-social-share-recipient:focus-visible {
+  outline: none;
+  box-shadow: var(--veil-focus-ring);
+}
+
+.veil-social-share-link {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-sm, 8px);
+  background: var(--veil-bg-surface-elevated);
+}
+
+.veil-social-share-link span {
+  color: var(--veil-text-muted);
+  font-size: var(--veil-text-xs, 0.75rem);
+}
+
+.veil-social-share-link code {
+  overflow-wrap: anywhere;
+  color: var(--veil-text-primary);
+  font: inherit;
+  font-size: var(--veil-text-sm, 0.875rem);
+}
+
+.veil-social-share-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: min(40dvh, 20rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.veil-social-share-recipient {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-height: 48px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-sm, 8px);
+  background: transparent;
+  color: var(--veil-text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.veil-social-share-recipient:hover,
+.veil-social-share-recipient.selected {
+  border-color: var(--veil-accent-primary);
+  background: var(--veil-accent-primary-subtle);
+}
+
+.veil-social-share-recipient-type {
+  flex: 0 0 auto;
+  color: var(--veil-text-muted);
+  font-size: var(--veil-text-xs, 0.75rem);
+}
+
+.veil-social-share-error {
+  color: var(--veil-danger);
+}
+
+.veil-social-video-preview {
+  display: grid;
+  gap: 0.65rem;
+  width: min(100%, 20rem);
+  margin-top: 0.55rem;
+  overflow: hidden;
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md, 12px);
+  background: var(--veil-bg-surface-elevated);
+  color: var(--veil-text-primary);
+}
+
+.veil-social-video-preview-copy,
+.veil-social-video-load {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  min-width: 0;
+}
+
+.veil-social-video-preview-copy strong {
+  color: var(--veil-text-primary);
+  font-size: var(--veil-text-sm, 0.875rem);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.veil-social-video-preview-copy span,
+.veil-social-video-load span {
+  color: var(--veil-text-muted);
+  font-size: var(--veil-text-xs, 0.75rem);
+  line-height: 1.4;
+}
+
+.veil-social-video-preview-copy a,
+.veil-social-video-player-actions a {
+  color: var(--veil-accent-primary);
+  font-size: var(--veil-text-sm, 0.875rem);
+  text-underline-offset: 0.2em;
+  width: fit-content;
+}
+
+.veil-social-video-load button,
+.veil-social-video-poster button,
+.veil-social-video-player-actions button {
+  min-height: 40px;
+  border: 1px solid var(--veil-border-strong);
+  border-radius: var(--veil-radius-sm, 8px);
+  padding: 0.5rem 0.8rem;
+  background: var(--veil-bg-surface);
+  color: var(--veil-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.veil-social-video-load button:hover,
+.veil-social-video-poster button:hover,
+.veil-social-video-player-actions button:hover {
+  border-color: var(--veil-accent-primary);
+  background: var(--veil-bg-surface-hover);
+}
+
+.veil-social-video-load button:focus-visible,
+.veil-social-video-poster button:focus-visible,
+.veil-social-video-player-actions button:focus-visible,
+.veil-social-video-preview-copy a:focus-visible,
+.veil-social-video-player-actions a:focus-visible {
+  outline: none;
+  box-shadow: var(--veil-focus-ring);
+}
+
+.veil-social-video-load button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.veil-social-video-poster {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  max-height: 28rem;
+  overflow: hidden;
+  background: var(--veil-bg-surface);
+}
+
+.veil-social-video-poster img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.veil-social-video-poster button {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(9, 12, 19, 0.92);
+  color: #ffffff;
+}
+
+.veil-social-video-player {
+  width: min(100%, 26rem);
+  overflow: hidden;
+  border: 1px solid var(--veil-border);
+  border-radius: var(--veil-radius-md, 12px);
+  background: var(--veil-bg-surface-elevated);
+}
+
+.veil-social-video-player iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: min(75dvh, 42rem);
+  border: 0;
+  background: #000000;
+}
+
+.veil-social-video-player-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+}
+
+@media (max-width: 480px) {
+  .veil-social-video-preview,
+  .veil-social-video-player {
+    width: min(100%, 17rem);
+  }
+}
+
 /* --- Share Media Bottom Sheet (Image 2 Redesign) --- */
 .veil-share-media-modal {
   border-radius: 28px !important;

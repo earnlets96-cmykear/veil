@@ -96,6 +96,7 @@ interface ContextMenuState {
 
 interface ConversationMessageRowProps {
   msg: UIMessage;
+  activeSpaceId?: string;
   isUnreadFirst: boolean;
   isSelected: boolean;
   isSelectionMode: boolean;
@@ -131,6 +132,7 @@ interface ConversationMessageRowProps {
 
 const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = ({
   msg,
+  activeSpaceId,
   isUnreadFirst,
   isSelected,
   isSelectionMode,
@@ -730,6 +732,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               forwardedFrom={msg.forwardedFrom}
               isOutgoing={msg.isOutgoing}
               text={msg.text}
+              spaceId={activeSpaceId}
               timestamp={msg.timestamp}
               status={msg.status}
               uploadProgress={effectiveUploadPercent}
@@ -819,6 +822,7 @@ function areEqualMessageRowProps(
   }
 
   if (
+    prev.activeSpaceId !== next.activeSpaceId ||
     prev.isUnreadFirst !== next.isUnreadFirst ||
     prev.isSelected !== next.isSelected ||
     prev.isSelectionMode !== next.isSelectionMode ||
@@ -2264,6 +2268,7 @@ export const ConversationView: React.FC = () => {
               <ConversationMessageRow
                 key={msg.id}
                 msg={msg}
+                activeSpaceId={activeSession?.spaceId}
                 isUnreadFirst={isUnreadFirst}
                 isSelected={isSelected}
                 isSelectionMode={isSelectionMode}

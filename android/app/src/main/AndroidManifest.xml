@@ -59,6 +59,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Accept a video link or text shared from another Android app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
             <!-- Invitation deep linking for veil://invite/... -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

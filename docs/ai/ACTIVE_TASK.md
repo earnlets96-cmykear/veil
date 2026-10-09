@@ -1,6 +1,19 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
+## Active Phase: PHASE 126 — SOCIAL VIDEO SHARE & PREVIEW
+- **Status**: Implementation and focused verification complete; physical Android validation and post-RC security release gates remain open.
+- [x] Accept Android text share intents from TikTok and Instagram without logging or persisting pending share text.
+- [x] Require an explicit recipient choice and Send action; send only the normalized URL through the existing encrypted message path.
+- [x] Parse supported TikTok/Instagram URLs, including TikTok short links and Instagram share/Reel URLs; render an opt-in preview in message bubbles.
+- [x] Load validated provider metadata/thumbnails on user request, play in a sandboxed iframe with autoplay disabled, and retain an Open original fallback.
+- [x] Add adversarial parser, provider-response, cache-isolation, UI-isolation, share-confirmation, and Android source-contract regressions.
+- [x] Run the focused Phase 126 suites (28 tests) and `npm run typecheck`.
+- [ ] Validate Android cold/warm share intake, locked-state/cancel behavior, thumbnails, and provider playback on physical devices; compile the Android app.
+- [ ] Obtain independent security review, formal security audit, and explicit dual sign-off before deployment under the post-RC security freeze.
+- **Privacy limitation**: Provider and CDN requests reveal device IP, requested public post URL, and timing after the recipient explicitly loads a preview. Platform/WebView HTTP cache eviction is outside VEIL's control.
+- **Build limitation**: `gradlew.bat :app:assembleDebug` fails before compilation with `Unable to establish loopback connection`; `npm test` has numerous loopback relay/recovery failures and unrelated Phase 87/112 failures.
+
+## Previous Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
 - **Status**: Appearance studio implemented; focused tests and typecheck pass. Full-suite baseline is restricted by local relay/recovery networking.
 - [x] Group curated palettes into Minimal, Nature, and Expressive collections, including the new warm Porcelain theme.
 - [x] Add quiet, dotted, wave, orbit, and organic chat backgrounds with CSS-only theme-aware treatments.

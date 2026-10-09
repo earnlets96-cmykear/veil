@@ -12,6 +12,8 @@ import { MessageStatus, DeliveryStatus } from './MessageStatus.tsx';
 import { MessageTimestamp } from './MessageTimestamp.tsx';
 import { Spinner } from './Spinner.tsx';
 import { RefreshCwIcon, ReplyIcon, ForwardIcon } from '../icons/index.ts';
+import { splitSocialVideoLinkText } from '../../../media/socialVideoLinks.ts';
+import { SocialVideoPreviewCard } from './SocialVideoPreviewCard.tsx';
 
 export interface MessageBubbleProps {
   id?: string;
@@ -22,6 +24,7 @@ export interface MessageBubbleProps {
   forwardedFrom?: string;
   isOutgoing: boolean;
   text?: string;
+  spaceId?: string;
   timestamp: number | Date;
   status?: DeliveryStatus;
   deliveryStatus?: DeliveryStatus;
@@ -58,6 +61,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   forwardedFrom,
   isOutgoing,
   text,
+  spaceId,
   timestamp,
   status,
   deliveryStatus,
@@ -173,6 +177,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
     /Android/i.test(navigator.userAgent)
   );
   const hasReactions = Boolean(reactions && reactions.length > 0);
+  const socialVideoText = text ? splitSocialVideoLinkText(text) : null;
   const canReply = Boolean(!isSelectionMode && triggerReply && !isFailed);
   const showDesktopReply = canReply && !isMobilePlatform;
 
@@ -295,7 +300,18 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
           ) : attachmentElement ? (
             <div style={{ padding: '2px 0' }}>{attachmentElement}</div>
           ) : (
-            <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{text}</div>
+            <>
+              {socialVideoText && spaceId ? (
+                socialVideoText.text ? (
+                  <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{socialVideoText.text}</div>
+                ) : null
+              ) : (
+                <div style={{ wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{text}</div>
+              )}
+              {socialVideoText && spaceId && (
+                <SocialVideoPreviewCard link={socialVideoText.link} spaceId={spaceId} />
+              )}
+            </>
           )}
         </div>
 

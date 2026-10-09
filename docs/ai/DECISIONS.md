@@ -1408,8 +1408,22 @@ This document records all architectural decisions made across the VEIL project l
 - **Security review**: See `docs/ai/THREAT_MODEL_APP_LOCK.md`. Android can suspend or kill the process before receiving JavaScript lifecycle callbacks, and a force-stopped application cannot run a receiver. A fresh process therefore always relies on the existing lock-before-render startup gate. The native marker is only a same-boot aid when the receiver was registered at screen-off time.
 - **Release gate**: Add timing boundary, persistence failure, picker, startup-gate, screen-off, and existing PIN/Space isolation regressions. Do not deploy until an independent security audit, explicit dual sign-off, and physical Android validation are complete.
 
+## ADR-130: User-Initiated Social Video Previews and Android Share Intake
 
-
+- **Date**: 2026-10-09
+- **Status**: Accepted for implementation; post-RC independent security audit and explicit dual sign-off are required before deployment.
+- **Context**: Users need to send public TikTok and Instagram video links to VEIL from Android's native share sheet and preview/play those links in the chat. VEIL's existing strict zero-third-party-egress policy means provider metadata and media requests cannot happen silently or through the relay.
+- **Decision**:
+  1. Accept Android `ACTION_SEND` text only when it contains an HTTPS URL on the explicit TikTok or Instagram video-link allowlist. Keep bounded incoming share text in process memory until the user selects a conversation and confirms sending the normalized URL as an ordinary E2EE text message. Never log or persist the pending share text in plaintext.
+  2. Also render supported video URLs that a user pasted into an ordinary message. The encrypted message wire format and relay handling remain unchanged.
+  3. Do not contact TikTok, Instagram, Meta, or media CDNs until the user chooses **Load preview** on a video message. Resolve metadata only through the provider's public oEmbed/embed interface from the client. Never ask the VEIL relay to resolve, proxy, or cache a URL.
+  4. Render only bounded, validated metadata and provider-owned thumbnail URLs. Never execute provider HTML in VEIL's document. Load playback in a cross-origin iframe sandbox with autoplay disabled, no top-level navigation, and only the permissions needed for video controls.
+  5. Keep preview metadata in a small bounded runtime-only cache scoped to the active Space; clear it on Space lock or switch. Render provider thumbnail URLs directly without copying thumbnail bytes into VEIL-managed storage. Android WebView/platform HTTP caches are outside VEIL's purge control; do not persist provider media in VEIL storage.
+  6. Permit user-initiated egress only to the documented TikTok/Instagram embed endpoints and thumbnail CDNs needed for an explicitly requested preview. The device IP, preview timing, and requested public post URL are visible to the platform/CDN. This exception does not permit analytics, relay-side fetching, or arbitrary external link previews.
+  7. Unsupported, private, removed, or provider-blocked posts show a clear fallback to open the original URL through Android. They do not trigger generic page scraping.
+- **Reason**: The native share path and in-chat viewing use the existing E2EE message path while keeping provider disclosure explicit, bounded, and initiated by the recipient.
+- **Consequences**: This amends ADR-094's zero-egress policy only for the explicit user action and fixed provider host allowlist above. No encryption algorithm, identity, Space boundary, message schema, or relay protocol changes.
+- **Security review**: See `docs/ai/THREAT_MODEL_SOCIAL_VIDEO_PREVIEWS.md`. Add malicious URL, unsafe provider response, oversized metadata, embed isolation, Space-cache clearing, and send-confirmation regressions. Independent review, formal security audit, and explicit dual sign-off remain deployment gates under the post-RC freeze.
 
 
 

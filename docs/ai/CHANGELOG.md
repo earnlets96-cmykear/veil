@@ -2,6 +2,18 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 126] - 2026-10-09
+
+### Improved
+- Added Android share-sheet intake for TikTok and Instagram video links, with explicit recipient selection and confirmation before sending through VEIL's existing encrypted-message path.
+- Added normalized message previews for supported platform URLs, provider thumbnails when available, user-initiated sandboxed in-app playback, and an Open original fallback.
+- Added safe TikTok short-link and Instagram share/Reel URL handling, bounded metadata requests/cache, and Space-scoped cache cleanup.
+
+### Verification
+- Five focused suites pass (28 tests); `npm run typecheck` passes.
+- Full `npm test` reports widespread loopback relay/recovery failures and unrelated Phase 87/112 failures. Android Gradle fails before compilation with `Unable to establish loopback connection`; physical-device share/playback validation, independent security review, formal audit, and dual sign-off remain release gates.
+- ADR-130 and `docs/ai/THREAT_MODEL_SOCIAL_VIDEO_PREVIEWS.md` document the narrow provider-egress exception. No cryptography, identity, Space boundary, relay, or message wire format changed.
+
 ## [Phase 125] - 2026-10-09
 
 ### Improved

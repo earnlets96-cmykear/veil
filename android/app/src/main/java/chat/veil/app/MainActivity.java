@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VeilDeviceMediaPlugin.class);
         registerPlugin(VeilNotificationsPlugin.class);
         registerPlugin(VeilAppLockPlugin.class);
+        registerPlugin(VeilShareIntentPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

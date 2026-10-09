@@ -2,7 +2,7 @@
  * Root React Application Component for VEIL.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from './app/AppState.tsx';
 import { LockScreen } from './components/LockScreen.tsx';
 import { PinLockScreen } from './components/PinLockScreen.tsx';
@@ -18,10 +18,18 @@ import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
 import { ProfileModal } from './components/ProfileModal.tsx';
 import { AppLockSetupModal } from './components/AppLockSetupModal.tsx';
 import { AccountsAndSpacesModal } from './components/AccountsAndSpacesModal.tsx';
+import { SocialVideoShareDialog } from './components/SocialVideoShareDialog.tsx';
 import { ShieldIcon, CloseIcon } from './components/icons/index.ts';
 import { spacePinManager } from '../privacy/pinManager.ts';
 import { themeManager } from './utils/themeManager.ts';
 import { useVisualViewport } from './hooks/useVisualViewport.ts';
+import { extractSocialVideoLink, SocialVideoLink } from '../media/socialVideoLinks.ts';
+import { clearSocialVideoPreviewCache } from '../media/socialVideoPreviewService.ts';
+import {
+  addNativeSharedTextListener,
+  clearPendingNativeSharedText,
+  getPendingNativeSharedText,
+} from '../media/NativeShareIntentBridge.ts';
 
 export const App: React.FC = () => {
   // Bind visual viewport dimensions and keyboard insets to root CSS
@@ -36,6 +44,8 @@ export const App: React.FC = () => {
     closeModal,
     isAppLocked,
     appLockResumeCheckPending,
+    conversations,
+    sendMessage,
   } = useApp();
 
   const [showPasswordLogin, setShowPasswordLogin] = useState(false);
@@ -45,6 +55,69 @@ export const App: React.FC = () => {
     spaceName: string;
     password?: string;
   } | null>(null);
+  const [pendingSharedVideo, setPendingSharedVideo] = useState<SocialVideoLink | null>(null);
+  const previousSpaceIdRef = useRef<string | null>(activeSession?.spaceId || null);
+
+  useEffect(() => {
+    if (!activeSession?.isActive() || isAppLocked) setPendingSharedVideo(null);
+  }, [activeSession?.spaceId, isAppLocked]);
+
+  const receiveSharedText = useCallback((text: string) => {
+    const link = extractSocialVideoLink(text);
+    if (link) {
+      if (activeSession?.isActive() && !isAppLocked) setPendingSharedVideo(link);
+      return;
+    }
+    void clearPendingNativeSharedText().catch(() => undefined);
+  }, [activeSession?.spaceId, isAppLocked]);
+
+  useEffect(() => {
+    let disposed = false;
+    let listener: { remove: () => Promise<void> } | null = null;
+    void addNativeSharedTextListener(receiveSharedText).then((registered) => {
+      if (disposed) {
+        void registered?.remove();
+      } else {
+        listener = registered;
+      }
+    }).catch(() => undefined);
+    return () => {
+      disposed = true;
+      void listener?.remove();
+    };
+  }, [receiveSharedText]);
+
+  useEffect(() => {
+    if (!activeSession || !activeSession.isActive() || isAppLocked) return;
+    let cancelled = false;
+    void getPendingNativeSharedText().then((text) => {
+      if (!cancelled && text) receiveSharedText(text);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession?.spaceId, isAppLocked, receiveSharedText]);
+
+  useEffect(() => {
+    const previousSpaceId = previousSpaceIdRef.current;
+    const nextSpaceId = activeSession?.spaceId || null;
+    if (previousSpaceId && previousSpaceId !== nextSpaceId) {
+      clearSocialVideoPreviewCache(previousSpaceId);
+    }
+    if (nextSpaceId && isAppLocked) clearSocialVideoPreviewCache(nextSpaceId);
+    previousSpaceIdRef.current = nextSpaceId;
+  }, [activeSession?.spaceId, isAppLocked]);
+
+  const closeSharedVideo = useCallback(() => {
+    setPendingSharedVideo(null);
+    void clearPendingNativeSharedText().catch(() => undefined);
+  }, []);
+
+  const sendSharedVideo = useCallback(async (conversationId: string, url: string) => {
+    await sendMessage(conversationId, url);
+    setPendingSharedVideo(null);
+    await clearPendingNativeSharedText().catch(() => undefined);
+  }, [sendMessage]);
 
   const [isBannerDismissed, setIsBannerDismissed] = useState(() => {
     try {
@@ -181,6 +254,15 @@ export const App: React.FC = () => {
       )}
       <Sidebar />
       <ConversationView />
+
+      {pendingSharedVideo && activeSession?.isActive() && !isAppLocked && (
+        <SocialVideoShareDialog
+          link={pendingSharedVideo}
+          conversations={conversations}
+          onSend={sendSharedVideo}
+          onClose={closeSharedVideo}
+        />
+      )}
 
       {/* Modals */}
       {activeModal?.type === 'settings' && (
