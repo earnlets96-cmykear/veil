@@ -111,8 +111,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   }, [editingMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Send on Enter in browsers; native mobile keyboards keep Enter for newlines.
-    if (e.key === 'Enter' && !e.shiftKey && !Capacitor.isNativePlatform()) {
+    // Send on Enter in desktop browsers; mobile layouts and native apps keep newlines.
+    if (e.key === 'Enter' && !e.shiftKey && typeof window !== 'undefined' && window.innerWidth > 768 && !Capacitor.isNativePlatform()) {
       e.preventDefault();
       handleSend();
     }
