@@ -10,6 +10,7 @@ import { AppContext } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
 import { MediaLogger } from '../../utils/mediaLogger.ts';
 import { RuntimeDiagnostics } from '../../../debug/runtimeDiagnostics.ts';
+import { requireCloudSessionForAttachment } from '../../../network/requireCloudSessionForAttachment.ts';
 import {
   CloseIcon,
   ChevronLeftIcon,
@@ -152,8 +153,10 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
       setMediaErrors((prev) => ({ ...prev, [key]: '' }));
 
       try {
-        if (!cloudClient.getSessionToken() && ensureCloudSession) {
-          await ensureCloudSession(activeSession);
+        if (ensureCloudSession) {
+          await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
+        } else if (!cloudClient.hasAuthenticatedSession()) {
+          throw new Error('Cloud authentication is unavailable. Reopen this Space to try again.');
         }
 
         MediaLogger.log({

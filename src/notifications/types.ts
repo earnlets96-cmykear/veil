@@ -12,4 +12,5 @@ export interface NotificationEvent {
   groupName?: string;
   timestamp: number;
   conversationId?: string;
+  spaceId?: string;
 }

@@ -1,5 +1,11 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 128 — ANDROID FULL PREVIEW REPLY & MEDIA RECOVERY
+- **Status**: Local notification replies, fail-closed attachment session gating, and cached voice MIME recovery are implemented; focused regressions and TypeScript pass. Android compilation/device validation remains outstanding.
+- **Changes**: Android local notifications in Full Preview mode now offer inline replies bound to the originating conversation and Space, routed through VEIL's encrypted send path. Locking the Space or changing privacy mode clears active notifications. Attachment and voice requests stop with a generic UI error when session restoration fails. Cached voice playback prefers audio MIME metadata over generic cache MIME values.
+- **Verification**: Six focused suites / 10 tests pass; `npm run typecheck` passes. Full `npm test`: 341 files passed / 109 failed (1,447 passed / 216 failed / 6 skipped), primarily because loopback relay/recovery endpoints are unavailable; pre-existing UI assertion failures also remain. Android Gradle stopped before compilation with `Unable to establish loopback connection`.
+- **Security**: ADR-131 and `docs/ai/THREAT_MODEL_NOTIFICATION_REPLIES.md` document the notification/reply and session data flows. No cryptography, identity, Space isolation, message wire format, or background FCM content changed. Independent review, formal audit, dual sign-off, and physical Android validation remain release gates.
+
 ## Current Phase: PHASE 127 — COMPOSER RECORDING & CHAT LIST POLISH
 - **Status**: UI refinement implemented; focused tests and production build pass. Physical Android gesture validation remains outstanding.
 - **Changes**: Preserved the floating composer controls while simplifying the input island and focus treatment. Recording gestures now update drag visuals at animation-frame cadence instead of causing a render on every pointer event. Reduced recording motion, honored reduced-motion preferences, retained the existing lock/cancel/send gestures, and removed the duplicate locked-state cancel button. Chat row timestamps and three-dot actions use the trailing edge while keeping the 44px action target.

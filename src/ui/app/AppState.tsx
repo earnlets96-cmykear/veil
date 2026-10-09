@@ -11,6 +11,7 @@ import { EncryptedSpaceStore } from '../../storage/spaceStore.ts';
 import { IndexedDBStorageAdapter } from '../../storage/indexedDbAdapter.ts';
 import { SpaceIdentityManager } from '../../identity/manager.ts';
 import { NetworkManager } from '../../network/networkManager.ts';
+import { requireCloudSessionForAttachment } from '../../network/requireCloudSessionForAttachment.ts';
 import { parseLegacyInboundPayload } from '../../network/legacyInboundPayload.ts';
 import { SessionController } from './sessionController.ts';
 import { UIConversation, UIMessage, ActiveModal, UserPrivacySettings, ReplyReference } from './types.ts';
@@ -89,6 +90,8 @@ import { prepareMediaUpload } from '../../attachments/mediaTransfer.ts';
 import { MediaOutbox } from '../../attachments/mediaOutbox.ts';
 import type { MediaUploadJob } from '../../attachments/mediaOutbox.ts';
 import { NotificationDispatcher } from '../../notifications/notificationDispatcher.ts';
+import { addNotificationReplyListener } from '../../notifications/nativeNotificationBridge.ts';
+import type { NotificationReply } from '../../notifications/nativeNotificationBridge.ts';
 import { LocalSearchEngine } from '../../search/searchEngine.ts';
 import { SearchResult } from '../../search/types.ts';
 import { ConfigManager } from '../../config/appConfig.ts';
@@ -1259,6 +1262,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 if (activeChatId !== parsed.groupId) {
                   notificationDispatcher.dispatch({
                     id: incomingMsg.id,
+                    conversationId: parsed.groupId,
+                    spaceId: session.spaceId,
                     senderName: parsed.senderName || 'Group Member',
                     text: plaintext || 'New group message',
                     timestamp: incomingMsg.timestamp,
@@ -1499,6 +1504,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           notificationDispatcher.dispatch({
             id: incomingMsg.id,
             conversationId: incomingMsg.conversationId,
+            spaceId: session.spaceId,
             senderName: matchingContact?.name || senderDoc.identityId.slice(0, 8),
             text: incomingMsg.text,
             timestamp: Date.now(),
@@ -1542,6 +1548,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             notificationDispatcher.dispatch({
               id: incomingMsg.id,
               conversationId: incomingMsg.conversationId,
+              spaceId: session.spaceId,
               senderName: parsed.senderName || 'Peer',
               text: parsed.text,
               timestamp: Date.now(),
@@ -2806,6 +2813,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     [activeSession, contacts, conversations, replyTarget, networkState, myProfile]
   );
 
+  const pendingNotificationRepliesRef = useRef<Array<{ reply: NotificationReply; receivedAt: number }>>([]);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    let disposed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+    void addNotificationReplyListener(async (reply) => {
+      // Replies use the normal encrypted send path and are bound to the Space
+      // that created the notification. Never send after a Space switch or lock.
+      if (!reply.conversationId) return;
+      const text = reply.text;
+      reply.text = '';
+      if (!text.trim()) return;
+
+      if (activeSession?.isActive()) {
+        if (activeSession.spaceId === reply.spaceId) {
+          await sendMessage(reply.conversationId, text).catch(() => {});
+        }
+        return;
+      }
+
+      // A cold launch or lock screen must not consume the reply before unlock.
+      // Keep at most five replies in volatile memory and expire them after 5m.
+      const now = Date.now();
+      const cutoff = now - 5 * 60 * 1000;
+      const pending = pendingNotificationRepliesRef.current.filter((item) => {
+        if (item.receivedAt >= cutoff) return true;
+        item.reply.text = '';
+        return false;
+      });
+      const pendingItem = { reply: { ...reply, text }, receivedAt: now };
+      pending.push(pendingItem);
+      const boundedPending = pending.slice(-5);
+      for (const dropped of pending.slice(0, -5)) dropped.reply.text = '';
+      pendingNotificationRepliesRef.current = boundedPending;
+      setTimeout(() => {
+        pendingItem.reply.text = '';
+        pendingNotificationRepliesRef.current = pendingNotificationRepliesRef.current.filter((item) => item !== pendingItem);
+      }, 5 * 60 * 1000);
+    }).then((handle) => {
+      if (disposed) void handle.remove();
+      else listenerHandle = handle;
+    }).catch(() => {});
+    return () => {
+      disposed = true;
+      if (listenerHandle) void listenerHandle.remove();
+    };
+  }, [activeSession, sendMessage]);
+
+  useEffect(() => {
+    if (!activeSession?.isActive()) return;
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    const pending = pendingNotificationRepliesRef.current;
+    pendingNotificationRepliesRef.current = [];
+    for (const item of pending) {
+      if (item.receivedAt < cutoff || item.reply.spaceId !== activeSession.spaceId) continue;
+      const text = item.reply.text;
+      item.reply.text = '';
+      void sendMessage(item.reply.conversationId, text).catch(() => {});
+    }
+  }, [activeSession, sendMessage]);
+
   const sendAttachments = useCallback(
     async (
       conversationId: string,
@@ -3055,12 +3124,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 await mediaOutbox.remove(activeSession, replacedJobId);
               }
 
-              if (!cloudClient.hasAuthenticatedSession()) {
-                await ensureCloudSession(activeSession);
-              }
-              if (!cloudClient.hasAuthenticatedSession()) {
-                await ensureCloudSession(activeSession, true);
-              }
+              await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
 
               let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
               const uploadWithSession = async () => {
@@ -3485,12 +3549,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             MediaCache.set(pendingMsg.voice.objectId, cachedVoiceMedia);
           }
 
-          if (!cloudClient.hasAuthenticatedSession()) {
-            await ensureCloudSession(activeSession);
-          }
-          if (!cloudClient.hasAuthenticatedSession()) {
-            await ensureCloudSession(activeSession, true);
-          }
+          await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
 
           const targetConv = conversations.find((c) => c.id === conversationId);
           const isGroup = conversationId.startsWith('grp_') || targetConv?.type === 'group';

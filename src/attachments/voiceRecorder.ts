@@ -46,6 +46,10 @@ export class VoiceRecorder {
   private state: RecorderState = 'INACTIVE';
   private mimeType = 'audio/webm';
 
+  private static resolvePlayableMimeType(...mimeTypes: Array<string | undefined>): string {
+    return mimeTypes.find((mimeType) => mimeType?.toLowerCase().startsWith('audio/')) || 'audio/webm';
+  }
+
   public getState(): RecorderState {
     return this.state;
   }
@@ -294,17 +298,24 @@ export class VoiceRecorder {
       };
       const cached = await MediaCache.getOrFetch(attachmentPayload, session, cloudClient, onProgress);
       if (cached && cached.data) {
+        const playableMimeType = this.resolvePlayableMimeType(cached.mimeType, meta.mimeType);
         let audioData = cached.data;
         if ((cached.mimeType?.includes('webm') || meta.mimeType?.includes('webm')) && !hasValidWebmIndex(audioData)) {
           try {
             audioData = makeWebmSeekableSync(audioData, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
           } catch (_e) {}
         }
-        const blob = new Blob([audioData as any], { type: cached.mimeType || meta.mimeType || 'audio/webm' });
+        const blob = new Blob([audioData as any], { type: playableMimeType });
         return URL.createObjectURL(blob);
       }
       if (cached && cached.blobUrl) {
-        return cached.blobUrl;
+        if (cached.mimeType?.toLowerCase().startsWith('audio/')) return cached.blobUrl;
+        const cachedResponse = await fetch(cached.blobUrl);
+        const cachedBlob = await cachedResponse.blob();
+        const playableBlob = new Blob([cachedBlob], {
+          type: this.resolvePlayableMimeType(meta.mimeType),
+        });
+        return URL.createObjectURL(playableBlob);
       }
     } catch (_cacheErr) {}
 
@@ -318,7 +329,7 @@ export class VoiceRecorder {
           finalBytes = makeWebmSeekableSync(finalBytes, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
         } catch (_e) {}
       }
-      const blob = new Blob([finalBytes as any], { type: meta.mimeType || 'audio/webm' });
+      const blob = new Blob([finalBytes as any], { type: this.resolvePlayableMimeType(meta.mimeType) });
       return URL.createObjectURL(blob);
     }
 
@@ -354,7 +365,7 @@ export class VoiceRecorder {
           plaintextBytes = makeWebmSeekableSync(plaintextBytes, meta.durationSeconds ? meta.durationSeconds * 1000 : undefined);
         } catch (_e) {}
       }
-      const blob = new Blob([plaintextBytes as any], { type: meta.mimeType || 'audio/webm' });
+      const blob = new Blob([plaintextBytes as any], { type: this.resolvePlayableMimeType(meta.mimeType) });
       return URL.createObjectURL(blob);
     } catch (_err) {
       throw new Error('Voice message failed authentication');

@@ -20,6 +20,7 @@ import { MessageComposer } from './MessageComposer.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { VoicePlayer } from '../../attachments/voicePlayer.ts';
 import { AttachmentPipeline } from '../../attachments/attachmentPipeline.ts';
+import { requireCloudSessionForAttachment } from '../../network/requireCloudSessionForAttachment.ts';
 import type { AttachmentMetadata, EncryptedAttachmentChunk } from '../../attachments/types.ts';
 import { base64ToBytes } from '../../crypto/utils.ts';
 import type { UIMessage } from '../app/types.ts';
@@ -1311,9 +1312,7 @@ export const ConversationView: React.FC = () => {
 
     // 3. Otherwise start playback
     try {
-      if (!cloudClient.hasAuthenticatedSession()) {
-        await ensureCloudSession(activeSession);
-      }
+      await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
 
       const senderName = msg.senderName || (msg.isOutgoing ? (activeSession?.name || myProfile?.displayName || 'You') : (activeContact?.name || conversationName || 'Contact'));
 
@@ -1402,9 +1401,7 @@ export const ConversationView: React.FC = () => {
         if (cached && cached.data) {
           data = cached.data;
         } else {
-          if (!cloudClient.getSessionToken()) {
-            await ensureCloudSession(activeSession);
-          }
+          await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
           const blobUrl = await VoiceRecorder.downloadAndDecryptVoiceNote(activeSession, cloudClient, msg.voice, onDownloadProgress);
           const res = await fetch(blobUrl);
           const buf = await res.arrayBuffer();
@@ -1415,9 +1412,7 @@ export const ConversationView: React.FC = () => {
         let cached = MediaCache.get(key);
 
         if (!cached) {
-          if (!cloudClient.getSessionToken()) {
-            await ensureCloudSession(activeSession);
-          }
+          await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
           cached = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient, onDownloadProgress);
         }
 
@@ -1475,9 +1470,7 @@ export const ConversationView: React.FC = () => {
     let cached = (key ? MediaCache.get(key) : undefined) || MediaCache.get(msg.id);
     if (cached?.blobUrl) return cached.blobUrl;
 
-    if (!cloudClient.getSessionToken()) {
-      await ensureCloudSession(activeSession);
-    }
+    await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
     const decrypted = await MediaCache.getOrFetch(msg.attachment, activeSession, cloudClient);
     if (decrypted?.blobUrl) {
       MediaCache.set(msg.id, decrypted);

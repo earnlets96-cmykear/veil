@@ -8,6 +8,7 @@
 import { NotificationEvent, NotificationPrivacyMode } from './types.ts';
 import {
   getNotificationPermissionStatus,
+  clearNativeNotifications,
   isNativeNotificationPlatform,
   showNativeNotification,
 } from './nativeNotificationBridge.ts';
@@ -16,6 +17,7 @@ export class NotificationDispatcher {
   private privacyMode: NotificationPrivacyMode = 'SENDER_ONLY';
   private isLocked = false;
   private mutedConversations = new Set<string>();
+  private browserNotifications = new Set<Notification>();
 
   constructor(initialMode: NotificationPrivacyMode = 'SENDER_ONLY') {
     this.privacyMode = this.readSavedPrivacyMode(initialMode);
@@ -48,6 +50,7 @@ export class NotificationDispatcher {
   }
 
   public setPrivacyMode(mode: NotificationPrivacyMode): void {
+    if (this.privacyMode !== mode) this.clearActiveNotifications();
     this.privacyMode = mode;
   }
 
@@ -57,6 +60,7 @@ export class NotificationDispatcher {
 
   public setLocked(isLocked: boolean): void {
     this.isLocked = isLocked;
+    if (isLocked) this.clearActiveNotifications();
   }
 
   /**
@@ -117,7 +121,13 @@ export class NotificationDispatcher {
     if (isNativeNotificationPlatform()) {
       if (await getNotificationPermissionStatus() !== 'granted') return false;
       try {
-        await showNativeNotification({ id: event.id, ...payload });
+        await showNativeNotification({
+          id: event.id,
+          ...payload,
+          ...(this.privacyMode === 'FULL_OBFUSCATED' && event.conversationId && event.spaceId
+            ? { conversationId: event.conversationId, spaceId: event.spaceId, allowReply: true }
+            : {}),
+        });
         return true;
       } catch {
         return false;
@@ -126,17 +136,25 @@ export class NotificationDispatcher {
 
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       try {
-        new Notification(payload.title, {
+        const notification = new Notification(payload.title, {
           body: payload.body,
           icon: '/favicon.ico',
           silent: false,
         });
+        this.browserNotifications.add(notification);
+        notification.onclose = () => this.browserNotifications.delete(notification);
         return true;
       } catch (_e) {
         return false;
       }
     }
     return false;
+  }
+
+  private clearActiveNotifications(): void {
+    for (const notification of this.browserNotifications) notification.close();
+    this.browserNotifications.clear();
+    void clearNativeNotifications().catch(() => {});
   }
 
   private shouldDeferToBackgroundPush(): boolean {

@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../app/AppState.tsx';
 import { MediaCache, DecryptedMedia, AttachmentPayload } from '../../utils/mediaCache.ts';
 import { MediaLogger } from '../../utils/mediaLogger.ts';
+import { requireCloudSessionForAttachment } from '../../../network/requireCloudSessionForAttachment.ts';
 import { ThumbnailGenerator } from '../../../attachments/thumbnailGenerator.ts';
 import { PlayIcon, RefreshCwIcon, AlertCircleIcon } from '../icons/index.ts';
 import { telegramStickerService } from '../../../media/telegramStickerService.ts';
@@ -139,9 +140,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
       isFetchingRef.current = true;
       try {
-        if (!cloudClient.getSessionToken()) {
-          await ensureCloudSession(activeSession);
-        }
+        await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
 
         MediaLogger.log({
           event: 'DECRYPTION_STARTED',

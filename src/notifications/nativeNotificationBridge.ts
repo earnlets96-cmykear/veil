@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'default' | 'unsupported';
 
@@ -6,10 +6,18 @@ interface NativeNotificationResult {
   status: NotificationPermissionStatus;
 }
 
+export interface NotificationReply {
+  conversationId: string;
+  spaceId: string;
+  text: string;
+}
+
 interface VeilNotificationsPlugin {
   checkPermission(): Promise<NativeNotificationResult>;
   requestPermission(): Promise<NativeNotificationResult>;
-  show(options: { id: string; title: string; body: string }): Promise<void>;
+  show(options: { id: string; title: string; body: string; conversationId?: string; spaceId?: string; allowReply?: boolean }): Promise<void>;
+  clearAll(): Promise<void>;
+  addListener(eventName: 'reply', listener: (reply: NotificationReply) => void): Promise<PluginListenerHandle>;
   openSettings(): Promise<void>;
   registerForPush(): Promise<{ token: string }>;
   deletePushToken(): Promise<void>;
@@ -51,9 +59,20 @@ export const showNativeNotification = async (payload: {
   id: string;
   title: string;
   body: string;
+  conversationId?: string;
+  spaceId?: string;
+  allowReply?: boolean;
 }): Promise<void> => {
   await nativeNotifications.show(payload);
 };
+
+export const clearNativeNotifications = async (): Promise<void> => {
+  if (isNativeNotificationPlatform()) await nativeNotifications.clearAll();
+};
+
+export const addNotificationReplyListener = (
+  listener: (reply: NotificationReply) => void,
+): Promise<PluginListenerHandle> => nativeNotifications.addListener('reply', listener);
 
 export const registerForRemotePushToken = async (): Promise<string> => {
   if (!isNativeNotificationPlatform()) throw new Error('Background push is available only in the Android app');

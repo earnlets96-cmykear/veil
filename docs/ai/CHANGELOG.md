@@ -2,6 +2,19 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 128] - 2026-10-10
+
+### Improved
+- Added an Android inline Reply action to local notifications when Full Preview is selected. Replies are bound to the originating conversation and Space and use VEIL's existing encrypted message send path.
+- Active notifications clear when the Space locks or notification privacy changes. Background FCM alerts remain generic and non-interactive.
+- Attachment and voice requests now stop before network access when cloud session restoration fails.
+- Voice playback now uses audio metadata when cached media carries a generic MIME type, avoiding unsupported-source playback errors for otherwise valid audio.
+
+### Verification
+- Six focused suites / 10 tests pass; `npm run typecheck` passes.
+- Full `npm test`: 341 files passed / 109 failed (1,447 tests passed / 216 failed / 6 skipped), mostly due blocked loopback relay/recovery connections, with existing UI assertion failures also present.
+- Android Gradle stopped before compilation with `Unable to establish loopback connection`; device validation and post-RC independent security review, formal audit, and dual sign-off remain release gates. No cryptographic or message wire format changes.
+
 ## [Phase 127] - 2026-10-09
 
 ### Improved
