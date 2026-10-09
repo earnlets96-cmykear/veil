@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "59138548312",
+    "project_id": "chat-veil-app",
+    "storage_bucket": "chat-veil-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:59138548312:android:b662d2c681e9faf5d5e02d",
+        "android_client_info": {
+          "package_name": "chat.veil.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7JnQDRT6rlXYwdFFEpdIbBhHeGsjLtAg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
