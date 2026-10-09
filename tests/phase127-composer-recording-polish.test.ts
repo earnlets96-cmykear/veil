@@ -7,22 +7,23 @@ const sidebar = fs.readFileSync(path.resolve(__dirname, '../src/ui/components/Si
 const styles = fs.readFileSync(path.resolve(__dirname, '../src/styles/veil-components.css'), 'utf8');
 
 describe('Phase 127 composer and conversation row polish', () => {
-  it('exposes one cancel action in recording mode, including after the gesture locks', () => {
-    const recordingBranch = composer.slice(composer.indexOf('className={`veil-recording-pill'), composer.indexOf('/* Standard Message & Attachment Controls'));
+  it('exposes one cancel action and explicit lock control in recording mode', () => {
+    const recordingBranch = composer.slice(composer.indexOf('className="veil-recording-pill"'), composer.indexOf('/* Standard Message & Attachment Controls'));
     expect(recordingBranch.match(/className="veil-recording-trash-btn"/g)).toHaveLength(1);
-    expect(recordingBranch).not.toContain('aria-label="Cancel Voice Recording"');
+    expect(recordingBranch).toContain('aria-label={isLocked ? \'Unlock recording\' : \'Lock recording\'}');
   });
 
-  it('keeps cancel and send taps from bubbling into the hold-to-send gesture handler', () => {
-    const recordingBranch = composer.slice(composer.indexOf('className={`veil-recording-pill'), composer.indexOf('/* Standard Message & Attachment Controls'));
-    expect(recordingBranch.match(/onTouchEnd=\{\(event\) => event\.stopPropagation\(\)\}/g)).toHaveLength(2);
-    expect(recordingBranch.match(/onMouseUp=\{\(event\) => event\.stopPropagation\(\)\}/g)).toHaveLength(2);
+  it('starts recording from tap and keeps send as a separate explicit action', () => {
+    const micButton = composer.slice(composer.indexOf('className="veil-btn-composer-send veil-btn-composer-mic"'), composer.indexOf('</button>', composer.indexOf('className="veil-btn-composer-send veil-btn-composer-mic"')));
+    expect(micButton).toContain('onClick={handleStartVoice}');
+    expect(micButton).not.toMatch(/on(?:TouchStart|MouseDown)=/);
+    expect(composer).toContain('aria-label="Send voice recording"');
   });
 
-  it('coalesces recording drag visuals to animation frames instead of rerendering per pointer event', () => {
-    expect(composer).toContain('requestAnimationFrame(');
-    expect(composer).toContain('--record-drag-x');
-    expect(composer).not.toContain('setDragOffset');
+  it('does not retain drag-to-record or drag-to-cancel gesture state', () => {
+    expect(composer).not.toContain('handleMicTouchMove');
+    expect(composer).not.toContain('--record-drag-x');
+    expect(styles).not.toContain('.veil-recording-pill.is-dragging');
   });
 
   it('keeps recording motion restrained and honors reduced-motion preferences', () => {

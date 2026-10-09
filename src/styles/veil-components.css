@@ -2904,10 +2904,6 @@
   position: relative;
   overflow: visible;
   gap: 10px;
-  --record-drag-x: 0px;
-  --record-drag-y: 0px;
-  --record-hint-x: 0px;
-  --record-lock-y: 0px;
   animation: veilRecordingEnter 120ms ease-out both;
 }
 
@@ -2989,77 +2985,73 @@
   100% { transform: scaleY(1); opacity: 1; }
 }
 
-.veil-recording-cancel-hint {
+.veil-recording-hint {
+  min-width: 0;
+  flex: 1;
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--veil-text-secondary, rgba(255, 255, 255, 0.6));
   user-select: none;
   white-space: nowrap;
-  transform: translateX(var(--record-hint-x, 0px));
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .veil-recording-locked-hint {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--veil-accent-primary, #14b8a6);
-}
-
-.veil-recording-mic-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.veil-recording-lock-pill {
-  position: absolute;
-  top: -42px;
-  left: 50%;
-  background: var(--veil-bg-surface-elevated, #161b22);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-  padding: 4px 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--veil-text-secondary, #cbd5e1);
   white-space: nowrap;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(var(--record-lock-y, 0px));
-  transition: opacity var(--veil-motion-fast);
-  z-index: 10;
-  animation: veilRecordingEnter 120ms ease-out both;
-}
-
-.veil-lock-arrow-bounce {
-  color: var(--veil-accent-primary, #14b8a6);
-}
-
-.veil-btn-composer-recording-active {
-  background: var(--veil-accent-primary, #14b8a6) !important;
-  box-shadow: var(--veil-elevation-1) !important;
-  transform: translate(var(--record-drag-x, 0px), var(--record-drag-y, 0px));
-  transition: transform 160ms ease-out;
-}
-
-.veil-recording-pill.is-dragging .veil-btn-composer-recording-active {
-  transition: none;
 }
 
 .veil-recording-actions {
   display: flex;
   align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.veil-recording-lock-btn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--veil-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--veil-text-secondary, #94a3b8);
+  cursor: pointer;
+  transition: background-color var(--veil-motion-fast), color var(--veil-motion-fast), border-color var(--veil-motion-fast);
+}
+
+.veil-recording-lock-btn:hover,
+.veil-recording-lock-btn.is-locked {
+  color: var(--veil-accent-primary, #14b8a6);
+  border-color: var(--veil-accent-primary, #14b8a6);
+  background: rgba(20, 184, 166, 0.1);
+}
+
+.veil-recording-lock-btn:focus-visible {
+  outline: 2px solid var(--veil-accent-primary, #14b8a6);
+  outline-offset: 2px;
+}
+
+.veil-btn-composer-recording-active {
+  background: var(--veil-accent-primary, #14b8a6) !important;
+  box-shadow: var(--veil-elevation-1) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .veil-recording-pill,
   .veil-recording-locked-hint,
-  .veil-recording-lock-pill,
-  .veil-lock-arrow-bounce,
+  .veil-recording-lock-btn,
   .veil-recording-dot,
   .veil-soundwave-bar,
   .veil-btn-composer-recording-active {
