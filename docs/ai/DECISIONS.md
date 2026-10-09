@@ -1441,6 +1441,21 @@ This document records all architectural decisions made across the VEIL project l
 - **Threat model**: See `docs/ai/THREAT_MODEL_NOTIFICATION_REPLIES.md`. Full Preview exposes a short plaintext preview in the unlocked notification shade; Android memory inspection and notification mirroring remain residual OS-level risks.
 - **Release gate**: Validate RemoteInput delivery, lock behavior, Space switching, notification cancellation, and audio playback on physical Android devices. Do not deploy before independent security review, formal security audit, and explicit dual sign-off.
 
+## ADR-132: Viewport-Loaded Social Video Thumbnails and Full-Screen Playback
+
+- **Date**: 2026-10-10
+- **Status**: Accepted for implementation; privacy disclosure, provider behavior, physical Android validation, and post-RC security release gates remain open.
+- **Context**: The explicit Load preview step made shared social videos look empty, and fixed-width/fixed-height player cards did not fit mobile message bubbles. The user requested thumbnails without the extra load button, embedded playback, and an optional full-screen viewer.
+- **Decision**:
+  1. When a supported link's preview card is within 120 CSS pixels of the visible viewport, request only the existing bounded provider oEmbed metadata/thumbnail through the existing fixed HTTPS provider endpoints. Do not fetch for offscreen messages; use existing in-flight coalescing, Space-scoped memory cache, timeouts, response limits, and Space-lock cache clearing.
+  2. Make provider loading visible in the card and label the preview source. The provider can observe the device IP, timing, and public post URL when its in-view preview request occurs. Thumbnail bytes remain provider-hosted and are not persisted by VEIL.
+  3. Keep playback separate from metadata: users must tap **Play in VEIL** before an iframe is mounted. Autoplay remains disabled, and **Open original** remains available.
+  4. Keep the player within the thumbnail's responsive width in the message bubble. Instagram uses a provider-specific taller frame. Offer a separate full-screen viewer, close action, and Escape dismissal.
+  5. Use the official TikTok player URL and allow its cross-origin player origin (`www.tiktok.com`) to retain its own origin inside the iframe sandbox, while keeping scripts/forms/popups scoped to that sandbox. Validate TikTok error messages by exact origin and iframe source; show retry and Open original on player error.
+  6. Do not change allowed provider hosts, relay fetching, E2EE message content, or persistent media storage.
+- **Reason**: Show useful preview thumbnails as a supported video enters view while avoiding eager fetches for every offscreen message; playback remains a distinct user action.
+- **Threat model**: Updated `docs/ai/THREAT_MODEL_SOCIAL_VIDEO_PREVIEWS.md` records the in-view egress and residual platform visibility. No cryptographic primitive, identity, Space boundary, relay, or message wire protocol changes.
+- **Release gate**: Verify in-view/offscreen request behavior, response validation, player isolation/error fallback, Space cache clearing, and Android rendering. Independent security review, formal audit, and explicit dual sign-off remain required before deployment.
 
 
 

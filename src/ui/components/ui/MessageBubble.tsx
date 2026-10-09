@@ -243,7 +243,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
       <div
         className={`veil-message-bubble ${isOutgoing ? 'outgoing' : 'incoming'} ${
           isSelected ? 'veil-message-selected' : ''
-        } ${isHighlighted ? 'veil-message-highlight' : ''}`}
+        } ${isHighlighted ? 'veil-message-highlight' : ''} ${socialVideoText && spaceId ? 'veil-social-video-bubble' : ''}`}
         style={{
           transform: (!disableInternalSwipe && swipeOffset !== 0) ? `translateX(${swipeOffset}px)` : undefined,
           transition: (!disableInternalSwipe && swipeOffset === 0) ? 'transform 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none',
