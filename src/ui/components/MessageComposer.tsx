@@ -137,8 +137,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   }, [editingMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Send on Enter (without Shift) on desktop; allow normal newline on mobile keyboards
-    if (e.key === 'Enter' && !e.shiftKey && typeof window !== 'undefined' && window.innerWidth > 768) {
+    // Send on Enter; leave Shift+Enter to insert a newline.
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
