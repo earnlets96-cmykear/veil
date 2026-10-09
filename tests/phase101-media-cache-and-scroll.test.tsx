@@ -92,7 +92,7 @@ describe('Phase 101: Media Cache, Timeline Scroll & CSS Geometry', () => {
       expect(css).toMatch(/\.veil-media-bubble-container\s+\.veil-media-thumbnail-loading\s*\{[^}]*aspect-ratio:\s*16\s*\/\s*10/);
     });
 
-    it('keeps sent photo previews outlined and media bubbles compact', () => {
+    it('keeps sent photo and video previews outlined and media bubbles compact', () => {
       const cssPath = path.resolve(__dirname, '../src/styles/veil-components.css');
       const css = fs.readFileSync(cssPath, 'utf8');
       const mediaImagePath = path.resolve(__dirname, '../src/ui/components/media/MediaImage.tsx');
@@ -100,10 +100,11 @@ describe('Phase 101: Media Cache, Timeline Scroll & CSS Geometry', () => {
       const groupedMediaPath = path.resolve(__dirname, '../src/ui/components/media/GroupedMediaGrid.tsx');
       const groupedMedia = fs.readFileSync(groupedMediaPath, 'utf8');
 
-      expect(css).toMatch(/\.veil-msg-row\.outgoing\s+\.veil-media-bubble-container\s+img\.veil-media-thumbnail-img:not\(\.veil-media-thumbnail-video-poster\)\s*\{[^}]*border:\s*1px solid var\(--veil-border\)/);
+      expect(css).toMatch(/\.veil-msg-row\.outgoing\s+\.veil-media-bubble-container\s+\.veil-media-thumbnail-img\s*\{[^}]*border:\s*1px solid var\(--veil-border\)/);
       expect(css).toMatch(/\.veil-media-bubble-container\s*\{[^}]*width:\s*min\(72vw,\s*300px\)/);
       expect(css).toMatch(/\.veil-media-thumbnail-img\s*\{[^}]*max-height:\s*300px/);
-      expect(mediaImage).toContain('veil-media-thumbnail-video-poster');
+      expect(mediaImage).toContain('className="veil-media-thumbnail-img veil-media-thumbnail-video"');
+      expect(mediaImage).toContain('veil-media-thumbnail-img ${isShowingThumbnail ?');
       expect(groupedMedia).toContain("maxWidth: '320px'");
       expect(groupedMedia).toContain("height: '150px'");
       expect(groupedMedia).toContain("height: '200px'");

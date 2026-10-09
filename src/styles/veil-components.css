@@ -2031,7 +2031,7 @@
   transition: transform var(--veil-duration-fast) var(--veil-easing-standard);
 }
 
-.veil-msg-row.outgoing .veil-media-bubble-container img.veil-media-thumbnail-img:not(.veil-media-thumbnail-video-poster) {
+.veil-msg-row.outgoing .veil-media-bubble-container .veil-media-thumbnail-img {
   box-sizing: border-box;
   border: 1px solid var(--veil-border);
 }
