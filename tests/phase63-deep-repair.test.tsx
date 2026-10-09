@@ -122,11 +122,10 @@ describe('Phase 63: VEIL Deep Authentication, App Lock, Navigation & Voice Repai
       expect(html).toMatch(/Enable App Lock/);
       expect(html).toMatch(/Change PIN/);
       expect(html).toMatch(/PIN Type/);
-      expect(html).toMatch(/Auto Lock/);
-      expect(html).toMatch(/After exiting app/);
-      expect(html).toMatch(/After background/);
-      expect(html).toMatch(/After screen off/);
-      expect(html).toMatch(/After inactivity/);
+      expect(html).toMatch(/When you leave VEIL/);
+      expect(html).toMatch(/While using VEIL/);
+      expect(html).not.toMatch(/After exiting app|After background|After inactivity/);
+      expect(html).not.toMatch(/Inactivity Auto-Lock/);
       expect(html).toMatch(/Lock Now/);
     });
 

@@ -28,7 +28,8 @@ import com.google.firebase.messaging.FirebaseMessaging
 class VeilNotificationsPlugin : Plugin() {
     companion object {
         private const val CHANNEL_ID = "veil_messages"
-        private const val CHANNEL_NAME = "Messages"
+        private const val CHANNEL_NAME = "VEIL messages"
+        private const val CHANNEL_DESCRIPTION = "Alerts for incoming messages. Lock screen content stays private."
     }
 
     @PluginMethod
@@ -150,7 +151,7 @@ class VeilNotificationsPlugin : Plugin() {
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "Notifications for incoming VEIL messages"
+            description = CHANNEL_DESCRIPTION
             lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
         }
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)

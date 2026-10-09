@@ -2,6 +2,17 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 124] - 2026-10-09
+
+### Improved
+- Grouped notification controls into device permission, local alerts while VEIL is open, and Android background alerts. Settings report push registration progress/results and a retry path without exposing FCM tokens; Android alert text and channel copy remain generic.
+- App Lock now persists and enforces one leave-app delay, a foreground inactivity delay, and an Android screen-off delay. The duplicate Security-page selector was removed. Android screen-off state uses a one-shot elapsed-time marker, and app content is gated while resume lock status is checked.
+
+### Verification
+- 12 focused suites / 68 tests pass; `npm run typecheck` passes; Impeccable detector returned no findings for the modified Settings surfaces.
+- Full `npm test` baseline was interrupted after widespread blocked relay/recovery loopback connection failures. Android Gradle failed before compilation with `Unable to establish loopback connection`.
+- Physical Android validation, independent security audit, and explicit dual sign-off remain outstanding. ADR-129 and `docs/ai/THREAT_MODEL_APP_LOCK.md` document the post-RC security review.
+
 ## [Phase 123] - 2026-10-09
 
 ### Fixed

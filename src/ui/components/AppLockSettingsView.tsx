@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { spacePinManager } from '../../privacy/pinManager.ts';
+import type { AppLockDelay } from '../../privacy/appLockPolicy.ts';
+import { isAppLockScreenOffSupported } from '../../privacy/nativeAppLockBridge.ts';
 import { useApp } from '../app/AppState.tsx';
 import { ArrowLeftIcon, ChevronRightIcon, LockIcon } from './icons/index.ts';
 
@@ -18,10 +20,9 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
 
   const [appLockEnabled, setAppLockEnabled] = useState<boolean>(() => spacePinManager.isAppLockEnabled());
   const [pinType, setPinType] = useState<'4-digit' | '6-digit'>(() => spacePinManager.getPinType(activeSession?.spaceId));
-  const [afterExitingApp, setAfterExitingApp] = useState<string>(() => spacePinManager.getAfterExitingApp());
-  const [afterBackground, setAfterBackground] = useState<string>(() => spacePinManager.getAfterBackground());
-  const [afterScreenOff, setAfterScreenOff] = useState<string>(() => spacePinManager.getAfterScreenOff());
-  const [afterInactivity, setAfterInactivity] = useState<string>(() => spacePinManager.getAfterInactivity());
+  const [leaveAppDelay, setLeaveAppDelay] = useState<AppLockDelay>(() => spacePinManager.getLeaveAppLockDelay());
+  const [screenOffDelay, setScreenOffDelay] = useState<AppLockDelay>(() => spacePinManager.getScreenOffLockDelay());
+  const [inactivityDelay, setInactivityDelay] = useState<AppLockDelay>(() => spacePinManager.getInactivityLockDelay());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const currentSpaceId = activeSession?.spaceId;
@@ -37,23 +38,28 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
       if (onOpenPinSetup) onOpenPinSetup();
       return;
     }
-    spacePinManager.setAppLockEnabled(enabled);
+    if (!spacePinManager.setAppLockEnabled(enabled)) {
+      showNotice('Could not save App Lock. Your previous setting is still active.');
+      return;
+    }
     setAppLockEnabled(enabled);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('veil:app-lock-settings-changed'));
     showNotice(enabled ? 'App Lock enabled' : 'App Lock disabled');
   };
 
-  const cycleInterval = (
-    current: string,
-    options: string[],
-    setter: (val: string) => void,
-    persister: (val: string) => void,
-    label: string
+  const saveDelay = (
+    value: AppLockDelay,
+    setter: (delay: AppLockDelay) => void,
+    persist: (delay: AppLockDelay) => boolean,
+    label: string,
   ) => {
-    const nextIdx = (options.indexOf(current) + 1) % options.length;
-    const nextVal = options[nextIdx];
-    setter(nextVal);
-    persister(nextVal);
-    showNotice(`${label} set to ${nextVal}`);
+    if (!persist(value)) {
+      showNotice(`Could not save ${label}. Your previous setting is still active.`);
+      return;
+    }
+    setter(value);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('veil:app-lock-settings-changed'));
+    showNotice(`${label} saved: ${formatIntervalLabel(value)}`);
   };
 
   const handleLockNow = () => {
@@ -110,6 +116,8 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
 
       {statusMessage && (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             padding: '0.6rem 0.85rem',
             borderRadius: '10px',
@@ -240,7 +248,7 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Card 2: Auto Lock Settings */}
+      {/* App Lock timing controls */}
       <div
         style={{
           backgroundColor: 'var(--veil-bg-surface)',
@@ -249,122 +257,55 @@ export const AppLockSettingsView: React.FC<AppLockSettingsViewProps> = ({
           overflow: 'hidden',
         }}
       >
-        <div style={{ padding: '0.9rem 1.1rem 0.5rem', fontSize: 'var(--veil-text-xs)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--veil-text-muted)' }}>
-          Auto Lock
+        <div style={{ padding: '1rem 1.1rem', display: 'grid', gap: '0.45rem' }}>
+          <label htmlFor="veil-leave-app-delay" style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+            When you leave VEIL
+          </label>
+          <select
+            id="veil-leave-app-delay"
+            className="veil-select"
+            value={leaveAppDelay}
+            onChange={(event) => saveDelay(event.target.value as AppLockDelay, setLeaveAppDelay, (delay) => spacePinManager.setLeaveAppLockDelay(delay), 'Leave VEIL delay')}
+            style={{ minHeight: 44 }}
+          >
+            {(['immediately', '30s', '1m', '5m', '10m', '15m', 'never'] as AppLockDelay[]).map((delay) => <option key={delay} value={delay}>{formatIntervalLabel(delay)}</option>)}
+          </select>
+          <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>Lock when this delay has elapsed after VEIL goes to the background.</span>
         </div>
 
-        {/* After exiting app */}
-        <div
-          onClick={() => cycleInterval(
-            afterExitingApp,
-            ['immediately', '1m', '5m', '10m', 'never'],
-            setAfterExitingApp,
-            (v) => spacePinManager.setAfterExitingApp(v),
-            'After exiting app'
-          )}
-          role="button"
-          tabIndex={0}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0.9rem 1.1rem',
-            borderBottom: '1px solid var(--veil-border-subtle)',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>After exiting app</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)' }}>
-            <span>{formatIntervalLabel(afterExitingApp)}</span>
-            <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
-          </div>
+        <div style={{ padding: '1rem 1.1rem', display: 'grid', gap: '0.45rem', borderTop: '1px solid var(--veil-border-subtle)' }}>
+          <label htmlFor="veil-inactivity-delay" style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+            While using VEIL
+          </label>
+          <select
+            id="veil-inactivity-delay"
+            className="veil-select"
+            value={inactivityDelay}
+            onChange={(event) => saveDelay(event.target.value as AppLockDelay, setInactivityDelay, (delay) => spacePinManager.setInactivityLockDelay(delay), 'Inactivity delay')}
+            style={{ minHeight: 44 }}
+          >
+            {(['1m', '5m', '10m', '15m', 'never'] as AppLockDelay[]).map((delay) => <option key={delay} value={delay}>{formatIntervalLabel(delay)}</option>)}
+          </select>
+          <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>Lock after no pointer, keyboard, or touch activity.</span>
         </div>
 
-        {/* After background */}
-        <div
-          onClick={() => cycleInterval(
-            afterBackground,
-            ['immediately', '30s', '1m', '5m', '10m', 'never'],
-            setAfterBackground,
-            (v) => {
-              spacePinManager.setAfterBackground(v);
-              spacePinManager.setLockOnBackgroundEnabled(v !== 'never');
-            },
-            'After background'
-          )}
-          role="button"
-          tabIndex={0}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0.9rem 1.1rem',
-            borderBottom: '1px solid var(--veil-border-subtle)',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>After background</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)' }}>
-            <span>{formatIntervalLabel(afterBackground)}</span>
-            <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
+        {isAppLockScreenOffSupported() && (
+          <div style={{ padding: '1rem 1.1rem', display: 'grid', gap: '0.45rem', borderTop: '1px solid var(--veil-border-subtle)' }}>
+            <label htmlFor="veil-screen-off-delay" style={{ fontSize: 'var(--veil-text-sm)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
+              When screen turns off
+            </label>
+            <select
+              id="veil-screen-off-delay"
+              className="veil-select"
+              value={screenOffDelay}
+              onChange={(event) => saveDelay(event.target.value as AppLockDelay, setScreenOffDelay, (delay) => spacePinManager.setScreenOffLockDelay(delay), 'Screen-off delay')}
+              style={{ minHeight: 44 }}
+            >
+              {(['immediately', '30s', '1m', '5m', '10m', '15m', 'never'] as AppLockDelay[]).map((delay) => <option key={delay} value={delay}>{formatIntervalLabel(delay)}</option>)}
+            </select>
+            <span style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>Android checks this setting when VEIL resumes after the screen turns off.</span>
           </div>
-        </div>
-
-        {/* After screen off */}
-        <div
-          onClick={() => cycleInterval(
-            afterScreenOff,
-            ['immediately', '30s', '1m', '5m', 'never'],
-            setAfterScreenOff,
-            (v) => {
-              spacePinManager.setAfterScreenOff(v);
-              spacePinManager.setLockOnScreenOffEnabled(v !== 'never');
-            },
-            'After screen off'
-          )}
-          role="button"
-          tabIndex={0}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0.9rem 1.1rem',
-            borderBottom: '1px solid var(--veil-border-subtle)',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>After screen off</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)' }}>
-            <span>{formatIntervalLabel(afterScreenOff)}</span>
-            <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
-          </div>
-        </div>
-
-        {/* After inactivity */}
-        <div
-          onClick={() => cycleInterval(
-            afterInactivity,
-            ['1m', '5m', '10m', '15m', 'never'],
-            setAfterInactivity,
-            (v) => spacePinManager.setAfterInactivity(v),
-            'After inactivity'
-          )}
-          role="button"
-          tabIndex={0}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '0.9rem 1.1rem',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: 'var(--veil-text-sm)', color: 'var(--veil-text-primary)' }}>After inactivity</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-sm)' }}>
-            <span>{formatIntervalLabel(afterInactivity)}</span>
-            <ChevronRightIcon size={16} color="var(--veil-text-muted)" />
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Lock Now Button (Red pill button with lock icon) */}

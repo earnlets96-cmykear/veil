@@ -19,6 +19,9 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { base64ToBytes } from '../../crypto/utils.ts';
 import { zeroize } from '../../crypto/memory.ts';
 import { spacePinManager } from '../../privacy/pinManager.ts';
+import { shouldLockForElapsed } from '../../privacy/appLockPolicy.ts';
+import { shouldLockOnResume, startInactivityLockTimer } from '../../privacy/appLockLifecycle.ts';
+import { consumePendingScreenOffElapsedMs } from '../../privacy/nativeAppLockBridge.ts';
 import { themeManager } from '../utils/themeManager.ts';
 import { NativeDeviceMediaBridge } from '../../media/NativeDeviceMediaBridge.ts';
 import { loadLocalSpaceSnapshot } from './loadLocalSpaceSnapshot.ts';
@@ -273,6 +276,7 @@ export interface AppContextType {
 
   // App Lock & Multi-Space PIN Gate
   isAppLocked: boolean;
+  appLockResumeCheckPending: boolean;
   setAppLocked: (locked: boolean) => void;
   unlockWithPin: (pin: string) => Promise<void>;
   setupSpacePin: (params: { spaceId: string; username: string; spaceName: string; password?: string; pin: string; accountId?: string }) => Promise<void>;
@@ -356,6 +360,8 @@ export interface AppContextType {
   notificationDispatcher: NotificationDispatcher;
   enableBackgroundPushNotifications: () => Promise<void>;
   disableBackgroundPushNotifications: () => Promise<void>;
+  backgroundPushStatus: 'off' | 'registering' | 'ready' | 'error';
+  backgroundPushError: string | null;
   contactRequestManager: ContactRequestManager;
   directoryClient: DirectoryClient;
   cloudClient: CloudClient;
@@ -396,7 +402,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [muteSettings, setMuteSettings] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<Record<string, { percent: number; loaded: number; total: number }>>({});
   const [isAppLocked, setIsAppLocked] = useState<boolean>(() => spacePinManager.isAppLockEnabled());
+  const [appLockResumeCheckPending, setAppLockResumeCheckPending] = useState(false);
+  const [backgroundPushStatus, setBackgroundPushStatus] = useState<'off' | 'registering' | 'ready' | 'error'>(() =>
+    typeof window !== 'undefined' && window.localStorage.getItem('veil:background-push-enabled') === 'true' ? 'registering' : 'off'
+  );
+  const [backgroundPushError, setBackgroundPushError] = useState<string | null>(null);
+  const [appLockSettingsRevision, setAppLockSettingsRevision] = useState(0);
   const lastBackgroundTimeRef = useRef<number | null>(null);
+  const resumeLockCheckRef = useRef<Promise<void> | null>(null);
   const isFilePickerActiveRef = useRef<boolean>(false);
   const filePickerGraceTimerRef = useRef<any>(null);
   const lastModalClosedAtRef = useRef<number>(0);
@@ -416,6 +429,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     filePickerGraceTimerRef.current = setTimeout(() => {
       isFilePickerActiveRef.current = false;
       filePickerGraceTimerRef.current = null;
+      if (typeof window !== 'undefined') window.dispatchEvent(new Event('veil:app-lock-user-activity'));
     }, 4000);
   }, []);
 
@@ -486,22 +500,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const enableBackgroundPushNotifications = useCallback(async () => {
-    if (!activeSession) throw new Error('Unlock a Space before enabling background alerts');
-    if (Capacitor.getPlatform() !== 'android') throw new Error('Background push is currently available in the Android app');
-    if (notificationDispatcher.getPrivacyMode() === 'SILENT_COUNTER') {
-      throw new Error('Switch from Silent Counter notification privacy before enabling background alerts');
-    }
+    setBackgroundPushStatus('registering');
+    setBackgroundPushError(null);
+    try {
+      if (!activeSession) throw new Error('Unlock a Space before enabling background alerts');
+      if (Capacitor.getPlatform() !== 'android') throw new Error('Background push is currently available in the Android app');
+      if (notificationDispatcher.getPrivacyMode() === 'SILENT_COUNTER') {
+        throw new Error('Switch from Silent Counter notification privacy before enabling background alerts');
+      }
 
-    const permission = await requestNativeNotificationPermission();
-    if (permission !== 'granted') throw new Error('Allow VEIL notifications in Android settings first');
-    const token = await registerForRemotePushToken();
-    await netManager.registerPushToken(activeSession, token);
-    await store.setAsync(activeSession, 'veil:notifications:push-token', token);
-    if (typeof window !== 'undefined') window.localStorage.setItem('veil:background-push-enabled', 'true');
+      const permission = await requestNativeNotificationPermission();
+      if (permission !== 'granted') throw new Error('Allow VEIL notifications in Android settings first');
+      const token = await registerForRemotePushToken();
+      await netManager.registerPushToken(activeSession, token);
+      await store.setAsync(activeSession, 'veil:notifications:push-token', token);
+      if (typeof window !== 'undefined') window.localStorage.setItem('veil:background-push-enabled', 'true');
+      setBackgroundPushStatus('ready');
+    } catch {
+      setBackgroundPushStatus('error');
+      setBackgroundPushError('Could not enable background alerts. Check notification permission and relay availability, then retry.');
+      throw new Error('Could not enable background alerts. Check notification permission and relay availability, then retry.');
+    }
   }, [activeSession]);
 
   const disableBackgroundPushNotifications = useCallback(async () => {
     if (typeof window !== 'undefined') window.localStorage.removeItem('veil:background-push-enabled');
+    setBackgroundPushStatus('off');
+    setBackgroundPushError(null);
     let failure: unknown;
     if (activeSession && Capacitor.getPlatform() === 'android') {
       try {
@@ -517,7 +542,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         failure ??= error;
       }
     }
-    if (failure) throw new Error('Could not fully unregister background alerts from the relay');
+    if (failure) {
+      setBackgroundPushStatus('error');
+      setBackgroundPushError('Background alerts are off here, but relay cleanup failed. Enable them again to retry registration.');
+      throw new Error('Background alerts are off here, but relay cleanup failed. Enable them again to retry registration.');
+    }
   }, [activeSession]);
 
   const ensureCloudSession = useCallback(
@@ -723,11 +752,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         typeof window !== 'undefined' &&
         window.localStorage.getItem('veil:background-push-enabled') === 'true'
       ) {
+        setBackgroundPushStatus('registering');
+        setBackgroundPushError(null);
         try {
           const token = await registerForRemotePushToken();
           await netManager.registerPushToken(session, token);
           await store.setAsync(session, 'veil:notifications:push-token', token);
+          setBackgroundPushStatus('ready');
         } catch {
+          setBackgroundPushStatus('error');
+          setBackgroundPushError('Could not register background alerts for this Space. You can retry from Notifications settings.');
           // Push setup is optional and must not block Space startup or message sync.
         }
       }
@@ -1720,8 +1754,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
       if (!spacePinManager.isAppLockEnabled()) return;
-      lastBackgroundTimeRef.current = Date.now();
-      if (spacePinManager.isLockOnBackgroundEnabled() || spacePinManager.getAutoLockInterval() === 'immediately') {
+      lastBackgroundTimeRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (shouldLockForElapsed(spacePinManager.getLeaveAppLockDelay(), 0)) {
         sessionController.lock();
         setIsAppLocked(true);
       }
@@ -1729,27 +1763,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const handleForeground = () => {
       if (isFilePickerActiveRef.current) {
+        lastBackgroundTimeRef.current = null;
+        void consumePendingScreenOffElapsedMs();
         markFilePickerInactive();
         return;
       }
       if (!spacePinManager.isAppLockEnabled()) return;
-      if (lastBackgroundTimeRef.current !== null) {
-        const elapsed = Date.now() - lastBackgroundTimeRef.current;
-        const intervalStr = spacePinManager.getAutoLockInterval();
-        let thresholdMs = 0;
-        if (intervalStr === 'immediately') thresholdMs = 0;
-        else if (intervalStr === '30s') thresholdMs = 30 * 1000;
-        else if (intervalStr === '1m') thresholdMs = 60 * 1000;
-        else if (intervalStr === '5m') thresholdMs = 5 * 60 * 1000;
-        else if (intervalStr === '10m') thresholdMs = 10 * 60 * 1000;
-        else if (intervalStr === 'never') thresholdMs = Infinity;
-
-        if (elapsed >= thresholdMs) {
-          sessionController.lock();
-          setIsAppLocked(true);
+      if (resumeLockCheckRef.current) return;
+      setAppLockResumeCheckPending(true);
+      resumeLockCheckRef.current = (async () => {
+        try {
+          const screenOffElapsed = await consumePendingScreenOffElapsedMs();
+          let backgroundElapsed: number | null = null;
+          if (lastBackgroundTimeRef.current !== null) {
+            const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            backgroundElapsed = Math.max(0, now - lastBackgroundTimeRef.current);
+            lastBackgroundTimeRef.current = null;
+          }
+          const mustLock = shouldLockOnResume({
+            appLockEnabled: spacePinManager.isAppLockEnabled(),
+            pickerActive: isFilePickerActiveRef.current,
+            leaveAppDelay: spacePinManager.getLeaveAppLockDelay(),
+            backgroundElapsedMs: backgroundElapsed,
+            screenOffDelay: spacePinManager.getScreenOffLockDelay(),
+            screenOffElapsedMs: screenOffElapsed,
+          });
+          if (mustLock && !isAppLocked) {
+            sessionController.lock();
+            setIsAppLocked(true);
+          }
+        } catch {
+          if (spacePinManager.isAppLockEnabled()) setIsAppLocked(true);
+        } finally {
+          resumeLockCheckRef.current = null;
+          setAppLockResumeCheckPending(false);
         }
-        lastBackgroundTimeRef.current = null;
-      }
+      })();
     };
 
     const onVisibilityChange = () => {
@@ -1790,7 +1839,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         capListenerHandle.remove();
       }
     };
-  }, [markFilePickerActive, markFilePickerInactive]);
+  }, [markFilePickerActive, markFilePickerInactive, appLockSettingsRevision, isAppLocked]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleAppLockSettingsChange = () => setAppLockSettingsRevision((revision) => revision + 1);
+    window.addEventListener('veil:app-lock-settings-changed', handleAppLockSettingsChange);
+    return () => window.removeEventListener('veil:app-lock-settings-changed', handleAppLockSettingsChange);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSession || isAppLocked || !spacePinManager.isAppLockEnabled()) return;
+    return startInactivityLockTimer(spacePinManager.getInactivityLockDelay(), {
+      onLock: () => {
+        sessionController.lock();
+        setIsAppLocked(true);
+      },
+      shouldDeferLock: () => isFilePickerActiveRef.current,
+    });
+  }, [activeSession?.spaceId, isAppLocked, appLockSettingsRevision]);
 
   const unlockSpace = useCallback(
     async (passphrase: string, username?: string) => {
@@ -5107,6 +5174,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       recoveryPasswordChangeRequired,
       uploadProgress,
       isAppLocked,
+      appLockResumeCheckPending,
       setAppLocked: setIsAppLocked,
       unlockWithPin,
       setupSpacePin,
@@ -5175,6 +5243,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       notificationDispatcher,
       enableBackgroundPushNotifications,
       disableBackgroundPushNotifications,
+      backgroundPushStatus,
+      backgroundPushError,
       contactRequestManager,
       directoryClient,
       cloudClient,
@@ -5206,6 +5276,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       recoveryPasswordChangeRequired,
       uploadProgress,
       isAppLocked,
+      appLockResumeCheckPending,
       setIsAppLocked,
       unlockWithPin,
       setupSpacePin,
@@ -5274,6 +5345,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       notificationDispatcher,
       enableBackgroundPushNotifications,
       disableBackgroundPushNotifications,
+      backgroundPushStatus,
+      backgroundPushError,
       contactRequestManager,
       directoryClient,
       cloudClient,

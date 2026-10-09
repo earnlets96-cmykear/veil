@@ -17,6 +17,7 @@ import { zeroize } from '../crypto/memory.ts';
 import { hmac } from '@noble/hashes/hmac.js';
 import { sha256 } from '@noble/hashes/sha256.js';
 import type { KdfParameters } from '../types/index.ts';
+import { AppLockDelay, isAppLockDelay, lockDelayMs, normalizeAppLockDelay } from './appLockPolicy.ts';
 
 export interface WrappedCredentialsPayload {
   password: string;
@@ -63,6 +64,9 @@ export interface DevicePinRegistry {
   afterBackground?: string;
   afterScreenOff?: string;
   afterInactivity?: string;
+  leaveAppDelay?: AppLockDelay;
+  inactivityLockDelay?: AppLockDelay;
+  screenOffLockDelay?: AppLockDelay;
   biometricsEnabled: boolean;
   failedAttempts: number;
   lockedUntilEpoch: number;
@@ -86,7 +90,7 @@ export class SpacePinManager {
       ...DEFAULT_KDF_PARAMS,
       ...customKdfParams,
     };
-    this.registry = this.loadRegistry();
+    this.registry = this.migrateAppLockDelays(this.loadRegistry());
   }
 
   public setKdfParams(customKdfParams: Partial<KdfParameters>): void {
@@ -140,13 +144,85 @@ export class SpacePinManager {
     return fresh;
   }
 
-  private saveRegistry(reg?: DevicePinRegistry): void {
+  private saveRegistry(reg?: DevicePinRegistry): boolean {
     const toSave = reg ?? this.registry;
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(toSave));
+        return true;
       } catch (_e) {}
+      return false;
     }
+    return false;
+  }
+
+  private migrateAppLockDelays(registry: DevicePinRegistry): DevicePinRegistry {
+    const legacyBackground = isAppLockDelay(registry.afterBackground) ? registry.afterBackground : undefined;
+    const legacyExit = isAppLockDelay(registry.afterExitingApp) ? registry.afterExitingApp : undefined;
+    let leaveAppDelay = registry.leaveAppDelay;
+    if (!isAppLockDelay(leaveAppDelay)) {
+      if (legacyBackground === 'never' || registry.lockOnBackground === false) {
+        leaveAppDelay = 'never';
+      } else if (legacyBackground && legacyExit) {
+        const delays = [legacyBackground, legacyExit].filter((delay) => delay !== 'never');
+        leaveAppDelay = delays.reduce<AppLockDelay>((shortest, delay) =>
+          lockDelayMs(delay) < lockDelayMs(shortest) ? delay : shortest, delays[0] ?? '5m');
+      } else if (legacyBackground || legacyExit) {
+        leaveAppDelay = legacyBackground ?? legacyExit ?? '5m';
+      } else {
+        leaveAppDelay = normalizeAppLockDelay(registry.autoLockInterval, '5m');
+      }
+    }
+    const migrated: DevicePinRegistry = {
+      ...registry,
+      leaveAppDelay,
+      inactivityLockDelay: normalizeAppLockDelay(registry.inactivityLockDelay ?? registry.afterInactivity, '10m'),
+      screenOffLockDelay: normalizeAppLockDelay(registry.screenOffLockDelay ?? registry.afterScreenOff, 'immediately'),
+    };
+    if (
+      migrated.leaveAppDelay !== registry.leaveAppDelay ||
+      migrated.inactivityLockDelay !== registry.inactivityLockDelay ||
+      migrated.screenOffLockDelay !== registry.screenOffLockDelay
+    ) {
+      this.saveRegistry(migrated);
+    }
+    return migrated;
+  }
+
+  private setAppLockDelay<K extends 'leaveAppDelay' | 'inactivityLockDelay' | 'screenOffLockDelay'>(
+    key: K,
+    value: AppLockDelay,
+  ): boolean {
+    if (!isAppLockDelay(value)) return false;
+    const previous = this.registry[key];
+    this.registry[key] = value;
+    if (this.saveRegistry()) return true;
+    this.registry[key] = previous;
+    return false;
+  }
+
+  public getLeaveAppLockDelay(): AppLockDelay {
+    return normalizeAppLockDelay(this.registry.leaveAppDelay, '5m');
+  }
+
+  public setLeaveAppLockDelay(value: AppLockDelay): boolean {
+    return this.setAppLockDelay('leaveAppDelay', value);
+  }
+
+  public getInactivityLockDelay(): AppLockDelay {
+    return normalizeAppLockDelay(this.registry.inactivityLockDelay, '10m');
+  }
+
+  public setInactivityLockDelay(value: AppLockDelay): boolean {
+    return this.setAppLockDelay('inactivityLockDelay', value);
+  }
+
+  public getScreenOffLockDelay(): AppLockDelay {
+    return normalizeAppLockDelay(this.registry.screenOffLockDelay, 'immediately');
+  }
+
+  public setScreenOffLockDelay(value: AppLockDelay): boolean {
+    return this.setAppLockDelay('screenOffLockDelay', value);
   }
 
   /**
@@ -200,9 +276,12 @@ export class SpacePinManager {
   /**
    * Enables or disables App Lock globally.
    */
-  public setAppLockEnabled(enabled: boolean): void {
+  public setAppLockEnabled(enabled: boolean): boolean {
+    const previous = this.registry.appLockEnabled;
     this.registry.appLockEnabled = enabled;
-    this.saveRegistry();
+    if (this.saveRegistry()) return true;
+    this.registry.appLockEnabled = previous;
+    return false;
   }
 
   /**

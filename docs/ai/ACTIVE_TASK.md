@@ -1,6 +1,17 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
-## Active Phase: PHASE 123 — DELIVERY ROUTE RECOVERY & CONTACT HANDSHAKE VERIFICATION
+## Active Phase: PHASE 124 — NOTIFICATION SETTINGS & APP LOCK RELIABILITY
+- **Status**: Implementation and focused verification are complete; Android compilation/device validation and security release gates remain open.
+- [x] Separate device notification permission, foreground privacy modes, and Android background-alert status with accessible operation feedback.
+- [x] Keep FCM payloads and Android background copy generic; align native channel naming and descriptions.
+- [x] Replace disconnected App Lock delay settings with validated persisted values shared by settings and runtime.
+- [x] Add leave-app, inactivity, picker, screen-off, persistence, and native source-contract regressions.
+- [x] Run focused App Lock/notification suites (68 tests), TypeScript, and Impeccable detector.
+- [ ] Compile Android after host Gradle loopback access is available; validate notifications, screen-off, process suspension/death, resume, and Space switching on device.
+- [ ] Obtain independent security audit and explicit dual sign-off before deploying this post-RC App Lock lifecycle change.
+- **Build limitation**: `gradlew.bat :app:assembleDebug` failed before compilation because Gradle could not establish its loopback connection. The initial full `npm test` attempt showed numerous pre-existing relay/recovery loopback failures and was stopped without a complete suite summary.
+
+## Previous Phase: PHASE 123 — DELIVERY ROUTE RECOVERY & CONTACT HANDSHAKE VERIFICATION
 - **Status**: Implementation and 11 focused/relay-backed tests pass. Two findings from initial independent review were fixed; follow-up review, Android/two-device validation, and formal audit/sign-off remain outstanding.
 - [x] Resolve expired recipient mailboxes by signed profile identity and retry the same persisted E2EE payload.
 - [x] Preserve the known peer signing key when refreshing mailbox/avatar data, and update active chat/list views.

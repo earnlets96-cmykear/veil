@@ -94,6 +94,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
     notificationDispatcher,
     enableBackgroundPushNotifications,
     disableBackgroundPushNotifications,
+    backgroundPushStatus,
+    backgroundPushError,
     exportMyInvitation,
     myProfile,
     privacySettings,
@@ -206,11 +208,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   const [cropModalImage, setCropModalImage] = useState<string | null>(null);
 
   // Settings State
-  const [autoLockVal, setAutoLockVal] = useState('5');
   const [notifLevel, setNotifLevel] = useState<NotificationPrivacyMode>(
     notificationDispatcher?.getPrivacyMode?.() || 'SENDER_ONLY'
   );
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionStatus>('default');
+  const [notificationActionPending, setNotificationActionPending] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [showPairingSas, setShowPairingSas] = useState(false);
   const [themeVal, setThemeVal] = useState(() => {
@@ -240,36 +242,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
   }, [activeCategory]);
 
   const handleEnableNotifications = async () => {
-    const status = await requestNativeNotificationPermission();
-    setNotificationPermission(status);
-    showToast({
-      type: status === 'granted' ? 'success' : 'error',
-      message: status === 'granted'
-        ? 'System notifications are enabled on this device.'
-        : status === 'unsupported'
-          ? 'System notifications are not supported on this device.'
-          : 'Notification permission was not granted. Check this app’s notification settings.',
-    });
+    setNotificationActionPending(true);
+    try {
+      const status = await requestNativeNotificationPermission();
+      setNotificationPermission(status);
+      showToast({
+        type: status === 'granted' ? 'success' : 'error',
+        message: status === 'granted'
+          ? 'System notifications are enabled on this device.'
+          : status === 'unsupported'
+            ? 'System notifications are not supported on this device.'
+            : 'Notification permission was not granted. Check this app’s notification settings.',
+      });
+    } finally {
+      setNotificationActionPending(false);
+    }
   };
 
   const handleEnableBackgroundPush = async () => {
+    setNotificationActionPending(true);
     try {
       await enableBackgroundPushNotifications();
       setBackgroundPushEnabled(true);
       showToast({ type: 'success', message: 'Background message alerts are enabled for this device.' });
     } catch (error) {
       showToast({ type: 'error', message: getErrorMessage(error, 'Could not enable background alerts. Check Firebase setup and relay availability.') });
+    } finally {
+      setNotificationActionPending(false);
     }
   };
 
   const handleDisableBackgroundPush = async () => {
+    setNotificationActionPending(true);
+    setBackgroundPushEnabled(false);
     try {
       await disableBackgroundPushNotifications();
-      setBackgroundPushEnabled(false);
       showToast({ type: 'success', message: 'Background message alerts are disabled.' });
     } catch (error) {
-      setBackgroundPushEnabled(false);
       showToast({ type: 'error', message: getErrorMessage(error, 'Background alerts may still be registered on the relay.') });
+    } finally {
+      setNotificationActionPending(false);
     }
   };
 
@@ -929,26 +941,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                 </form>
               </div>
 
-              <div className="veil-card">
-                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
-                  Inactivity Auto-Lock
-                </h3>
-                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
-                  Zeroizes decrypted session keys from RAM after the specified period of inactivity.
-                </p>
-                <select
-                  value={autoLockVal}
-                  onChange={(e) => setAutoLockVal(e.target.value)}
-                  className="veil-select"
-                >
-                  <option value="1">1 minute</option>
-                  <option value="5">5 minutes (Recommended)</option>
-                  <option value="15">15 minutes</option>
-                  <option value="60">1 hour</option>
-                  <option value="never">Never (Not Recommended)</option>
-                </select>
-              </div>
-
               <div className="veil-card" style={{ marginTop: '1rem' }}>
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
                   Emergency Panic Lock
@@ -966,57 +958,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
           {/* 5. NOTIFICATIONS SUB-PAGE */}
           {activeCategory === 'notifications' && (
             <div className="veil-settings-subpage">
-              <div className="veil-card" style={{ marginBottom: '1rem' }}>
+              <section aria-labelledby="notification-device-permission" className="veil-card" style={{ marginBottom: '1rem' }}>
                 <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
-                  System Notifications
+                  <span id="notification-device-permission">Device permission</span>
                 </h3>
                 <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
-                  Permission status: {notificationPermission}. Allow VEIL to show notifications on this device, then send a test.
+                  Device notifications are <strong>{notificationPermission}</strong>. Allow VEIL to post alerts in Android or browser settings. This permission controls what the device can display.
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <Button variant="primary" onClick={() => void handleEnableNotifications()}>
+                  <Button variant="primary" disabled={notificationActionPending || notificationPermission === 'granted'} onClick={() => void handleEnableNotifications()}>
                     Enable Notifications
                   </Button>
-                  {notificationPermission === 'denied' && (
+                  {notificationPermission === 'denied' && isNativeNotificationPlatform() && (
                     <Button variant="secondary" onClick={() => void openNativeNotificationSettings()}>
                       Open Notification Settings
                     </Button>
                   )}
                   <Button
                     variant="secondary"
-                    disabled={notificationPermission !== 'granted'}
+                    disabled={notificationPermission !== 'granted' || notificationActionPending}
                     onClick={handleTestNotification}
                   >
                     Send Test Notification
                   </Button>
                 </div>
-              </div>
-              {isNativeNotificationPlatform() && (
-                <div className="veil-card" style={{ marginBottom: '1rem' }}>
-                  <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
-                    Alerts while VEIL is closed
-                  </h3>
-                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
-                    Uses Google Firebase push delivery. Google receives this device’s push token and delivery timing; the relay sees which encrypted sends may alert. Alerts contain only generic text, never message content. Background alerts are routed to one Space at a time on this device.
-                  </p>
-                  <Button
-                    variant={backgroundPushEnabled ? 'secondary' : 'primary'}
-                    onClick={() => void (backgroundPushEnabled ? handleDisableBackgroundPush() : handleEnableBackgroundPush())}
-                  >
-                    {backgroundPushEnabled ? 'Disable Background Alerts' : 'Enable Background Alerts'}
-                  </Button>
-                </div>
-              )}
-              <div className="veil-card">
-                <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
-                  Notification Privacy Mode
-                </h3>
+              </section>
+              <section aria-labelledby="notification-foreground" className="veil-card" style={{ marginBottom: '1rem' }}>
+                <h3 id="notification-foreground" style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>While VEIL is open</h3>
+                <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                  These choices control local alerts while VEIL is running. Android background alerts stay generic regardless of this setting.
+                </p>
                 <div className="veil-radio-group">
                   {[
-                    { id: 'FULL_OBFUSCATED', label: 'Full Preview', desc: 'Shows sender name and message snippet' },
-                    { id: 'SENDER_ONLY', label: 'Sender Only', desc: 'Shows sender name without message content' },
-                    { id: 'HIDDEN', label: 'Minimal Alert', desc: 'Shows "New encrypted message received"' },
-                    { id: 'SILENT_COUNTER', label: 'Silent Counter', desc: 'Only updates unread badge counter' },
+                    { id: 'FULL_OBFUSCATED', label: 'Full Preview', desc: 'Shows sender or group and a short plaintext message preview.' },
+                    { id: 'SENDER_ONLY', label: 'Sender Only', desc: 'Shows the sender or group name without message text.' },
+                    { id: 'HIDDEN', label: 'Minimal Alert', desc: 'Shows a generic “New encrypted message received” alert.' },
+                    { id: 'SILENT_COUNTER', label: 'Silent Counter', desc: 'Suppresses system notifications and turns off Android background alerts.' },
                   ].map((mode) => (
                     <label key={mode.id} className="veil-radio-label">
                       <input
@@ -1027,14 +1004,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ initialCategory = 
                       />
                       <div>
                         <div style={{ fontWeight: 600 }}>{mode.label}</div>
-                        <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
-                          {mode.desc}
-                        </div>
+                        <div style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>{mode.desc}</div>
                       </div>
                     </label>
                   ))}
                 </div>
-              </div>
+              </section>
+              {isNativeNotificationPlatform() && (
+                <section aria-labelledby="notification-background-alerts" className="veil-card" style={{ marginBottom: '1rem' }}>
+                  <h3 style={{ fontSize: 'var(--veil-text-base)', marginBottom: '0.5rem' }}>
+                    <span id="notification-background-alerts">Background alerts (Android)</span>
+                  </h3>
+                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)', marginBottom: '0.75rem' }}>
+                    Uses Firebase Cloud Messaging. Google receives this device’s push token and delivery timing; the relay sees a one-bit hint for visible message sends. The alert stays generic. This device’s push token can be registered to one Space at a time and follows the active Space.
+                  </p>
+                  <p style={{ fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-secondary)', marginBottom: '0.75rem' }}>
+                    Active Space: <strong>{activeSession?.name || 'None'}</strong>
+                  </p>
+                  <p role="status" aria-live="polite" style={{ fontSize: 'var(--veil-text-xs)', color: backgroundPushStatus === 'error' ? 'var(--veil-danger)' : 'var(--veil-text-secondary)', marginBottom: '0.75rem' }}>
+                    {backgroundPushStatus === 'registering' ? 'Registering alerts for the active Space…'
+                      : backgroundPushStatus === 'ready' ? 'Background alerts are enabled for the active Space.'
+                        : backgroundPushStatus === 'error' ? (backgroundPushError || 'Background alert registration failed. Retry from here.')
+                          : 'Background alerts are off.'}
+                  </p>
+                  <Button
+                    variant={backgroundPushEnabled ? 'secondary' : 'primary'}
+                    disabled={notificationActionPending || backgroundPushStatus === 'registering'}
+                    onClick={() => void (backgroundPushEnabled && backgroundPushStatus !== 'error' ? handleDisableBackgroundPush() : handleEnableBackgroundPush())}
+                  >
+                    {notificationActionPending ? 'Updating Background Alerts…'
+                      : backgroundPushStatus === 'error' ? 'Retry Background Alerts'
+                        : backgroundPushEnabled ? 'Disable Background Alerts' : 'Enable Background Alerts'}
+                  </Button>
+                </section>
+              )}
             </div>
           )}
 

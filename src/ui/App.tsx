@@ -35,6 +35,7 @@ export const App: React.FC = () => {
     openModal,
     closeModal,
     isAppLocked,
+    appLockResumeCheckPending,
   } = useApp();
 
   const [showPasswordLogin, setShowPasswordLogin] = useState(false);
@@ -67,6 +68,19 @@ export const App: React.FC = () => {
   }, []);
 
   const hasRegisteredPins = spacePinManager.hasRegisteredPins() && spacePinManager.isAppLockEnabled();
+
+  if (appLockResumeCheckPending) {
+    return (
+      <main
+        role="status"
+        aria-live="polite"
+        aria-label="Checking App Lock"
+        style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: 'var(--veil-bg-primary)', color: 'var(--veil-text-primary)' }}
+      >
+        <p>Checking device lock status…</p>
+      </main>
+    );
+  }
 
   if (!activeSession || !activeSession.isActive() || isAppLocked) {
     if (hasRegisteredPins && !showPasswordLogin) {

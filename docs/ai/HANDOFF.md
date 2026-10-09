@@ -1,5 +1,13 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Phase 124 Update — Notification Settings & App Lock Reliability
+- Notification settings now separate device permission, local foreground privacy, and Android background-push state. Registration status is finite (`off`, `registering`, `ready`, `error`), errors are user-safe/retryable, and FCM notification content stays generic.
+- App Lock now reads validated persisted leave-app, inactivity, and screen-off delays. Legacy settings migrate to canonical values; failed writes roll back. Resume checks gate App UI while pending; foreground inactivity resets on pointer/key/touch events; Android screen-off marker stores only monotonic elapsed time and is consumed once.
+- Added ADR-129 and `docs/ai/THREAT_MODEL_APP_LOCK.md`. No crypto, identity, Space-isolation, or message wire format changes.
+- Verification: 12 focused suites / 68 tests pass; TypeScript passes; Impeccable detector reports no findings. Full baseline `npm test` was interrupted after existing blocked loopback relay/recovery failures. Gradle failed before compile because it could not establish a loopback connection.
+- Still required: Android native compile with loopback available, physical-device permission/push/screen-off/process-death/Space-switch validation, independent security audit, and explicit dual sign-off before deployment.
+- Preserve unrelated local changes: `android/app/src/main/assets/public/index.html`, release checksums/manifest, `android/app/google-services.json`, `.veil_persist_regression_temp/`, `.veil_test_sql_recovery_suite/`, and `business-card/`.
+
 ## Phase 123 Update — Mailbox Recovery & Contact Handshake Security Review
 - Independent review found that an accepted contact response could use a different signing key under the pending peer identity ID; a legacy request verifier also accepted signatures that did not bind the recipient or timestamp.
 - Contact responses now require the pending request's pinned signing key, a valid nested identity document whose identity ID matches the profile, and a valid response signature. Inbound contact requests now require a valid matching identity document and only accept the full recipient/time-bound signature form.

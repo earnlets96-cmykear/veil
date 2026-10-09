@@ -1393,6 +1393,20 @@ This document records all architectural decisions made across the VEIL project l
 - **Reason**: A stale route should not strand an otherwise valid encrypted message or contact acceptance. Identity continuity checks prevent a directory refresh from silently substituting a different signing identity.
 - **Security review**: See `docs/ai/THREAT_MODEL_DELIVERY_RECOVERY.md`. Initial review found a changed-key response could reuse the peer identity ID, and the legacy request-signature fallback did not bind recipient or time. Both paths are now rejected and covered by adversarial tests. The implementation remains unavailable for production deployment until follow-up independent review, formal security audit, and explicit dual sign-off are recorded.
 
+## ADR-129: Canonical App Lock Delays and Android Screen-Off Recovery
+
+- **Date**: 2026-10-09
+- **Status**: Accepted for implementation; independent security audit, explicit dual sign-off, and physical Android validation are required before deployment.
+- **Context**: App Lock settings persisted separate exit, background, inactivity, and screen-off delays, while runtime behavior read a legacy shared interval. Screen-off settings had no native event integration, and a duplicate Security-page inactivity selector was disconnected from persistence.
+- **Decision**:
+  1. Define one validated delay model for leave-app, foreground inactivity, and screen-off events. Migrate existing optional registry values deterministically and retain version-1 registry compatibility.
+  2. Make settings and runtime consume the same persisted values. Failed writes return failure and preserve the last saved selection.
+  3. Evaluate leave-app elapsed time on resume, reset a single foreground inactivity timer on user activity, and preserve existing picker lifecycle exceptions.
+  4. On Android, a lifecycle-scoped native receiver records only monotonic elapsed time for a pending screen-off event. TypeScript consumes the marker before making a resumed session visible. Markers from a prior boot are discarded; the startup lock gate remains authoritative after restart.
+  5. Persist no PIN, credential, key, identity, message, or activity event content in the new screen-off marker. Do not change message or cryptographic wire formats.
+- **Reason**: The configured controls must be the behavior enforced by the local lock lifecycle, including transitions that suspend the WebView.
+- **Security review**: See `docs/ai/THREAT_MODEL_APP_LOCK.md`. Android can suspend or kill the process before receiving JavaScript lifecycle callbacks, and a force-stopped application cannot run a receiver. A fresh process therefore always relies on the existing lock-before-render startup gate. The native marker is only a same-boot aid when the receiver was registered at screen-off time.
+- **Release gate**: Add timing boundary, persistence failure, picker, startup-gate, screen-off, and existing PIN/Space isolation regressions. Do not deploy until an independent security audit, explicit dual sign-off, and physical Android validation are complete.
 
 
 

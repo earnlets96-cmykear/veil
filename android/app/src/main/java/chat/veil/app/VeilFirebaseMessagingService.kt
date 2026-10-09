@@ -70,7 +70,7 @@ class VeilFirebaseMessagingService : FirebaseMessagingService() {
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "Private alerts for new encrypted VEIL messages"
+            description = CHANNEL_DESCRIPTION
             lockscreenVisibility = NotificationCompat.VISIBILITY_PRIVATE
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -78,7 +78,8 @@ class VeilFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
         const val CHANNEL_ID = "veil_messages"
-        private const val CHANNEL_NAME = "Messages"
+        private const val CHANNEL_NAME = "VEIL messages"
+        private const val CHANNEL_DESCRIPTION = "Alerts for incoming messages. Lock screen content stays private."
         private const val PREFERENCES = "veil_push"
         private const val TOKEN_KEY = "fcm_token"
     }
