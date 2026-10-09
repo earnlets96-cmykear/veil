@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useComposer, resolveReplyReference } from '../app/AppState.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { IconButton, ReplyPreview, Spinner, useToast, EmojiDrawer } from './ui/index.ts';
@@ -110,8 +111,8 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   }, [editingMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Send on Enter; leave Shift+Enter to insert a newline.
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Send on Enter in browsers; native mobile keyboards keep Enter for newlines.
+    if (e.key === 'Enter' && !e.shiftKey && !Capacitor.isNativePlatform()) {
       e.preventDefault();
       handleSend();
     }
