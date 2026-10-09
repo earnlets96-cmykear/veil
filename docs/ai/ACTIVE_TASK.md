@@ -7,7 +7,7 @@
 - [x] Expose accent, message shape, and text size controls with an interactive preview and reset action.
 - [x] Preserve local preference storage and add coverage for preset selection, wallpaper persistence, and reset notifications.
 - [x] Run focused theme tests (10 tests), TypeScript, and the Impeccable detector; no new detector findings in edited selectors.
-- [ ] Review the appearance studio on desktop and mobile in a browser/device capture.
+- [x] Visually review the studio at desktop and 390px phone widths; verify preset switching and reset in a local browser preview.
 - **Scope**: Presentation/preferences only. No cryptography, identity, Space boundaries, or message protocol changes.
 - **Full-suite baseline**: `npm test` reports 336 files passed / 108 failed (1,410 tests passed / 215 failed / 6 skipped); failures are primarily local relay/recovery `EACCES`/`fetch failed`, plus a small number of unrelated existing failures.
 

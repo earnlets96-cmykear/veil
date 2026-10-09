@@ -1,9 +1,9 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
 ## Current Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
-- **Status**: Implemented; focused theme tests and TypeScript pass. Browser/device visual review remains outstanding.
+- **Status**: Implemented; focused theme tests, TypeScript, and desktop/phone browser review pass.
 - **Changes**: The appearance settings now group curated palettes into Minimal, Nature, and Expressive collections; add Porcelain; expose independent accent, chat background, bubble shape, and font size controls; show a live sample conversation; and provide reset-to-defaults. Chat backgrounds include quiet, solid, fine dots, waves, orbit, and organic treatments, rendered locally in CSS and adapted for dark, light, and Porcelain surfaces.
-- **Verification**: `tests/theme-accent-system.test.ts` passes (10 tests); `npm run typecheck` passes. Impeccable detector reports only pre-existing findings outside the new appearance styles. Full `npm test` baseline: 336 files passed, 108 failed; failures are primarily blocked relay/recovery loopback networking (`EACCES` / `fetch failed`), with other unrelated failures also present.
+- **Verification**: `tests/theme-accent-system.test.ts` passes (10 tests); `npm run typecheck` passes. Desktop and 390px phone previews verified preset selection, background controls, and reset behavior. Impeccable detector reports only pre-existing findings outside the new appearance styles. Full `npm test` baseline: 336 files passed, 108 failed; failures are primarily blocked relay/recovery loopback networking (`EACCES` / `fetch failed`), with other unrelated failures also present.
 - **Scope**: Appearance UI and local display preferences only. No cryptography, identity, Space isolation, transport, or message protocol changes.
 
 ## Previous Phase: PHASE 124 — NOTIFICATION SETTINGS & APP LOCK RELIABILITY

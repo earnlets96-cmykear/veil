@@ -11,6 +11,7 @@ All notable changes, architectural decisions, and security milestones across the
 
 ### Verification
 - `tests/theme-accent-system.test.ts`: 10 tests pass; `npm run typecheck` passes.
+- Desktop and 390px phone browser previews confirm the theme change, background choices, and reset behavior.
 - Full baseline `npm test`: 336 files pass / 108 fail (1,410 tests pass / 215 fail / 6 skipped), primarily due blocked relay/recovery loopback connections, with some unrelated existing failures.
 - No cryptography, identity, Space isolation, transport, or message protocol changes.
 
