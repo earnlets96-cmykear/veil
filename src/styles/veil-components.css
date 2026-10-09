@@ -3215,6 +3215,17 @@
   max-width: min(82vw, 340px);
 }
 
+.veil-social-video-preview.is-playing {
+  display: block;
+  width: min(100%, 320px);
+  gap: 0;
+  margin-top: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .veil-social-video-preview-copy,
 .veil-social-video-load {
   display: grid;
@@ -3409,36 +3420,49 @@
   z-index: calc(var(--veil-z-modal, 1000) + 2);
   display: grid;
   place-items: center;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
   background: rgba(0, 0, 0, 0.94);
 }
 
 .veil-social-video-fullscreen-dialog {
   width: min(100%, 30rem);
-  max-height: 100%;
+  height: 100%;
+  max-height: 100dvh;
   display: grid;
   place-items: center;
   outline: none;
 }
 
 .veil-social-video-player.is-fullscreen {
-  width: min(100%, 26rem);
+  width: min(100%, 30rem);
+  height: 100%;
   max-height: 100%;
   border-color: transparent;
   background: transparent;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: visible;
 }
 
 .veil-social-video-player.is-fullscreen iframe {
-  width: min(100%, 26rem);
-  height: min(78dvh, 46rem);
+  width: min(100%, 30rem);
+  height: min(80dvh, calc(100dvh - 88px));
   min-height: 0;
-  max-height: 78dvh;
+  max-height: 80dvh;
   aspect-ratio: 9 / 16;
+  justify-self: center;
+  align-self: center;
 }
 
 .veil-social-video-player.is-fullscreen.is-instagram iframe {
   aspect-ratio: auto;
-  height: min(78dvh, 46rem);
+  height: min(78dvh, calc(100dvh - 88px));
 }
 
 .veil-social-video-player-actions button {

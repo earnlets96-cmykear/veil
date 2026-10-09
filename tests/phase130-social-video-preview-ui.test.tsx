@@ -46,6 +46,15 @@ describe('Phase 130 social video preview UX', () => {
     expect(componentSource).toContain('aria-modal="true"');
   });
 
+  it('replaces the preview card with one player and portals that player for full screen', () => {
+    expect(componentSource).toContain("player && !isFullscreen ? player");
+    expect(componentSource).toContain("className={`veil-social-video-preview${player && !isFullscreen ? ' is-playing' : ''}`}");
+    expect(componentSource).toContain('createPortal(');
+    expect(componentSource).toContain('document.body');
+    expect(componentSource.match(/<SocialVideoEmbed\b/g)).toHaveLength(1);
+    expect(componentSource).not.toContain('{!isFullscreen && player}');
+  });
+
   it('checks TikTok errors against the provider origin and active iframe before showing recovery', () => {
     expect(componentSource).toContain("event.origin !== 'https://www.tiktok.com'");
     expect(componentSource).toContain('event.source !== iframeRef.current?.contentWindow');

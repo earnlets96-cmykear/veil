@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SocialVideoLink } from '../../../media/socialVideoLinks.ts';
 import { loadSocialVideoPreview, SocialVideoPreview } from '../../../media/socialVideoPreviewService.ts';
 import { MaximizeIcon } from '../icons/index.ts';
@@ -194,8 +195,9 @@ export const SocialVideoPreviewCard: React.FC<SocialVideoPreviewCardProps> = ({ 
       link={link}
       src={preview.embedUrl}
       title={preview.title}
-      onClose={() => setIsPlaying(false)}
+      onClose={() => { setIsPlaying(false); setIsFullscreen(false); }}
       onExpand={() => setIsFullscreen(true)}
+      isFullscreen={isFullscreen}
     />
   ) : null;
 
@@ -203,48 +205,52 @@ export const SocialVideoPreviewCard: React.FC<SocialVideoPreviewCardProps> = ({ 
     <>
       <section
         ref={previewRef}
-        className="veil-social-video-preview"
+        className={`veil-social-video-preview${player && !isFullscreen ? ' is-playing' : ''}`}
         aria-label={`${providerName} video preview`}
         aria-busy={isLoading}
+        hidden={isFullscreen}
       >
-        {preview?.thumbnailUrl ? (
-          <div className="veil-social-video-poster">
-            <img
-              src={preview.thumbnailUrl}
-              alt={`${providerName} video${preview.author ? ` by ${preview.author}` : ''}`}
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={() => setPreview((current) => current ? { ...current, thumbnailUrl: null } : current)}
-            />
-            <button type="button" onClick={() => setIsPlaying(true)} aria-label={`Play ${providerName} video in VEIL`}>
-              Play in VEIL
-            </button>
-          </div>
-        ) : isLoading ? (
-          <div className="veil-social-video-poster veil-social-video-poster-loading" role="status" aria-label={`Loading ${providerName} preview`}>
-            <span className="veil-social-video-preview-spinner" aria-hidden="true" />
-            <span className="veil-social-video-preview-loading-label">Loading preview from {providerName}</span>
-          </div>
-        ) : (
-          <div className="veil-social-video-poster veil-social-video-poster-fallback">
-            {preview?.embedUrl && (
-              <button type="button" onClick={() => setIsPlaying(true)} aria-label={`Play ${providerName} video in VEIL`}>
-                Play in VEIL
-              </button>
+        {player && !isFullscreen ? player : (
+          <>
+            {preview?.thumbnailUrl ? (
+              <div className="veil-social-video-poster">
+                <img
+                  src={preview.thumbnailUrl}
+                  alt={`${providerName} video${preview.author ? ` by ${preview.author}` : ''}`}
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  onError={() => setPreview((current) => current ? { ...current, thumbnailUrl: null } : current)}
+                />
+                <button type="button" onClick={() => setIsPlaying(true)} aria-label={`Play ${providerName} video in VEIL`}>
+                  Play in VEIL
+                </button>
+              </div>
+            ) : isLoading ? (
+              <div className="veil-social-video-poster veil-social-video-poster-loading" role="status" aria-label={`Loading ${providerName} preview`}>
+                <span className="veil-social-video-preview-spinner" aria-hidden="true" />
+                <span className="veil-social-video-preview-loading-label">Loading preview from {providerName}</span>
+              </div>
+            ) : (
+              <div className="veil-social-video-poster veil-social-video-poster-fallback">
+                {preview?.embedUrl && (
+                  <button type="button" onClick={() => setIsPlaying(true)} aria-label={`Play ${providerName} video in VEIL`}>
+                    Play in VEIL
+                  </button>
+                )}
+              </div>
             )}
-          </div>
+            <div className="veil-social-video-preview-copy">
+              <strong>{preview?.title || `${providerName} video`}</strong>
+              {preview?.author && <span>{preview.author}</span>}
+              <span className="veil-social-video-preview-source">Preview from {providerName}</span>
+              <a href={link.canonicalUrl} target="_blank" rel="noopener noreferrer">Open original</a>
+              {failed && !isLoading && <button type="button" onClick={() => { void loadPreview(() => mountedRef.current); }}>Retry preview</button>}
+            </div>
+          </>
         )}
-        <div className="veil-social-video-preview-copy">
-          <strong>{preview?.title || `${providerName} video`}</strong>
-          {preview?.author && <span>{preview.author}</span>}
-          <span className="veil-social-video-preview-source">Preview from {providerName}</span>
-          <a href={link.canonicalUrl} target="_blank" rel="noopener noreferrer">Open original</a>
-          {failed && !isLoading && <button type="button" onClick={() => { void loadPreview(() => mountedRef.current); }}>Retry preview</button>}
-        </div>
       </section>
-      {!isFullscreen && player}
-      {isFullscreen && player && preview?.embedUrl && (
+      {isFullscreen && player && typeof document !== 'undefined' && createPortal(
         <div
           className="veil-social-video-fullscreen-overlay"
           role="presentation"
@@ -256,16 +262,10 @@ export const SocialVideoPreviewCard: React.FC<SocialVideoPreviewCardProps> = ({ 
             aria-modal="true"
             aria-label={`${providerName} video full screen`}
           >
-            <SocialVideoEmbed
-              link={link}
-              src={preview.embedUrl}
-              title={preview.title}
-              isFullscreen
-              onClose={() => { setIsFullscreen(false); setIsPlaying(false); }}
-              onExpand={() => setIsFullscreen(false)}
-            />
+            {player}
           </section>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
