@@ -55,8 +55,8 @@ const GroupedMediaGridComponent: React.FC<GroupedMediaGridProps> = ({
         gridTemplateColumns: '1fr 1fr',
         gap: '3px',
         width: '100%',
-        maxWidth: '380px',
-        height: '180px',
+        maxWidth: '320px',
+        height: '150px',
         borderRadius: 'var(--veil-radius-md, 12px)',
         overflow: 'hidden',
       };
@@ -68,8 +68,8 @@ const GroupedMediaGridComponent: React.FC<GroupedMediaGridProps> = ({
         gridTemplateRows: '1fr 1fr',
         gap: '3px',
         width: '100%',
-        maxWidth: '380px',
-        height: '240px',
+        maxWidth: '320px',
+        height: '200px',
         borderRadius: 'var(--veil-radius-md, 12px)',
         overflow: 'hidden',
       };
@@ -80,8 +80,8 @@ const GroupedMediaGridComponent: React.FC<GroupedMediaGridProps> = ({
       gridTemplateRows: '1fr 1fr',
       gap: '3px',
       width: '100%',
-      maxWidth: '380px',
-      height: '240px',
+      maxWidth: '320px',
+      height: '200px',
       borderRadius: 'var(--veil-radius-md, 12px)',
       overflow: 'hidden',
     };

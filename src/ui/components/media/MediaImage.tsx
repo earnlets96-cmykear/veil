@@ -387,7 +387,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
             <img
               src={videoThumbnailUrl}
               alt={isSticker ? '' : (alt || attachment.name)}
-              className={`veil-media-thumbnail-img ${isShowingThumbnail ? 'veil-media-thumbnail-blurred' : ''}`.trim()}
+              className={`veil-media-thumbnail-img veil-media-thumbnail-video-poster ${isShowingThumbnail ? 'veil-media-thumbnail-blurred' : ''}`.trim()}
               loading="lazy"
               onError={() => setVideoThumbnailUrl(null)}
             />
