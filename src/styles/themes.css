@@ -15,6 +15,7 @@
 [data-theme="midnight"],
 [data-theme="obsidian"],
 [data-theme="light"],
+[data-theme="porcelain"],
 [data-theme="nord"] {
   --veil-surface-app: var(--veil-bg-base);
   --veil-surface-panel: var(--veil-bg-surface);
@@ -186,6 +187,33 @@
   --veil-gradient-dark: linear-gradient(180deg, #0a0a0c 0%, #000000 100%);
 
   --veil-scheme: dark;
+}
+
+/* Porcelain — warm light surfaces with ink-like text. */
+[data-theme="porcelain"] {
+  --veil-bg-base: #f4efe7;
+  --veil-bg-surface: #fffaf2;
+  --veil-bg-surface-elevated: #eee5d8;
+  --veil-bg-surface-active: #e4d8c7;
+  --veil-bg-surface-hover: rgba(52, 39, 27, 0.045);
+  --veil-bg-surface-subtle: rgba(255, 250, 242, 0.88);
+  --veil-bg-glass: rgba(255, 250, 242, 0.96);
+  --veil-overlay-backdrop: rgba(35, 27, 19, 0.42);
+  --veil-border: rgba(58, 43, 29, 0.12);
+  --veil-border-subtle: rgba(58, 43, 29, 0.06);
+  --veil-border-strong: rgba(58, 43, 29, 0.2);
+  --veil-border-focus: var(--veil-accent-primary, #a65f32);
+  --veil-divider: rgba(58, 43, 29, 0.08);
+  --veil-text-primary: #29231e;
+  --veil-text-secondary: #5d5349;
+  --veil-text-muted: #82766a;
+  --veil-text-disabled: #b6aa9e;
+  --veil-text-inverse: #fffaf2;
+  --veil-bubble-incoming: #fffaf2;
+  --veil-bubble-incoming-border: rgba(58, 43, 29, 0.09);
+  --veil-bubble-incoming-text: #29231e;
+  --veil-input-bg: #ebe3d8;
+  --veil-scheme: light;
 }
 
 /* =========================================================================
@@ -485,13 +513,59 @@
   border-top-left-radius: 3px;
 }
 
-/* Subtle Wallpaper Presets */
-[data-wallpaper="solid"] .veil-chat-messages-container {
-  background: var(--veil-bg-base);
+/* Quiet chat backgrounds. Patterns are CSS-only and intentionally low contrast. */
+:root {
+  --veil-wallpaper-ink: rgba(255, 255, 255, 0.065);
+  --veil-wallpaper-accent: color-mix(in srgb, var(--veil-accent-primary) 10%, transparent);
 }
 
-[data-wallpaper="subtle-patterns"] .veil-chat-messages-container {
+[data-theme="light"] {
+  --veil-wallpaper-ink: rgba(20, 25, 35, 0.065);
+}
+
+[data-theme="porcelain"] {
+  --veil-wallpaper-ink: rgba(58, 43, 29, 0.065);
+  --veil-wallpaper-accent: color-mix(in srgb, var(--veil-accent-primary) 8%, transparent);
+}
+
+[data-wallpaper="default"] .veil-timeline,
+[data-wallpaper="subtle-patterns"] .veil-timeline,
+[data-wallpaper="waves"] .veil-timeline,
+[data-wallpaper="orbit"] .veil-timeline,
+[data-wallpaper="organic"] .veil-timeline {
   background-color: var(--veil-bg-base);
-  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
-  background-size: 20px 20px;
+}
+
+[data-wallpaper="solid"] .veil-timeline {
+  background-color: var(--veil-bg-surface);
+}
+
+[data-wallpaper="subtle-patterns"] .veil-timeline,
+.veil-wallpaper-pattern--subtle-patterns {
+  background-image: radial-gradient(var(--veil-wallpaper-ink) 1px, transparent 1.4px);
+  background-size: 18px 18px;
+}
+
+[data-wallpaper="waves"] .veil-timeline,
+.veil-wallpaper-pattern--waves {
+  background-image:
+    repeating-radial-gradient(ellipse 95% 100% at 0% 100%, transparent 0 13px, var(--veil-wallpaper-ink) 14px 15px, transparent 16px 31px),
+    repeating-radial-gradient(ellipse 95% 100% at 100% 0%, transparent 0 17px, var(--veil-wallpaper-ink) 18px 19px, transparent 20px 38px);
+  background-size: 100% 100%;
+}
+
+[data-wallpaper="orbit"] .veil-timeline,
+.veil-wallpaper-pattern--orbit {
+  background-image:
+    radial-gradient(circle at 16% 24%, var(--veil-wallpaper-ink) 1px, transparent 1.6px),
+    radial-gradient(circle at 78% 72%, var(--veil-wallpaper-ink) 1px, transparent 1.6px),
+    radial-gradient(ellipse at 82% 18%, transparent 0 26px, var(--veil-wallpaper-ink) 27px 28px, transparent 29px);
+  background-size: 74px 74px, 96px 96px, 180px 180px;
+}
+
+[data-wallpaper="organic"] .veil-timeline,
+.veil-wallpaper-pattern--organic {
+  background-image:
+    radial-gradient(ellipse at 12% 18%, var(--veil-wallpaper-accent) 0, transparent 46%),
+    radial-gradient(ellipse at 88% 78%, var(--veil-wallpaper-accent) 0, transparent 42%);
 }

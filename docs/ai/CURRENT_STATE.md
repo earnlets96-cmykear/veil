@@ -1,5 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Current Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
+- **Status**: Implemented; focused theme tests and TypeScript pass. Browser/device visual review remains outstanding.
+- **Changes**: The appearance settings now group curated palettes into Minimal, Nature, and Expressive collections; add Porcelain; expose independent accent, chat background, bubble shape, and font size controls; show a live sample conversation; and provide reset-to-defaults. Chat backgrounds include quiet, solid, fine dots, waves, orbit, and organic treatments, rendered locally in CSS and adapted for dark, light, and Porcelain surfaces.
+- **Verification**: `tests/theme-accent-system.test.ts` passes (10 tests); `npm run typecheck` passes. Impeccable detector reports only pre-existing findings outside the new appearance styles. Full `npm test` baseline: 336 files passed, 108 failed; failures are primarily blocked relay/recovery loopback networking (`EACCES` / `fetch failed`), with other unrelated failures also present.
+- **Scope**: Appearance UI and local display preferences only. No cryptography, identity, Space isolation, transport, or message protocol changes.
+
+## Previous Phase: PHASE 124 — NOTIFICATION SETTINGS & APP LOCK RELIABILITY
+
 ## Current Phase: PHASE 124 — NOTIFICATION SETTINGS & APP LOCK RELIABILITY
 - **Status**: Settings and runtime changes are implemented; focused verification passes. Android compilation/device checks and security governance gates remain outstanding.
 - **Changes**: Notifications settings now separate device permission, local alerts while VEIL is open, and Android background FCM status. Push registration exposes only `off/registering/ready/error`, keeps the alert generic, and supports retry. App Lock now uses persisted canonical leave-app, inactivity, and screen-off delays; legacy values migrate safely; failed writes preserve the selected value. Background resume and foreground inactivity use those delays, and Android records a one-shot monotonic screen-off marker. The Security page's disconnected duplicate selector was removed.

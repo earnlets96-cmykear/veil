@@ -1,5 +1,18 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Active Phase: PHASE 125 — PREMIUM APPEARANCE CUSTOMIZATION
+- **Status**: Appearance studio implemented; focused tests and typecheck pass. Full-suite baseline is restricted by local relay/recovery networking.
+- [x] Group curated palettes into Minimal, Nature, and Expressive collections, including the new warm Porcelain theme.
+- [x] Add quiet, dotted, wave, orbit, and organic chat backgrounds with CSS-only theme-aware treatments.
+- [x] Expose accent, message shape, and text size controls with an interactive preview and reset action.
+- [x] Preserve local preference storage and add coverage for preset selection, wallpaper persistence, and reset notifications.
+- [x] Run focused theme tests (10 tests), TypeScript, and the Impeccable detector; no new detector findings in edited selectors.
+- [ ] Review the appearance studio on desktop and mobile in a browser/device capture.
+- **Scope**: Presentation/preferences only. No cryptography, identity, Space boundaries, or message protocol changes.
+- **Full-suite baseline**: `npm test` reports 336 files passed / 108 failed (1,410 tests passed / 215 failed / 6 skipped); failures are primarily local relay/recovery `EACCES`/`fetch failed`, plus a small number of unrelated existing failures.
+
+## Previous Phase: PHASE 124 — NOTIFICATION SETTINGS & APP LOCK RELIABILITY
+
 ## Active Phase: PHASE 124 — NOTIFICATION SETTINGS & APP LOCK RELIABILITY
 - **Status**: Implementation and focused verification are complete; Android compilation/device validation and security release gates remain open.
 - [x] Separate device notification permission, foreground privacy modes, and Android background-alert status with accessible operation feedback.

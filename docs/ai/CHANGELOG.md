@@ -2,6 +2,18 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+## [Phase 125] - 2026-10-09
+
+### Improved
+- Expanded Appearance settings into a customization studio with Minimal, Nature, and Expressive theme collections, including a warm Porcelain palette.
+- Added theme-aware chat backgrounds: Quiet, Solid, Fine Dots, Soft Waves, Orbit, and Organic. Patterns are local CSS and keep message content readable.
+- Exposed accent color, message shape, and text size with a live preview and a reset-to-defaults action.
+
+### Verification
+- `tests/theme-accent-system.test.ts`: 10 tests pass; `npm run typecheck` passes.
+- Full baseline `npm test`: 336 files pass / 108 fail (1,410 tests pass / 215 fail / 6 skipped), primarily due blocked relay/recovery loopback connections, with some unrelated existing failures.
+- No cryptography, identity, Space isolation, transport, or message protocol changes.
+
 ## [Phase 124] - 2026-10-09
 
 ### Improved

@@ -10,8 +10,8 @@ import { ToastProvider } from './ui/components/ui/index.ts';
 import { App } from './ui/App.tsx';
 import { Capacitor } from '@capacitor/core';
 import { applyPlatformViewportInsets } from './ui/mobileViewportInsets.ts';
-import './styles/themes.css';
 import './styles/veil-design-system.css';
+import './styles/themes.css';
 import './styles/veil-components.css';
 
 applyPlatformViewportInsets(Capacitor.getPlatform());

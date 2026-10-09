@@ -1,373 +1,205 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  themeManager,
   ACCENT_PALETTE,
+  BUBBLE_STYLES,
+  FONT_SIZES,
   THEME_OPTIONS,
-  AccentColor,
-  ThemeMode,
+  WALLPAPERS,
+  themeManager,
+  type AppearancePreferences,
+  type BubbleStyle,
+  type FontSizeSetting,
 } from '../utils/themeManager.ts';
-import {
-  ArrowLeftIcon,
-  CheckIcon,
-  MoonIcon,
-  DropletIcon,
-  FlameIcon,
-  HeartIcon,
-  ShieldIcon,
-  LayersIcon,
-  ClockIcon,
-  PhoneIcon,
-  CodeIcon,
-  DatabaseSlashIcon,
-} from './icons/index.ts';
+import { ArrowLeftIcon, CheckIcon } from './icons/index.ts';
 
 interface AppearanceSettingsViewProps {
   onBack?: () => void;
 }
 
+const THEME_COLLECTIONS = ['Minimal', 'Nature', 'Expressive'] as const;
+
 export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ onBack }) => {
-  const [currentTheme, setCurrentTheme] = useState<ThemeMode>(() => themeManager.getTheme());
-  const [currentAccent, setCurrentAccent] = useState<AccentColor>(() => themeManager.getAccent());
-  const [notice, setNotice] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<AppearancePreferences>(() => themeManager.getPreferences());
+  const [notice, setNotice] = useState('');
+  const selectedTheme = preferences.theme === 'dark'
+    ? 'midnight'
+    : preferences.theme === 'dim'
+      ? 'slate'
+      : preferences.theme;
 
-  useEffect(() => {
-    const unsub = themeManager.subscribe((settings) => {
-      setCurrentTheme(settings.theme);
-      setCurrentAccent(settings.accent);
-    });
-    return unsub;
-  }, []);
+  useEffect(() => themeManager.subscribe(setPreferences), []);
 
-  const showNotice = (msg: string) => {
-    setNotice(msg);
-    setTimeout(() => setNotice(null), 2500);
+  const handleReset = () => {
+    themeManager.resetToDefaults();
+    setNotice('Default appearance restored.');
   };
-
-  const handleSelectTheme = (theme: ThemeMode) => {
-    themeManager.setTheme(theme);
-    setCurrentTheme(theme);
-    showNotice(`Theme updated to ${theme}`);
-  };
-
-  const handleSelectAccent = (accent: AccentColor) => {
-    themeManager.setAccent(accent);
-    setCurrentAccent(accent);
-    showNotice(`Accent color updated to ${accent}`);
-  };
-
-  const renderThemeIcon = (id: ThemeMode) => {
-    switch (id) {
-      case 'midnight':
-      case 'dark':
-      case 'amoled':
-        return <MoonIcon size={20} color="var(--veil-accent-primary)" />;
-      case 'ocean':
-        return <DropletIcon size={20} color="#3b82f6" />;
-      case 'forest':
-        return <FlameIcon size={20} color="#22c55e" />;
-      case 'amber':
-        return <FlameIcon size={20} color="#f59e0b" />;
-      case 'rose':
-        return <HeartIcon size={20} color="#f43f5e" />;
-      case 'slate':
-      case 'light':
-      default:
-        return <CheckIcon size={20} color="#94a3b8" />;
-    }
-  };
-
-  const showcaseThemes = THEME_OPTIONS.filter((t) =>
-    ['midnight', 'ocean', 'forest', 'amber', 'rose', 'slate'].includes(t.id)
-  );
 
   return (
-    <div className="veil-customize-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div className="veil-appearance-studio">
       {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--veil-text-secondary)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            fontSize: 'var(--veil-text-sm)',
-            padding: 0,
-            width: 'fit-content',
-          }}
-        >
+        <button className="veil-appearance-back" type="button" onClick={onBack}>
           <ArrowLeftIcon size={16} />
-          <span>Back</span>
+          <span>Back to settings</span>
         </button>
       )}
 
-      {/* Title */}
-      <div>
-        <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--veil-text-primary)' }}>
-          Customize Your VEIL
-        </h2>
-        <p style={{ margin: '0.25rem 0 0 0', fontSize: 'var(--veil-text-xs)', color: 'var(--veil-text-muted)' }}>
-          Make it yours.
-        </p>
-      </div>
-
-      {notice && (
-        <div
-          style={{
-            padding: '0.6rem 0.85rem',
-            borderRadius: '10px',
-            backgroundColor: 'var(--veil-accent-primary-subtle)',
-            border: '1px solid var(--veil-accent-primary-alpha)',
-            color: 'var(--veil-accent-primary)',
-            fontSize: 'var(--veil-text-xs)',
-            fontWeight: 500,
-          }}
-        >
-          {notice}
+      <header className="veil-appearance-heading">
+        <div>
+          <h2>Make VEIL yours</h2>
+          <p>Choose a palette, set the mood, and tune your chats.</p>
         </div>
-      )}
+        <button className="veil-appearance-reset" type="button" onClick={handleReset}>
+          Reset
+        </button>
+      </header>
+      {notice && <p className="veil-appearance-notice" role="status">{notice}</p>}
 
-      {/* Section 1: Themes */}
-      <div>
-        <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--veil-text-muted)', marginBottom: '0.65rem' }}>
-          Themes
+      <section className="veil-appearance-preview-wrap" aria-labelledby="appearance-preview-title">
+        <div className="veil-appearance-section-heading">
+          <div>
+            <h3 id="appearance-preview-title">Live preview</h3>
+            <p>Updates as you customize</p>
+          </div>
+          <span className="veil-appearance-preview-label">YOUR CHAT</span>
         </div>
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '0.65rem',
-          }}
+          className={`veil-appearance-preview veil-wallpaper-pattern--${preferences.wallpaper}`}
+          data-wallpaper={preferences.wallpaper}
+          data-bubble-style={preferences.bubbleStyle}
         >
-          {showcaseThemes.map((opt) => {
-            const isSelected = currentTheme === opt.id || (currentTheme === 'dark' && opt.id === 'midnight');
+          <div className="veil-appearance-preview-topline">
+            <span className="veil-appearance-preview-avatar" aria-hidden="true">M</span>
+            <div><strong>Morgan</strong><span>Personal space</span></div>
+            <span className="veil-appearance-preview-lock">Encrypted</span>
+          </div>
+          <div className="veil-appearance-preview-messages">
+            <div className="veil-bubble veil-bubble-incoming">Hey, found a quiet place for coffee.</div>
+            <div className="veil-bubble veil-bubble-outgoing">That sounds perfect. See you there.</div>
+          </div>
+          <div className="veil-appearance-preview-composer"><span>Message</span><span>Send</span></div>
+        </div>
+      </section>
+
+      <section className="veil-appearance-section" aria-labelledby="appearance-themes-title">
+        <div className="veil-appearance-section-heading">
+          <div>
+            <h3 id="appearance-themes-title">Theme collections</h3>
+            <p>Curated palettes for every kind of mood</p>
+          </div>
+          <span className="veil-appearance-current" aria-live="polite">
+            {THEME_OPTIONS.find(option => option.id === selectedTheme)?.name ?? 'Custom'}
+          </span>
+        </div>
+        {THEME_COLLECTIONS.map(collection => (
+          <div className="veil-theme-collection" key={collection}>
+            <h4>{collection}</h4>
+            <div className="veil-theme-collection-grid">
+              {THEME_OPTIONS.filter(option => option.collection === collection).map(option => {
+                const selected = selectedTheme === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    className={`veil-theme-option${selected ? ' is-selected' : ''}`}
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={`${option.name}: ${option.description}${selected ? ', selected' : ''}`}
+                    onClick={() => themeManager.setThemePreset(option.id, option.accent)}
+                  >
+                    <span className="veil-theme-option-preview" style={{ backgroundColor: option.bgHex }} aria-hidden="true">
+                      <span style={{ backgroundColor: option.accentHex ?? 'var(--veil-accent-primary)' }} />
+                      <span />
+                      <span />
+                    </span>
+                    <span className="veil-theme-option-copy"><strong>{option.name}</strong><small>{option.description}</small></span>
+                    {selected && <CheckIcon size={16} className="veil-theme-option-check" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="veil-appearance-section" aria-labelledby="appearance-accent-title">
+        <div className="veil-appearance-section-heading">
+          <div><h3 id="appearance-accent-title">Accent color</h3><p>Fine-tune buttons and highlights</p></div>
+          <span className="veil-appearance-current">{ACCENT_PALETTE.find(color => color.id === preferences.accent)?.label}</span>
+        </div>
+        <div className="veil-accent-options" role="group" aria-label="Accent color">
+          {ACCENT_PALETTE.map(color => {
+            const selected = preferences.accent === color.id;
             return (
               <button
-                key={opt.id}
+                key={color.id}
+                className={`veil-accent-option${selected ? ' is-selected' : ''}`}
                 type="button"
-                onClick={() => handleSelectTheme(opt.id)}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  padding: '1rem 0.65rem',
-                  borderRadius: '16px',
-                  backgroundColor: opt.bgHex,
-                  border: isSelected ? '2px solid var(--veil-accent-primary)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  cursor: 'pointer',
-                  boxShadow: isSelected ? '0 0 14px var(--veil-accent-glow)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
+                aria-label={`${color.label} accent${selected ? ', selected' : ''}`}
+                aria-pressed={selected}
+                style={{ '--swatch-color': color.primary } as React.CSSProperties}
+                onClick={() => themeManager.setAccent(color.id)}
               >
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {renderThemeIcon(opt.id)}
-                </div>
-                <span
-                  style={{
-                    fontSize: 'var(--veil-text-xs)',
-                    fontWeight: isSelected ? 600 : 500,
-                    color: isSelected ? 'var(--veil-accent-primary)' : 'var(--veil-text-primary)',
-                  }}
-                >
-                  {opt.name}
-                </span>
+                {selected && <CheckIcon size={15} />}
               </button>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* Section 2: Accent Color */}
-      <div>
-        <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--veil-text-muted)', marginBottom: '0.65rem' }}>
-          Accent Color
+      <section className="veil-appearance-section" aria-labelledby="appearance-wallpaper-title">
+        <div className="veil-appearance-section-heading">
+          <div><h3 id="appearance-wallpaper-title">Chat backgrounds</h3><p>From minimal to a little more playful</p></div>
         </div>
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '16px',
-            padding: '1rem',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.65rem',
-            justifyContent: 'center',
-          }}
-        >
-          {ACCENT_PALETTE.map((pal) => (
-            <button
-              key={pal.id}
-              type="button"
-              onClick={() => handleSelectAccent(pal.id)}
-              aria-label={`Select ${pal.label} accent`}
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                backgroundColor: pal.primary,
-                border: currentAccent === pal.id ? '2px solid #ffffff' : '2px solid transparent',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: currentAccent === pal.id ? `0 0 10px ${pal.primary}` : 'none',
-                transition: 'transform 0.15s ease',
-              }}
-            >
-              {currentAccent === pal.id && <CheckIcon size={16} color="#ffffff" />}
-            </button>
-          ))}
+        <div className="veil-wallpaper-grid">
+          {WALLPAPERS.map(wallpaper => {
+            const selected = preferences.wallpaper === wallpaper.id;
+            return (
+              <button
+                key={wallpaper.id}
+                className={`veil-wallpaper-option${selected ? ' is-selected' : ''}`}
+                type="button"
+                aria-pressed={selected}
+                aria-label={`${wallpaper.name}: ${wallpaper.description}${selected ? ', selected' : ''}`}
+                onClick={() => themeManager.setWallpaper(wallpaper.id)}
+              >
+                <span className={`veil-wallpaper-sample veil-wallpaper-pattern--${wallpaper.id}`} aria-hidden="true" />
+                <strong>{wallpaper.name}</strong>
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      {/* Section 3: Feature Callout Badges */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: '0.65rem',
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          <ShieldIcon size={20} color="var(--veil-accent-primary)" />
-          <div>
-            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
-              End-to-End Encrypted
-            </div>
+      <div className="veil-appearance-controls">
+        <fieldset className="veil-appearance-section veil-appearance-fieldset">
+          <legend>Message shape</legend>
+          <p>Choose the feel of each conversation</p>
+          <div className="veil-appearance-segmented">
+            {BUBBLE_STYLES.map(style => (
+              <button
+                key={style.id}
+                type="button"
+                aria-pressed={preferences.bubbleStyle === style.id}
+                className={preferences.bubbleStyle === style.id ? 'is-selected' : ''}
+                onClick={() => themeManager.setBubbleStyle(style.id as BubbleStyle)}
+              >{style.name}</button>
+            ))}
           </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          <LayersIcon size={20} color="var(--veil-accent-primary)" />
-          <div>
-            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
-              Multi-Space Isolation
-            </div>
+        </fieldset>
+        <fieldset className="veil-appearance-section veil-appearance-fieldset">
+          <legend>Text size</legend>
+          <p>Set a comfortable reading size</p>
+          <div className="veil-appearance-segmented">
+            {FONT_SIZES.map(size => (
+              <button
+                key={size.id}
+                type="button"
+                aria-pressed={preferences.fontSize === size.id}
+                className={preferences.fontSize === size.id ? 'is-selected' : ''}
+                onClick={() => themeManager.setFontSize(size.id as FontSizeSetting)}
+              >{size.name}</button>
+            ))}
           </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          <DatabaseSlashIcon size={20} color="var(--veil-accent-primary)" />
-          <div>
-            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
-              No Cloud Backup
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--veil-text-muted)' }}>
-              Your data, yours only
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          <ClockIcon size={20} color="var(--veil-accent-primary)" />
-          <div>
-            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
-              Ephemeral by Choice
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--veil-text-muted)' }}>
-              Set timers per chat
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          <PhoneIcon size={20} color="var(--veil-accent-primary)" />
-          <div>
-            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
-              Secure Calls
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--veil-text-muted)' }}>
-              Coming Soon
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'var(--veil-bg-surface)',
-            border: '1px solid var(--veil-border)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-          }}
-        >
-          <CodeIcon size={20} color="var(--veil-accent-primary)" />
-          <div>
-            <div style={{ fontSize: 'var(--veil-text-xs)', fontWeight: 600, color: 'var(--veil-text-primary)' }}>
-              Open Source Friendly
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--veil-text-muted)' }}>
-              Transparency always
-            </div>
-          </div>
-        </div>
+        </fieldset>
       </div>
     </div>
   );

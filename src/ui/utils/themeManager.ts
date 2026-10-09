@@ -11,6 +11,7 @@
 
 export type ThemeMode =
   | 'midnight'
+  | 'porcelain'
   | 'ocean'
   | 'forest'
   | 'amber'
@@ -34,7 +35,7 @@ export type AccentColor =
   | 'violet'
   | 'gray';
 
-export type ChatWallpaper = 'default' | 'solid' | 'subtle-patterns';
+export type ChatWallpaper = 'default' | 'solid' | 'subtle-patterns' | 'waves' | 'orbit' | 'organic';
 export type WallpaperOption = ChatWallpaper;
 export type BubbleStyle = 'modern' | 'classic';
 export type FontSizeSetting = 'small' | 'default' | 'large';
@@ -45,18 +46,21 @@ export interface ThemeOption {
   name: string;
   description: string;
   bgHex: string;
+  collection: 'Minimal' | 'Nature' | 'Expressive';
+  accent: AccentColor;
   accentHex?: string;
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { id: 'midnight', name: 'Midnight', description: 'Deep navy & black VEIL dark mode', bgHex: '#080b11', accentHex: '#14b8a6' },
-  { id: 'ocean', name: 'Ocean', description: 'Deep marine blue encrypted tones', bgHex: '#08101a', accentHex: '#3b82f6' },
-  { id: 'forest', name: 'Forest', description: 'Deep emerald pine dark surfaces', bgHex: '#07130e', accentHex: '#22c55e' },
-  { id: 'amber', name: 'Amber', description: 'Warm obsidian dark charcoal', bgHex: '#120e0a', accentHex: '#f59e0b' },
-  { id: 'rose', name: 'Rose', description: 'Deep velvet burgundy dark surfaces', bgHex: '#13090e', accentHex: '#f43f5e' },
-  { id: 'slate', name: 'Slate', description: 'Neutral graphite slate dark finish', bgHex: '#0c0d10', accentHex: '#94a3b8' },
-  { id: 'amoled', name: 'AMOLED', description: 'Pure black background (#000000) for OLED battery savings', bgHex: '#000000' },
-  { id: 'light', name: 'Light', description: 'High-contrast clean light mode', bgHex: '#f8fafc' },
+  { id: 'midnight', name: 'Midnight', description: 'Quiet ink with VEIL teal', bgHex: '#080b11', collection: 'Minimal', accent: 'teal', accentHex: '#14b8a6' },
+  { id: 'slate', name: 'Graphite', description: 'Soft charcoal and silver', bgHex: '#14161a', collection: 'Minimal', accent: 'gray', accentHex: '#94a3b8' },
+  { id: 'amoled', name: 'True Black', description: 'Pure black for OLED displays', bgHex: '#000000', collection: 'Minimal', accent: 'teal', accentHex: '#14b8a6' },
+  { id: 'light', name: 'Porcelain', description: 'Clean, bright neutral surfaces', bgHex: '#f7f8fa', collection: 'Minimal', accent: 'teal', accentHex: '#0d9488' },
+  { id: 'porcelain', name: 'Oat', description: 'Warm paper and soft bronze', bgHex: '#f4efe7', collection: 'Minimal', accent: 'amber', accentHex: '#a65f32' },
+  { id: 'ocean', name: 'Tide', description: 'Deep marine blue and clear cyan', bgHex: '#08101a', collection: 'Nature', accent: 'blue', accentHex: '#3b82f6' },
+  { id: 'forest', name: 'Moss', description: 'Quiet pine with fresh green', bgHex: '#07130e', collection: 'Nature', accent: 'green', accentHex: '#22c55e' },
+  { id: 'amber', name: 'Ember', description: 'Warm charcoal with soft gold', bgHex: '#120e0a', collection: 'Nature', accent: 'amber', accentHex: '#f59e0b' },
+  { id: 'rose', name: 'Rosewood', description: 'Velvet plum with muted rose', bgHex: '#13090e', collection: 'Expressive', accent: 'rose', accentHex: '#f43f5e' },
 ];
 
 export const BUBBLE_STYLES: Array<{ id: BubbleStyle; name: string; description: string }> = [
@@ -71,9 +75,12 @@ export const FONT_SIZES: Array<{ id: FontSizeSetting; name: string; description:
 ];
 
 export const WALLPAPERS: Array<{ id: ChatWallpaper; name: string; description: string }> = [
-  { id: 'default', name: 'Deep Charcoal', description: 'Clean minimalist matte finish' },
-  { id: 'solid', name: 'Solid Midnight', description: 'Pure monochromatic backdrop' },
-  { id: 'subtle-patterns', name: 'Subtle Patterns', description: 'Discrete encrypted-grid texture' },
+  { id: 'default', name: 'Quiet', description: 'Clean, plain chat background' },
+  { id: 'solid', name: 'Solid', description: 'A crisp single-color surface' },
+  { id: 'subtle-patterns', name: 'Fine Dots', description: 'A barely-there dotted texture' },
+  { id: 'waves', name: 'Soft Waves', description: 'Low-contrast flowing contours' },
+  { id: 'orbit', name: 'Orbit', description: 'Scattered points and fine rings' },
+  { id: 'organic', name: 'Organic', description: 'Soft, overlapping color forms' },
 ];
 
 export interface AccentDefinition {
@@ -177,7 +184,7 @@ export class ThemeManager {
     let fontSize: FontSizeSetting = 'default';
 
     const savedTheme = getStorageItem(STORAGE_KEYS.theme) as ThemeMode;
-    const validThemes: ThemeMode[] = ['midnight', 'ocean', 'forest', 'amber', 'rose', 'slate', 'dark', 'amoled', 'dim', 'light'];
+    const validThemes: ThemeMode[] = ['midnight', 'porcelain', 'ocean', 'forest', 'amber', 'rose', 'slate', 'dark', 'amoled', 'dim', 'light'];
     if (savedTheme && validThemes.includes(savedTheme)) {
       theme = savedTheme;
     }
@@ -188,7 +195,7 @@ export class ThemeManager {
     }
 
     const savedWall = getStorageItem(STORAGE_KEYS.wallpaper) as ChatWallpaper;
-    if (savedWall === 'default' || savedWall === 'solid' || savedWall === 'subtle-patterns') {
+    if (WALLPAPERS.some(option => option.id === savedWall)) {
       wallpaper = savedWall;
     }
 
@@ -240,6 +247,32 @@ export class ThemeManager {
   public setFontSize(fontSize: FontSizeSetting): void {
     this.prefs.fontSize = fontSize;
     setStorageItem(STORAGE_KEYS.fontSize, fontSize);
+    this.applyToDOM();
+    this.notify();
+  }
+
+  public setThemePreset(theme: ThemeMode, accent: AccentColor): void {
+    this.prefs.theme = theme;
+    this.prefs.accent = accent;
+    setStorageItem(STORAGE_KEYS.theme, theme);
+    setStorageItem(STORAGE_KEYS.accent, accent);
+    this.applyToDOM();
+    this.notify();
+  }
+
+  public resetToDefaults(): void {
+    this.prefs = {
+      theme: 'dark',
+      accent: 'teal',
+      wallpaper: 'default',
+      bubbleStyle: 'modern',
+      fontSize: 'default',
+    };
+    setStorageItem(STORAGE_KEYS.theme, this.prefs.theme);
+    setStorageItem(STORAGE_KEYS.accent, this.prefs.accent);
+    setStorageItem(STORAGE_KEYS.wallpaper, this.prefs.wallpaper);
+    setStorageItem(STORAGE_KEYS.bubbleStyle, this.prefs.bubbleStyle);
+    setStorageItem(STORAGE_KEYS.fontSize, this.prefs.fontSize);
     this.applyToDOM();
     this.notify();
   }
