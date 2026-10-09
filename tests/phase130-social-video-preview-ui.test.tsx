@@ -49,7 +49,8 @@ describe('Phase 130 social video preview UX', () => {
   it('checks TikTok errors against the provider origin and active iframe before showing recovery', () => {
     expect(componentSource).toContain("event.origin !== 'https://www.tiktok.com'");
     expect(componentSource).toContain('event.source !== iframeRef.current?.contentWindow');
-    expect(componentSource).toContain("event.data.type !== 'onPlayerError'");
+    expect(componentSource).toContain("event.data.type === 'onPlayerError'");
+    expect(componentSource).toContain("event.data.type === 'onPlayerReady'");
     expect(componentSource).toContain('Retry video');
     expect(componentSource).toContain('Open original');
   });

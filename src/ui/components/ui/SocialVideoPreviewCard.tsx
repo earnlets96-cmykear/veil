@@ -3,6 +3,8 @@ import { SocialVideoLink } from '../../../media/socialVideoLinks.ts';
 import { loadSocialVideoPreview, SocialVideoPreview } from '../../../media/socialVideoPreviewService.ts';
 import { MaximizeIcon } from '../icons/index.ts';
 
+const TIKTOK_PLAYER_READY_TIMEOUT_MS = 15_000;
+
 interface SocialVideoPreviewCardProps {
   link: SocialVideoLink;
   spaceId: string;
@@ -31,14 +33,30 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
 
   useEffect(() => {
     if (link.provider !== 'tiktok') return;
+    let playerReady = false;
+    const readinessTimeout = window.setTimeout(() => {
+      if (!playerReady) setPlayerError(true);
+    }, TIKTOK_PLAYER_READY_TIMEOUT_MS);
     const handlePlayerMessage = (event: MessageEvent) => {
       if (event.origin !== 'https://www.tiktok.com' || event.source !== iframeRef.current?.contentWindow) return;
       if (!event.data || typeof event.data !== 'object') return;
-      if (event.data['x-tiktok-player'] !== true || event.data.type !== 'onPlayerError') return;
-      setPlayerError(true);
+      if (event.data['x-tiktok-player'] !== true) return;
+      if (event.data.type === 'onPlayerReady') {
+        playerReady = true;
+        window.clearTimeout(readinessTimeout);
+        return;
+      }
+      if (event.data.type === 'onPlayerError') {
+        playerReady = true;
+        window.clearTimeout(readinessTimeout);
+        setPlayerError(true);
+      }
     };
     window.addEventListener('message', handlePlayerMessage);
-    return () => window.removeEventListener('message', handlePlayerMessage);
+    return () => {
+      window.clearTimeout(readinessTimeout);
+      window.removeEventListener('message', handlePlayerMessage);
+    };
   }, [link.provider, reloadKey]);
 
   const retryPlayer = () => {
@@ -51,7 +69,7 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
       {playerError ? (
         <div className="veil-social-video-player-error" role="alert">
           <strong>Video unavailable in VEIL</strong>
-          <span>This post may be restricted or the platform player may be unavailable.</span>
+          <span>The player did not finish loading or may be unavailable for this post.</span>
           <button type="button" onClick={retryPlayer}>Retry video</button>
         </div>
       ) : (

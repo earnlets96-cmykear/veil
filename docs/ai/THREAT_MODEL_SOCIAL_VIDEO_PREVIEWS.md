@@ -26,7 +26,7 @@ This feature does not download the source video, rewrite message payloads, or ad
 | Automatic metadata loading reveals which supported messages are being viewed | Defer provider requests until the preview is within 120 CSS pixels of the visible viewport; show the provider attribution; do not prefetch offscreen messages, refresh in the background, or auto-play. The provider can infer that the user is viewing a conversation containing that public link. |
 | Provider metadata or a thumbnail remains visible after Space lock | Clear the VEIL-owned metadata cache and remove the conversation/player UI on lock or Space switch. VEIL does not copy thumbnail bytes into app storage; the Android WebView and remote provider control their own HTTP caches, which VEIL cannot guarantee to purge. |
 | Oversized or malformed provider responses cause excessive memory use | Bound response bytes, metadata field lengths, request duration, and cache entries; lazy-load the thumbnail and mount the iframe only after an explicit Play in VEIL action. Fail closed to the original-link action when no safe embed URL is available. |
-| Provider playback fails or sends forged error messages | Accept TikTok player errors only from the exact TikTok origin and the active iframe window; show a retry action and Open original fallback. Keep playback inside a cross-origin iframe sandbox and do not autoplay. |
+| Provider playback fails, stalls before readiness, or sends forged error messages | Accept TikTok player events only from the exact TikTok origin and active iframe window. Show recovery on a provider error or if TikTok does not report `onPlayerReady` within 15 seconds; offer Retry and Open original. Keep playback inside a cross-origin iframe sandbox and do not autoplay. |
 | Unavailable/private/restricted content appears broken or VEIL appears to endorse it | Show an explicit unavailable state and a user-controlled **Open original** fallback. Do not scrape a normal provider webpage when official embed metadata is unavailable. |
 
 ## Deliberate privacy trade-off
@@ -38,7 +38,7 @@ The user requested automatic in-view thumbnails. When a supported message scroll
 - Reject lookalike domains, non-HTTPS URLs, credentialed URLs, non-video paths, malformed short links, and unsafe schemes.
 - Reject malformed, oversized, timed-out, or wrong-host oEmbed responses and thumbnail URLs.
 - Verify offscreen messages do not request metadata, in-view messages issue bounded/coalesced requests, and failed/removed/private content leaves a safe original-link fallback.
-- Verify provider content is isolated from the VEIL document, TikTok error messages are source/origin-checked, and autoplay is disabled.
+- Verify provider content is isolated from the VEIL document, TikTok events are source/origin-checked, a missing `onPlayerReady` produces recovery, and autoplay is disabled.
 - Verify pending share text requires recipient selection and confirmation, is not logged or persisted, and is hidden/cleared across lock and Space transitions.
 - Verify provider cache bounds, duplicate-request coalescing, and cleanup on Space lock; document that platform-controlled HTTP cache eviction is outside VEIL's control.
 - Run Android cold-start, warm-start, locked-state, cancellation, and provider playback checks on-device.
