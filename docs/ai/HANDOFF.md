@@ -1,9 +1,9 @@
 # HANDOFF.md — AI Agent Session Handoff
 
 ## Phase 128 Update — Android Full Preview Reply & Media Recovery
-- Local Full Preview Android notifications now include inline replies bound to the conversation and Space. Native RemoteInput is cleared from its one-shot intent before an in-memory event reaches AppState; `sendMessage` handles it only while that Space is active. FCM notifications remain generic. Active notifications clear on lock and privacy-mode changes.
+- Local Full Preview Android notifications now include inline replies bound to the conversation and Space. Native RemoteInput is cleared from its one-shot intent before an in-memory event reaches AppState; replies are captured on both cold launch and Activity reuse, and `sendMessage` handles them only while that Space is active. Local notifications use VEIL's current accent color. FCM notifications remain generic. Active notifications clear on lock and privacy-mode changes.
 - Attachment and voice requests now stop before cloud access if session restoration fails. Voice playback chooses valid audio metadata rather than passing through `application/octet-stream` from an old cache entry.
-- Six focused suites / 10 tests pass and TypeScript passes. Full baseline suite: 341 files passed / 109 failed (1,447 passed / 216 failed / 6 skipped), primarily blocked loopback relay/recovery plus existing UI assertions. Android Gradle stopped before compilation with `Unable to establish loopback connection`.
+- Four Phase 128 suites / nine tests pass and TypeScript passes. Full baseline suite: 341 files passed / 109 failed (1,447 passed / 216 failed / 6 skipped), primarily blocked loopback relay/recovery plus existing UI assertions. Latest Android Gradle attempt stopped before compilation because access to the user-level Gradle lock file was denied.
 - Added ADR-131 and `docs/ai/THREAT_MODEL_NOTIFICATION_REPLIES.md`. Physical Android validation, independent security review, formal audit, and explicit dual sign-off are required before deployment. Preserve pre-existing Android asset/release metadata changes and local test/business-card artifacts.
 
 ## Phase 127 Update — Composer Recording & Chat List Polish

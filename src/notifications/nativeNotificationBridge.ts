@@ -15,7 +15,7 @@ export interface NotificationReply {
 interface VeilNotificationsPlugin {
   checkPermission(): Promise<NativeNotificationResult>;
   requestPermission(): Promise<NativeNotificationResult>;
-  show(options: { id: string; title: string; body: string; conversationId?: string; spaceId?: string; allowReply?: boolean }): Promise<void>;
+  show(options: { id: string; title: string; body: string; conversationId?: string; spaceId?: string; allowReply?: boolean; accentColor?: string }): Promise<void>;
   clearAll(): Promise<void>;
   addListener(eventName: 'reply', listener: (reply: NotificationReply) => void): Promise<PluginListenerHandle>;
   openSettings(): Promise<void>;
@@ -62,6 +62,7 @@ export const showNativeNotification = async (payload: {
   conversationId?: string;
   spaceId?: string;
   allowReply?: boolean;
+  accentColor?: string;
 }): Promise<void> => {
   await nativeNotifications.show(payload);
 };

@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -111,7 +112,10 @@ class VeilNotificationsPlugin : Plugin() {
         val messageId = call.getString("id") ?: System.currentTimeMillis().toString()
         val conversationId = call.getString("conversationId")?.take(160)
         val spaceId = call.getString("spaceId")?.take(160)
-        val allowReply = call.getBoolean("allowReply", false) &&
+        val notificationColor = call.getString("accentColor")
+            ?.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) }
+            ?.let { Color.parseColor(it) }
+        val allowReply = (call.getBoolean("allowReply", false) == true) &&
             !conversationId.isNullOrBlank() && !spaceId.isNullOrBlank()
 
         try {
@@ -132,6 +136,7 @@ class VeilNotificationsPlugin : Plugin() {
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .apply { if (notificationColor != null) setColor(notificationColor) }
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .apply { if (pendingIntent != null) setContentIntent(pendingIntent) }
@@ -180,8 +185,17 @@ class VeilNotificationsPlugin : Plugin() {
         }
     }
 
+    override fun load() {
+        // A notification reply can cold-start the Activity instead of arriving via onNewIntent.
+        acceptReplyIntent(activity.intent)
+    }
+
     override fun handleOnNewIntent(intent: Intent) {
-        if (intent.action != REPLY_ACTION) return
+        acceptReplyIntent(intent)
+    }
+
+    private fun acceptReplyIntent(intent: Intent?) {
+        if (intent?.action != REPLY_ACTION) return
         val remoteInput = RemoteInput.Builder(REPLY_KEY).build()
         val replyText = RemoteInput.getResultsFromIntent(intent)
             ?.getCharSequence(REPLY_KEY)
@@ -192,7 +206,7 @@ class VeilNotificationsPlugin : Plugin() {
         val spaceId = intent.getStringExtra(SPACE_ID_KEY)
 
         // Clear the one-shot intent payload before passing the in-memory reply to JS.
-        RemoteInput.addResultsToIntent(remoteInput, intent, Bundle())
+        RemoteInput.addResultsToIntent(arrayOf(remoteInput), intent, Bundle())
         intent.removeExtra(CONVERSATION_ID_KEY)
         intent.removeExtra(SPACE_ID_KEY)
         intent.clipData = null

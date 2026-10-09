@@ -5,7 +5,8 @@
 - [x] Bind replies to the originating Space, clear active notifications on lock/privacy-mode changes, and keep FCM alerts generic.
 - [x] Stop attachment and voice requests before network access when cloud session restoration fails.
 - [x] Repair voice playback blobs that inherit a generic cached MIME type despite audio metadata.
-- [x] Add focused regressions; six focused suites / 10 tests and TypeScript pass.
+- [x] Add focused regressions; four Phase 128 suites / nine tests and TypeScript pass.
+- [x] Handle notification RemoteInput on cold launch as well as new Activity intents; apply the active VEIL accent to local Android notifications.
 - [ ] Compile and validate notification replies, lock clearing, and audio playback on physical Android.
 - [ ] Complete independent security review, formal audit, and explicit dual sign-off before deployment.
 - **Scope**: Notification presentation, attachment authentication gating, and voice playback metadata only; no cryptographic, identity, Space boundary, relay, or message wire protocol changes.

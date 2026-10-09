@@ -121,9 +121,11 @@ export class NotificationDispatcher {
     if (isNativeNotificationPlatform()) {
       if (await getNotificationPermissionStatus() !== 'granted') return false;
       try {
+        const accentColor = this.readAccentColor();
         await showNativeNotification({
           id: event.id,
           ...payload,
+          ...(accentColor ? { accentColor } : {}),
           ...(this.privacyMode === 'FULL_OBFUSCATED' && event.conversationId && event.spaceId
             ? { conversationId: event.conversationId, spaceId: event.spaceId, allowReply: true }
             : {}),
@@ -155,6 +157,18 @@ export class NotificationDispatcher {
     for (const notification of this.browserNotifications) notification.close();
     this.browserNotifications.clear();
     void clearNativeNotifications().catch(() => {});
+  }
+
+  private readAccentColor(): string | undefined {
+    try {
+      if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return undefined;
+      const accent = getComputedStyle(document.documentElement)
+        .getPropertyValue('--veil-accent-primary')
+        .trim();
+      return /^#[0-9a-f]{6}$/i.test(accent) ? accent : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private shouldDeferToBackgroundPush(): boolean {

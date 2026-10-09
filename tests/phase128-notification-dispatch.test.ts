@@ -60,4 +60,26 @@ describe('Phase 128: notification reply privacy gates', () => {
     })).resolves.toBe(false);
     expect(native.show).not.toHaveBeenCalled();
   });
+
+  it('passes the active VEIL accent into native notifications', async () => {
+    vi.stubGlobal('document', {
+      visibilityState: 'visible',
+      documentElement: {},
+    });
+    vi.stubGlobal('getComputedStyle', () => ({
+      getPropertyValue: (name: string) => name === '--veil-accent-primary' ? '#8b5cf6' : '',
+    }));
+
+    const dispatcher = new NotificationDispatcher('FULL_OBFUSCATED');
+    await dispatcher.dispatch({
+      id: 'message-themed',
+      conversationId: 'conversation-1',
+      spaceId: 'space-1',
+      senderName: 'Alice',
+      text: 'A private message',
+      timestamp: 1,
+    });
+
+    expect(native.show).toHaveBeenCalledWith(expect.objectContaining({ accentColor: '#8b5cf6' }));
+  });
 });
