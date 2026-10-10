@@ -28,7 +28,7 @@ export interface StagedAttachment {
 
 export interface AttachmentPreviewModalProps {
   files: File[];
-  onConfirmSend: (files: File[], caption?: string) => void;
+  onConfirmSend: (files: File[], caption?: string) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -40,6 +40,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
   const [staged, setStaged] = useState<StagedAttachment[]>([]);
   const [caption, setCaption] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   useEffect(() => {
     const list: StagedAttachment[] = files.map((file) => {
@@ -77,8 +78,11 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
   const handleSend = async () => {
     if (staged.length === 0 || isSending) return;
     setIsSending(true);
+    setSendError('');
     try {
       await onConfirmSend(staged.map((s) => s.file), caption.trim() || undefined);
+    } catch {
+      setSendError('Could not start sending. Your selected files are still here; please try again.');
     } finally {
       setIsSending(false);
     }
@@ -158,6 +162,12 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
         </div>
 
         {/* Optional Caption Input */}
+        {sendError && (
+          <div className="veil-share-send-error" role="alert" style={{ color: 'var(--veil-danger)', fontSize: 'var(--veil-text-xs)', padding: '6px 10px' }}>
+            {sendError}
+          </div>
+        )}
+
         <div className="veil-preview-caption-wrapper">
           <input
             type="text"
@@ -176,7 +186,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
           <Button variant="ghost" onClick={onCancel} disabled={isSending}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSend} disabled={staged.length === 0} loading={isSending}>
+          <Button variant="primary" onClick={handleSend} disabled={staged.length === 0 || isSending} loading={isSending}>
             <SendIcon size={18} />
             <span>Send</span>
           </Button>

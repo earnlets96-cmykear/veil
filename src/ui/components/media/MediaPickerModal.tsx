@@ -33,7 +33,7 @@ export interface MediaPickerSendOptions {
 export interface MediaPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSend: (options: MediaPickerSendOptions) => void;
+  onSend: (options: MediaPickerSendOptions) => void | Promise<void>;
 }
 
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
@@ -44,6 +44,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [activeTab, setActiveTab] = useState<'gallery' | 'camera' | 'video' | 'files'>('gallery');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [caption, setCaption] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [recentItems, setRecentItems] = useState<DeviceMediaItem[]>([]);
   const [recentStatus, setRecentStatus] = useState<'idle' | 'loading' | 'ready' | 'denied' | 'error'>('idle');
   const [recentCursor, setRecentCursor] = useState<string | undefined>(undefined);
@@ -223,16 +225,24 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     }
   };
 
-  const handleConfirmSend = () => {
-    if (selectedFiles.length === 0) return;
-    onSend({
-      files: selectedFiles,
-      caption: caption.trim() || undefined,
-    });
-    setSelectedFiles([]);
-    setCaption('');
-    fileToUriMapRef.current.clear();
-    onClose();
+  const handleConfirmSend = async () => {
+    if (selectedFiles.length === 0 || isSending) return;
+    setIsSending(true);
+    setSendError('');
+    try {
+      await onSend({
+        files: selectedFiles,
+        caption: caption.trim() || undefined,
+      });
+      setSelectedFiles([]);
+      setCaption('');
+      fileToUriMapRef.current.clear();
+      onClose();
+    } catch {
+      setSendError('Could not start sending. Your selected files are still here; please try again.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -266,7 +276,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             type="button"
             className="veil-btn-share-send"
             onClick={handleConfirmSend}
-            disabled={selectedFiles.length === 0}
+            disabled={selectedFiles.length === 0 || isSending}
+            aria-busy={isSending}
             aria-label={selectedFiles.length > 0 ? `Send ${selectedFiles.length} media items` : 'Send media'}
           >
             <span>{selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
@@ -564,6 +575,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         )}
 
         {/* Staged Attachments List (documents/files picked via SAF or web) */}
+        {sendError && (
+          <div className="veil-share-send-error" role="alert" style={{ color: 'var(--veil-danger)', fontSize: 'var(--veil-text-xs)', padding: '6px 10px' }}>
+            {sendError}
+          </div>
+        )}
+
         {selectedFiles.some((f) => !f.type.startsWith('image/') && !f.type.startsWith('video/')) && (
           <div className="veil-attachment-staging-list" style={{ marginTop: '8px' }}>
             {selectedFiles

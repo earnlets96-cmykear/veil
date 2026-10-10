@@ -155,30 +155,22 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
 
   // Confirm sending staged files (Telegram-style single message with caption)
   const handleConfirmSendFiles = async (filesToSend: File[], caption?: string) => {
-    setStagedFiles(null);
-    try {
-      const trimmedCaption = caption?.trim() || undefined;
-      if (filesToSend.length === 1) {
-        sendAttachment(conversationId, filesToSend[0], { caption: trimmedCaption });
-      } else if (filesToSend.length > 1) {
-        sendAttachments(conversationId, filesToSend, { caption: trimmedCaption });
-      }
-    } catch (_err) {
-      // Background queue preserves messages
+    const trimmedCaption = caption?.trim() || undefined;
+    if (filesToSend.length === 1) {
+      await sendAttachment(conversationId, filesToSend[0], { caption: trimmedCaption });
+    } else if (filesToSend.length > 1) {
+      await sendAttachments(conversationId, filesToSend, { caption: trimmedCaption });
     }
+    setStagedFiles(null);
   };
 
   // Handle send from In-App Media Picker (Telegram-style single message with caption)
   const handleMediaPickerSend = async (options: MediaPickerSendOptions) => {
-    try {
-      const trimmedCaption = options.caption?.trim() || undefined;
-      if (options.files.length === 1) {
-        sendAttachment(conversationId, options.files[0], { caption: trimmedCaption });
-      } else if (options.files.length > 1) {
-        sendAttachments(conversationId, options.files, { caption: trimmedCaption });
-      }
-    } catch (_err) {
-      // Background queue preserves messages
+    const trimmedCaption = options.caption?.trim() || undefined;
+    if (options.files.length === 1) {
+      await sendAttachment(conversationId, options.files[0], { caption: trimmedCaption });
+    } else if (options.files.length > 1) {
+      await sendAttachments(conversationId, options.files, { caption: trimmedCaption });
     }
   };
 
