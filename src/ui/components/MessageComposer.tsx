@@ -62,7 +62,9 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const peerName = activeContact?.name || activeConv?.name;
   const selfName = myProfile?.displayName || myProfile?.username;
 
-  const [text, setText] = useState('');
+  const textValueRef = useRef('');
+  const hasTextRef = useRef(false);
+  const [hasText, setHasText] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -76,13 +78,27 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  useTextareaAutoResize(textareaRef, text);
+  const resizeTextarea = useTextareaAutoResize(textareaRef);
   const recorderRef = useRef<VoiceRecorder | null>(null);
 
+  const updateComposerText = useCallback((nextText: string) => {
+    textValueRef.current = nextText;
+    if (textareaRef.current && textareaRef.current.value !== nextText) {
+      textareaRef.current.value = nextText;
+    }
+    resizeTextarea();
+
+    const nextHasText = Boolean(nextText.trim());
+    if (nextHasText !== hasTextRef.current) {
+      hasTextRef.current = nextHasText;
+      setHasText(nextHasText);
+    }
+  }, [resizeTextarea]);
+
   const handleSend = () => {
-    if (!text.trim()) return;
-    const msgText = text.trim();
-    setText('');
+    const msgText = textValueRef.current.trim();
+    if (!msgText) return;
+    updateComposerText('');
 
     // If editing, confirm the edit instead of sending a new message
     if (editingMessage && onConfirmEdit) {
@@ -100,7 +116,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   // Pre-fill text when entering edit mode
   React.useEffect(() => {
     if (editingMessage && editingMessage.text) {
-      setText(editingMessage.text);
+      updateComposerText(editingMessage.text);
       // Auto-focus and resize textarea
       setTimeout(() => {
         if (textareaRef.current) {
@@ -108,7 +124,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         }
       }, 50);
     }
-  }, [editingMessage]);
+  }, [editingMessage, updateComposerText]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // Send on Enter in desktop browsers; mobile layouts and native apps keep newlines.
@@ -119,7 +135,13 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
+    textValueRef.current = e.currentTarget.value;
+    resizeTextarea();
+    const nextHasText = Boolean(textValueRef.current.trim());
+    if (nextHasText !== hasTextRef.current) {
+      hasTextRef.current = nextHasText;
+      setHasText(nextHasText);
+    }
   };
 
   // Stage files for pre-send preview modal
@@ -162,74 +184,77 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
 
   // Emoji insertion and backspace handlers
   const handleInsertEmoji = useCallback((emoji: string) => {
-    setText((prev) => {
-      const textarea = textareaRef.current;
-      if (!textarea) return prev + emoji;
-      const start = textarea.selectionStart ?? prev.length;
-      const end = textarea.selectionEnd ?? prev.length;
-      const nextText = prev.slice(0, start) + emoji + prev.slice(end);
+    const prev = textValueRef.current;
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      updateComposerText(prev + emoji);
+      return;
+    }
+    const start = textarea.selectionStart ?? prev.length;
+    const end = textarea.selectionEnd ?? prev.length;
+    const nextText = prev.slice(0, start) + emoji + prev.slice(end);
+    updateComposerText(nextText);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const newPos = start + emoji.length;
+        try {
+          textareaRef.current.setSelectionRange(newPos, newPos);
+        } catch {
+          // Ignore if setSelectionRange is not supported
+        }
+      }
+    }, 0);
+  }, [updateComposerText]);
+
+  const handleEmojiBackspace = useCallback(() => {
+    const prev = textValueRef.current;
+    if (!prev) return;
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? prev.length;
+    const end = textarea?.selectionEnd ?? prev.length;
+    if (start !== end) {
+      const nextText = prev.slice(0, start) + prev.slice(end);
+      updateComposerText(nextText);
       setTimeout(() => {
         if (textareaRef.current) {
-          const newPos = start + emoji.length;
           try {
-            textareaRef.current.setSelectionRange(newPos, newPos);
+            textareaRef.current.setSelectionRange(start, start);
           } catch {
-            // Ignore if setSelectionRange is not supported
+            // Ignore
           }
         }
       }, 0);
-      return nextText;
-    });
-  }, []);
-
-  const handleEmojiBackspace = useCallback(() => {
-    setText((prev) => {
-      if (!prev) return '';
-      const textarea = textareaRef.current;
-      const start = textarea?.selectionStart ?? prev.length;
-      const end = textarea?.selectionEnd ?? prev.length;
-      if (start !== end) {
-        const nextText = prev.slice(0, start) + prev.slice(end);
-        setTimeout(() => {
-          if (textareaRef.current) {
-            try {
-              textareaRef.current.setSelectionRange(start, start);
-            } catch {
-              // Ignore
-            }
-          }
-        }, 0);
-        return nextText;
+      return;
+    }
+    if (start === 0) return;
+    const chars = Array.from(prev);
+    let runningLength = 0;
+    let deleteIdx = -1;
+    for (let i = 0; i < chars.length; i++) {
+      runningLength += chars[i].length;
+      if (runningLength >= start) {
+        deleteIdx = i;
+        break;
       }
-      if (start === 0) return prev;
-      const chars = Array.from(prev);
-      let runningLength = 0;
-      let deleteIdx = -1;
-      for (let i = 0; i < chars.length; i++) {
-        runningLength += chars[i].length;
-        if (runningLength >= start) {
-          deleteIdx = i;
-          break;
+    }
+    if (deleteIdx >= 0) {
+      chars.splice(deleteIdx, 1);
+      const nextText = chars.join('');
+      const newPos = Math.max(0, start - (prev.length - nextText.length));
+      updateComposerText(nextText);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          try {
+            textareaRef.current.setSelectionRange(newPos, newPos);
+          } catch {
+            // Ignore
+          }
         }
-      }
-      if (deleteIdx >= 0) {
-        chars.splice(deleteIdx, 1);
-        const nextText = chars.join('');
-        const newPos = Math.max(0, start - (prev.length - nextText.length));
-        setTimeout(() => {
-          if (textareaRef.current) {
-            try {
-              textareaRef.current.setSelectionRange(newPos, newPos);
-            } catch {
-              // Ignore
-            }
-          }
-        }, 0);
-        return nextText;
-      }
-      return prev.slice(0, -1);
-    });
-  }, []);
+      }, 0);
+      return;
+    }
+    updateComposerText(prev.slice(0, -1));
+  }, [updateComposerText]);
 
   const handleCloseEmojiDrawer = useCallback(() => {
     setIsEmojiDrawerOpen(false);
@@ -418,7 +443,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             type="button"
             onClick={() => {
               if (onCancelEdit) onCancelEdit();
-              setText('');
+              updateComposerText('');
               if (textareaRef.current) textareaRef.current.style.height = 'auto';
             }}
             style={{
@@ -555,7 +580,6 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
                 ref={textareaRef}
                 className="veil-composer-input"
                 placeholder="Message..."
-                value={text}
                 onChange={handleTextChange}
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
@@ -592,7 +616,7 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
             </div>
 
             {/* Dynamic Send / Mic Action Button */}
-            {text.trim() || editingMessage ? (
+            {hasText || editingMessage ? (
               <button
                 type="button"
                 className="veil-btn-composer-send"

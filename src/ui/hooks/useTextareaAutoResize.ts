@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 type FrameRef = { current: number | null };
 
@@ -19,20 +19,25 @@ export function scheduleTextareaResize(
 
 export function useTextareaAutoResize(
   textareaRef: React.RefObject<HTMLTextAreaElement | null>,
-  value: string,
   maxHeight = 140
-): void {
+): () => void {
   const frameRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     scheduleTextareaResize(textarea, frameRef, requestAnimationFrame, maxHeight);
-  }, [textareaRef, value, maxHeight]);
+  }, [textareaRef, maxHeight]);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [resizeTextarea]);
 
   useEffect(() => () => {
     if (frameRef.current !== null) {
       cancelAnimationFrame(frameRef.current);
     }
   }, []);
+
+  return resizeTextarea;
 }
