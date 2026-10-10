@@ -944,7 +944,9 @@ body {
 .veil-message-row.outgoing .veil-message-bubble,
 .veil-message-bubble.outgoing {
   background-color: var(--veil-bubble-outgoing, var(--veil-accent-primary));
+  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.075), transparent 58%);
   color: var(--veil-bubble-outgoing-text, #ffffff);
+  border: 1px solid var(--veil-bubble-outgoing-border, transparent);
   border-bottom-right-radius: 4px;
 }
 
@@ -952,7 +954,7 @@ body {
 .veil-message-bubble.incoming {
   background-color: var(--veil-bubble-incoming, #161922);
   color: var(--veil-bubble-incoming-text, var(--veil-text-primary));
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--veil-bubble-incoming-border, rgba(255, 255, 255, 0.07));
   border-bottom-left-radius: 4px;
 }
 

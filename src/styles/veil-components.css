@@ -5760,7 +5760,7 @@ img.veil-message-sticker-img {
 }
 
 .veil-message-row.incoming .veil-message-bubble {
-  border-color: var(--veil-border) !important;
+  border-color: var(--veil-bubble-incoming-border, var(--veil-border)) !important;
 }
 
 .veil-message-meta,
@@ -5782,6 +5782,112 @@ img.veil-message-sticker-img {
   border-color: var(--veil-border) !important;
   box-shadow: var(--veil-elevation-1);
   transition: background-color var(--veil-motion-fast), border-color var(--veil-motion-fast), box-shadow var(--veil-motion-fast);
+}
+
+.veil-bubble-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
+  gap: 10px;
+}
+
+.veil-bubble-palette-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 96px;
+  padding: 12px;
+  border: 1px solid var(--veil-border);
+  border-radius: 15px;
+  background: var(--veil-bg-surface, #121824);
+  color: var(--veil-text-primary, #f8fafc);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.veil-bubble-palette-option:hover {
+  border-color: color-mix(in srgb, var(--veil-accent-primary) 52%, var(--veil-border));
+  background: color-mix(in srgb, var(--veil-bg-surface, #121824) 90%, var(--veil-accent-primary) 10%);
+}
+
+.veil-bubble-palette-option:focus-visible {
+  outline: 2px solid var(--veil-accent-primary);
+  outline-offset: 2px;
+}
+
+.veil-bubble-palette-option.is-selected {
+  border-color: var(--veil-accent-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--veil-accent-primary) 34%, transparent), 0 8px 22px rgba(0, 0, 0, 0.12);
+}
+
+.veil-bubble-palette-samples {
+  display: flex;
+  flex: 0 0 112px;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.veil-bubble-palette-sample {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 3px 8px;
+  overflow: hidden;
+  border: 1px solid var(--sample-border, var(--veil-border));
+  border-radius: 9px;
+  background-color: var(--sample-background);
+  color: var(--sample-text);
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.veil-bubble-palette-sample.is-incoming {
+  --sample-background: var(--veil-bubble-incoming);
+  --sample-text: var(--veil-bubble-incoming-text);
+  --sample-border: var(--veil-bubble-incoming-border);
+  border-bottom-left-radius: 3px;
+}
+
+.veil-bubble-palette-sample.is-outgoing {
+  align-self: flex-end;
+  --sample-background: var(--veil-bubble-outgoing);
+  --sample-text: var(--veil-bubble-outgoing-text);
+  --sample-border: var(--veil-bubble-outgoing-border);
+  border-bottom-right-radius: 3px;
+}
+
+.veil-bubble-palette-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 18px;
+}
+
+.veil-bubble-palette-copy strong {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.veil-bubble-palette-copy small {
+  color: var(--veil-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .veil-bubble-palette-grid { grid-template-columns: 1fr; }
+  .veil-bubble-palette-option { min-height: 90px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .veil-bubble-palette-option { transition: none; }
 }
 
 .veil-composer-input-island:focus-within {

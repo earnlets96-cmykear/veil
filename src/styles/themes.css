@@ -513,6 +513,20 @@
   border-top-left-radius: 3px;
 }
 
+/* Shared opaque surfaces keep the Appearance preview and live messages in sync. */
+.veil-bubble-outgoing {
+  background-color: var(--veil-bubble-outgoing);
+  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.075), transparent 58%);
+  border: 1px solid var(--veil-bubble-outgoing-border, transparent);
+  color: var(--veil-bubble-outgoing-text, #ffffff);
+}
+
+.veil-bubble-incoming {
+  background-color: var(--veil-bubble-incoming);
+  border: 1px solid var(--veil-bubble-incoming-border, rgba(255, 255, 255, 0.07));
+  color: var(--veil-bubble-incoming-text, #f1f3f7);
+}
+
 /* Quiet chat backgrounds. Patterns are CSS-only and intentionally low contrast. */
 :root {
   --veil-wallpaper-ink: rgba(255, 255, 255, 0.065);

@@ -1,5 +1,10 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+
+## Message Bubble Palettes — 2026-10-10
+- Added Deep Sea, Arctic, Evergreen, Ember, Amethyst, and Rosewood paired palettes plus VEIL Default to Appearance settings. The cards preview incoming and outgoing messages and apply instantly to the main preview and live messages.
+- Light and dark variants use opaque surfaces, readable text, coordinated borders, and a subtle outgoing highlight. Palette selection is device-local and independent of theme accent, bubble shape, and font size.
+- Verification: 20 tests pass across the theme and appearance suites, including WCAG 4.5:1 contrast checks; `npm run typecheck` passes. Live browser inspection was unavailable in the current environment.
 ## Expanded Themes and Wallpapers — 2026-10-10
 - Added Glacier, Canyon, and Aurora theme presets; six new offline wallpaper designs across Nature, Abstract, and Patterns; and local photo upload/replace/select/remove.
 - Custom photos are re-encoded as metadata-stripped WebP, capped at 15 MiB source / 40 MP decoded / 2400 px edge, and stored in app-origin IndexedDB outside Space encryption, relay, and device sync. UI states this storage boundary.

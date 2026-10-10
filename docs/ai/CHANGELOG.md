@@ -2,6 +2,11 @@
 
 All notable changes, architectural decisions, and security milestones across the VEIL project will be documented in this file.
 
+
+## [Message Bubble Palette Follow-up] - 2026-10-10
+- Added six paired, opaque bubble palettes with incoming/outgoing previews and a VEIL Default option. Palette selection is separate from accent, theme, and bubble shape.
+- Applied palette surfaces, text, and borders to the Appearance preview and live messages with light/dark-specific colors and subtle outgoing highlights.
+- Verification: appearance/theme suites pass (20 tests), including contrast checks for every light/dark pair; `npm run typecheck` passes. Live VEIL browser inspection was unavailable.
 ## [Phase 128] - 2026-10-10
 
 ### Improved

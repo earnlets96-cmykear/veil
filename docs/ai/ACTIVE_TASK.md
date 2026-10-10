@@ -1,5 +1,12 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+
+## Completed Message Bubble Palette Follow-up
+- [x] Add six curated incoming/outgoing color pairs plus VEIL Default in Appearance, each with a live mini-preview and selected state.
+- [x] Apply opaque light/dark bubble colors, readable text, subtle outgoing highlights, and palette-aware borders to preview and actual messages.
+- [x] Keep palette preference independent from theme accent, message shape, and font size; persist locally and restore through reset.
+- [x] Verify light/dark contrast thresholds, focused appearance suites (20 tests), and TypeScript.
+- **Visual check**: Live VEIL browser inspection was unavailable; focused renders and CSS token checks were used.
 ## Completed Expanded Themes and Wallpapers
 - [x] Add Glacier, Canyon, and Aurora coordinated presets plus two offline wallpaper designs in each Nature, Abstract, and Patterns family.
 - [x] Add local JPEG/PNG/WebP upload, replace, reselect, remove, IndexedDB persistence, WebP normalization, and startup restoration.

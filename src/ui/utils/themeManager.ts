@@ -42,6 +42,7 @@ export type ChatWallpaper = 'default' | 'solid' | 'subtle-patterns' | 'waves' | 
 export type BuiltInWallpaper = Exclude<ChatWallpaper, 'custom'>;
 export type WallpaperOption = ChatWallpaper;
 export type BubbleStyle = 'modern' | 'classic';
+export type BubblePaletteId = 'veil' | 'deep-sea' | 'arctic' | 'evergreen' | 'ember' | 'amethyst' | 'rosewood';
 export type FontSizeSetting = 'small' | 'default' | 'large';
 export type FontSizeOption = FontSizeSetting;
 
@@ -73,6 +74,53 @@ export const THEME_OPTIONS: ThemeOption[] = [
 export const BUBBLE_STYLES: Array<{ id: BubbleStyle; name: string; description: string }> = [
   { id: 'modern', name: 'Modern Rounded', description: 'Curved responsive corners with subtle borders' },
   { id: 'classic', name: 'Classic Compact', description: 'Tight angles with high information density' },
+];
+
+export interface BubbleSurfacePalette {
+  background: string;
+  text: string;
+  border: string;
+}
+
+export interface BubblePalette {
+  id: Exclude<BubblePaletteId, 'veil'>;
+  name: string;
+  description: string;
+  dark: { incoming: BubbleSurfacePalette; outgoing: BubbleSurfacePalette };
+  light: { incoming: BubbleSurfacePalette; outgoing: BubbleSurfacePalette };
+}
+
+export const BUBBLE_PALETTES: BubblePalette[] = [
+  {
+    id: 'deep-sea', name: 'Deep Sea', description: 'Cool teal and marine blue',
+    dark: { incoming: { background: '#15383a', text: '#eaf7f6', border: '#31595a' }, outgoing: { background: '#176f70', text: '#ffffff', border: '#348a87' } },
+    light: { incoming: { background: '#edf8f6', text: '#193d3a', border: '#c4ded9' }, outgoing: { background: '#b8e4df', text: '#133a39', border: '#8ccbc3' } },
+  },
+  {
+    id: 'arctic', name: 'Arctic', description: 'Clear blue and pale slate',
+    dark: { incoming: { background: '#29384b', text: '#edf4ff', border: '#465b73' }, outgoing: { background: '#345f92', text: '#ffffff', border: '#527cb0' } },
+    light: { incoming: { background: '#eef4fc', text: '#233952', border: '#cbd9ea' }, outgoing: { background: '#bdd5f5', text: '#1c3554', border: '#91b5e2' } },
+  },
+  {
+    id: 'evergreen', name: 'Evergreen', description: 'Botanical green and soft sage',
+    dark: { incoming: { background: '#293a2e', text: '#eef6ef', border: '#465c4b' }, outgoing: { background: '#376849', text: '#ffffff', border: '#578564' } },
+    light: { incoming: { background: '#eff7f1', text: '#294230', border: '#d0e2d3' }, outgoing: { background: '#c8e4d0', text: '#1f3e2b', border: '#a2ccad' } },
+  },
+  {
+    id: 'ember', name: 'Ember', description: 'Warm bronze and amber stone',
+    dark: { incoming: { background: '#453326', text: '#fff3e7', border: '#68503b' }, outgoing: { background: '#88522e', text: '#ffffff', border: '#aa7149' } },
+    light: { incoming: { background: '#fbf1e5', text: '#523c28', border: '#ead7bf' }, outgoing: { background: '#f2d4b6', text: '#53351f', border: '#ddb48d' } },
+  },
+  {
+    id: 'amethyst', name: 'Amethyst', description: 'Muted violet and cool lilac',
+    dark: { incoming: { background: '#33283f', text: '#f4edff', border: '#514362' }, outgoing: { background: '#654783', text: '#ffffff', border: '#8464a0' } },
+    light: { incoming: { background: '#f6f1fc', text: '#403455', border: '#ded3ec' }, outgoing: { background: '#dcccf2', text: '#35224c', border: '#c3addf' } },
+  },
+  {
+    id: 'rosewood', name: 'Rosewood', description: 'Muted berry and soft rose',
+    dark: { incoming: { background: '#432933', text: '#fff0f3', border: '#65404d' }, outgoing: { background: '#8a475b', text: '#ffffff', border: '#aa6677' } },
+    light: { incoming: { background: '#fcf0f3', text: '#4d2f39', border: '#e7ccd3' }, outgoing: { background: '#f1cbd4', text: '#512636', border: '#dbaab7' } },
+  },
 ];
 
 export const FONT_SIZES: Array<{ id: FontSizeSetting; name: string; description: string; scale?: string }> = [
@@ -129,6 +177,7 @@ export interface AppearancePreferences {
   accent: AccentColor;
   wallpaper: ChatWallpaper;
   bubbleStyle: BubbleStyle;
+  bubblePalette: BubblePaletteId;
   fontSize: FontSizeSetting;
 }
 
@@ -137,6 +186,7 @@ const STORAGE_KEYS = {
   accent: 'veil:accent',
   wallpaper: 'veil:wallpaper',
   bubbleStyle: 'veil:bubble_style',
+  bubblePalette: 'veil:bubble_palette',
   fontSize: 'veil:font_size',
   lastBuiltInWallpaper: 'veil:wallpaper:last_builtin',
 };
@@ -195,6 +245,7 @@ export class ThemeManager {
     let accent: AccentColor = 'teal';
     let wallpaper: ChatWallpaper = 'default';
     let bubbleStyle: BubbleStyle = 'modern';
+    let bubblePalette: BubblePaletteId = 'veil';
     let fontSize: FontSizeSetting = 'default';
 
     const savedTheme = getStorageItem(STORAGE_KEYS.theme) as ThemeMode;
@@ -218,12 +269,17 @@ export class ThemeManager {
       bubbleStyle = savedBubble;
     }
 
+    const savedBubblePalette = getStorageItem(STORAGE_KEYS.bubblePalette) as BubblePaletteId;
+    if (savedBubblePalette === 'veil' || BUBBLE_PALETTES.some((palette) => palette.id === savedBubblePalette)) {
+      bubblePalette = savedBubblePalette;
+    }
+
     const savedSize = getStorageItem(STORAGE_KEYS.fontSize) as FontSizeSetting;
     if (savedSize === 'small' || savedSize === 'default' || savedSize === 'large') {
       fontSize = savedSize;
     }
 
-    return { theme, accent, wallpaper, bubbleStyle, fontSize };
+    return { theme, accent, wallpaper, bubbleStyle, bubblePalette, fontSize };
   }
 
   public getPreferences(): AppearancePreferences {
@@ -270,6 +326,14 @@ export class ThemeManager {
     this.notify();
   }
 
+  public setBubblePalette(bubblePalette: BubblePaletteId): void {
+    if (bubblePalette !== 'veil' && !BUBBLE_PALETTES.some((palette) => palette.id === bubblePalette)) return;
+    this.prefs.bubblePalette = bubblePalette;
+    setStorageItem(STORAGE_KEYS.bubblePalette, bubblePalette);
+    this.applyToDOM();
+    this.notify();
+  }
+
   public setFontSize(fontSize: FontSizeSetting): void {
     this.prefs.fontSize = fontSize;
     setStorageItem(STORAGE_KEYS.fontSize, fontSize);
@@ -292,12 +356,14 @@ export class ThemeManager {
       accent: 'teal',
       wallpaper: 'default',
       bubbleStyle: 'modern',
+      bubblePalette: 'veil',
       fontSize: 'default',
     };
     setStorageItem(STORAGE_KEYS.theme, this.prefs.theme);
     setStorageItem(STORAGE_KEYS.accent, this.prefs.accent);
     setStorageItem(STORAGE_KEYS.wallpaper, this.prefs.wallpaper);
     setStorageItem(STORAGE_KEYS.bubbleStyle, this.prefs.bubbleStyle);
+    setStorageItem(STORAGE_KEYS.bubblePalette, this.prefs.bubblePalette);
     setStorageItem(STORAGE_KEYS.fontSize, this.prefs.fontSize);
     this.applyToDOM();
     this.notify();
@@ -319,6 +385,10 @@ export class ThemeManager {
     return this.prefs.bubbleStyle;
   }
 
+  public getBubblePalette(): BubblePaletteId {
+    return this.prefs.bubblePalette;
+  }
+
   public getFontSize(): FontSizeSetting {
     return this.prefs.fontSize;
   }
@@ -337,6 +407,7 @@ export class ThemeManager {
     root.setAttribute('data-theme', this.prefs.theme);
     root.setAttribute('data-accent', this.prefs.accent);
     root.setAttribute('data-bubble-style', this.prefs.bubbleStyle);
+    root.setAttribute('data-bubble-palette', this.prefs.bubblePalette);
     root.setAttribute('data-font-size', this.prefs.fontSize);
     root.setAttribute('data-wallpaper', this.prefs.wallpaper);
 
@@ -347,10 +418,27 @@ export class ThemeManager {
     root.style.setProperty('--veil-accent-primary-subtle', activeAccent.subtle);
     root.style.setProperty('--veil-accent-primary-alpha', activeAccent.alpha);
 
-    // Set outgoing bubble color based on accent (dark muted shade for readable white text)
+    // Keep VEIL Default tied to the selected accent; curated palettes use paired tokens below.
     const bubbleColor = ACCENT_BUBBLE_COLORS[this.prefs.accent];
-    if (bubbleColor) {
+    if (this.prefs.bubblePalette === 'veil' && bubbleColor) {
       root.style.setProperty('--veil-bubble-outgoing', bubbleColor);
+      root.style.removeProperty('--veil-bubble-outgoing-text');
+      root.style.removeProperty('--veil-bubble-outgoing-border');
+      root.style.removeProperty('--veil-bubble-incoming');
+      root.style.removeProperty('--veil-bubble-incoming-text');
+      root.style.removeProperty('--veil-bubble-incoming-border');
+    } else {
+      const palette = BUBBLE_PALETTES.find(({ id }) => id === this.prefs.bubblePalette);
+      const lightTheme = ['light', 'porcelain', 'glacier'].includes(this.prefs.theme);
+      const surfaces = lightTheme ? palette?.light : palette?.dark;
+      if (surfaces) {
+        root.style.setProperty('--veil-bubble-outgoing', surfaces.outgoing.background);
+        root.style.setProperty('--veil-bubble-outgoing-text', surfaces.outgoing.text);
+        root.style.setProperty('--veil-bubble-outgoing-border', surfaces.outgoing.border);
+        root.style.setProperty('--veil-bubble-incoming', surfaces.incoming.background);
+        root.style.setProperty('--veil-bubble-incoming-text', surfaces.incoming.text);
+        root.style.setProperty('--veil-bubble-incoming-border', surfaces.incoming.border);
+      }
     }
   }
 

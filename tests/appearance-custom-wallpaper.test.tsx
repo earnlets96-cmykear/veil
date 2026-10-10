@@ -26,4 +26,15 @@ describe('Appearance wallpaper controls', () => {
     expect(markup).toContain('Canyon');
     expect(markup).toContain('Aurora');
   });
+
+  it('renders paired, accessible bubble palette choices and selected live preview state', () => {
+    const markup = renderToStaticMarkup(<AppearanceSettingsView />);
+    for (const name of ['VEIL Default', 'Deep Sea', 'Arctic', 'Evergreen', 'Ember', 'Amethyst', 'Rosewood']) {
+      expect(markup).toContain(`${name} bubble palette`);
+    }
+    expect(markup.match(/class="veil-bubble-palette-sample is-incoming"/g)).toHaveLength(7);
+    expect(markup.match(/class="veil-bubble-palette-sample is-outgoing"/g)).toHaveLength(7);
+    expect(markup).toContain('data-bubble-palette="veil"');
+    expect(markup).toContain('aria-label="VEIL Default bubble palette, selected"');
+  });
 });

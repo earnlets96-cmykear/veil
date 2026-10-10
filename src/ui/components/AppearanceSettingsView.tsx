@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ACCENT_PALETTE,
+  BUBBLE_PALETTES,
   BUBBLE_STYLES,
   FONT_SIZES,
   THEME_OPTIONS,
   WALLPAPERS,
   themeManager,
   type AppearancePreferences,
+  type BubblePaletteId,
   type BubbleStyle,
   type FontSizeSetting,
 } from '../utils/themeManager.ts';
@@ -21,6 +23,7 @@ interface AppearanceSettingsViewProps {
 }
 
 const THEME_COLLECTIONS = ['Minimal', 'Nature', 'Expressive'] as const;
+const BUBBLE_PALETTE_IDS: BubblePaletteId[] = ['veil', ...BUBBLE_PALETTES.map(({ id }) => id)];
 
 export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ onBack }) => {
   const [preferences, setPreferences] = useState<AppearancePreferences>(() => themeManager.getPreferences());
@@ -103,6 +106,7 @@ export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ 
           className={`veil-appearance-preview veil-wallpaper-pattern--${preferences.wallpaper}${currentCuratedWallpaper ? ` ${currentCuratedWallpaper.patternClass}` : ''}`}
           data-wallpaper={preferences.wallpaper}
           data-bubble-style={preferences.bubbleStyle}
+          data-bubble-palette={preferences.bubblePalette}
         >
           <div className="veil-appearance-preview-topline">
             <span className="veil-appearance-preview-avatar" aria-hidden="true">M</span>
@@ -176,6 +180,55 @@ export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ 
                 onClick={() => themeManager.setAccent(color.id)}
               >
                 {selected && <CheckIcon size={15} />}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="veil-appearance-section" aria-labelledby="appearance-bubble-palette-title">
+        <div className="veil-appearance-section-heading">
+          <div><h3 id="appearance-bubble-palette-title">Bubble palette</h3><p>Pair incoming and outgoing colors</p></div>
+          <span className="veil-appearance-current" aria-live="polite">
+            {preferences.bubblePalette === 'veil' ? 'VEIL Default' : BUBBLE_PALETTES.find(({ id }) => id === preferences.bubblePalette)?.name}
+          </span>
+        </div>
+        <div className="veil-bubble-palette-grid" role="group" aria-label="Message bubble palette">
+          {BUBBLE_PALETTE_IDS.map((paletteId) => {
+            const palette = BUBBLE_PALETTES.find(({ id }) => id === paletteId);
+            const isLightTheme = ['light', 'porcelain', 'glacier'].includes(preferences.theme);
+            const surfaces = isLightTheme ? palette?.light : palette?.dark;
+            const selected = preferences.bubblePalette === paletteId;
+            const paletteName = palette?.name ?? 'VEIL Default';
+            return (
+              <button
+                key={paletteId}
+                type="button"
+                aria-label={`${paletteName} bubble palette${selected ? ', selected' : ''}`}
+                aria-pressed={selected}
+                className={`veil-bubble-palette-option${selected ? ' is-selected' : ''}`}
+                onClick={() => themeManager.setBubblePalette(paletteId)}
+              >
+                <span className="veil-bubble-palette-samples" aria-hidden="true">
+                  <span
+                    className="veil-bubble-palette-sample is-incoming"
+                    style={surfaces ? {
+                      '--sample-background': surfaces.incoming.background,
+                      '--sample-text': surfaces.incoming.text,
+                      '--sample-border': surfaces.incoming.border,
+                    } as React.CSSProperties : undefined}
+                  >Incoming</span>
+                  <span
+                    className="veil-bubble-palette-sample is-outgoing"
+                    style={surfaces ? {
+                      '--sample-background': surfaces.outgoing.background,
+                      '--sample-text': surfaces.outgoing.text,
+                      '--sample-border': surfaces.outgoing.border,
+                    } as React.CSSProperties : undefined}
+                  >Outgoing</span>
+                </span>
+                <span className="veil-bubble-palette-copy"><strong>{paletteName}</strong><small>{palette?.description ?? 'Use your current accent colors'}</small></span>
+                {selected && <CheckIcon size={16} className="veil-theme-option-check" />}
               </button>
             );
           })}
