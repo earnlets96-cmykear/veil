@@ -381,7 +381,7 @@ export const Sidebar: React.FC = () => {
     tabSwipeStartRef.current = {
       x: event.touches[0].clientX,
       y: event.touches[0].clientY,
-      startedOnControl: Boolean(target?.closest('button, a, input, textarea, select, [role="slider"]')),
+      startedOnControl: Boolean(target?.closest('button, a, input, textarea, select, [role="button"], [role="slider"]')),
     };
   };
 
