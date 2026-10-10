@@ -342,11 +342,77 @@ export const Sidebar: React.FC = () => {
   const [isSearchingDirectory, setIsSearchingDirectory] = useState(false);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
+  const quickMenuRef = useRef<HTMLDivElement | null>(null);
+  const tabSwipeStartRef = useRef<{ x: number; y: number; startedOnControl: boolean } | null>(null);
+  const suppressListClickUntilRef = useRef(0);
   const [deleteTarget, setDeleteTarget] = useState<UIConversation | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingChat, setIsDeletingChat] = useState(false);
 
   const debounceTimerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!showQuickMenu) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !quickMenuRef.current?.contains(event.target)) {
+        setShowQuickMenu(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowQuickMenu(false);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showQuickMenu]);
+
+  const handleTabSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (event.touches.length !== 1) {
+      tabSwipeStartRef.current = null;
+      return;
+    }
+
+    const target = event.target instanceof Element ? event.target : null;
+    tabSwipeStartRef.current = {
+      x: event.touches[0].clientX,
+      y: event.touches[0].clientY,
+      startedOnControl: Boolean(target?.closest('button, a, input, textarea, select, [role="slider"]')),
+    };
+  };
+
+  const handleTabSwipeMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = tabSwipeStartRef.current;
+    if (!start || start.startedOnControl || event.touches.length !== 1 || searchQuery.trim()) return;
+
+    const deltaX = event.touches[0].clientX - start.x;
+    const deltaY = event.touches[0].clientY - start.y;
+    if (Math.abs(deltaX) > 12 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
+      event.preventDefault();
+    }
+  };
+
+  const handleTabSwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = tabSwipeStartRef.current;
+    tabSwipeStartRef.current = null;
+    if (!start || start.startedOnControl || searchQuery.trim() || event.changedTouches.length !== 1) return;
+
+    const deltaX = event.changedTouches[0].clientX - start.x;
+    const deltaY = event.changedTouches[0].clientY - start.y;
+    if (Math.abs(deltaX) < 50 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+
+    const tabs = ['all', 'unread', 'group'] as const;
+    const currentIndex = tabs.indexOf(activeChip);
+    const nextIndex = Math.max(0, Math.min(tabs.length - 1, currentIndex + (deltaX < 0 ? 1 : -1)));
+    if (nextIndex !== currentIndex) {
+      setActiveChip(tabs[nextIndex]);
+      suppressListClickUntilRef.current = Date.now() + 700;
+    }
+  };
 
   // Debounced Global Directory Search
   useEffect(() => {
@@ -568,11 +634,13 @@ export const Sidebar: React.FC = () => {
           </button>
 
           {/* Quick Lock Dropdown Trigger */}
-          <div style={{ position: 'relative' }}>
+          <div ref={quickMenuRef} style={{ position: 'relative' }}>
             <button
               type="button"
               onClick={() => setShowQuickMenu((prev) => !prev)}
               aria-label="Security Menu"
+              aria-haspopup="menu"
+              aria-expanded={showQuickMenu}
               title="Security & Lock Options"
               style={{
                 background: 'none',
@@ -591,6 +659,7 @@ export const Sidebar: React.FC = () => {
 
             {showQuickMenu && (
               <div
+                role="menu"
                 style={{
                   position: 'absolute',
                   right: 0,
@@ -755,9 +824,21 @@ export const Sidebar: React.FC = () => {
       {/* Conversation / Contacts / Unified Search List */}
       <div
         className="veil-conversation-list"
+        onTouchStart={handleTabSwipeStart}
+        onTouchMove={handleTabSwipeMove}
+        onTouchEnd={handleTabSwipeEnd}
+        onTouchCancel={() => { tabSwipeStartRef.current = null; }}
+        onClickCapture={(event) => {
+          if (Date.now() < suppressListClickUntilRef.current) {
+            suppressListClickUntilRef.current = 0;
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
         style={{
           flex: 1,
           overflowY: 'auto',
+          touchAction: 'pan-y',
           padding: '0 0.5rem',
         }}
       >
@@ -978,7 +1059,7 @@ export const Sidebar: React.FC = () => {
         title="Start New Chat"
         style={{
           position: 'absolute',
-          bottom: '24px',
+          bottom: 'calc(40px + env(safe-area-inset-bottom, 0px))',
           right: '18px',
           width: '52px',
           height: '52px',
