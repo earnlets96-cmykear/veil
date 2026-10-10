@@ -3451,7 +3451,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
         } else {
           updateTimeline(activeAttachments, 'FAILED');
-          throw new Error('One or more attachments failed to upload.');
+          const failureReason = activeAttachments.find((attachment) => attachment.state === 'FAILED')?.error;
+          throw new Error(failureReason || 'One or more attachments failed to upload.');
         }
       })();
     },

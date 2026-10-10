@@ -23,6 +23,7 @@ import {
   type DeviceMediaType,
   NativeDeviceMediaBridge,
 } from '../../../media/NativeDeviceMediaBridge.ts';
+import { attachmentSendFailureMessage } from '../../../attachments/attachmentSendError.ts';
 import { useApp } from '../../app/AppState.tsx';
 
 export interface MediaPickerSendOptions {
@@ -245,8 +246,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       fileToUriMapRef.current.clear();
       fileMetadataRef.current.clear();
       onClose();
-    } catch {
-      setSendError('Sending failed. Your selected files are still here; please try again.');
+    } catch (error) {
+      setSendError(attachmentSendFailureMessage(error));
     } finally {
       setIsSending(false);
     }

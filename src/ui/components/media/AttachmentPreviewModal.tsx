@@ -18,6 +18,7 @@ import {
 } from '../icons/index.ts';
 import { Button, IconButton } from '../ui/index.ts';
 import { inferMediaMime } from '../../../attachments/mimeUtils.ts';
+import { attachmentSendFailureMessage } from '../../../attachments/attachmentSendError.ts';
 
 export interface StagedAttachment {
   file: File;
@@ -81,8 +82,8 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
     setSendError('');
     try {
       await onConfirmSend(staged.map((s) => s.file), caption.trim() || undefined);
-    } catch {
-      setSendError('Sending failed. Your selected files are still here; please try again.');
+    } catch (error) {
+      setSendError(attachmentSendFailureMessage(error));
     } finally {
       setIsSending(false);
     }

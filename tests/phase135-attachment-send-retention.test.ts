@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { attachmentSendFailureMessage } from '../src/attachments/attachmentSendError.ts';
 
 const source = (relativePath: string) =>
   fs.readFileSync(path.resolve(__dirname, relativePath), 'utf8').replace(/\r\n/g, '\n');
 
 describe('Phase 135: Attachment send selection retention', () => {
+  it('explains auth, file-read, and connection failures without showing raw errors', () => {
+    expect(attachmentSendFailureMessage(new Error('Cloud authentication is unavailable'))).toContain('Reopen and unlock this Space');
+    expect(attachmentSendFailureMessage(new Error('Unable to read selected media chunk'))).toContain('select it again');
+    expect(attachmentSendFailureMessage(new Error('Unable to connect to storage at https://private.example'))).toContain('Check your connection');
+    expect(attachmentSendFailureMessage(new Error('Unable to connect to storage at https://private.example'))).not.toContain('private.example');
+  });
+
   it('waits for media sends before clearing the selected files and closing the picker', () => {
     const picker = source('../src/ui/components/media/MediaPickerModal.tsx');
     const confirm = picker.slice(picker.indexOf('const handleConfirmSend'), picker.indexOf('const formatFileSize'));
@@ -61,6 +69,7 @@ describe('Phase 135: Attachment send selection retention', () => {
     const worker = send.slice(send.indexOf('// 3. Perform bounded encryption'));
 
     expect(worker).toMatch(/await\s+\(async\s*\(\)\s*=>/);
-    expect(worker).toContain('throw new Error');
+    expect(worker).toContain("activeAttachments.find((attachment) => attachment.state === 'FAILED')?.error");
+    expect(worker).toMatch(/throw new Error\(failureReason/);
   });
 });
