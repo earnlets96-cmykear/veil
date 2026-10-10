@@ -258,7 +258,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
 
   useEffect(() => {
     // Avoid eagerly extracting video thumbnails when an existing server/cached thumbnail exists
-    if (!isVideoMedia || !displayUrl || durableThumbnail || attachment.thumbnailUrl) return;
+    if (!isNearViewport || !isVideoMedia || !displayUrl || durableThumbnail || attachment.thumbnailUrl) return;
 
     let isCancelled = false;
     let idleHandle: any = null;
@@ -316,7 +316,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
         } catch (_e) {}
       }
     };
-  }, [isVideoMedia, displayUrl, media, attachment.mimeType, durableThumbnail, attachment.thumbnailUrl]);
+  }, [isVideoMedia, displayUrl, media, attachment.mimeType, durableThumbnail, attachment.thumbnailUrl, isNearViewport]);
 
   if (isLoading && !displayUrl) {
     return (
@@ -395,7 +395,7 @@ const MediaImageComponent: React.FC<MediaImageProps> = ({
             <video
               src={displayUrl}
               className="veil-media-thumbnail-img veil-media-thumbnail-video"
-              preload="metadata"
+              preload="none"
               muted
               playsInline
               onError={handleMediaError}

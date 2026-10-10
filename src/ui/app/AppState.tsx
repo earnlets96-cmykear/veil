@@ -3211,7 +3211,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
               await requireCloudSessionForAttachment(cloudClient, () => ensureCloudSession(activeSession));
 
-              let objectId = `obj_${Date.now()}_${bytesToHex(randomBytes(6))}`;
+              let objectId = '';
               const uploadWithSession = async () => {
                 const createParams: any = {
                   attachmentId: currentAtt.attachmentId,
@@ -3257,16 +3257,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   }));
                 };
 
-                const createRes = await cloudClient.createAttachment(createParams);
-                objectId = createRes.attachment.objectId;
-                await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
-                  state: 'UPLOADING',
-                  attachment: { ...prepared.attachment, objectId },
-                });
+                if (!objectId) {
+                  const createRes = await cloudClient.createAttachment(createParams);
+                  objectId = createRes.attachment.objectId;
+                  await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
+                    state: 'UPLOADING',
+                    attachment: { ...prepared.attachment, objectId },
+                  });
+                }
                 await cloudClient.uploadAttachment(objectId, prepared.ciphertext, onProgress, prepared.attachment.ciphertextHash);
               };
-
-              const uploadTimeoutMs = Math.max(180000, Math.ceil(file.size / 50000) * 1000);
 
               RuntimeDiagnostics.upload('uploadStarted', {
                 attachmentId: currentAtt.attachmentId,
@@ -3275,26 +3275,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
 
               try {
-                const timeoutPromise = new Promise<never>((_, reject) =>
-                  setTimeout(
-                    () => reject(new Error(`Upload timeout (${Math.round(uploadTimeoutMs / 1000)}s limit exceeded)`)),
-                    uploadTimeoutMs
-                  )
-                );
-                await Promise.race([uploadWithSession(), timeoutPromise]);
+                await uploadWithSession();
               } catch (uploadErr: any) {
                 const reauthed = await ensureCloudSession(activeSession, true);
-                if (reauthed) {
-                  const timeoutPromise = new Promise<never>((_, reject) =>
-                    setTimeout(
-                      () => reject(new Error(`Upload timeout (${Math.round(uploadTimeoutMs / 1000)}s limit exceeded)`)),
-                      uploadTimeoutMs
-                    )
-                  );
-                  await Promise.race([uploadWithSession(), timeoutPromise]);
-                } else {
+                if (!reauthed) {
                   throw uploadErr;
                 }
+                await uploadWithSession();
               }
 
               setUploadProgress((prev) => {

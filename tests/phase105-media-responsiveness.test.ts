@@ -73,6 +73,28 @@ describe('Phase 105 media responsiveness', () => {
     expect(mediaImage).toContain('if (!isNearViewport) return;');
   });
 
+  it('defers video thumbnail decoding and metadata loading until needed', () => {
+    const mediaImage = fs.readFileSync(path.resolve('src/ui/components/media/MediaImage.tsx'), 'utf8');
+    const thumbnailStart = mediaImage.indexOf('// Avoid eagerly extracting video thumbnails');
+    const thumbnailEnd = mediaImage.indexOf('if (isLoading && !displayUrl)', thumbnailStart);
+    const thumbnailEffect = mediaImage.slice(thumbnailStart, thumbnailEnd);
+
+    expect(thumbnailEffect).toContain('if (!isNearViewport || !isVideoMedia || !displayUrl');
+    expect(thumbnailEffect).toMatch(/\}, \[isVideoMedia, displayUrl, media, attachment\.mimeType, durableThumbnail, attachment\.thumbnailUrl, isNearViewport\]\);/);
+    expect(mediaImage).toContain('preload="none"');
+  });
+
+  it('does not start a competing upload timeout or recreate the attachment on retry', () => {
+    const appState = fs.readFileSync(path.resolve('src/ui/app/AppState.tsx'), 'utf8');
+    const uploadStart = appState.indexOf('const uploadWithSession = async () =>');
+    const uploadEnd = appState.indexOf('setUploadProgress((prev) => {', appState.indexOf("RuntimeDiagnostics.upload('uploadCompleted'", uploadStart));
+    const uploadBlock = appState.slice(uploadStart, uploadEnd);
+
+    expect(uploadBlock).not.toContain('Promise.race([uploadWithSession(), timeoutPromise])');
+    expect(uploadBlock).toContain('ensureCloudSession(activeSession, true)');
+    expect(uploadBlock).toContain('if (!objectId)');
+  });
+
   it('offers the sticker pack from a sent sticker and persists its pack identity in the filename', () => {
     const composer = fs.readFileSync(path.resolve('src/ui/components/MessageComposer.tsx'), 'utf8');
     const conversation = fs.readFileSync(path.resolve('src/ui/components/ConversationView.tsx'), 'utf8');
