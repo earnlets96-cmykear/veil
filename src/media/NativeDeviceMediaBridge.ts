@@ -134,10 +134,11 @@ export class NativeDeviceMediaBridge {
     }
   }
 
-  public async fileFromUri(uri: string): Promise<File> {
+  public async fileFromUri(uri: string, onProgress?: (loadedBytes: number, totalBytes: number) => void): Promise<File> {
     const chunkSize = 1024 * 1024;
     const parts: Uint8Array[] = [];
     let metadata: { name: string; mimeType: string; sizeBytes: number } | undefined;
+    onProgress?.(0, 0);
     for (let offset = 0; ; offset += chunkSize) {
       const response = await this.readMediaChunk(uri, offset, chunkSize);
       metadata ||= {
@@ -154,6 +155,7 @@ export class NativeDeviceMediaBridge {
       }
       if (bytes.length > chunkSize) throw new Error('Selected media returned an invalid chunk');
       if (bytes.length > 0) parts.push(bytes);
+      onProgress?.(offset + bytes.length, metadata.sizeBytes);
 
       const isLast = response.isLast ?? offset + bytes.length >= metadata.sizeBytes;
       if (isLast) break;

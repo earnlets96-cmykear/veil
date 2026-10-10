@@ -14,13 +14,22 @@ describe('Phase 135: Attachment send selection retention', () => {
     expect(attachmentSendFailureMessage(new Error('Unable to connect to storage at https://private.example'))).not.toContain('private.example');
   });
 
-  it('waits for media sends before clearing the selected files and closing the picker', () => {
+  it('retains files for source-read errors, then closes only after optimistic upload starts', () => {
     const picker = source('../src/ui/components/media/MediaPickerModal.tsx');
     const confirm = picker.slice(picker.indexOf('const handleConfirmSend'), picker.indexOf('const formatFileSize'));
+    const appState = source('../src/ui/app/AppState.tsx');
+    const send = appState.slice(appState.indexOf('const sendAttachments ='), appState.indexOf('const sendAttachment ='));
+    const optimisticStart = send.indexOf('options?.onUploadStarted?.()');
+    const uploadWorkerStart = send.indexOf('// 3. Perform bounded encryption');
 
-    expect(confirm).toMatch(/await\s+onSend\(/);
-    expect(confirm.indexOf('await onSend(')).toBeLessThan(confirm.indexOf('setSelectedFiles([])'));
-    expect(confirm.indexOf('await onSend(')).toBeLessThan(confirm.indexOf('onClose()'));
+    expect(confirm).toContain('await deviceMedia.fileFromUri(uri');
+    expect(confirm).toContain('onUploadStarted: closeAfterUploadStarts');
+    expect(confirm).toMatch(/const closeAfterUploadStarts = \(\) => \{[\s\S]*?setSelectedFiles\(\[\]\);[\s\S]*?onClose\(\);/);
+    expect(confirm).toContain('setSelectedFiles([])');
+    expect(confirm).toContain('onClose()');
+    expect(optimisticStart).toBeGreaterThan(-1);
+    expect(optimisticStart).toBeLessThan(uploadWorkerStart);
+    expect(send.slice(0, optimisticStart)).toContain('setMessages((prev) =>');
     expect(picker).toContain('role="alert"');
   });
 
@@ -51,8 +60,19 @@ describe('Phase 135: Attachment send selection retention', () => {
 
     expect(stage).toContain('createSelectionPlaceholder(item)');
     expect(stage).not.toContain('fileFromUri');
-    expect(confirm).toContain('await deviceMedia.fileFromUri(uri)');
+    expect(confirm).toContain('await deviceMedia.fileFromUri(uri,');
     expect(confirm).toContain('await onSend(');
+  });
+
+  it('keeps the media picker out of the broad app context and indexes selections once per render', () => {
+    const picker = source('../src/ui/components/media/MediaPickerModal.tsx');
+
+    expect(picker).not.toContain('useApp()');
+    expect(picker).toContain('stagedIndexByUri');
+    expect(picker).toContain('stagedIndexByUri.get(item.uri)');
+    expect(picker).not.toContain('Array.from(stagedUris)');
+    expect(picker).toContain('React.memo<RecentMediaCellProps>');
+    expect(picker).toContain('onToggle={handleToggleRecentItem}');
   });
 
   it('ignores stale recent-media queries after the person switches picker tabs', () => {

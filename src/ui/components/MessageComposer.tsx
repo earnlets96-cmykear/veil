@@ -173,9 +173,15 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
   const handleMediaPickerSend = async (options: MediaPickerSendOptions) => {
     const trimmedCaption = options.caption?.trim() || undefined;
     if (options.files.length === 1) {
-      await sendAttachment(conversationId, options.files[0], { caption: trimmedCaption });
+      await sendAttachment(conversationId, options.files[0], {
+        caption: trimmedCaption,
+        onUploadStarted: options.onUploadStarted,
+      });
     } else if (options.files.length > 1) {
-      await sendAttachments(conversationId, options.files, { caption: trimmedCaption });
+      await sendAttachments(conversationId, options.files, {
+        caption: trimmedCaption,
+        onUploadStarted: options.onUploadStarted,
+      });
     }
   };
 

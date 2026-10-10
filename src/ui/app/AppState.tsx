@@ -305,8 +305,8 @@ export interface AppContextType {
   selectConversation: (id: string | null) => void;
   setReplyTarget: (msg: UIMessage | null) => void;
   sendMessage: (conversationId: string, text: string, options?: { forwarded?: boolean; forwardedFrom?: string }) => Promise<void>;
-  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
-  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
+  sendAttachment: (conversationId: string, file: File, options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined>; onUploadStarted?: () => void }) => Promise<void>;
+  sendAttachments: (conversationId: string, files: File[], options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined>; onUploadStarted?: () => void }) => Promise<void>;
   sendVoiceMessage: (conversationId: string, durationSeconds: number, audioBlob: Blob, mimeType: string, options?: { forwarded?: boolean; forwardedFrom?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }) => Promise<void>;
   setSearchQuery: (query: string) => void;
   deleteMessageLocally: (conversationId: string, messageId: string) => Promise<void>;
@@ -2966,7 +2966,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       files: File[],
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined>; onUploadStarted?: () => void }
     ) => {
       if (!activeSession || files.length === 0) return;
 
@@ -3120,6 +3120,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
+
+      // The composer can dismiss the media picker now that the outgoing message
+      // is visible and upload progress continues in the conversation.
+      options?.onUploadStarted?.();
 
       // 3. Perform bounded encryption, cloud upload (MAX CONCURRENCY = 2) and wire dispatch
       await (async () => {
@@ -3511,7 +3515,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       file: File,
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined> }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined>; onUploadStarted?: () => void }
     ) => {
       return sendAttachments(conversationId, [file], options);
     },

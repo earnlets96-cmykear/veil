@@ -77,6 +77,7 @@ describe('Phase 74: native device media bridge', () => {
     const nativeBytes = new Uint8Array(2 * 1024 * 1024 + 5);
     nativeBytes.fill(7);
     const chunkCalls: Array<{ offset: number; length: number }> = [];
+    const progress: Array<[number, number]> = [];
     const bridge = NativeDeviceMediaBridge.createForTesting({
       isNative: () => true,
       readMediaChunk: async ({ offset, length }) => {
@@ -93,11 +94,19 @@ describe('Phase 74: native device media bridge', () => {
       },
     });
 
-    const file = await bridge.fileFromUri('content://media/large-video');
+    const file = await bridge.fileFromUri('content://media/large-video', (loadedBytes, totalBytes) => {
+      progress.push([loadedBytes, totalBytes]);
+    });
 
     expect(file.size).toBe(nativeBytes.length);
     expect(chunkCalls.length).toBeGreaterThan(1);
     expect(Math.max(...chunkCalls.map((call) => call.length))).toBeLessThanOrEqual(1024 * 1024);
     expect(chunkCalls.map((call) => call.offset)).toEqual([0, 1024 * 1024, 2 * 1024 * 1024]);
+    expect(progress).toEqual([
+      [0, 0],
+      [1024 * 1024, nativeBytes.length],
+      [2 * 1024 * 1024, nativeBytes.length],
+      [nativeBytes.length, nativeBytes.length],
+    ]);
   });
 });

@@ -24,11 +24,11 @@ import {
   NativeDeviceMediaBridge,
 } from '../../../media/NativeDeviceMediaBridge.ts';
 import { attachmentSendFailureMessage } from '../../../attachments/attachmentSendError.ts';
-import { useApp } from '../../app/AppState.tsx';
 
 export interface MediaPickerSendOptions {
   files: File[];
   caption?: string;
+  onUploadStarted?: () => void;
 }
 
 export interface MediaPickerModalProps {
@@ -41,10 +41,10 @@ interface RecentMediaCellProps {
   item: DeviceMediaItem;
   isSelected: boolean;
   stagedIndex: number;
-  onClick: () => void;
+  onToggle: (item: DeviceMediaItem) => void;
 }
 
-const RecentMediaCell: React.FC<RecentMediaCellProps> = ({ item, isSelected, stagedIndex, onClick }) => {
+const RecentMediaCellComponent: React.FC<RecentMediaCellProps> = ({ item, isSelected, stagedIndex, onToggle }) => {
   const cellRef = useRef<HTMLButtonElement>(null);
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState(item.thumbnailDataUrl);
 
@@ -85,7 +85,7 @@ const RecentMediaCell: React.FC<RecentMediaCellProps> = ({ item, isSelected, sta
       className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
       aria-label={`Attach ${item.name}`}
       aria-pressed={isSelected}
-      onClick={onClick}
+      onClick={() => onToggle(item)}
     >
       {thumbnailDataUrl ? (
         <img
@@ -114,6 +114,8 @@ const RecentMediaCell: React.FC<RecentMediaCellProps> = ({ item, isSelected, sta
   );
 };
 
+const RecentMediaCell = React.memo<RecentMediaCellProps>(RecentMediaCellComponent);
+
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   isOpen,
   onClose,
@@ -124,6 +126,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [caption, setCaption] = useState('');
   const [sendError, setSendError] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sendStage, setSendStage] = useState<'preparing' | 'starting'>('preparing');
+  const [readProgress, setReadProgress] = useState<{ name: string; fileIndex: number; fileCount: number; loadedBytes: number; totalBytes: number } | null>(null);
   const [recentItems, setRecentItems] = useState<DeviceMediaItem[]>([]);
   const [recentStatus, setRecentStatus] = useState<'idle' | 'loading' | 'ready' | 'denied' | 'error'>('idle');
   const [recentCursor, setRecentCursor] = useState<string | undefined>(undefined);
@@ -138,14 +142,14 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const recentRequestIdRef = useRef(0);
   const deviceMedia = NativeDeviceMediaBridge.getInstance();
 
-  let markFilePickerActive: (() => void) | undefined;
-  try {
-    const app = useApp();
-    markFilePickerActive = app.markFilePickerActive;
-  } catch (_e) {}
+  const stagedIndexByUri = React.useMemo(() => {
+    const indices = new Map<string, number>();
+    let index = 0;
+    for (const uri of stagedUris) indices.set(uri, index++);
+    return indices;
+  }, [stagedUris]);
 
   const notifyPickerLaunch = () => {
-    markFilePickerActive?.();
     NativeDeviceMediaBridge.notifyPickerActive(true);
   };
 
@@ -223,6 +227,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       await stageDeviceItems([item]);
     }
   };
+
+  const toggleDeviceItemRef = useRef(toggleDeviceItem);
+  toggleDeviceItemRef.current = toggleDeviceItem;
+  const handleToggleRecentItem = React.useCallback((item: DeviceMediaItem) => {
+    void toggleDeviceItemRef.current(item);
+  }, []);
 
   const openRecent = async (types: DeviceMediaType[] = ['image'], triggerFallbackDialog = false) => {
     if (!deviceMedia.isNative()) {
@@ -307,26 +317,60 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const handleConfirmSend = async () => {
     if (selectedFiles.length === 0 || isSending) return;
     setIsSending(true);
+    setSendStage('preparing');
     setSendError('');
-    try {
-      const filesToSend: File[] = [];
-      for (const file of selectedFiles) {
-        const uri = fileToUriMapRef.current.get(file);
-        filesToSend.push(uri ? await deviceMedia.fileFromUri(uri) : file);
-      }
-      await onSend({
-        files: filesToSend,
-        caption: caption.trim() || undefined,
-      });
+    let closedAtUploadStart = false;
+    const closeAfterUploadStarts = () => {
+      if (closedAtUploadStart) return;
+      closedAtUploadStart = true;
       setSelectedFiles([]);
       setCaption('');
+      setStagedUris(new Set());
       fileToUriMapRef.current.clear();
       fileMetadataRef.current.clear();
       onClose();
+    };
+    try {
+      const filesToSend: File[] = [];
+      for (let index = 0; index < selectedFiles.length; index += 1) {
+        const file = selectedFiles[index];
+        const uri = fileToUriMapRef.current.get(file);
+        if (uri) {
+          setReadProgress({
+            name: file.name,
+            fileIndex: index + 1,
+            fileCount: selectedFiles.length,
+            loadedBytes: 0,
+            totalBytes: fileMetadataRef.current.get(file)?.sizeBytes || 0,
+          });
+          const fileFromDevice = await deviceMedia.fileFromUri(uri, (loadedBytes, totalBytes) => {
+            setReadProgress({
+              name: file.name,
+              fileIndex: index + 1,
+              fileCount: selectedFiles.length,
+              loadedBytes,
+              totalBytes: totalBytes || fileMetadataRef.current.get(file)?.sizeBytes || 0,
+            });
+          });
+          filesToSend.push(fileFromDevice);
+        } else {
+          filesToSend.push(file);
+        }
+      }
+      setReadProgress(null);
+      setSendStage('starting');
+      await onSend({
+        files: filesToSend,
+        caption: caption.trim() || undefined,
+        onUploadStarted: closeAfterUploadStarts,
+      });
+      closeAfterUploadStarts();
     } catch (error) {
       setSendError(attachmentSendFailureMessage(error));
     } finally {
       setIsSending(false);
+      setReadProgress(null);
+      setSendStage('preparing');
     }
   };
 
@@ -365,7 +409,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             aria-busy={isSending}
             aria-label={selectedFiles.length > 0 ? `Send ${selectedFiles.length} media items` : 'Send media'}
           >
-            <span>{isSending ? 'Sending…' : selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
+            <span>{isSending ? sendStage === 'preparing' ? 'Preparing…' : 'Starting…' : selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" />
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -533,8 +577,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             {recentItems.length > 0 ? (
               <div className="veil-share-files-list">
                 {recentItems.map((item) => {
-                  const stagedArray = Array.from(stagedUris);
-                  const stagedIndex = stagedArray.indexOf(item.uri);
+                  const stagedIndex = stagedIndexByUri.get(item.uri) ?? -1;
                   const isSelected = stagedIndex !== -1;
 
                   return (
@@ -584,8 +627,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             {recentItems.length > 0 ? (
               <div className="veil-share-media-grid">
                 {recentItems.map((item) => {
-                  const stagedArray = Array.from(stagedUris);
-                  const stagedIndex = stagedArray.indexOf(item.uri);
+                  const stagedIndex = stagedIndexByUri.get(item.uri) ?? -1;
                   const isSelected = stagedIndex !== -1;
 
                   return (
@@ -594,7 +636,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       item={item}
                       isSelected={isSelected}
                       stagedIndex={stagedIndex}
-                      onClick={() => void toggleDeviceItem(item)}
+                      onToggle={handleToggleRecentItem}
                     />
                   );
                 })}
@@ -632,6 +674,16 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         {sendError && (
           <div className="veil-share-send-error" role="alert" style={{ color: 'var(--veil-danger)', fontSize: 'var(--veil-text-xs)', padding: '6px 10px' }}>
             {sendError}
+          </div>
+        )}
+
+        {isSending && (
+          <div role="status" aria-live="polite" className="veil-share-send-progress" style={{ color: 'var(--veil-text-secondary)', fontSize: 'var(--veil-text-xs)', padding: '6px 10px' }}>
+            {sendStage === 'preparing'
+              ? readProgress?.totalBytes
+                ? `Preparing ${readProgress.name} (${readProgress.fileIndex}/${readProgress.fileCount}, ${Math.min(100, Math.round((readProgress.loadedBytes / readProgress.totalBytes) * 100))}%)…`
+                : 'Preparing selected media…'
+              : 'Starting secure upload…'}
           </div>
         )}
 
