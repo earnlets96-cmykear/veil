@@ -269,7 +269,6 @@ export interface AppContextType {
   config: AppConfig;
   replyTarget: UIMessage | null;
   recoveryPasswordChangeRequired: boolean;
-  uploadProgress?: Record<string, { percent: number; loaded: number; total: number }>;
 
   privacySettings: UserPrivacySettings;
   updatePrivacySettings: (settings: Partial<UserPrivacySettings>) => Promise<void>;
@@ -374,6 +373,8 @@ export interface AppContextType {
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
+export type UploadProgressState = Record<string, { percent: number; loaded: number; total: number }>;
+export const UploadProgressContext = createContext<UploadProgressState>({});
 
 export type ComposerContextType = Pick<
   AppContextType,
@@ -3187,8 +3188,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                   createParams.recipientIdentityId = recipientIdentityId;
                 }
 
+                let lastProgressUpdateAt = 0;
                 const onProgress = (loaded: number, total: number) => {
                   const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+                  const now = Date.now();
+                  if (percent < 100 && now - lastProgressUpdateAt < 100) return;
+                  lastProgressUpdateAt = now;
                   setUploadProgress((prev) => ({
                     ...prev,
                     [currentAtt.attachmentId]: { percent, loaded, total },
@@ -5257,7 +5262,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       config: appConfig,
       replyTarget,
       recoveryPasswordChangeRequired,
-      uploadProgress,
       isAppLocked,
       appLockResumeCheckPending,
       setAppLocked: setIsAppLocked,
@@ -5359,7 +5363,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       appConfig,
       replyTarget,
       recoveryPasswordChangeRequired,
-      uploadProgress,
       isAppLocked,
       appLockResumeCheckPending,
       setIsAppLocked,
@@ -5442,7 +5445,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   return (
     <AppContext.Provider value={value}>
-      <ComposerContext.Provider value={composerValue}>{children}</ComposerContext.Provider>
+      <UploadProgressContext.Provider value={uploadProgress}>
+        <ComposerContext.Provider value={composerValue}>{children}</ComposerContext.Provider>
+      </UploadProgressContext.Provider>
     </AppContext.Provider>
   );
 };
@@ -5461,4 +5466,8 @@ export function useComposer(): ComposerContextType {
     throw new Error('useComposer must be used within an AppProvider');
   }
   return context;
+}
+
+export function useUploadProgress(): UploadProgressState {
+  return useContext(UploadProgressContext);
 }

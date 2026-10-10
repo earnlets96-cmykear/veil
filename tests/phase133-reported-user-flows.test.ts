@@ -66,12 +66,17 @@ describe('Phase 133 reported user flows', () => {
     expect(nativeMedia).not.toContain('input.copyTo(output)');
   });
 
-  it('keeps sequential native chunks on one background media stream and skips video thumbnail decoding', () => {
+  it('keeps chunk reads sequential and defers thumbnails until media cells are visible', () => {
     const nativeMedia = read('android/app/src/main/java/chat/veil/app/VeilDeviceMediaPlugin.kt');
     const readChunk = nativeMedia.slice(nativeMedia.indexOf('fun readMediaChunk'), nativeMedia.indexOf('fun pickDocuments'));
+    const mediaPicker = read('src/ui/components/media/MediaPickerModal.tsx');
 
     expect(readChunk).toContain('mediaExecutor.execute');
     expect(readChunk).toContain('previous.nextOffset == offset');
-    expect(nativeMedia).toContain('val thumb = if (mime.startsWith("image/")) thumbnailFor(itemUri) else null');
+    expect(readChunk).toContain('put("bytesRead", bytesRead)');
+    expect(readChunk).toContain('put("isLast", reachedEnd)');
+    expect(nativeMedia).toContain('fun getThumbnail(call: PluginCall)');
+    expect(nativeMedia).toContain('rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, null))');
+    expect(mediaPicker).toContain('new IntersectionObserver');
   });
 });

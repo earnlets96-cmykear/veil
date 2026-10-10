@@ -218,10 +218,9 @@ class VeilDeviceMediaPlugin : Plugin() {
                                 val size = it.getLong(sizeCol)
                                 val dateAdded = it.getLong(dateCol)
                                 val itemUri = Uri.withAppendedPath(contentUri, id.toString())
-                                // Video thumbnails require decoding work for each row and are not
-                                // needed to select/send an attachment. Keep the gallery responsive.
-                                val thumb = if (mime.startsWith("image/")) thumbnailFor(itemUri) else null
-                                rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, thumb))
+                                // Fetch previews lazily for visible cells. Decoding every thumbnail
+                                // here delays opening the picker, especially for large video libraries.
+                                rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, null))
                                 c++
                             }
                         }
@@ -289,6 +288,25 @@ class VeilDeviceMediaPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getThumbnail(call: PluginCall) {
+        val rawUri = call.getString("uri")
+        if (rawUri.isNullOrBlank()) {
+            call.reject("uri is required")
+            return
+        }
+        mediaExecutor.execute {
+            try {
+                val thumbnail = thumbnailFor(Uri.parse(rawUri))
+                call.resolve(JSObject().apply {
+                    if (thumbnail != null) put("thumbnailDataUrl", thumbnail)
+                })
+            } catch (error: Exception) {
+                call.reject("Unable to load media thumbnail", error)
+            }
+        }
+    }
+
+    @PluginMethod
     fun readMediaChunk(call: PluginCall) {
         val rawUri = call.getString("uri")
         val offset = call.getLong("offset") ?: 0L
@@ -308,10 +326,6 @@ class VeilDeviceMediaPlugin : Plugin() {
                         previous?.input?.close()
                         mediaReadCursors.remove(rawUri)
                         val metadata = metadataFor(uri)
-                        if (offset > metadata.sizeBytes) {
-                            call.reject("Media chunk offset is outside the selected file")
-                            return@execute
-                        }
                         val input = context.contentResolver.openInputStream(uri)
                             ?: throw IllegalStateException("Selected media cannot be opened")
                         val newCursor = MediaReadCursor(input, metadata, offset)
@@ -330,25 +344,40 @@ class VeilDeviceMediaPlugin : Plugin() {
                     }
 
                     val metadata = cursor.metadata
-                    val remaining = (metadata.sizeBytes - offset).coerceAtLeast(0).coerceAtMost(requestedLength.toLong()).toInt()
-                    val chunk = ByteArray(remaining)
+                    val chunk = ByteArray(requestedLength)
                     var bytesRead = 0
+                    var reachedEnd = false
                     while (bytesRead < chunk.size) {
                         val read = cursor.input.read(chunk, bytesRead, chunk.size - bytesRead)
-                        if (read < 0) break
-                        bytesRead += read
+                        when {
+                            read < 0 -> {
+                                reachedEnd = true
+                                break
+                            }
+                            read == 0 -> {
+                                val nextByte = cursor.input.read()
+                                if (nextByte < 0) {
+                                    reachedEnd = true
+                                    break
+                                }
+                                chunk[bytesRead++] = nextByte.toByte()
+                            }
+                            else -> bytesRead += read
+                        }
                     }
-                    if (bytesRead != remaining) throw IllegalStateException("Selected media ended before requested chunk")
                     cursor.nextOffset = offset + bytesRead
-                    if (cursor.nextOffset >= metadata.sizeBytes) {
+                    if (reachedEnd) {
                         cursor.input.close()
                         mediaReadCursors.remove(rawUri)
                     }
+                    val actualChunk = if (bytesRead == chunk.size) chunk else chunk.copyOf(bytesRead)
                     call.resolve(JSObject().apply {
                         put("name", metadata.name)
                         put("mimeType", metadata.mimeType)
                         put("sizeBytes", metadata.sizeBytes)
-                        put("base64Data", Base64.encodeToString(chunk, Base64.NO_WRAP))
+                        put("bytesRead", bytesRead)
+                        put("isLast", reachedEnd)
+                        put("base64Data", Base64.encodeToString(actualChunk, Base64.NO_WRAP))
                     })
                 }
             } catch (error: Exception) {
@@ -459,13 +488,34 @@ class VeilDeviceMediaPlugin : Plugin() {
 
     /** Keeps the attachment sheet fast: only a small preview crosses the bridge. */
     private fun thumbnailFor(uri: Uri): String? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         return try {
-            val bitmap = context.contentResolver.loadThumbnail(uri, Size(120, 120), null)
-            val output = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 60, output)
-            bitmap.recycle()
-            "data:image/jpeg;base64," + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.contentResolver.loadThumbnail(uri, Size(120, 120), null)
+            } else {
+                val mediaId = uri.lastPathSegment?.toLongOrNull() ?: return null
+                when {
+                    uri.pathSegments.contains("video") -> MediaStore.Video.Thumbnails.getThumbnail(
+                        context.contentResolver,
+                        mediaId,
+                        MediaStore.Video.Thumbnails.MINI_KIND,
+                        null,
+                    )
+                    uri.pathSegments.contains("images") -> MediaStore.Images.Thumbnails.getThumbnail(
+                        context.contentResolver,
+                        mediaId,
+                        MediaStore.Images.Thumbnails.MINI_KIND,
+                        null,
+                    )
+                    else -> null
+                } ?: return null
+            }
+            try {
+                val output = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 60, output)
+                "data:image/jpeg;base64," + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+            } finally {
+                bitmap.recycle()
+            }
         } catch (_: Exception) {
             null
         }

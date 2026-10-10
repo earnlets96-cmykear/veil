@@ -20,7 +20,15 @@ export interface DeviceMediaPage {
 export interface NativeDeviceMediaPluginInterface {
   requestRecentMediaPermission(): Promise<{ status: DeviceMediaPermissionStatus }>;
   listRecentMedia(options: { cursor?: string; limit: number; types: DeviceMediaType[] }): Promise<DeviceMediaPage>;
-  readMediaChunk(options: { uri: string; offset: number; length: number }): Promise<{ name: string; mimeType: string; sizeBytes: number; base64Data: string }>;
+  readMediaChunk(options: { uri: string; offset: number; length: number }): Promise<{
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+    base64Data: string;
+    bytesRead?: number;
+    isLast?: boolean;
+  }>;
+  getThumbnail(options: { uri: string }): Promise<{ thumbnailDataUrl?: string }>;
   pickDocuments(): Promise<{ items: DeviceMediaItem[] }>;
   captureMedia(): Promise<{ items: DeviceMediaItem[] }>;
   saveToGallery(options: { filename: string; mimeType: string; base64Data: string }): Promise<{ uri: string; location: string }>;
@@ -76,10 +84,24 @@ export class NativeDeviceMediaBridge {
     };
   }
 
-  public async readMediaChunk(uri: string, offset: number, length: number): Promise<{ name: string; mimeType: string; sizeBytes: number; base64Data: string }> {
+  public async readMediaChunk(uri: string, offset: number, length: number): Promise<{
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+    base64Data: string;
+    bytesRead?: number;
+    isLast?: boolean;
+  }> {
     if (!this.isNative()) throw new Error('Device media is unavailable on the web');
     const read = this.adapter?.readMediaChunk || NativeDeviceMedia.readMediaChunk;
     return read({ uri, offset, length });
+  }
+
+  public async getThumbnail(uri: string): Promise<string | undefined> {
+    if (!this.isNative()) return undefined;
+    const load = this.adapter?.getThumbnail || NativeDeviceMedia.getThumbnail;
+    const result = await load({ uri });
+    return typeof result.thumbnailDataUrl === 'string' ? result.thumbnailDataUrl : undefined;
   }
 
   /** Creates a zero-byte selection token; file bytes are read only when Send is pressed. */
@@ -116,20 +138,27 @@ export class NativeDeviceMediaBridge {
     const chunkSize = 1024 * 1024;
     const parts: Uint8Array[] = [];
     let metadata: { name: string; mimeType: string; sizeBytes: number } | undefined;
-    for (let offset = 0; !metadata || offset < metadata.sizeBytes; offset += chunkSize) {
+    for (let offset = 0; ; offset += chunkSize) {
       const response = await this.readMediaChunk(uri, offset, chunkSize);
       metadata ||= {
         name: response.name,
         mimeType: response.mimeType,
         sizeBytes: response.sizeBytes,
       };
-      if (response.sizeBytes !== metadata.sizeBytes || response.base64Data.length > Math.ceil(chunkSize * 4 / 3) + 8) {
+      if (response.base64Data.length > Math.ceil(chunkSize * 4 / 3) + 8) {
         throw new Error('Selected media returned an invalid chunk');
       }
       const bytes = base64ToBytes(response.base64Data);
-      const expectedLength = Math.min(chunkSize, metadata.sizeBytes - offset);
-      if (bytes.length !== expectedLength) throw new Error('Selected media ended before all chunks were read');
-      parts.push(bytes);
+      if (response.bytesRead !== undefined && response.bytesRead !== bytes.length) {
+        throw new Error('Selected media returned an invalid chunk');
+      }
+      if (bytes.length > chunkSize) throw new Error('Selected media returned an invalid chunk');
+      if (bytes.length > 0) parts.push(bytes);
+
+      const isLast = response.isLast ?? offset + bytes.length >= metadata.sizeBytes;
+      if (isLast) break;
+      if (bytes.length === 0) throw new Error('Selected media ended before all chunks were read');
+      if (offset > Number.MAX_SAFE_INTEGER - chunkSize) throw new Error('Selected media is too large to read');
     }
     if (!metadata) throw new Error('Selected media could not be read');
     return new File(parts as unknown as BlobPart[], metadata.name, { type: metadata.mimeType });

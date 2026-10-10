@@ -15,7 +15,7 @@
  */
 
 import React, { startTransition, useRef, useEffect, useLayoutEffect, useState, useMemo, useCallback } from 'react';
-import { useApp } from '../app/AppState.tsx';
+import { useApp, useUploadProgress } from '../app/AppState.tsx';
 import { MessageComposer } from './MessageComposer.tsx';
 import { VoiceRecorder } from '../../attachments/voiceRecorder.ts';
 import { VoicePlayer } from '../../attachments/voicePlayer.ts';
@@ -860,7 +860,6 @@ export const ConversationView: React.FC = () => {
     conversations,
     contacts,
     messages,
-    uploadProgress,
     myProfile,
     sendMessage,
     sendAttachment,
@@ -879,6 +878,7 @@ export const ConversationView: React.FC = () => {
     forwardMessage,
     toggleMessageReaction,
   } = useApp();
+  const uploadProgress = useUploadProgress();
 
   const { showToast } = useToast();
 

@@ -37,6 +37,83 @@ export interface MediaPickerModalProps {
   onSend: (options: MediaPickerSendOptions) => void | Promise<void>;
 }
 
+interface RecentMediaCellProps {
+  item: DeviceMediaItem;
+  isSelected: boolean;
+  stagedIndex: number;
+  onClick: () => void;
+}
+
+const RecentMediaCell: React.FC<RecentMediaCellProps> = ({ item, isSelected, stagedIndex, onClick }) => {
+  const cellRef = useRef<HTMLButtonElement>(null);
+  const [thumbnailDataUrl, setThumbnailDataUrl] = useState(item.thumbnailDataUrl);
+
+  useEffect(() => {
+    if (thumbnailDataUrl || (!item.mimeType.startsWith('image/') && !item.mimeType.startsWith('video/'))) return;
+
+    let active = true;
+    const loadThumbnail = () => {
+      void NativeDeviceMediaBridge.getInstance().getThumbnail(item.uri)
+        .then((thumbnail) => {
+          if (active && thumbnail) setThumbnailDataUrl(thumbnail);
+        })
+        .catch(() => {});
+    };
+
+    if (typeof IntersectionObserver === 'undefined') {
+      loadThumbnail();
+      return () => { active = false; };
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      loadThumbnail();
+    }, { rootMargin: '180px' });
+    if (cellRef.current) observer.observe(cellRef.current);
+
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [item.mimeType, item.uri, thumbnailDataUrl]);
+
+  return (
+    <button
+      ref={cellRef}
+      type="button"
+      className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
+      aria-label={`Attach ${item.name}`}
+      aria-pressed={isSelected}
+      onClick={onClick}
+    >
+      {thumbnailDataUrl ? (
+        <img
+          src={thumbnailDataUrl}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      ) : (
+        <span style={{ display: 'grid', placeItems: 'center', height: '100%', padding: '0.35rem', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {item.name}
+        </span>
+      )}
+
+      {item.mimeType.startsWith('video/') && (
+        <span className="veil-media-video-badge">
+          <PlayIcon size={9} color="#ffffff" />
+        </span>
+      )}
+
+      {isSelected ? (
+        <span className="veil-media-badge-numbered">{stagedIndex + 1}</span>
+      ) : (
+        <span className="veil-media-badge-unselected" />
+      )}
+    </button>
+  );
+};
+
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   isOpen,
   onClose,
@@ -512,40 +589,13 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   const isSelected = stagedIndex !== -1;
 
                   return (
-                    <button
+                    <RecentMediaCell
                       key={item.uri}
-                      type="button"
-                      className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
-                      aria-label={`Attach ${item.name}`}
-                      aria-pressed={isSelected}
+                      item={item}
+                      isSelected={isSelected}
+                      stagedIndex={stagedIndex}
                       onClick={() => void toggleDeviceItem(item)}
-                    >
-                      {item.thumbnailDataUrl ? (
-                        <img
-                          src={item.thumbnailDataUrl}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <span style={{ display: 'grid', placeItems: 'center', height: '100%', padding: '0.35rem', fontSize: '0.68rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {item.name}
-                        </span>
-                      )}
-
-                      {item.mimeType.startsWith('video/') && (
-                        <span className="veil-media-video-badge">
-                          <PlayIcon size={9} color="#ffffff" />
-                        </span>
-                      )}
-
-                      {isSelected ? (
-                        <span className="veil-media-badge-numbered">
-                          {stagedIndex + 1}
-                        </span>
-                      ) : (
-                        <span className="veil-media-badge-unselected" />
-                      )}
-                    </button>
+                    />
                   );
                 })}
               </div>
