@@ -82,7 +82,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
     try {
       await onConfirmSend(staged.map((s) => s.file), caption.trim() || undefined);
     } catch {
-      setSendError('Could not start sending. Your selected files are still here; please try again.');
+      setSendError('Sending failed. Your selected files are still here; please try again.');
     } finally {
       setIsSending(false);
     }

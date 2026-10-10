@@ -65,4 +65,13 @@ describe('Phase 133 reported user flows', () => {
     expect(nativeMedia).not.toContain('fun readMedia(call: PluginCall)');
     expect(nativeMedia).not.toContain('input.copyTo(output)');
   });
+
+  it('keeps sequential native chunks on one background media stream and skips video thumbnail decoding', () => {
+    const nativeMedia = read('android/app/src/main/java/chat/veil/app/VeilDeviceMediaPlugin.kt');
+    const readChunk = nativeMedia.slice(nativeMedia.indexOf('fun readMediaChunk'), nativeMedia.indexOf('fun pickDocuments'));
+
+    expect(readChunk).toContain('mediaExecutor.execute');
+    expect(readChunk).toContain('previous.nextOffset == offset');
+    expect(nativeMedia).toContain('val thumb = if (mime.startsWith("image/")) thumbnailFor(itemUri) else null');
+  });
 });

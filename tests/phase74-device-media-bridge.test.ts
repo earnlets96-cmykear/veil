@@ -53,6 +53,26 @@ describe('Phase 74: native device media bridge', () => {
     await expect(file.arrayBuffer()).resolves.toEqual(new Uint8Array([1, 2, 3]).buffer);
   });
 
+  it('creates an immediate metadata-only selection before reading a large video', () => {
+    const bridge = NativeDeviceMediaBridge.createForTesting({
+      isNative: () => true,
+      readMediaChunk: async () => {
+        throw new Error('media bytes must not be read to select the item');
+      },
+    });
+
+    const selection = bridge.createSelectionPlaceholder({
+      uri: 'content://media/large-video',
+      name: 'clip.mp4',
+      mimeType: 'video/mp4',
+      sizeBytes: 80 * 1024 * 1024,
+    });
+
+    expect(selection.name).toBe('clip.mp4');
+    expect(selection.type).toBe('video/mp4');
+    expect(selection.size).toBe(0);
+  });
+
   it('reads large native videos in bounded chunks instead of one full-size Base64 result', async () => {
     const nativeBytes = new Uint8Array(2 * 1024 * 1024 + 5);
     nativeBytes.fill(7);

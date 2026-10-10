@@ -9,7 +9,7 @@ describe('Phase 74: Media Attachment Interaction Tests', () => {
   let bridge: NativeDeviceMediaBridge;
   let requestPermissionMock: ReturnType<typeof vi.fn>;
   let listRecentMock: ReturnType<typeof vi.fn>;
-  let readMediaMock: ReturnType<typeof vi.fn>;
+  let readMediaChunkMock: ReturnType<typeof vi.fn>;
   let pickDocumentsMock: ReturnType<typeof vi.fn>;
   let saveToGalleryMock: ReturnType<typeof vi.fn>;
 
@@ -21,7 +21,7 @@ describe('Phase 74: Media Attachment Interaction Tests', () => {
         { uri: 'content://media/2', name: 'video1.mp4', mimeType: 'video/mp4', sizeBytes: 2048 },
       ],
     }));
-    readMediaMock = vi.fn(async ({ uri }: { uri: string }) => ({
+    readMediaChunkMock = vi.fn(async ({ uri }: { uri: string }) => ({
       name: uri.endsWith('2') ? 'video1.mp4' : 'photo1.jpg',
       mimeType: uri.endsWith('2') ? 'video/mp4' : 'image/jpeg',
       sizeBytes: 4,
@@ -38,7 +38,7 @@ describe('Phase 74: Media Attachment Interaction Tests', () => {
       isNative: () => true,
       requestRecentMediaPermission: requestPermissionMock,
       listRecentMedia: listRecentMock,
-      readMedia: readMediaMock,
+      readMediaChunk: readMediaChunkMock,
       pickDocuments: pickDocumentsMock,
       saveToGallery: saveToGalleryMock,
     });
@@ -91,15 +91,21 @@ describe('Phase 74: Media Attachment Interaction Tests', () => {
     expect(pickDocumentsMock).toHaveBeenCalledTimes(1);
   });
 
-  it('5. Selecting native media calls readMedia only after the item is actually tapped', async () => {
+  it('5. Selecting native media is immediate; file bytes are read only when preparing the send', async () => {
     // Listing recent media fetches only thumbnails and metadata, NOT full file content
     const page = await bridge.listRecentMedia({ limit: 48, types: ['image', 'video'] });
     expect(page.items).toHaveLength(2);
-    expect(readMediaMock).not.toHaveBeenCalled();
+    expect(readMediaChunkMock).not.toHaveBeenCalled();
 
-    // Only when user explicitly taps/selects an item does readMedia get called
+    // Selection uses only the metadata token; tapping Send materializes the file.
+    const selection = bridge.createSelectionPlaceholder(page.items[0]);
+    expect(selection.name).toBe('photo1.jpg');
+    expect(selection.type).toBe('image/jpeg');
+    expect(selection.size).toBe(0);
+    expect(readMediaChunkMock).not.toHaveBeenCalled();
+
     const file = await bridge.fileFromUri(page.items[0].uri);
-    expect(readMediaMock).toHaveBeenCalledTimes(1);
+    expect(readMediaChunkMock).toHaveBeenCalledTimes(1);
     expect(file.name).toBe('photo1.jpg');
     expect(file.type).toBe('image/jpeg');
   });
@@ -136,8 +142,13 @@ describe('Phase 74: Media Attachment Interaction Tests', () => {
   });
 
   it('8. Removing a staged native item clears its selection state and uri mapping', async () => {
-    // Stage item
-    const file = await bridge.fileFromUri('content://media/1');
+    // Stage the lightweight item without reading its underlying bytes.
+    const file = bridge.createSelectionPlaceholder({
+      uri: 'content://media/1',
+      name: 'photo1.jpg',
+      mimeType: 'image/jpeg',
+      sizeBytes: 4,
+    });
     const fileToUriMap = new Map<File, string>();
     const stagedUris = new Set<string>();
 

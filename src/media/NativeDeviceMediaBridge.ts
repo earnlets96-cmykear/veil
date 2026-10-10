@@ -82,6 +82,11 @@ export class NativeDeviceMediaBridge {
     return read({ uri, offset, length });
   }
 
+  /** Creates a zero-byte selection token; file bytes are read only when Send is pressed. */
+  public createSelectionPlaceholder(item: DeviceMediaItem): File {
+    return new File([], item.name, { type: item.mimeType });
+  }
+
   /**
    * Reads an item only after the person has tapped it to stage an attachment.
    * The bytes remain in memory so the existing encrypted attachment pipeline is

@@ -3064,8 +3064,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return updated;
       });
 
-      // 3. Perform bounded background encryption, cloud upload (MAX CONCURRENCY = 2) and wire dispatch
-      (async () => {
+      // 3. Perform bounded encryption, cloud upload (MAX CONCURRENCY = 2) and wire dispatch
+      await (async () => {
         const activeAttachments = [...initialAttachments];
         let hasAnyError = false;
 
@@ -3447,9 +3447,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               error: wireErr?.message || 'Wire dispatch failed',
             });
             updateTimeline(activeAttachments, 'FAILED');
+            throw wireErr;
           }
         } else {
           updateTimeline(activeAttachments, 'FAILED');
+          throw new Error('One or more attachments failed to upload.');
         }
       })();
     },

@@ -23,6 +23,7 @@ import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 @CapacitorPlugin(
     name = "VeilDeviceMedia",
@@ -36,6 +37,12 @@ import java.io.ByteArrayOutputStream
 class VeilDeviceMediaPlugin : Plugin() {
 
     private val mediaExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+    private data class MediaReadCursor(
+        val input: InputStream,
+        val metadata: MediaMetadata,
+        var nextOffset: Long,
+    )
+    private val mediaReadCursors = java.util.concurrent.ConcurrentHashMap<String, MediaReadCursor>()
     private var pendingCameraUri: Uri? = null
     private var pendingCameraFile: java.io.File? = null
 
@@ -211,7 +218,9 @@ class VeilDeviceMediaPlugin : Plugin() {
                                 val size = it.getLong(sizeCol)
                                 val dateAdded = it.getLong(dateCol)
                                 val itemUri = Uri.withAppendedPath(contentUri, id.toString())
-                                val thumb = if (mime.startsWith("image/") || mime.startsWith("video/")) thumbnailFor(itemUri) else null
+                                // Video thumbnails require decoding work for each row and are not
+                                // needed to select/send an attachment. Keep the gallery responsive.
+                                val thumb = if (mime.startsWith("image/")) thumbnailFor(itemUri) else null
                                 rows.add(MediaRow(itemUri.toString(), name, mime, size, dateAdded, thumb))
                                 c++
                             }
@@ -288,45 +297,66 @@ class VeilDeviceMediaPlugin : Plugin() {
             call.reject("uri, valid offset, and bounded length are required")
             return
         }
-        try {
-            val uri = Uri.parse(rawUri)
-            val metadata = metadataFor(uri)
-            if (offset > metadata.sizeBytes) {
-                call.reject("Media chunk offset is outside the selected file")
-                return
-            }
-            val remaining = (metadata.sizeBytes - offset).coerceAtLeast(0).coerceAtMost(requestedLength.toLong()).toInt()
-            val chunk = ByteArray(remaining)
-            val input = context.contentResolver.openInputStream(uri)
-                ?: throw IllegalStateException("Selected media cannot be opened")
-            val bytesRead = input.use { stream ->
-                var skipped = 0L
-                while (skipped < offset) {
-                    val step = stream.skip(offset - skipped)
-                    if (step <= 0L) {
-                        if (stream.read() == -1) throw IllegalStateException("Selected media ended before requested chunk")
-                        skipped++
+        mediaExecutor.execute {
+            try {
+                val uri = Uri.parse(rawUri)
+                synchronized(mediaReadCursors) {
+                    val previous = mediaReadCursors[rawUri]
+                    val cursor = if (previous != null && previous.nextOffset == offset) {
+                        previous
                     } else {
-                        skipped += step
+                        previous?.input?.close()
+                        mediaReadCursors.remove(rawUri)
+                        val metadata = metadataFor(uri)
+                        if (offset > metadata.sizeBytes) {
+                            call.reject("Media chunk offset is outside the selected file")
+                            return@execute
+                        }
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: throw IllegalStateException("Selected media cannot be opened")
+                        val newCursor = MediaReadCursor(input, metadata, offset)
+                        mediaReadCursors[rawUri] = newCursor
+                        var skipped = 0L
+                        while (skipped < offset) {
+                            val step = input.skip(offset - skipped)
+                            if (step <= 0L) {
+                                if (input.read() == -1) throw IllegalStateException("Selected media ended before requested chunk")
+                                skipped++
+                            } else {
+                                skipped += step
+                            }
+                        }
+                        newCursor
                     }
+
+                    val metadata = cursor.metadata
+                    val remaining = (metadata.sizeBytes - offset).coerceAtLeast(0).coerceAtMost(requestedLength.toLong()).toInt()
+                    val chunk = ByteArray(remaining)
+                    var bytesRead = 0
+                    while (bytesRead < chunk.size) {
+                        val read = cursor.input.read(chunk, bytesRead, chunk.size - bytesRead)
+                        if (read < 0) break
+                        bytesRead += read
+                    }
+                    if (bytesRead != remaining) throw IllegalStateException("Selected media ended before requested chunk")
+                    cursor.nextOffset = offset + bytesRead
+                    if (cursor.nextOffset >= metadata.sizeBytes) {
+                        cursor.input.close()
+                        mediaReadCursors.remove(rawUri)
+                    }
+                    call.resolve(JSObject().apply {
+                        put("name", metadata.name)
+                        put("mimeType", metadata.mimeType)
+                        put("sizeBytes", metadata.sizeBytes)
+                        put("base64Data", Base64.encodeToString(chunk, Base64.NO_WRAP))
+                    })
                 }
-                var written = 0
-                while (written < chunk.size) {
-                    val read = stream.read(chunk, written, chunk.size - written)
-                    if (read < 0) break
-                    written += read
+            } catch (error: Exception) {
+                synchronized(mediaReadCursors) {
+                    mediaReadCursors.remove(rawUri)?.input?.close()
                 }
-                written
+                call.reject("Unable to read selected media chunk", error)
             }
-            if (bytesRead != remaining) throw IllegalStateException("Selected media ended before requested chunk")
-            call.resolve(JSObject().apply {
-                put("name", metadata.name)
-                put("mimeType", metadata.mimeType)
-                put("sizeBytes", metadata.sizeBytes)
-                put("base64Data", Base64.encodeToString(chunk, Base64.NO_WRAP))
-            })
-        } catch (error: Exception) {
-            call.reject("Unable to read selected media chunk", error)
         }
     }
 

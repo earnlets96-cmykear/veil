@@ -35,4 +35,32 @@ describe('Phase 135: Attachment send selection retention', () => {
     expect(send).toMatch(/await\s+sendAttachments\(/);
     expect(send).not.toContain('catch');
   });
+
+  it('marks native media selected without reading video bytes until Send is pressed', () => {
+    const picker = source('../src/ui/components/media/MediaPickerModal.tsx');
+    const stage = picker.slice(picker.indexOf('const stageDeviceItems'), picker.indexOf('const toggleDeviceItem'));
+    const confirm = picker.slice(picker.indexOf('const handleConfirmSend'), picker.indexOf('const formatFileSize'));
+
+    expect(stage).toContain('createSelectionPlaceholder(item)');
+    expect(stage).not.toContain('fileFromUri');
+    expect(confirm).toContain('await deviceMedia.fileFromUri(uri)');
+    expect(confirm).toContain('await onSend(');
+  });
+
+  it('ignores stale recent-media queries after the person switches picker tabs', () => {
+    const picker = source('../src/ui/components/media/MediaPickerModal.tsx');
+    const load = picker.slice(picker.indexOf('const openRecent'), picker.indexOf('const loadMoreRecent'));
+
+    expect(load).toContain('const requestId = ++recentRequestIdRef.current');
+    expect(load).toContain('if (requestId !== recentRequestIdRef.current) return');
+  });
+
+  it('keeps the picker send promise pending until background upload reports success or failure', () => {
+    const appState = source('../src/ui/app/AppState.tsx');
+    const send = appState.slice(appState.indexOf('const sendAttachments ='), appState.indexOf('const sendAttachment ='));
+    const worker = send.slice(send.indexOf('// 3. Perform bounded encryption'));
+
+    expect(worker).toMatch(/await\s+\(async\s*\(\)\s*=>/);
+    expect(worker).toContain('throw new Error');
+  });
 });

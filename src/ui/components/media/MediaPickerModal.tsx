@@ -49,7 +49,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const [recentItems, setRecentItems] = useState<DeviceMediaItem[]>([]);
   const [recentStatus, setRecentStatus] = useState<'idle' | 'loading' | 'ready' | 'denied' | 'error'>('idle');
   const [recentCursor, setRecentCursor] = useState<string | undefined>(undefined);
-  const [stagingUris, setStagingUris] = useState<Set<string>>(() => new Set());
   const [stagedUris, setStagedUris] = useState<Set<string>>(() => new Set());
 
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +56,8 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileToUriMapRef = useRef<Map<File, string>>(new Map());
+  const fileMetadataRef = useRef<Map<File, DeviceMediaItem>>(new Map());
+  const recentRequestIdRef = useRef(0);
   const deviceMedia = NativeDeviceMediaBridge.getInstance();
 
   let markFilePickerActive: (() => void) | undefined;
@@ -75,14 +76,15 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       setActiveTab('gallery');
       void openRecent(['image'], false);
     } else {
+      recentRequestIdRef.current += 1;
       setRecentStatus('idle');
       setRecentItems([]);
       setRecentCursor(undefined);
-      setStagingUris(new Set());
       setStagedUris(new Set());
       setSelectedFiles([]);
       setCaption('');
       fileToUriMapRef.current.clear();
+      fileMetadataRef.current.clear();
     }
   }, [isOpen]);
 
@@ -106,25 +108,18 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         return next;
       });
     }
+    fileMetadataRef.current.delete(file);
     setSelectedFiles((prev) => prev.filter((candidate) => candidate !== file));
   };
 
   const stageDeviceItems = async (items: DeviceMediaItem[]) => {
     for (const item of items) {
-      if (stagedUris.has(item.uri) || stagingUris.has(item.uri)) continue;
-      setStagingUris((current) => new Set(current).add(item.uri));
-      try {
-        const file = await deviceMedia.fileFromUri(item.uri);
-        fileToUriMapRef.current.set(file, item.uri);
-        setSelectedFiles((current) => [...current, file]);
-        setStagedUris((current) => new Set(current).add(item.uri));
-      } finally {
-        setStagingUris((current) => {
-          const next = new Set(current);
-          next.delete(item.uri);
-          return next;
-        });
-      }
+      if (stagedUris.has(item.uri)) continue;
+      const file = deviceMedia.createSelectionPlaceholder(item);
+      fileToUriMapRef.current.set(file, item.uri);
+      fileMetadataRef.current.set(file, item);
+      setSelectedFiles((current) => [...current, file]);
+      setStagedUris((current) => new Set(current).add(item.uri));
     }
   };
 
@@ -162,18 +157,24 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       return;
     }
 
+    const requestId = ++recentRequestIdRef.current;
     setRecentStatus('loading');
+    setRecentItems([]);
+    setRecentCursor(undefined);
     try {
       const permission = await deviceMedia.requestRecentMediaPermission();
+      if (requestId !== recentRequestIdRef.current) return;
       if (permission.status !== 'granted' && permission.status !== 'limited') {
         setRecentStatus('denied');
         return;
       }
       const page = await deviceMedia.listRecentMedia({ limit: 48, types });
+      if (requestId !== recentRequestIdRef.current) return;
       setRecentItems(page.items);
       setRecentCursor(page.nextCursor);
       setRecentStatus('ready');
     } catch (_error) {
+      if (requestId !== recentRequestIdRef.current) return;
       setRecentStatus('error');
     }
   };
@@ -230,16 +231,22 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
     setIsSending(true);
     setSendError('');
     try {
+      const filesToSend: File[] = [];
+      for (const file of selectedFiles) {
+        const uri = fileToUriMapRef.current.get(file);
+        filesToSend.push(uri ? await deviceMedia.fileFromUri(uri) : file);
+      }
       await onSend({
-        files: selectedFiles,
+        files: filesToSend,
         caption: caption.trim() || undefined,
       });
       setSelectedFiles([]);
       setCaption('');
       fileToUriMapRef.current.clear();
+      fileMetadataRef.current.clear();
       onClose();
     } catch {
-      setSendError('Could not start sending. Your selected files are still here; please try again.');
+      setSendError('Sending failed. Your selected files are still here; please try again.');
     } finally {
       setIsSending(false);
     }
@@ -280,7 +287,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
             aria-busy={isSending}
             aria-label={selectedFiles.length > 0 ? `Send ${selectedFiles.length} media items` : 'Send media'}
           >
-            <span>{selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
+            <span>{isSending ? 'Sending…' : selectedFiles.length > 0 ? `Send (${selectedFiles.length})` : 'Send'}</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13" />
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -451,14 +458,12 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   const stagedArray = Array.from(stagedUris);
                   const stagedIndex = stagedArray.indexOf(item.uri);
                   const isSelected = stagedIndex !== -1;
-                  const isStaging = stagingUris.has(item.uri);
 
                   return (
                     <button
                       key={item.uri}
                       type="button"
                       className={`veil-share-file-row ${isSelected ? 'selected' : ''}`}
-                      disabled={isStaging}
                       onClick={() => void toggleDeviceItem(item)}
                       aria-label={`Attach ${item.name}`}
                       aria-pressed={isSelected}
@@ -504,7 +509,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                   const stagedArray = Array.from(stagedUris);
                   const stagedIndex = stagedArray.indexOf(item.uri);
                   const isSelected = stagedIndex !== -1;
-                  const isStaging = stagingUris.has(item.uri);
 
                   return (
                     <button
@@ -513,7 +517,6 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       className={`veil-share-media-cell ${isSelected ? 'selected' : ''}`}
                       aria-label={`Attach ${item.name}`}
                       aria-pressed={isSelected}
-                      disabled={isStaging}
                       onClick={() => void toggleDeviceItem(item)}
                     >
                       {item.thumbnailDataUrl ? (
@@ -597,7 +600,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.65rem', color: 'var(--veil-text-secondary)', marginTop: '2px' }}>
                         <span className="veil-attachment-badge">{getFileTypeBadge(file.type)}</span>
-                        <span>{formatFileSize(file.size)}</span>
+                        <span>{formatFileSize(fileMetadataRef.current.get(file)?.sizeBytes ?? file.size)}</span>
                       </div>
                     </div>
                   </div>
