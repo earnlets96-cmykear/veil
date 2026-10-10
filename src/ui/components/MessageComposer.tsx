@@ -27,6 +27,11 @@ import { AttachmentPreviewModal } from './media/AttachmentPreviewModal.tsx';
 import { MediaPickerModal, MediaPickerSendOptions } from './media/MediaPickerModal.tsx';
 import { PermissionsModal } from './PermissionsModal.tsx';
 import { BackButtonManager } from '../utils/backButtonManager.ts';
+import {
+  acknowledgeMicrophonePermissionExplanation,
+  hasAcknowledgedMicrophonePermissionExplanation,
+  shouldShowMicrophonePermissionExplanation,
+} from '../utils/microphonePermission.ts';
 import { useTextareaAutoResize } from '../hooks/useTextareaAutoResize.ts';
 
 import type { UIMessage } from '../app/types.ts';
@@ -324,7 +329,12 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
           setIsPermissionPermanent(true);
           setShowPermissionModal(true);
           return;
-        } else if (perm.state === 'prompt') {
+        } else if (
+          shouldShowMicrophonePermissionExplanation(
+            perm.state,
+            hasAcknowledgedMicrophonePermissionExplanation()
+          )
+        ) {
           // Show permission explanation before prompting
           setIsPermissionPermanent(false);
           setShowPermissionModal(true);
@@ -399,7 +409,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
         <PermissionsModal
           type="microphone"
           isPermanentlyDenied={isPermissionPermanent}
-          onAllow={startRecordingFlow}
+          onAllow={async () => {
+            acknowledgeMicrophonePermissionExplanation();
+            await startRecordingFlow();
+          }}
           onCancel={() => setShowPermissionModal(false)}
         />
       )}
