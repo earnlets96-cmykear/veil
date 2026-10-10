@@ -326,6 +326,14 @@ export const Sidebar: React.FC = () => {
     deleteConversation,
   } = useApp();
 
+  const contactAvatarById = React.useMemo(() => {
+    const avatars = new Map<string, string | undefined>();
+    for (const contact of contacts || []) {
+      avatars.set(contact.identityId, contact.avatar);
+    }
+    return avatars;
+  }, [contacts]);
+
   const handleSidebarJumpToMessage = useCallback((messageId: string, conversationId?: string) => {
     if (conversationId) {
       selectConversation(conversationId);
@@ -1030,7 +1038,7 @@ export const Sidebar: React.FC = () => {
                 const isMuted = typeof isConversationMuted === 'function' && isConversationMuted(conv.id);
                 const convMsgs = (messages && messages[conv.id]) || [];
                 const latestMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
-                const contactAvatar = (contacts || []).find((c) => c.identityId === conv.id)?.avatar;
+                const contactAvatar = contactAvatarById.get(conv.id);
 
                 return (
                   <SidebarConversationItem

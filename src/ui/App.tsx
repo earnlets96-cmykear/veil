@@ -9,16 +9,7 @@ import { PinLockScreen } from './components/PinLockScreen.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { ConversationView } from './components/ConversationView.tsx';
 import { CreateSpaceModal } from './components/CreateSpaceModal.tsx';
-import { NewChatModal } from './components/NewChatModal.tsx';
-import { NewGroupModal } from './components/NewGroupModal.tsx';
-import { GroupDetailsModal } from './components/GroupDetailsModal.tsx';
-import { ContactDetailsModal } from './components/ContactDetailsModal.tsx';
-import { SettingsModal } from './components/SettingsModal.tsx';
 import { RestoreAccountModal } from './components/RestoreAccountModal.tsx';
-import { ProfileModal } from './components/ProfileModal.tsx';
-import { AppLockSetupModal } from './components/AppLockSetupModal.tsx';
-import { AccountsAndSpacesModal } from './components/AccountsAndSpacesModal.tsx';
-import { SocialVideoShareDialog } from './components/SocialVideoShareDialog.tsx';
 import { ShieldIcon, CloseIcon } from './components/icons/index.ts';
 import { spacePinManager } from '../privacy/pinManager.ts';
 import { themeManager } from './utils/themeManager.ts';
@@ -30,6 +21,16 @@ import {
   clearPendingNativeSharedText,
   getPendingNativeSharedText,
 } from '../media/NativeShareIntentBridge.ts';
+
+const NewChatModal = React.lazy(() => import('./components/NewChatModal.tsx').then((module) => ({ default: module.NewChatModal })));
+const NewGroupModal = React.lazy(() => import('./components/NewGroupModal.tsx').then((module) => ({ default: module.NewGroupModal })));
+const GroupDetailsModal = React.lazy(() => import('./components/GroupDetailsModal.tsx').then((module) => ({ default: module.GroupDetailsModal })));
+const ContactDetailsModal = React.lazy(() => import('./components/ContactDetailsModal.tsx').then((module) => ({ default: module.ContactDetailsModal })));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal.tsx').then((module) => ({ default: module.SettingsModal })));
+const ProfileModal = React.lazy(() => import('./components/ProfileModal.tsx').then((module) => ({ default: module.ProfileModal })));
+const AppLockSetupModal = React.lazy(() => import('./components/AppLockSetupModal.tsx').then((module) => ({ default: module.AppLockSetupModal })));
+const AccountsAndSpacesModal = React.lazy(() => import('./components/AccountsAndSpacesModal.tsx').then((module) => ({ default: module.AccountsAndSpacesModal })));
+const SocialVideoShareDialog = React.lazy(() => import('./components/SocialVideoShareDialog.tsx').then((module) => ({ default: module.SocialVideoShareDialog })));
 
 export const App: React.FC = () => {
   // Bind visual viewport dimensions and keyboard insets to root CSS
@@ -255,49 +256,51 @@ export const App: React.FC = () => {
       <Sidebar />
       <ConversationView />
 
-      {pendingSharedVideo && activeSession?.isActive() && !isAppLocked && (
-        <SocialVideoShareDialog
-          link={pendingSharedVideo}
-          conversations={conversations}
-          onSend={sendSharedVideo}
-          onClose={closeSharedVideo}
-        />
-      )}
+      <React.Suspense fallback={null}>
+        {pendingSharedVideo && activeSession?.isActive() && !isAppLocked && (
+          <SocialVideoShareDialog
+            link={pendingSharedVideo}
+            conversations={conversations}
+            onSend={sendSharedVideo}
+            onClose={closeSharedVideo}
+          />
+        )}
 
-      {/* Modals */}
-      {activeModal?.type === 'settings' && (
-        <SettingsModal initialCategory={activeModal.initialCategory} />
-      )}
-      {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
-      {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
-      {activeModal?.type === 'newChat' && <NewChatModal />}
-      {activeModal?.type === 'newGroup' && <NewGroupModal />}
-      {activeModal?.type === 'groupDetails' && (
-        <GroupDetailsModal conversationId={activeModal.conversationId} />
-      )}
-      {activeModal?.type === 'contactDetails' && (
-        <ContactDetailsModal conversationId={activeModal.conversationId} />
-      )}
-      {activeModal?.type === 'profile' && (
-        <ProfileModal
-          peerId={activeModal.peerId}
-          peerUsername={activeModal.peerUsername}
-          searchResult={activeModal.searchResult}
-        />
-      )}
-      {activeModal?.type === 'accountsAndSpaces' && <AccountsAndSpacesModal />}
-      {(activeModal?.type === 'appLockSetup' || pendingPinSetup) && (
-        <AppLockSetupModal
-          spaceId={pendingPinSetup?.spaceId || activeSession?.spaceId || ''}
-          username={pendingPinSetup?.username || (activeSession as any)?.username || ''}
-          spaceName={pendingPinSetup?.spaceName || activeSession?.name || ''}
-          password={pendingPinSetup?.password}
-          onComplete={() => {
-            setPendingPinSetup(null);
-            closeModal();
-          }}
-        />
-      )}
+        {/* Modals */}
+        {activeModal?.type === 'settings' && (
+          <SettingsModal initialCategory={activeModal.initialCategory} />
+        )}
+        {activeModal?.type === 'createSpace' && <CreateSpaceModal />}
+        {activeModal?.type === 'restoreAccount' && <RestoreAccountModal />}
+        {activeModal?.type === 'newChat' && <NewChatModal />}
+        {activeModal?.type === 'newGroup' && <NewGroupModal />}
+        {activeModal?.type === 'groupDetails' && (
+          <GroupDetailsModal conversationId={activeModal.conversationId} />
+        )}
+        {activeModal?.type === 'contactDetails' && (
+          <ContactDetailsModal conversationId={activeModal.conversationId} />
+        )}
+        {activeModal?.type === 'profile' && (
+          <ProfileModal
+            peerId={activeModal.peerId}
+            peerUsername={activeModal.peerUsername}
+            searchResult={activeModal.searchResult}
+          />
+        )}
+        {activeModal?.type === 'accountsAndSpaces' && <AccountsAndSpacesModal />}
+        {(activeModal?.type === 'appLockSetup' || pendingPinSetup) && (
+          <AppLockSetupModal
+            spaceId={pendingPinSetup?.spaceId || activeSession?.spaceId || ''}
+            username={pendingPinSetup?.username || (activeSession as any)?.username || ''}
+            spaceName={pendingPinSetup?.spaceName || activeSession?.name || ''}
+            password={pendingPinSetup?.password}
+            onComplete={() => {
+              setPendingPinSetup(null);
+              closeModal();
+            }}
+          />
+        )}
+      </React.Suspense>
     </div>
   );
 };
