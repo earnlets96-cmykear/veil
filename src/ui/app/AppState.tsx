@@ -443,6 +443,62 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const autoResumedMediaSpaceRef = useRef<string | null>(null);
   const syncTimeoutRef = useRef<any>(null);
   const searchIndexTimeoutRef = useRef<any>(null);
+  const pendingMessagePersistSpaceRef = useRef<string | null>(null);
+  const pendingConversationPersistSpaceRef = useRef<string | null>(null);
+
+  const queueMessagePersistence = useCallback(() => {
+    pendingMessagePersistSpaceRef.current = activeSession?.spaceId || null;
+  }, [activeSession]);
+
+  const queueConversationPersistence = useCallback(() => {
+    pendingConversationPersistSpaceRef.current = activeSession?.spaceId || null;
+  }, [activeSession]);
+
+  useEffect(() => {
+    const requestedSpaceId = pendingMessagePersistSpaceRef.current;
+    if (!requestedSpaceId) return;
+    if (!activeSession || activeSession.spaceId !== requestedSpaceId) {
+      pendingMessagePersistSpaceRef.current = null;
+      return;
+    }
+
+    const session = activeSession;
+    const snapshot = messages;
+    const persistTimer = setTimeout(() => {
+      if (pendingMessagePersistSpaceRef.current === requestedSpaceId) {
+        pendingMessagePersistSpaceRef.current = null;
+      }
+      if (!session.isActive()) return;
+      void store.setAsync(session, 'veil:ui:messages', snapshot).catch((error) => {
+        console.warn('[VEIL-UI] Deferred message persistence failed:', error);
+      });
+    }, 0);
+
+    return () => clearTimeout(persistTimer);
+  }, [activeSession, messages]);
+
+  useEffect(() => {
+    const requestedSpaceId = pendingConversationPersistSpaceRef.current;
+    if (!requestedSpaceId) return;
+    if (!activeSession || activeSession.spaceId !== requestedSpaceId) {
+      pendingConversationPersistSpaceRef.current = null;
+      return;
+    }
+
+    const session = activeSession;
+    const snapshot = conversations;
+    const persistTimer = setTimeout(() => {
+      if (pendingConversationPersistSpaceRef.current === requestedSpaceId) {
+        pendingConversationPersistSpaceRef.current = null;
+      }
+      if (!session.isActive()) return;
+      void store.setAsync(session, 'veil:ui:conversations', snapshot).catch((error) => {
+        console.warn('[VEIL-UI] Deferred conversation persistence failed:', error);
+      });
+    }, 0);
+
+    return () => clearTimeout(persistTimer);
+  }, [activeSession, conversations]);
 
   const queueSearchIndexUpdate = useCallback(
     (c: Contact[], convs: UIConversation[], msgs: Record<string, UIMessage[]>) => {
@@ -2619,19 +2675,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setReplyTargetState(null);
 
       // Instant optimistic UI render (0ms)
+      queueMessagePersistence();
       setMessages((prev) => {
         const list = prev[conversationId] || [];
         const updated = { ...prev, [conversationId]: [...list, newMsg] };
-        store.setAsync(activeSession, 'veil:ui:messages', updated);
         queueSearchIndexUpdate(contacts, conversations, updated);
         return updated;
       });
 
+      queueConversationPersistence();
       setConversations((prev) => {
         const updated = prev.map((c) =>
           c.id === conversationId ? { ...c, name: isSelfVault ? 'My Vault' : c.name, lastMessage: text.trim(), timestamp: Date.now() } : c
         );
-        store.setAsync(activeSession, 'veil:ui:conversations', updated);
         return updated;
       });
 
@@ -2793,6 +2849,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               targetContact?.name,
             ].filter(Boolean) as string[]);
 
+            queueMessagePersistence();
             setMessages((prev) => {
               const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
                 m.id === msgId ? { ...m, status: deliveryStatus } : m
@@ -2801,7 +2858,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               for (const k of keys) {
                 updated[k] = list;
               }
-              store.setAsync(activeSession, 'veil:ui:messages', updated);
               return updated;
             });
 
@@ -2820,6 +2876,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               targetContact?.name,
             ].filter(Boolean) as string[]);
 
+            queueMessagePersistence();
             setMessages((prev) => {
               const list = (prev[conversationId] || (targetContact?.name ? prev[targetContact.name] : []) || []).map((m) =>
                 m.id === msgId ? { ...m, status: failureStatus } : m
@@ -2828,7 +2885,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               for (const k of keys) {
                 updated[k] = list;
               }
-              store.setAsync(activeSession, 'veil:ui:messages', updated);
               return updated;
             });
 
@@ -2841,7 +2897,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         } catch (_bgErr) {}
       })();
     },
-    [activeSession, contacts, conversations, replyTarget, networkState, myProfile]
+    [activeSession, contacts, conversations, replyTarget, networkState, myProfile, queueMessagePersistence, queueConversationPersistence]
   );
 
   const pendingNotificationRepliesRef = useRef<Array<{ reply: NotificationReply; receivedAt: number }>>([]);
