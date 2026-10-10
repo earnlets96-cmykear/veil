@@ -1,5 +1,11 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Completed Expanded Themes and Wallpapers
+- [x] Add Glacier, Canyon, and Aurora coordinated presets plus two offline wallpaper designs in each Nature, Abstract, and Patterns family.
+- [x] Add local JPEG/PNG/WebP upload, replace, reselect, remove, IndexedDB persistence, WebP normalization, and startup restoration.
+- [x] State plainly that custom photos remain on this device, are not Space-encrypted, and are not uploaded or synced.
+- [x] Run four focused appearance/theme/image/store suites (21 tests) and `npm run typecheck`.
+- **Limitation**: Network access to image hosts and localhost preview is blocked by the environment; additions use CSS designs and were not visually inspected in the live app.
 ## Active Phase: PHASE 128 — ANDROID FULL PREVIEW REPLY & MEDIA RECOVERY
 - [x] Add Full Preview-only inline reply to Android local notifications and route it through the existing encrypted send path.
 - [x] Bind replies to the originating Space, clear active notifications on lock/privacy-mode changes, and keep FCM alerts generic.

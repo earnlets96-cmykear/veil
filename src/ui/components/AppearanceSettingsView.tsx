@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ACCENT_PALETTE,
   BUBBLE_STYLES,
@@ -10,6 +10,10 @@ import {
   type BubbleStyle,
   type FontSizeSetting,
 } from '../utils/themeManager.ts';
+import { getWallpapersForFamily, WALLPAPER_FAMILIES } from '../utils/wallpaperCatalog.ts';
+import { normalizeCustomWallpaper } from '../utils/customWallpaperImage.ts';
+import { customWallpaperManager } from '../utils/customWallpaperManager.ts';
+import { customWallpaperStore } from '../utils/customWallpaperStore.ts';
 import { ArrowLeftIcon, CheckIcon } from './icons/index.ts';
 
 interface AppearanceSettingsViewProps {
@@ -21,6 +25,12 @@ const THEME_COLLECTIONS = ['Minimal', 'Nature', 'Expressive'] as const;
 export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ onBack }) => {
   const [preferences, setPreferences] = useState<AppearancePreferences>(() => themeManager.getPreferences());
   const [notice, setNotice] = useState('');
+  const [wallpaperError, setWallpaperError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [hasSavedPhoto, setHasSavedPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const curatedWallpaperIds = new Set(['nature-misty-pines', 'nature-desert-dusk', 'abstract-aurora-glow', 'abstract-rosewater', 'pattern-soft-grid', 'pattern-contours']);
+  const currentCuratedWallpaper = WALLPAPER_FAMILIES.flatMap(getWallpapersForFamily).find(item => item.wallpaperId === preferences.wallpaper);
   const selectedTheme = preferences.theme === 'dark'
     ? 'midnight'
     : preferences.theme === 'dim'
@@ -28,10 +38,37 @@ export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ 
       : preferences.theme;
 
   useEffect(() => themeManager.subscribe(setPreferences), []);
+  useEffect(() => {
+    let active = true;
+    void customWallpaperStore.load().then(blob => { if (active) setHasSavedPhoto(Boolean(blob)); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   const handleReset = () => {
     themeManager.resetToDefaults();
     setNotice('Default appearance restored.');
+  };
+
+  const handleWallpaperUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    setWallpaperError('');
+    setUploading(true);
+    try {
+      const blob = await normalizeCustomWallpaper(file);
+      await customWallpaperManager.replace(blob);
+      setHasSavedPhoto(true);
+    } catch (error) {
+      setWallpaperError(error instanceof Error ? error.message : 'The wallpaper could not be saved.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const chooseBuiltInWallpaper = (wallpaperId: typeof WALLPAPERS[number]['id']) => {
+    setWallpaperError('');
+    themeManager.setWallpaper(wallpaperId);
   };
 
   return (
@@ -63,7 +100,7 @@ export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ 
           <span className="veil-appearance-preview-label">YOUR CHAT</span>
         </div>
         <div
-          className={`veil-appearance-preview veil-wallpaper-pattern--${preferences.wallpaper}`}
+          className={`veil-appearance-preview veil-wallpaper-pattern--${preferences.wallpaper}${currentCuratedWallpaper ? ` ${currentCuratedWallpaper.patternClass}` : ''}`}
           data-wallpaper={preferences.wallpaper}
           data-bubble-style={preferences.bubbleStyle}
         >
@@ -150,7 +187,7 @@ export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ 
           <div><h3 id="appearance-wallpaper-title">Chat backgrounds</h3><p>From minimal to a little more playful</p></div>
         </div>
         <div className="veil-wallpaper-grid">
-          {WALLPAPERS.map(wallpaper => {
+          {WALLPAPERS.filter(wallpaper => !curatedWallpaperIds.has(wallpaper.id)).map(wallpaper => {
             const selected = preferences.wallpaper === wallpaper.id;
             return (
               <button
@@ -159,13 +196,46 @@ export const AppearanceSettingsView: React.FC<AppearanceSettingsViewProps> = ({ 
                 type="button"
                 aria-pressed={selected}
                 aria-label={`${wallpaper.name}: ${wallpaper.description}${selected ? ', selected' : ''}`}
-                onClick={() => themeManager.setWallpaper(wallpaper.id)}
+                onClick={() => chooseBuiltInWallpaper(wallpaper.id)}
               >
                 <span className={`veil-wallpaper-sample veil-wallpaper-pattern--${wallpaper.id}`} aria-hidden="true" />
                 <strong>{wallpaper.name}</strong>
               </button>
             );
           })}
+        </div>
+        {WALLPAPER_FAMILIES.map(family => (
+          <div className="veil-wallpaper-family" key={family}>
+            <h4>{family}</h4>
+            <div className="veil-wallpaper-grid">
+              {getWallpapersForFamily(family).map(wallpaper => {
+                const selected = preferences.wallpaper === wallpaper.wallpaperId;
+                return (
+                  <button
+                    key={wallpaper.id}
+                    className={`veil-wallpaper-option${selected ? ' is-selected' : ''}`}
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={`${wallpaper.name}: ${wallpaper.description}${selected ? ', selected' : ''}`}
+                    onClick={() => chooseBuiltInWallpaper(wallpaper.wallpaperId)}
+                  >
+                    <span className={`veil-wallpaper-sample ${wallpaper.patternClass}`} aria-hidden="true" />
+                    <strong>{wallpaper.name}</strong>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="veil-wallpaper-upload">
+          <input ref={fileInputRef} className="veil-wallpaper-file-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Choose a wallpaper photo" onChange={handleWallpaperUpload} />
+          <button type="button" className="veil-appearance-upload-button" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? 'Processing photo…' : preferences.wallpaper === 'custom' ? 'Change photo' : 'Upload photo'}
+          </button>
+          {hasSavedPhoto && preferences.wallpaper !== 'custom' && <button type="button" className="veil-appearance-remove-button" onClick={() => void customWallpaperManager.selectSaved().catch(error => setWallpaperError(error instanceof Error ? error.message : 'The photo could not be selected.'))}>Use uploaded photo</button>}
+          {hasSavedPhoto && <button type="button" className="veil-appearance-remove-button" onClick={() => void customWallpaperManager.remove().then(() => setHasSavedPhoto(false)).catch(error => setWallpaperError(error instanceof Error ? error.message : 'The wallpaper could not be removed.'))}>Remove photo</button>}
+          <p>Your photo stays on this device in local app storage. It is not encrypted by VEIL Spaces, uploaded, or synced.</p>
+          {wallpaperError && <p className="veil-wallpaper-error" role="alert">{wallpaperError}</p>}
         </div>
       </section>
 

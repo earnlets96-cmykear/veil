@@ -569,3 +569,84 @@
     radial-gradient(ellipse at 12% 18%, var(--veil-wallpaper-accent) 0, transparent 46%),
     radial-gradient(ellipse at 88% 78%, var(--veil-wallpaper-accent) 0, transparent 42%);
 }
+
+/* Additional coordinated palettes. */
+[data-theme="glacier"] {
+  --veil-bg-base: #eaf2f5; --veil-bg-surface: #f4f8fa; --veil-bg-surface-elevated: #ffffff;
+  --veil-bg-surface-active: #dce9ee; --veil-bg-glass: rgba(244, 248, 250, .94);
+  --veil-text-primary: #162b34; --veil-text-secondary: #526b75; --veil-text-muted: #70868f;
+  --veil-border: rgba(39, 78, 92, .15); --veil-border-subtle: rgba(39, 78, 92, .08);
+  --veil-bubble-incoming: #f7fbfc; --veil-bubble-incoming-text: #162b34; --veil-bubble-outgoing: #176878;
+  --veil-bubble-outgoing-text: #ffffff; --veil-input-bg: #ffffff; --veil-scheme: light;
+}
+[data-theme="canyon"] {
+  --veil-bg-base: #21170f; --veil-bg-surface: #2c2016; --veil-bg-surface-elevated: #36271b;
+  --veil-bg-surface-active: #493421; --veil-bg-glass: rgba(44, 32, 22, .94);
+  --veil-text-primary: #f5eee5; --veil-text-secondary: #c8b7a2; --veil-text-muted: #9a8771;
+  --veil-border: rgba(220, 164, 112, .18); --veil-border-subtle: rgba(220, 164, 112, .09);
+  --veil-bubble-incoming: #332519; --veil-bubble-incoming-text: #f5eee5; --veil-bubble-outgoing: #75472e;
+  --veil-bubble-outgoing-text: #ffffff; --veil-input-bg: #2c2016; --veil-scheme: dark;
+}
+[data-theme="aurora"] {
+  --veil-bg-base: #0c1020; --veil-bg-surface: #13182a; --veil-bg-surface-elevated: #1a2035;
+  --veil-bg-surface-active: #252c48; --veil-bg-glass: rgba(19, 24, 42, .94);
+  --veil-text-primary: #f0efff; --veil-text-secondary: #b0b2d0; --veil-text-muted: #7e82a6;
+  --veil-border: rgba(167, 139, 250, .18); --veil-border-subtle: rgba(167, 139, 250, .09);
+  --veil-bubble-incoming: #1b2035; --veil-bubble-incoming-text: #f0efff; --veil-bubble-outgoing: #433078;
+  --veil-bubble-outgoing-text: #ffffff; --veil-input-bg: #13182a; --veil-scheme: dark;
+}
+
+/* Offline wallpaper designs are intentionally low contrast behind message bubbles. */
+[data-wallpaper^="nature-"] .veil-timeline,
+[data-wallpaper^="abstract-"] .veil-timeline,
+[data-wallpaper^="pattern-"] .veil-timeline,
+[data-wallpaper^="nature-"] .veil-appearance-preview,
+[data-wallpaper^="abstract-"] .veil-appearance-preview,
+[data-wallpaper^="pattern-"] .veil-appearance-preview {
+  background-color: var(--veil-bg-base);
+  background-size: cover;
+}
+.veil-wallpaper-photo--misty-pines {
+  background-image: radial-gradient(ellipse at 75% 12%, rgba(179, 205, 198, .21), transparent 43%), linear-gradient(145deg, rgba(17, 46, 43, .84), rgba(64, 88, 79, .43) 48%, rgba(19, 34, 36, .8));
+}
+.veil-wallpaper-photo--desert-dusk {
+  background-image: radial-gradient(ellipse at 20% 90%, rgba(203, 127, 79, .24), transparent 54%), linear-gradient(160deg, rgba(90, 62, 48, .7), rgba(177, 119, 77, .37) 55%, rgba(58, 45, 41, .76));
+}
+.veil-wallpaper-photo--aurora-glow {
+  background-image: radial-gradient(ellipse at 25% 25%, rgba(34, 163, 151, .24), transparent 45%), radial-gradient(ellipse at 78% 76%, rgba(111, 87, 183, .2), transparent 46%), linear-gradient(135deg, rgba(13, 21, 43, .7), rgba(36, 39, 63, .58));
+}
+.veil-wallpaper-photo--rosewater {
+  background-image: radial-gradient(ellipse at 80% 15%, rgba(226, 164, 181, .24), transparent 48%), radial-gradient(ellipse at 13% 85%, rgba(159, 141, 194, .19), transparent 48%), linear-gradient(135deg, rgba(76, 55, 75, .56), rgba(126, 79, 100, .48));
+}
+.veil-wallpaper-photo--soft-grid {
+  background-image: linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+.veil-wallpaper-photo--contours {
+  background-image: repeating-radial-gradient(ellipse at 15% 80%, transparent 0 14px, rgba(255,255,255,.07) 15px 16px, transparent 17px 28px), repeating-radial-gradient(ellipse at 85% 14%, transparent 0 22px, rgba(255,255,255,.045) 23px 24px, transparent 25px 38px);
+}
+[data-wallpaper="nature-misty-pines"] .veil-timeline,
+[data-wallpaper="nature-misty-pines"] .veil-appearance-preview { background-image: radial-gradient(ellipse at 75% 12%, rgba(179, 205, 198, .21), transparent 43%), linear-gradient(145deg, rgba(17, 46, 43, .84), rgba(64, 88, 79, .43) 48%, rgba(19, 34, 36, .8)); }
+[data-wallpaper="nature-desert-dusk"] .veil-timeline,
+[data-wallpaper="nature-desert-dusk"] .veil-appearance-preview { background-image: radial-gradient(ellipse at 20% 90%, rgba(203, 127, 79, .24), transparent 54%), linear-gradient(160deg, rgba(90, 62, 48, .7), rgba(177, 119, 77, .37) 55%, rgba(58, 45, 41, .76)); }
+[data-wallpaper="abstract-aurora-glow"] .veil-timeline,
+[data-wallpaper="abstract-aurora-glow"] .veil-appearance-preview { background-image: radial-gradient(ellipse at 25% 25%, rgba(34, 163, 151, .24), transparent 45%), radial-gradient(ellipse at 78% 76%, rgba(111, 87, 183, .2), transparent 46%), linear-gradient(135deg, rgba(13, 21, 43, .7), rgba(36, 39, 63, .58)); }
+[data-wallpaper="abstract-rosewater"] .veil-timeline,
+[data-wallpaper="abstract-rosewater"] .veil-appearance-preview { background-image: radial-gradient(ellipse at 80% 15%, rgba(226, 164, 181, .24), transparent 48%), radial-gradient(ellipse at 13% 85%, rgba(159, 141, 194, .19), transparent 48%), linear-gradient(135deg, rgba(76, 55, 75, .56), rgba(126, 79, 100, .48)); }
+[data-wallpaper="pattern-soft-grid"] .veil-timeline,
+[data-wallpaper="pattern-soft-grid"] .veil-appearance-preview { background-image: linear-gradient(rgba(255,255,255,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.055) 1px, transparent 1px); background-size: 36px 36px; }
+[data-wallpaper="pattern-contours"] .veil-timeline,
+[data-wallpaper="pattern-contours"] .veil-appearance-preview { background-image: repeating-radial-gradient(ellipse at 15% 80%, transparent 0 14px, rgba(255,255,255,.07) 15px 16px, transparent 17px 28px), repeating-radial-gradient(ellipse at 85% 14%, transparent 0 22px, rgba(255,255,255,.045) 23px 24px, transparent 25px 38px); }
+[data-wallpaper="custom"] .veil-timeline,
+[data-wallpaper="custom"] .veil-appearance-preview {
+  background-color: var(--veil-bg-base);
+  background-image: linear-gradient(rgba(0, 0, 0, .32), rgba(0, 0, 0, .32)), var(--veil-custom-wallpaper-image);
+  background-position: center;
+  background-size: cover;
+}
+[data-theme="light"][data-wallpaper="custom"] .veil-timeline,
+[data-theme="light"][data-wallpaper="custom"] .veil-appearance-preview,
+[data-theme="glacier"][data-wallpaper="custom"] .veil-timeline,
+[data-theme="glacier"][data-wallpaper="custom"] .veil-appearance-preview {
+  background-image: linear-gradient(rgba(255, 255, 255, .46), rgba(255, 255, 255, .46)), var(--veil-custom-wallpaper-image);
+}

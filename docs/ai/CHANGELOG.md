@@ -1234,3 +1234,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Composer UI Follow-up] - 2026-10-10
 - Changed the composer send and voice-record action buttons to circular shapes while preserving size, focus, and gesture behavior.
 - Verification: Phase 127 and Phase 129 focused suites (8 tests) and TypeScript pass.
+# [Expanded Themes and Wallpapers] - 2026-10-10
+- Added three theme presets and six offline wallpaper designs grouped into Nature, Abstract, and Patterns.
+- Added safe local photo upload, replace, reselect, and remove with IndexedDB storage and WebP normalization. Custom image data remains outside Space encryption and sync.
+- Verification: 21 focused tests and TypeScript pass. Remote wallpaper asset hosts and localhost preview were unavailable in the sandbox, so the new built-ins use CSS designs rather than web-sourced photos.

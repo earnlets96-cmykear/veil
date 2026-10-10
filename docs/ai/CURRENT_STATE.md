@@ -1,5 +1,9 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Expanded Themes and Wallpapers — 2026-10-10
+- Added Glacier, Canyon, and Aurora theme presets; six new offline wallpaper designs across Nature, Abstract, and Patterns; and local photo upload/replace/select/remove.
+- Custom photos are re-encoded as metadata-stripped WebP, capped at 15 MiB source / 40 MP decoded / 2400 px edge, and stored in app-origin IndexedDB outside Space encryption, relay, and device sync. UI states this storage boundary.
+- Focused verification: four appearance/theme/image/store suites pass (21 tests); `npm run typecheck` passes. Live browser preview was unavailable because the sandbox blocks localhost socket access. Web asset hosts were also unreachable, so the six additional wallpapers are offline CSS designs rather than sourced photographs.
 ## Current Phase: PHASE 128 — ANDROID FULL PREVIEW REPLY & MEDIA RECOVERY
 - **Status**: Local notification replies, including cold-start RemoteInput, fail-closed attachment session gating, and cached voice MIME recovery are implemented; focused regressions and TypeScript pass. Android compilation/device validation remains outstanding.
 - **Changes**: Android local notifications in Full Preview mode now offer inline replies bound to the originating conversation and Space, routed through VEIL's encrypted send path. Cold-start replies are captured during native plugin load, and notifications use the active VEIL accent color. Locking the Space or changing privacy mode clears active notifications. Attachment and voice requests stop with a generic UI error when session restoration fails. Cached voice playback prefers audio MIME metadata over generic cache MIME values.

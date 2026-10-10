@@ -17,6 +17,9 @@ export type ThemeMode =
   | 'amber'
   | 'rose'
   | 'slate'
+  | 'glacier'
+  | 'canyon'
+  | 'aurora'
   | 'dark'
   | 'amoled'
   | 'dim'
@@ -35,7 +38,8 @@ export type AccentColor =
   | 'violet'
   | 'gray';
 
-export type ChatWallpaper = 'default' | 'solid' | 'subtle-patterns' | 'waves' | 'orbit' | 'organic';
+export type ChatWallpaper = 'default' | 'solid' | 'subtle-patterns' | 'waves' | 'orbit' | 'organic' | 'nature-misty-pines' | 'nature-desert-dusk' | 'abstract-aurora-glow' | 'abstract-rosewater' | 'pattern-soft-grid' | 'pattern-contours' | 'custom';
+export type BuiltInWallpaper = Exclude<ChatWallpaper, 'custom'>;
 export type WallpaperOption = ChatWallpaper;
 export type BubbleStyle = 'modern' | 'classic';
 export type FontSizeSetting = 'small' | 'default' | 'large';
@@ -57,10 +61,13 @@ export const THEME_OPTIONS: ThemeOption[] = [
   { id: 'amoled', name: 'True Black', description: 'Pure black for OLED displays', bgHex: '#000000', collection: 'Minimal', accent: 'teal', accentHex: '#14b8a6' },
   { id: 'light', name: 'Porcelain', description: 'Clean, bright neutral surfaces', bgHex: '#f7f8fa', collection: 'Minimal', accent: 'teal', accentHex: '#0d9488' },
   { id: 'porcelain', name: 'Oat', description: 'Warm paper and soft bronze', bgHex: '#f4efe7', collection: 'Minimal', accent: 'amber', accentHex: '#a65f32' },
+  { id: 'glacier', name: 'Glacier', description: 'Cool, pale blue and quiet silver', bgHex: '#e8f1f5', collection: 'Minimal', accent: 'cyan', accentHex: '#168ba0' },
   { id: 'ocean', name: 'Tide', description: 'Deep marine blue and clear cyan', bgHex: '#08101a', collection: 'Nature', accent: 'blue', accentHex: '#3b82f6' },
   { id: 'forest', name: 'Moss', description: 'Quiet pine with fresh green', bgHex: '#07130e', collection: 'Nature', accent: 'green', accentHex: '#22c55e' },
   { id: 'amber', name: 'Ember', description: 'Warm charcoal with soft gold', bgHex: '#120e0a', collection: 'Nature', accent: 'amber', accentHex: '#f59e0b' },
+  { id: 'canyon', name: 'Canyon', description: 'Warm stone with desert green', bgHex: '#21170f', collection: 'Nature', accent: 'orange', accentHex: '#df8750' },
   { id: 'rose', name: 'Rosewood', description: 'Velvet plum with muted rose', bgHex: '#13090e', collection: 'Expressive', accent: 'rose', accentHex: '#f43f5e' },
+  { id: 'aurora', name: 'Aurora', description: 'Deep indigo with a cool northern glow', bgHex: '#0c1020', collection: 'Expressive', accent: 'violet', accentHex: '#a78bfa' },
 ];
 
 export const BUBBLE_STYLES: Array<{ id: BubbleStyle; name: string; description: string }> = [
@@ -74,13 +81,19 @@ export const FONT_SIZES: Array<{ id: FontSizeSetting; name: string; description:
   { id: 'large', name: 'Large', description: 'Comfortable 110% scaling', scale: '1.1' },
 ];
 
-export const WALLPAPERS: Array<{ id: ChatWallpaper; name: string; description: string }> = [
+export const WALLPAPERS: Array<{ id: BuiltInWallpaper; name: string; description: string }> = [
   { id: 'default', name: 'Quiet', description: 'Clean, plain chat background' },
   { id: 'solid', name: 'Solid', description: 'A crisp single-color surface' },
   { id: 'subtle-patterns', name: 'Fine Dots', description: 'A barely-there dotted texture' },
   { id: 'waves', name: 'Soft Waves', description: 'Low-contrast flowing contours' },
   { id: 'orbit', name: 'Orbit', description: 'Scattered points and fine rings' },
   { id: 'organic', name: 'Organic', description: 'Soft, overlapping color forms' },
+  { id: 'nature-misty-pines', name: 'Misty Pines', description: 'Soft forest layers in a cool morning haze' },
+  { id: 'nature-desert-dusk', name: 'Desert Dusk', description: 'Warm sandstone shapes at the end of the day' },
+  { id: 'abstract-aurora-glow', name: 'Aurora Glow', description: 'Muted indigo and teal light' },
+  { id: 'abstract-rosewater', name: 'Rosewater', description: 'Soft rose and lilac color fields' },
+  { id: 'pattern-soft-grid', name: 'Soft Grid', description: 'A subtle geometric grid' },
+  { id: 'pattern-contours', name: 'Contour Lines', description: 'Quiet topographic rings' },
 ];
 
 export interface AccentDefinition {
@@ -125,6 +138,7 @@ const STORAGE_KEYS = {
   wallpaper: 'veil:wallpaper',
   bubbleStyle: 'veil:bubble_style',
   fontSize: 'veil:font_size',
+  lastBuiltInWallpaper: 'veil:wallpaper:last_builtin',
 };
 
 // In-memory fallback for test runner & SSR
@@ -184,7 +198,7 @@ export class ThemeManager {
     let fontSize: FontSizeSetting = 'default';
 
     const savedTheme = getStorageItem(STORAGE_KEYS.theme) as ThemeMode;
-    const validThemes: ThemeMode[] = ['midnight', 'porcelain', 'ocean', 'forest', 'amber', 'rose', 'slate', 'dark', 'amoled', 'dim', 'light'];
+    const validThemes: ThemeMode[] = ['midnight', 'porcelain', 'ocean', 'forest', 'amber', 'rose', 'slate', 'glacier', 'canyon', 'aurora', 'dark', 'amoled', 'dim', 'light'];
     if (savedTheme && validThemes.includes(savedTheme)) {
       theme = savedTheme;
     }
@@ -195,7 +209,7 @@ export class ThemeManager {
     }
 
     const savedWall = getStorageItem(STORAGE_KEYS.wallpaper) as ChatWallpaper;
-    if (WALLPAPERS.some(option => option.id === savedWall)) {
+    if (savedWall === 'custom' || WALLPAPERS.some(option => option.id === savedWall)) {
       wallpaper = savedWall;
     }
 
@@ -231,10 +245,22 @@ export class ThemeManager {
   }
 
   public setWallpaper(wallpaper: ChatWallpaper): void {
+    if (wallpaper === 'custom' && this.prefs.wallpaper !== 'custom') {
+      setStorageItem(STORAGE_KEYS.lastBuiltInWallpaper, this.prefs.wallpaper);
+    }
     this.prefs.wallpaper = wallpaper;
     setStorageItem(STORAGE_KEYS.wallpaper, wallpaper);
     this.applyToDOM();
     this.notify();
+  }
+
+  public getLastBuiltInWallpaper(): BuiltInWallpaper {
+    const saved = getStorageItem(STORAGE_KEYS.lastBuiltInWallpaper) as BuiltInWallpaper;
+    return WALLPAPERS.some((option) => option.id === saved) ? saved : 'default';
+  }
+
+  public restoreLastBuiltInWallpaper(): void {
+    this.setWallpaper(this.getLastBuiltInWallpaper());
   }
 
   public setBubbleStyle(bubbleStyle: BubbleStyle): void {

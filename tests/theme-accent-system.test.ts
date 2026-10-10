@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ThemeManager, ACCENT_PALETTE, THEME_OPTIONS, WALLPAPERS } from '../src/ui/utils/themeManager.ts';
+import { getWallpapersForFamily, WALLPAPER_CATALOG, WALLPAPER_FAMILIES } from '../src/ui/utils/wallpaperCatalog.ts';
 
 describe('ThemeManager — Centralized Dynamic Accent & Theme System', () => {
   let manager: ThemeManager;
@@ -72,15 +73,44 @@ describe('ThemeManager — Centralized Dynamic Accent & Theme System', () => {
     );
   });
 
+  it('provides Glacier, Canyon, and Aurora as one additional preset per collection', () => {
+    expect(THEME_OPTIONS.filter(({ id }) => ['glacier', 'canyon', 'aurora'].includes(id))).toHaveLength(3);
+    expect(THEME_OPTIONS.find(({ id }) => id === 'glacier')?.collection).toBe('Minimal');
+    expect(THEME_OPTIONS.find(({ id }) => id === 'canyon')?.collection).toBe('Nature');
+    expect(THEME_OPTIONS.find(({ id }) => id === 'aurora')?.collection).toBe('Expressive');
+  });
+
+  it('provides at least two bundled, offline wallpaper choices in every family', () => {
+    for (const family of WALLPAPER_FAMILIES) {
+      expect(getWallpapersForFamily(family).length).toBeGreaterThanOrEqual(2);
+    }
+    expect(WALLPAPER_CATALOG.every(({ patternClass }) => patternClass.startsWith('veil-wallpaper-'))).toBe(true);
+    expect(WALLPAPER_CATALOG.some(({ patternClass }) => /^https?:/.test(patternClass))).toBe(false);
+  });
+
+  it('remembers the last built-in wallpaper when custom wallpaper is selected', () => {
+    manager.setWallpaper('orbit');
+    manager.setWallpaper('custom');
+    expect(manager.getLastBuiltInWallpaper()).toBe('orbit');
+    manager.restoreLastBuiltInWallpaper();
+    expect(manager.getWallpaper()).toBe('orbit');
+  });
+
   it('offers distinct minimal and expressive chat wallpaper patterns', () => {
     expect(WALLPAPERS.map(({ id }) => id)).toEqual([
       'default', 'solid', 'subtle-patterns', 'waves', 'orbit', 'organic',
+      'nature-misty-pines', 'nature-desert-dusk', 'abstract-aurora-glow', 'abstract-rosewater', 'pattern-soft-grid', 'pattern-contours',
     ]);
   });
 
   it('persists newly selected wallpaper choices across manager instances', () => {
     manager.setWallpaper('waves');
     expect(new ThemeManager().getWallpaper()).toBe('waves');
+  });
+
+  it('restores the custom wallpaper selection across manager instances', () => {
+    manager.setWallpaper('custom');
+    expect(new ThemeManager().getWallpaper()).toBe('custom');
   });
 
   it('applies a coordinated theme preset and accent in one update', () => {

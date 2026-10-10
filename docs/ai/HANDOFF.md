@@ -1,5 +1,9 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Expanded Themes and Wallpapers — 2026-10-10
+- Implemented Glacier/Canyon/Aurora theme cards and six new offline CSS wallpapers, with two choices each for Nature, Abstract, and Patterns.
+- Added JPEG/PNG/WebP image normalization and app-origin IndexedDB persistence for custom wallpapers, including restore-on-start, reselect, replacement, removal, and object-URL cleanup on replacement/remove/pagehide.
+- Focused results: 21 tests pass across four suites; `npm run typecheck` passes. Live preview and web image-host access were blocked by sandbox socket/network restrictions. New catalog wallpapers use CSS designs pending a future opportunity to bundle sourced photographs.
 ## Phase 128 Update — Android Full Preview Reply & Media Recovery
 - Local Full Preview Android notifications now include inline replies bound to the conversation and Space. Native RemoteInput is cleared from its one-shot intent before an in-memory event reaches AppState; replies are captured on both cold launch and Activity reuse, and `sendMessage` handles them only while that Space is active. Local notifications use VEIL's current accent color. FCM notifications remain generic. Active notifications clear on lock and privacy-mode changes.
 - Attachment and voice requests now stop before cloud access if session restoration fails. Voice playback chooses valid audio metadata rather than passing through `application/octet-stream` from an old cache entry.

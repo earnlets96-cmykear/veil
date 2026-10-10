@@ -8,6 +8,7 @@ import { ErrorBoundary } from './ui/components/ErrorBoundary.tsx';
 import { AppProvider } from './ui/app/AppState.tsx';
 import { ToastProvider } from './ui/components/ui/index.ts';
 import { App } from './ui/App.tsx';
+import { restoreCustomWallpaperAtStartup } from './ui/utils/customWallpaperManager.ts';
 import { Capacitor } from '@capacitor/core';
 import { applyPlatformViewportInsets } from './ui/mobileViewportInsets.ts';
 import './styles/veil-design-system.css';
@@ -15,6 +16,7 @@ import './styles/themes.css';
 import './styles/veil-components.css';
 
 applyPlatformViewportInsets(Capacitor.getPlatform());
+restoreCustomWallpaperAtStartup();
 
 const rootEl = document.getElementById('root');
 if (rootEl) {
