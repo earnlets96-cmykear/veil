@@ -13,7 +13,7 @@ describe('Sidebar touch navigation and quick lock menu', () => {
   });
 
   it('keeps swipe gestures from replacing taps on interactive list controls', () => {
-    expect(sidebar).toContain("target?.closest('button, a, input, textarea, select, [role=\"slider\"]')");
+    expect(sidebar).toContain("target?.closest('button, a, input, textarea, select, [role=\"button\"], [role=\"slider\"]')");
     expect(sidebar).toContain('onClickCapture={(event) => {');
     expect(sidebar).toContain('suppressListClickUntilRef.current = Date.now() + 700');
   });

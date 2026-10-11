@@ -115,7 +115,7 @@ describe('Phase 62: App Lock, Privacy & Authentication Suite', () => {
       expect(html).toMatch(/VEIL never lists inactive or decoy spaces/i);
     });
 
-    it('Sidebar removes "Spaces" filter pill and applies .veil-filter-pill to remaining chips', () => {
+    it('Sidebar removes "Spaces" filter pill and applies .veil-tab-btn to remaining tabs', () => {
       const html = renderToStaticMarkup(
         <AppProvider>
           <ToastProvider>
@@ -132,8 +132,8 @@ describe('Phase 62: App Lock, Privacy & Authentication Suite', () => {
       // Spaces filter pill must NOT be rendered in the category chips
       expect(html).not.toMatch(/>Spaces<\/button>/);
 
-      // Filter pills must have the veil-filter-pill class for clean oval touch styling
-      expect(html).toMatch(/class="[^"]*veil-filter-pill[^"]*"/);
+      // Tab buttons must have the veil-tab-btn class for the redesigned tab bar
+      expect(html).toMatch(/class="[^"]*veil-tab-btn[^"]*"/);
     });
 
     it('Sidebar removes "Calls" tab and rebalances bottom navigation to 3 equal tabs', () => {
