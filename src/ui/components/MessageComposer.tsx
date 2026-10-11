@@ -175,12 +175,10 @@ const MessageComposerComponent: React.FC<MessageComposerProps> = ({
     if (options.files.length === 1) {
       await sendAttachment(conversationId, options.files[0], {
         caption: trimmedCaption,
-        onUploadStarted: options.onUploadStarted,
       });
     } else if (options.files.length > 1) {
       await sendAttachments(conversationId, options.files, {
         caption: trimmedCaption,
-        onUploadStarted: options.onUploadStarted,
       });
     }
   };
