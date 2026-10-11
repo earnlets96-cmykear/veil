@@ -5417,6 +5417,13 @@ img.veil-message-sticker-img {
 .veil-timeline {
   padding: 0 !important;
   background: var(--veil-surface-app);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.veil-msg-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
 }
 
 /* Premium appearance studio */

@@ -499,6 +499,11 @@ export const Sidebar: React.FC = () => {
     }
   }, [deleteTarget, deleteConversation, isDeletingChat]);
 
+  const handleDeleteClick = useCallback((conversation: UIConversation) => {
+    setDeleteError(null);
+    setDeleteTarget(conversation);
+  }, []);
+
   const pendingIncoming = contactRequests.filter((r) => r.isIncoming && r.status === 'INCOMING_PENDING');
 
   const localConvResults = searchResults.filter((r) => r.type === 'contact' || r.type === 'message' || (r.type as any) === 'conversation');
@@ -1011,7 +1016,7 @@ export const Sidebar: React.FC = () => {
                     contactAvatar={contactAvatar}
                     onSelect={handleSelectConversation}
                     onTogglePin={handleTogglePin}
-                    onDelete={(conversation) => { setDeleteError(null); setDeleteTarget(conversation); }}
+                    onDelete={handleDeleteClick}
                   />
                 );
               })
