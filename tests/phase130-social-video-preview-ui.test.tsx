@@ -40,6 +40,11 @@ describe('Phase 130 social video preview UX', () => {
     expect(html).toContain('referrerPolicy="no-referrer"');
     expect(html).toContain('Open original');
     expect(html).toContain('View full screen');
+    expect(html).toContain('class="veil-social-video-action-link"');
+    expect(html).toContain('class="veil-social-video-action-button veil-social-video-action-expand"');
+    expect(html).toContain('class="veil-social-video-action-button veil-social-video-action-close"');
+    expect(html).toContain('aria-label="Close video player"');
+    expect(html).toContain('title="Close video player"');
     expect(html).not.toContain('allow="autoplay');
     expect(html).not.toContain('dangerouslySetInnerHTML');
     expect(componentSource).toContain("event.key === 'Escape'");
@@ -69,6 +74,9 @@ describe('Phase 130 social video preview UX', () => {
     expect(styles).toMatch(/\.veil-social-video-bubble\s*\{[^}]*padding:\s*0\.35rem/s);
     expect(styles).toMatch(/\.veil-social-video-preview,[\s\S]*?width:\s*min\(100%, 320px\)/);
     expect(styles).toMatch(/\.veil-social-video-player\.is-instagram iframe\s*\{[^}]*min-height:\s*min\(440px, 72dvh\)/s);
+    expect(styles).toMatch(/\.veil-social-video-player-actions \.veil-social-video-action-button\s*\{[^}]*min-width:\s*40px;[^}]*min-height:\s*40px/s);
+    expect(styles).toContain('@media (max-width: 360px)');
+    expect(styles).toContain('@media (prefers-reduced-motion: reduce)');
     expect(styles).toContain('.veil-social-video-fullscreen-overlay');
   });
 });

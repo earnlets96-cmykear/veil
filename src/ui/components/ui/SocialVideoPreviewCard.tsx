@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SocialVideoLink } from '../../../media/socialVideoLinks.ts';
 import { loadSocialVideoPreview, SocialVideoPreview } from '../../../media/socialVideoPreviewService.ts';
-import { MaximizeIcon } from '../icons/index.ts';
+import { CloseIcon, ExternalLinkIcon, MaximizeIcon } from '../icons/index.ts';
 
 const TIKTOK_PLAYER_READY_TIMEOUT_MS = 15_000;
 
@@ -99,12 +99,37 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
         </>
       )}
       <div className="veil-social-video-player-actions">
-        <a href={link.canonicalUrl} target="_blank" rel="noopener noreferrer">Open original</a>
-        <button type="button" onClick={onExpand} aria-label={isFullscreen ? 'Exit full screen' : 'View full screen'}>
-          <MaximizeIcon size={16} />
-          <span>{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
-        </button>
-        <button type="button" onClick={onClose} aria-label="Close video player">Close</button>
+        <a
+          className="veil-social-video-action-link"
+          href={link.canonicalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open original ${link.provider === 'tiktok' ? 'TikTok' : 'Instagram'} video`}
+        >
+          <ExternalLinkIcon size={15} aria-hidden="true" />
+          <span>Open original</span>
+        </a>
+        <div className="veil-social-video-action-group">
+          <button
+            className="veil-social-video-action-button veil-social-video-action-expand"
+            type="button"
+            onClick={onExpand}
+            aria-label={isFullscreen ? 'Exit full screen' : 'View full screen'}
+            title={isFullscreen ? 'Exit full screen' : 'View full screen'}
+          >
+            <MaximizeIcon size={16} />
+            <span>{isFullscreen ? 'Exit full screen' : 'Full screen'}</span>
+          </button>
+          <button
+            className="veil-social-video-action-button veil-social-video-action-close"
+            type="button"
+            onClick={onClose}
+            aria-label="Close video player"
+            title="Close video player"
+          >
+            <CloseIcon size={17} aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   );
