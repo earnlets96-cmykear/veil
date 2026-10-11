@@ -681,10 +681,11 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
           </div>
         )}
 
-        {selectedFiles.some((f) => !f.type.startsWith('image/') && !f.type.startsWith('video/')) && (
+        {/* Staged file list for web-picked files (not shown in native grid) */}
+        {selectedFiles.some((f) => !fileToUriMapRef.current.has(f)) && (
           <div className="veil-attachment-staging-list" style={{ marginTop: '8px' }}>
             {selectedFiles
-              .filter((f) => !f.type.startsWith('image/') && !f.type.startsWith('video/'))
+              .filter((f) => !fileToUriMapRef.current.has(f))
               .map((file, idx) => (
                 <div key={`${file.name}-${idx}`} className="veil-attachment-staging-item">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
