@@ -3419,6 +3419,13 @@
   font-size: var(--veil-text-sm, 0.875rem);
 }
 
+.veil-social-video-player-stalled {
+  padding: 0.5rem 0.75rem;
+  color: var(--veil-text-secondary);
+  font-size: var(--veil-text-xs, 0.75rem);
+  line-height: 1.4;
+}
+
 .veil-social-video-fullscreen-overlay {
   position: fixed;
   inset: 0;

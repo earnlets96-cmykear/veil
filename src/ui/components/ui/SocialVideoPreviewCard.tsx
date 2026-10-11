@@ -30,13 +30,14 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
 }) => {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [playerError, setPlayerError] = useState(false);
+  const [playerStalled, setPlayerStalled] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (link.provider !== 'tiktok') return;
     let playerReady = false;
     const readinessTimeout = window.setTimeout(() => {
-      if (!playerReady) setPlayerError(true);
+      if (!playerReady) setPlayerStalled(true);
     }, TIKTOK_PLAYER_READY_TIMEOUT_MS);
     const handlePlayerMessage = (event: MessageEvent) => {
       if (event.origin !== 'https://www.tiktok.com' || event.source !== iframeRef.current?.contentWindow) return;
@@ -44,11 +45,13 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
       if (event.data['x-tiktok-player'] !== true) return;
       if (event.data.type === 'onPlayerReady') {
         playerReady = true;
+        setPlayerStalled(false);
         window.clearTimeout(readinessTimeout);
         return;
       }
       if (event.data.type === 'onPlayerError') {
         playerReady = true;
+        setPlayerStalled(false);
         window.clearTimeout(readinessTimeout);
         setPlayerError(true);
       }
@@ -62,6 +65,7 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
 
   const retryPlayer = () => {
     setPlayerError(false);
+    setPlayerStalled(false);
     setReloadKey((key) => key + 1);
   };
 
@@ -74,18 +78,25 @@ export const SocialVideoEmbed: React.FC<SocialVideoEmbedProps> = ({
           <button type="button" onClick={retryPlayer}>Retry video</button>
         </div>
       ) : (
-        <iframe
-          key={reloadKey}
-          ref={iframeRef}
-          src={src}
-          title={`${link.provider === 'tiktok' ? 'TikTok' : 'Instagram'} video player${title ? `: ${title}` : ''}`}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups"
-          allow="encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          onError={() => setPlayerError(true)}
-        />
+        <>
+          <iframe
+            key={reloadKey}
+            ref={iframeRef}
+            src={src}
+            title={`${link.provider === 'tiktok' ? 'TikTok' : 'Instagram'} video player${title ? `: ${title}` : ''}`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups"
+            allow="encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            onError={() => setPlayerError(true)}
+          />
+          {playerStalled && link.provider === 'tiktok' && (
+            <div className="veil-social-video-player-stalled" role="status" aria-live="polite">
+              TikTok hasn’t confirmed the player is ready. If it doesn’t start, open the original video.
+            </div>
+          )}
+        </>
       )}
       <div className="veil-social-video-player-actions">
         <a href={link.canonicalUrl} target="_blank" rel="noopener noreferrer">Open original</a>
