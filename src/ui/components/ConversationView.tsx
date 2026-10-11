@@ -593,7 +593,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               <MediaImage
                 attachment={msg.attachment}
                 isVideo={msg.attachment.mimeType?.startsWith('video/')}
-                onClick={handleMediaClick}
+                onClick={msg.status === 'FAILED' && onRetry ? handleRetryAction : handleMediaClick}
                 alt={msg.attachment.name}
               />
               {msg.text && !msg.text.startsWith('Attachment:') && msg.text !== 'Voice Message' && (
@@ -629,6 +629,39 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
                     loadedBytes={isCurrentlyDownloading ? dlLoaded : effectiveUploadLoaded}
                     variant={msg.status === 'UPLOADING' || (msg.attachment as any)?.state === 'UPLOADING' ? 'upload' : 'download'}
                   />
+                </div>
+              )}
+              {msg.status === 'FAILED' && msg.isOutgoing && onRetry && (
+                <div
+                  className="veil-media-retry-overlay"
+                  onClick={(e) => { e.stopPropagation(); handleRetryAction(); }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Retry sending"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    borderRadius: 'var(--veil-radius-md, 12px)',
+                    zIndex: 5,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff5555" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                  </svg>
+                  <span style={{ color: '#ff5555', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.02em' }}>
+                    Tap to retry
+                  </span>
                 </div>
               )}
               <div className="veil-media-meta-overlay">
@@ -760,6 +793,38 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
               onContextMenu={handleContextMenuAction}
               disableInternalSwipe={true}
             />
+          )}
+
+          {/* Retry Banner for failed outgoing messages without a visible text bubble */}
+          {!hasVisibleTextBubble && msg.status === 'FAILED' && msg.isOutgoing && onRetry && !isMedia && (
+            <button
+              type="button"
+              className="veil-media-retry-banner"
+              onClick={(e) => { e.stopPropagation(); handleRetryAction(); }}
+              aria-label="Retry sending"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                width: '100%',
+                padding: '8px 12px',
+                background: 'rgba(255, 85, 85, 0.12)',
+                border: '1px solid rgba(255, 85, 85, 0.25)',
+                borderRadius: 'var(--veil-radius-sm, 8px)',
+                color: '#ff5555',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginTop: '4px',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              Tap to retry
+            </button>
           )}
 
           {/* Universal Floating Reactions Badge for all message types (Text, Voice, Media, File, Sticker) */}
