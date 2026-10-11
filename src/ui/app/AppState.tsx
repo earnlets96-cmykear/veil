@@ -2966,7 +2966,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     async (
       conversationId: string,
       files: File[],
-      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined>; onUploadStarted?: () => void }
+      options?: { allowSave?: boolean; allowForward?: boolean; forwarded?: boolean; forwardedFrom?: string; caption?: string; retryMessageId?: string; retryJobIds?: Array<string | undefined>; retryUploadedAttachments?: Array<LocalAttachmentPayload | undefined>; retryGroupId?: string; onUploadStarted?: () => void }
     ) => {
       if (!activeSession || files.length === 0) return;
 
@@ -3000,11 +3000,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       replyTargetRef.current = null;
       setReplyTargetState(null);
 
-      const batchGroupId = files.length > 1 ? `grp_media_${Date.now()}_${bytesToHex(randomBytes(4))}` : undefined;
+      const batchGroupId = options?.retryGroupId || (files.length > 1 ? `grp_media_${Date.now()}_${bytesToHex(randomBytes(4))}` : undefined);
 
       // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
       const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
-        const attachmentId = `att_${bytesToHex(randomBytes(8))}`;
+        const reusableUpload = options?.retryUploadedAttachments?.[idx];
+        const attachmentId = reusableUpload?.attachmentId || `att_${bytesToHex(randomBytes(8))}`;
         const effectiveMime = inferMediaMime(file);
         const isSticker = Boolean(
           (file as any).isSticker ||
@@ -3031,6 +3032,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           MediaCache.set(file.name, decryptedStub);
         }
         return {
+          ...(reusableUpload || {}),
           attachmentId,
           groupId: batchGroupId,
           name: file.name,
@@ -3039,7 +3041,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           previewUrl: initialPreviewUrl,
           localPreviewUrl: initialPreviewUrl,
           isSticker,
-          state: idx < 2 ? ('UPLOADING' as const) : ('QUEUED' as const),
+          state: reusableUpload?.objectId ? ('SENT' as const) : idx < 2 ? ('UPLOADING' as const) : ('QUEUED' as const),
           allowSave,
           allowForward,
         } as LocalAttachmentPayload;
@@ -3160,6 +3162,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const idx = queueIndex++;
             const file = files[idx];
             const currentAtt = activeAttachments[idx];
+            const reusableUpload = options?.retryUploadedAttachments?.[idx];
+
+            if (reusableUpload?.objectId) {
+              activeAttachments[idx] = { ...currentAtt, ...reusableUpload, state: 'SENT' };
+              continue;
+            }
 
             currentAtt.state = 'UPLOADING';
             updateTimeline(activeAttachments, 'UPLOADING');
@@ -3288,6 +3296,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 await uploadWithSession();
               }
 
+              // The ciphertext is durably uploaded now. Persist that fact before
+              // thumbnail work or message dispatch can fail, so a retry can reuse it.
+              activeAttachments[idx] = { ...activeAttachments[idx], objectId, state: 'SENT' };
+              await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
+                state: 'UPLOADED',
+                attachment: activeAttachments[idx],
+              });
+
               setUploadProgress((prev) => {
                 const next = { ...prev };
                 delete next[currentAtt.attachmentId];
@@ -3338,11 +3354,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 allowSave,
                 allowForward,
               };
-              await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
-                state: 'UPLOADING',
-                attachment: activeAttachments[idx],
-              });
-
               updateTimeline(activeAttachments, 'UPLOADING');
             } catch (err: any) {
               setUploadProgress((prev) => {
@@ -3350,6 +3361,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 delete next[currentAtt.attachmentId];
                 return next;
               });
+              if (activeAttachments[idx]?.state === 'SENT' && activeAttachments[idx]?.objectId) {
+                // Upload completed; only local bookkeeping failed. Preserve the
+                // reusable object and let dispatch/retry handle the remaining work.
+                await mediaOutbox.update(activeSession, currentAtt.attachmentId, {
+                  state: 'UPLOADED',
+                  attachment: activeAttachments[idx],
+                }).catch(() => {});
+                updateTimeline(activeAttachments, 'UPLOADING');
+                continue;
+              }
               hasAnyError = true;
               await mediaOutbox.update(activeSession, currentAtt.attachmentId, { state: 'FAILED' }).catch(() => {});
               activeAttachments[idx] = {
@@ -3488,7 +3509,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             });
 
             updateTimeline(activeAttachments, 'SENT_TO_RELAY');
-            await mediaOutbox.removeMessage(activeSession, msgId);
+            await mediaOutbox.removeMessage(activeSession, msgId).catch(() => {});
           } catch (wireErr: any) {
             RuntimeDiagnostics.wire('wireFailed', {
               msgId,
@@ -4191,6 +4212,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (att) {
           const originalAttachments = targetMsg.attachments?.length ? targetMsg.attachments : [att];
           const jobs = originalAttachments.map((item) => outboxJobs.find((job) => job.attachment.attachmentId === item.attachmentId));
+          const reusableUploads = originalAttachments.map((item, index) => {
+            const job = jobs[index];
+            if (item.state === 'SENT' && item.objectId) return item;
+            if (job?.state === 'UPLOADED' && job.attachment.objectId) return { ...job.attachment, ...item, objectId: job.attachment.objectId, state: 'SENT' as const } as LocalAttachmentPayload;
+            return undefined;
+          });
           const files: File[] = [];
           for (let index = 0; index < originalAttachments.length; index += 1) {
             const item = originalAttachments[index];
@@ -4213,6 +4240,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               caption: targetMsg.text && targetMsg.text !== 'Photo' && targetMsg.text !== 'Video' && targetMsg.text !== 'Attachment' ? targetMsg.text : undefined,
               retryMessageId: messageId,
               retryJobIds: jobs.map((job) => job?.jobId),
+              retryUploadedAttachments: reusableUploads as Array<LocalAttachmentPayload | undefined>,
+              retryGroupId: targetMsg.groupId,
             });
             return;
           } else {

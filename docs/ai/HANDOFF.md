@@ -1,5 +1,12 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
+- Confirmed the attachment UI can show a failed message after ciphertext upload completed because later message dispatch or outbox cleanup shared the same failure boundary. The outbox now records `UPLOADED`; retry restores ciphertext as before but reuses the existing attachment/object ID and does not upload again. Cleanup after relay dispatch is best-effort.
+- Verification: 5 attachment/outbox suites / 18 tests and 4 social-video suites / 16 tests pass; `npm run typecheck` passes. No production build was run in this pass.
+- TikTok remains unresolved for the user’s specific share because the exact public share URL/provider response is not available. Keep to official oEmbed/player endpoints; ADR-130 forbids relay proxying and generic page scraping. The Render deployment screenshot belongs to another service and cannot be diagnosed from this checkout.
+- Takeover report: read `AGENTS.md` and required `docs/ai` architecture/security/task docs; inspected recent git history and the worktree. Current HEAD was `048f917`. Preserve pre-existing `business-card/` deletions and `release/v1.0.0/{manifest.json,checksums.sha256}` edits; do not stage or revert them. The new regression test and source/docs changes are the scoped work.
+- Next action: ask for/inspect the failing TikTok URL and the provider result on the affected Android device, then decide whether an allowed client-side compatibility fix exists. Physical playback and post-RC security review/dual sign-off remain release gates.
+
 ## Social Video Player Action Controls — 2026-10-12
 - Player footer controls now use a compact responsive action bar: external-link affordance, VEIL fullscreen, and icon close. Existing callbacks and destinations are unchanged. Buttons have 40px minimum hit targets, accessible labels, visible keyboard focus, and reduced-motion handling.
 - Five social-video suites / 29 tests and `npm run typecheck` pass. The Impeccable scan reported existing findings in other shared-stylesheet sections. Physical Android WebView visual validation remains pending.

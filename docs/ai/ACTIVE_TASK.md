@@ -1,5 +1,12 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Completed: Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
+- [x] Preserve completed encrypted uploads in the outbox and reuse their attachment/object IDs when only message delivery needs retrying.
+- [x] Prevent best-effort outbox cleanup after relay dispatch from changing a successful message to failed.
+- [x] Verify attachment/outbox and social-video regressions (34 tests) and TypeScript.
+- [ ] Diagnose the remaining TikTok preview failure against the exact shared URL/provider response; validate playback on Android WebView.
+- [ ] Obtain independent security review, formal audit, and dual sign-off before deployment under the post-RC security freeze.
+
 ## Completed: Social Video Player Action Controls — 2026-10-12
 - [x] Group Open original, VEIL fullscreen, and close into a compact responsive player action bar with clear icons and accessible names.
 - [x] Preserve existing handlers; keep minimum 40px touch targets, keyboard focus visibility, narrow-screen labels, and reduced-motion support.

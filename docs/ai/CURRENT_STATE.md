@@ -1,5 +1,10 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+# Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
+- A completed encrypted attachment upload is now recorded as `UPLOADED` in the Space-encrypted outbox. If message dispatch later fails, retry reuses the uploaded object and original attachment identity instead of encrypting and uploading the same bytes again. Post-dispatch outbox cleanup is best-effort so cleanup I/O cannot turn a relayed message into a failed bubble.
+- Verification: focused attachment/outbox and social-video suites pass (34 tests); `npm run typecheck` passes. Physical Android/TikTok playback remains unverified. The exact failing TikTok share URL is still needed to diagnose provider-specific resolution failures.
+- Scope: no cryptographic primitive, Space boundary, E2EE wire format, provider endpoint, relay fetch, or persistent provider-media behavior changed.
+
 ## Social Video Player Action Controls — 2026-10-12
 - Reworked the player footer into a compact action bar with an external-link affordance, visible fullscreen control, and icon close button. All actions retain accessible names and existing handlers; touch controls remain at least 40px tall, with the fullscreen label visually collapsed only on very narrow screens.
 - Added visible keyboard focus styling and reduced-motion handling. Five social-video suites / 29 tests and `npm run typecheck` pass. Impeccable detector findings are existing issues elsewhere in the shared stylesheet; no Android device preview was available.

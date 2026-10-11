@@ -11,7 +11,7 @@ export interface MediaUploadJob {
   conversationId: string;
   kind?: 'attachment' | 'voice';
   attachment: LocalAttachmentPayload;
-  state: 'READY' | 'UPLOADING' | 'FAILED';
+  state: 'READY' | 'UPLOADING' | 'UPLOADED' | 'FAILED';
   createdAt: number;
   updatedAt: number;
 }
