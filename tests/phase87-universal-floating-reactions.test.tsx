@@ -25,7 +25,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ConversationView } from '../src/ui/components/ConversationView.tsx';
 import { MessageBubble } from '../src/ui/components/ui/MessageBubble.tsx';
-import { AppContext, AppContextType } from '../src/ui/app/AppState.tsx';
+import { AppContext, AppContextType, ComposerContext, ComposerContextType } from '../src/ui/app/AppState.tsx';
 import { ToastProvider } from '../src/ui/components/ui/Toast.tsx';
 import type { UIConversation, UIMessage } from '../src/ui/app/types.ts';
 import type { Contact } from '../src/contacts/types.ts';
@@ -97,10 +97,23 @@ function createMockAppContext(overrides: Partial<AppContextType> = {}): AppConte
 }
 
 function renderWithContext(contextValue: AppContextType): string {
+  const composerValue: ComposerContextType = {
+    sendMessage: contextValue.sendMessage,
+    sendAttachment: (contextValue as any).sendAttachment || (async () => {}),
+    sendAttachments: (contextValue as any).sendAttachments || (async () => {}),
+    sendVoiceMessage: (contextValue as any).sendVoiceMessage || (async () => {}),
+    replyTarget: contextValue.replyTarget,
+    setReplyTarget: contextValue.setReplyTarget,
+    myProfile: contextValue.myProfile,
+    contacts: contextValue.contacts,
+    conversations: contextValue.conversations,
+  };
   return renderToStaticMarkup(
     <ToastProvider>
       <AppContext.Provider value={contextValue}>
-        <ConversationView />
+        <ComposerContext.Provider value={composerValue}>
+          <ConversationView />
+        </ComposerContext.Provider>
       </AppContext.Provider>
     </ToastProvider>
   );

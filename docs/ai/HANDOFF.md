@@ -1,9 +1,81 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Social Video Player Action Controls — 2026-10-12
+- Player footer controls now use a compact responsive action bar: external-link affordance, VEIL fullscreen, and icon close. Existing callbacks and destinations are unchanged. Buttons have 40px minimum hit targets, accessible labels, visible keyboard focus, and reduced-motion handling.
+- Five social-video suites / 29 tests and `npm run typecheck` pass. The Impeccable scan reported existing findings in other shared-stylesheet sections. Physical Android WebView visual validation remains pending.
+- Changed source: `src/ui/components/ui/SocialVideoPreviewCard.tsx`, `src/styles/veil-components.css`, and `tests/phase130-social-video-preview-ui.test.tsx`. Preserve unrelated working-tree modifications and artifacts.
+
+## TikTok Player Loading Regression — 2026-10-12
+- Phase 131's 15-second readiness timeout removed the active TikTok iframe when `onPlayerReady` was not received, even without an explicit player error. Retry recreated the same URL and repeated the issue.
+- The timeout now leaves the iframe mounted and shows a non-blocking waiting status. Actual player/iframe errors still show recovery controls. Six social-video suites / 30 tests and TypeScript pass.
+- Verify TikTok playback and full-screen behavior in physical Android WebView; `adb` is not available in this environment.
+
+## Attachment Retry and Video Scroll Responsiveness — 2026-10-11
+- Attachment uploads no longer race a shorter caller timeout against CloudClient's own bounded request. The old race could reject early while the underlying transfer continued and then launch another upload. Existing reauthentication behavior remains; retry starts after the bounded request settles and reuses the created object ID.
+- Video thumbnail extraction waits for the message tile to approach the viewport; fallback `<video>` elements use `preload="none"`.
+- Focused Phase 105/106/107 suites pass (12 tests), TypeScript passes, and the production Vite bundle builds (existing mixed-import and large-chunk warnings remain). Full `npm test`: 355 files passed / 113 failed (1,510 tests passed / 220 failed / 6 skipped); most failures involve local relay/recovery socket denials, with some unrelated UI assertion failures.
+- Physical Android send/scroll validation remains outstanding. No attachment wire format or crypto behavior changed.
+- Preserve unrelated working-tree changes, including the Android release asset/index, release manifests/checksums, temporary regression folders, and `business-card/`.
+
+## Microphone Permission Prompt Follow-up — 2026-10-11
+- Android WebView may continue reporting microphone permission state `prompt` after the user has acknowledged VEIL's explanation. Store that acknowledgement as a local UI preference and skip the repeated explanation; direct requests still reach the platform/browser permission flow. Explicitly denied access keeps the Settings guidance.
+- Verification: Phase 135 permission persistence, Phase 36, Phase 37, and Phase 129 recording suites pass (12 tests); `npm run typecheck` passes.
+- No authentication, cryptographic, Space-isolation, or message protocol changes.
+
+## Attachment Read, Thumbnail, and Responsiveness Follow-up — 2026-10-10
+- Native Android document chunks now read until actual stream EOF and return `bytesRead`/`isLast`; TypeScript assembles the file without trusting an inaccurate OpenableColumns size. Existing encrypted attachment payload format is unchanged.
+- Recent image/video tiles lazily request a 120px native thumbnail when they approach the viewport. This restores video previews and avoids serially decoding the full recent-media grid before showing it.
+- Upload progress updates are throttled to at most 10 per second and moved to `UploadProgressContext`; only `ConversationView` consumes that context, avoiding app-wide React context invalidation on XHR progress.
+- `npm run typecheck` passes. Tests were not run in this pass. Android Gradle packaging failed before compilation with `Unable to establish loopback connection`; physical-device checks remain required.
+- No authentication, cryptographic, Space-isolation, or attachment wire-format changes. Continue preserving unrelated working-tree edits and user artifacts.
+
+## Message Bubble Palettes — 2026-10-10
+- Implemented six curated incoming/outgoing palettes and a VEIL Default control in the Appearance screen; each card previews both directions. ThemeManager persists the selection locally and restores it independently of accent and shape.
+- Actual message bubbles and the live Appearance preview share palette tokens. All 12 light/dark surface-text pairs pass the 4.5:1 contrast check; both theme/appearance suites pass (20 tests) and TypeScript passes.
+- A live VEIL browser preview was not available in this environment; this pass verified rendered markup and shared production CSS selectors.
+
 ## Expanded Themes and Wallpapers — 2026-10-10
 - Implemented Glacier/Canyon/Aurora theme cards and six new offline CSS wallpapers, with two choices each for Nature, Abstract, and Patterns.
 - Added JPEG/PNG/WebP image normalization and app-origin IndexedDB persistence for custom wallpapers, including restore-on-start, reselect, replacement, removal, and object-URL cleanup on replacement/remove/pagehide.
 - Focused results: 21 tests pass across four suites; `npm run typecheck` passes. Live preview and web image-host access were blocked by sandbox socket/network restrictions. New catalog wallpapers use CSS designs pending a future opportunity to bundle sourced photographs.
+- Custom wallpaper bytes are not encrypted by VEIL Spaces and are not uploaded or synchronized; the Appearance UI explains this.
+
+## Attachment Send Retention Follow-up
+- Both the media picker and file-preview send paths await AppState send setup before clearing their staged selections. On setup errors, files remain selected and the user sees a retry prompt.
+- Phase 135 plus six existing attachment/audio suites pass (24 tests); TypeScript passes.
+- Follow-up audit: Android recent Files query omits audio-library rows, while the system Browse all files picker can select them. Mixed multi-file batches still route through an image/video gallery renderer and need a type-aware display fix.
+
+## Mobile Chat List Interaction Follow-up — 2026-10-10
+- Raised the floating New Chat action using the Android safe-area inset, added outside-touch/Escape dismissal for the Security menu, and wired horizontal conversation-list swipes to All, Unread, and Groups. Vertical scrolling and control taps remain intact.
+- Added `tests/phase134-sidebar-touch-navigation.test.ts`. The new suite (4), Phase 62 sidebar/app-lock suite (10), and Phase 127 chat-list suite (5) pass; `npm run typecheck` passes.
+- UI-only scope; no cryptography, identity, Space boundary, relay, or message wire protocol changed. Preserve all pre-existing unrelated working-tree changes.
+
+## Composer Input Responsiveness Follow-up
+- MessageComposer no longer binds the textarea to per-keystroke React state. It stores live text in a ref and only rerenders when switching between the empty and non-empty send/microphone control. Edit prefill, send, emoji insertion/backspace, and textarea resizing read/update this live value.
+- Verification: Phase 134 composer responsiveness, Phase 108 composer responsiveness, and Phase 102B emoji drawer suites pass (12 tests); `npm run typecheck` passes.
+- No cryptography, identity, Space isolation, transport, or message protocol changed.
+
+## Media Bubble UI Follow-up
+- Reduced single and grouped photo/video message previews to a 300px maximum width and reduced their maximum height.
+- Outgoing photo and video previews get a 1px `--veil-border` border; sticker art is excluded.
+- Phase 101 media suite (8 tests) and TypeScript pass. The Impeccable detector reported only existing findings outside the changed selectors.
+
+## Phase 133 Update — My Vault, Group Entry & Video Upload Memory
+- Added My Vault as the local destination for the active Space's own identity. Text notes are stored via the encrypted Space store and return before contact/directory lookup, relay delivery, or cloud recovery sync; self-directed contact requests are rejected.
+- New Chat now opens group creation. A named creator-only group can be created and populated later through the existing group details flow.
+- Android recent media is read in sequential 1 MiB chunks instead of returning the complete file as Base64. Upload no longer retains a separate full plaintext `MediaCache` entry; main-thread plaintext, worker plaintext, and temporary media key buffers are zeroized after encryption.
+- Added ADR-133, `docs/ai/THREAT_MODEL_SELF_VAULT_AND_MEDIA.md`, and `tests/phase133-reported-user-flows.test.ts`.
+- Verification: five focused suites / 19 tests pass; TypeScript and production Vite build pass. Full `npm test` baseline: 346 files passed / 112 failed (1,463 passed / 220 failed / 6 skipped), with failures primarily from localhost relay/recovery connection limits. The Phase 56C recovery integration test also cannot connect to localhost in this sandbox.
+- Android compile and physical-device large-video testing remain required. No key identity, crypto primitive, attachment wire format, group protocol, or relay behavior changed. Post-RC independent review, formal audit, and dual sign-off remain deployment gates.
+- Preserve unrelated pre-existing edits in Android notification/video preview files, Phase 130 docs/tests/styles, release manifests/checksums, `business-card/`, and the local regression temp directories. Do not include those in a Phase 133 commit.
+
+## Phase 130 Update — Social Video Preview Layout & Playback
+- Replaced the manual Load preview prompt with bounded in-view provider metadata loading (120px viewport margin); offscreen cards do not fetch. Provider attribution is visible, thumbnails stay remote, and playback still requires a tap.
+- Video cards/bubbles now share a compact responsive width. Instagram uses a taller embed frame. Added an optional Escape-dismissible full-screen player and TikTok error handling that validates the exact origin and iframe source, with Retry/Open original fallback.
+- Added ADR-132 and updated the threat model for in-view provider egress. Five focused suites / 28 tests pass; typecheck and production Vite build pass. Impeccable found only pre-existing issues outside video selectors.
+- Physical Android/WebView playback validation, independent security review, formal audit, and dual sign-off remain outstanding. No cryptography, identity, Space boundary, relay, or wire protocol changes.
+- Preserve unrelated Android/release artifact changes, Phase 129 voice-composer work, and local test/business-card directories; keep them out of this feature commit.
+
 ## Phase 128 Update — Android Full Preview Reply & Media Recovery
 - Local Full Preview Android notifications now include inline replies bound to the conversation and Space. Native RemoteInput is cleared from its one-shot intent before an in-memory event reaches AppState; replies are captured on both cold launch and Activity reuse, and `sendMessage` handles them only while that Space is active. Local notifications use VEIL's current accent color. FCM notifications remain generic. Active notifications clear on lock and privacy-mode changes.
 - Attachment and voice requests now stop before cloud access if session restoration fails. Voice playback chooses valid audio metadata rather than passing through `application/octet-stream` from an old cache entry.

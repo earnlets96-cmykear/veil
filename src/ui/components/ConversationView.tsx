@@ -242,7 +242,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     const target = e.target as HTMLElement | null;
     const inVoiceCard = Boolean(target?.closest('[data-voice-swipe-surface="true"]'));
     const isVoiceCardButton = Boolean(inVoiceCard && target?.closest('button'));
-    const ignoredTarget = target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]');
+    const ignoredTarget = target?.closest('button, input, textarea, a, select, [role="slider"], [role="checkbox"], .veil-voicenote-card, .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, .veil-waveform-container, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]');
     if (ignoredTarget && !isVoiceCardButton) {
       return;
     }
@@ -272,7 +272,7 @@ const ConversationMessageRowComponent: React.FC<ConversationMessageRowProps> = (
     const target = e.target as HTMLElement | null;
     const inVoiceCard = Boolean(target?.closest('[data-voice-swipe-surface="true"]'));
     const isVoiceCardButton = Boolean(inVoiceCard && target?.closest('button'));
-    const ignoredTarget = target?.closest('.veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, [role="slider"], button, input, textarea, a, select, [role="checkbox"], .veil-waveform-container, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]');
+    const ignoredTarget = target?.closest('.veil-voicenote-card, .veil-audio-player-card, .veil-audio-player-track-wrap, .veil-audio-scrubber-track, [role="slider"], button, input, textarea, a, select, [role="checkbox"], .veil-waveform-container, .veil-reaction-chip, .veil-reaction-pill, .veil-msg-checkbox, [data-no-swipe="true"]');
     if (ignoredTarget && !isVoiceCardButton) {
       return;
     }

@@ -2000,7 +2000,7 @@
   overflow: hidden;
   width: min(72vw, 300px);
   max-width: 100%;
-  min-width: 160px;
+  min-width: 180px;
   background-color: var(--veil-bg-surface-elevated);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   display: block;
@@ -4722,6 +4722,7 @@
 }
 
 .veil-sticker-grid {
+  height: min(320px, 44vh);
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;

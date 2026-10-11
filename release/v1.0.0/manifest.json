@@ -1,19 +1,44 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-10-08T13:11:24.492Z",
+  "generatedAt": "2026-10-10T22:10:00.703Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
-  "totalArtifacts": 8,
+  "totalArtifacts": 18,
   "artifacts": [
     {
-      "path": "dist/assets/index-C1vkoj-d.css",
-      "sizeBytes": 139293,
-      "sha256": "773351b875510526833d729b9261878ea3deacea324f838b7c3f3b46c1e4e38c"
+      "path": "dist/assets/AccountsAndSpacesModal-DdzABvTO.js",
+      "sizeBytes": 17200,
+      "sha256": "2d1be2cbdc059fd9b9ff08a23df2e671a1e63d82860d77adbb9f596c3eb7163f"
     },
     {
-      "path": "dist/assets/index-kcoqiRF4.js",
-      "sizeBytes": 1041179,
-      "sha256": "81131acccbf0a51d615d88d102fa2cd918af2011267a10d2ac51dee95e060509"
+      "path": "dist/assets/AppLockSetupModal-C0E9s3g5.js",
+      "sizeBytes": 8534,
+      "sha256": "56ed248c16ce2f59964e1465c1d50a83866b61e674df35945ff2b643b0ea2e34"
+    },
+    {
+      "path": "dist/assets/AvatarCropModal-Bfq2NrwZ.js",
+      "sizeBytes": 8027,
+      "sha256": "b4916470c230c90290af9bbb4bceb8d0162873448b4b682253747d189b08271b"
+    },
+    {
+      "path": "dist/assets/ContactDetailsModal-BhFP_CJ-.js",
+      "sizeBytes": 9524,
+      "sha256": "f5744cfc55da519d93984f85b7ea3d79b93c01177a15748cf36d3a5db192f4ad"
+    },
+    {
+      "path": "dist/assets/GroupDetailsModal-kO33_VGM.js",
+      "sizeBytes": 10243,
+      "sha256": "71975c20f99fa0313df3ed38fc17657f525728e14103c947b86488a51b4810e7"
+    },
+    {
+      "path": "dist/assets/index-Blqigd5g.js",
+      "sizeBytes": 926421,
+      "sha256": "1ebf40c000210213340160d11e94a56b373af667b0b65d7f85cc5e79e5d2f1c7"
+    },
+    {
+      "path": "dist/assets/index-DTApCaWC.css",
+      "sizeBytes": 169165,
+      "sha256": "026f82e64da8dc965efe65daa0742b1b3c4291f817e4b0bc30366a5f353a76ba"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -21,29 +46,54 @@
       "sha256": "6048b9cef7b4c77a80daa82232e814acdf1f49cbb7bd21618d3a006d803aa4e6"
     },
     {
-      "path": "dist/assets/mediaWorker-DPgRcg4-.js",
-      "sizeBytes": 21590,
-      "sha256": "8f562fd02168244055567425b6018e3fbde83c66d85a32f787982be1a6b5916b"
+      "path": "dist/assets/mediaWorker-Dq3zY_ez.js",
+      "sizeBytes": 21608,
+      "sha256": "feef8d2e6427f06f724d2469bf2f91d77395abd49c759e31bb15cee62449156e"
     },
     {
-      "path": "dist/assets/web-B8G9NWFN.js",
-      "sizeBytes": 842,
-      "sha256": "1b1d920720ad453bf971eed7fbd087ae2e9c5011ce105fd46dc4979afca70301"
+      "path": "dist/assets/NewChatModal-DTtU57aN.js",
+      "sizeBytes": 11251,
+      "sha256": "203dce9e2a04eb2d9f3bca5b0d1d893a041cafb498a3e04ce6f1172c0cc8cafe"
     },
     {
-      "path": "dist/assets/web-Cowpd1u2.js",
-      "sizeBytes": 361,
-      "sha256": "c49027cd81dc1a561e275fe92a836396f6d4b197fdd7b68cdb8a14ab36716600"
+      "path": "dist/assets/NewGroupModal-BqcIXhtQ.js",
+      "sizeBytes": 8914,
+      "sha256": "9115ee56d19dce8e3144476ed281054d980d35421e8090215015f8b2c4cc0ca8"
     },
     {
-      "path": "dist/assets/web-Gqz4D4FH.js",
-      "sizeBytes": 8728,
-      "sha256": "df0ee00c3e4636eb81e5eb9431204e729bbc0541777d0217c0e3223bcce828eb"
+      "path": "dist/assets/ProfileModal-D6jIpsjc.js",
+      "sizeBytes": 32185,
+      "sha256": "4a7bbb0e5e7322584bf72b0b1d22cb9e64f4662edf19401664059152a1e176c8"
+    },
+    {
+      "path": "dist/assets/SettingsModal-C9QbLMjs.js",
+      "sizeBytes": 57059,
+      "sha256": "dd99fdd0ff6510fe1c5bc85c94c3e3bf881522a39aaa209a29cfd76f9e2c02e1"
+    },
+    {
+      "path": "dist/assets/SocialVideoShareDialog-8-qYOaZS.js",
+      "sizeBytes": 2194,
+      "sha256": "18537e125aa0eef6b5d6524b6b180892915b2439d8ed97833cffdc8a6637cd57"
+    },
+    {
+      "path": "dist/assets/web-CUop9Raa.js",
+      "sizeBytes": 8736,
+      "sha256": "0fbc872220647b38abb91dd611e8de760442073f6b0cd49c94b902e87af5826a"
+    },
+    {
+      "path": "dist/assets/web-DiQW2toH.js",
+      "sizeBytes": 362,
+      "sha256": "b1d73bc038775e3012a3a6e260c73c8d4a4b3c15850cd7ddf37e6aec9c5895f0"
+    },
+    {
+      "path": "dist/assets/web-uM0-VKIv.js",
+      "sizeBytes": 843,
+      "sha256": "8058c0f2b3b70e2f6e3dc26c1ccbb953b6e0453d4885374caec3082b564b8ef9"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "636796202b8ddd82e0f63d02fb0563ff71a5a4c1d25abe916f5939ef9abc89d1"
+      "sha256": "1391f90922b3c85840fc2707f4bfc887442100c720c26395c9a59ba4c6038dc3"
     }
   ]
 }

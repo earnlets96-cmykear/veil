@@ -1,0 +1,52 @@
+body {
+    background-color: black;
+}
+
+
+
+
+.main {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    width: 420px;
+    display: flex;
+    margin: auto;
+    border: 1px solid black;
+    padding: 22px;
+    text-align: center;
+    height: 220px;
+
+    border-bottom: 8px solid black;
+    border-radius: 6px;
+
+    background-image: linear-gradient(black, rgb(34, 34, 34), red);
+    box-shadow: 0 0 50px red;
+}
+
+.text {
+    color: rgba(255, 255, 255, 0.767);
+    font-size: 20px;
+    margin-left: 50px;
+    margin-bottom: 9px;
+    text-shadow: 0 0 2px black;
+}
+
+.img-dag {
+
+    width: 150px;
+}
+
+.btn {
+    transition: all 0.3s;
+    padding: 10px;
+    background-color: #2b2d42;
+    color: rgba(255, 255, 255, 0.767);
+    border-radius: 20px;
+    margin-bottom: 20px;
+}
+
+.btn:hover {
+    transform: translateY(-10px);
+    background-color: #dd2d4a;
+    color: #2b2d42;
+
+}

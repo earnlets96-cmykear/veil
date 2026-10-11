@@ -1,5 +1,48 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Completed: Social Video Player Action Controls — 2026-10-12
+- [x] Group Open original, VEIL fullscreen, and close into a compact responsive player action bar with clear icons and accessible names.
+- [x] Preserve existing handlers; keep minimum 40px touch targets, keyboard focus visibility, narrow-screen labels, and reduced-motion support.
+- [x] Verify five social-video suites (29 tests) and `npm run typecheck`; detector findings are in unrelated stylesheet areas.
+- [ ] Check the player controls in Android WebView on a physical device.
+
+## Completed: TikTok Player Loading Regression — 2026-10-12
+- [x] Confirmed the Phase 131 readiness timeout removed the iframe when TikTok sent no `onPlayerReady`; Retry reloaded the same URL.
+- [x] Keep the iframe mounted after a missing ready event and show only a non-blocking status. Actual player errors retain explicit recovery actions.
+- [x] Add regression coverage; social-video suites (30 tests) and TypeScript pass.
+- [ ] Validate TikTok playback and full-screen behavior on a physical Android WebView.
+
+## Completed: Attachment Retry and Video Scroll Responsiveness — 2026-10-11
+- [x] Remove the shorter caller-side upload race that could start a duplicate upload while the CloudClient request remained active.
+- [x] Keep the existing reauthentication/retry behavior, but let CloudClient's bounded request settle before retrying and reuse the already-created attachment object.
+- [x] Defer video thumbnail extraction until the message is near the viewport and disable eager video metadata preload.
+- [x] Add regressions; focused Phase 105/106/107 suites (12 tests) and TypeScript pass.
+- [x] Production Vite bundle builds successfully (existing mixed-import and large-chunk warnings remain).
+- [x] Run full `npm test`: 355 files passed / 113 failed (1,510 tests passed / 220 failed / 6 skipped); failures are mostly blocked local relay/recovery sockets plus unrelated pre-existing UI assertions.
+- [ ] Validate video scrolling and attachment send on a physical Android device. Physical Android video-scroll/send validation remains pending.
+- **Scope**: Existing encrypted attachment and transport formats are unchanged.
+
+## Completed Microphone Permission Prompt Follow-up
+- [x] Explain the permission prompt loop: Android WebView can continue reporting microphone state `prompt` after access has been acknowledged.
+- [x] Persist acknowledgement of VEIL's explanation locally and skip repeated in-app explanations; keep denied-access Settings guidance.
+- [x] Add Phase 135 regressions and run permission/recording suites (12 tests) plus TypeScript.
+- **Scope**: Permission prompt UX only. No security-sensitive behavior or wire protocol changed.
+
+## Active: Attachment Read, Thumbnail, and Responsiveness Regression
+- [x] Read Android document streams to EOF using actual bytes returned instead of trusting provider-reported size; keep encrypted attachment format unchanged.
+- [x] Restore photo/video thumbnails through lazy visible-cell requests on the native background executor.
+- [x] Isolate upload progress from the broad app context and throttle updates to at most 10 per second.
+- [x] Run TypeScript typecheck.
+- [ ] Build Android and validate document sends, video thumbnails, and app responsiveness on a device. Gradle currently fails before compilation with `Unable to establish loopback connection`.
+- [ ] Profile broader device interactions after the focused media fixes; source changes do not yet establish that all app-wide lag is resolved.
+
+## Completed Attachment Selection and Failure Retention Follow-up
+- [x] Stage native media by metadata/URI and read source bytes only after Send is pressed.
+- [x] Read sequential Android media chunks on a background executor using one open stream; avoid video thumbnail decoding in the picker grid.
+- [x] Ignore stale media-list responses after tab switches; await upload/relay outcomes so failed sends keep selected files visible for retry, and show a safe error category for auth/read/network failures.
+- [x] Add attachment selection, stale-query, native chunk, and failed-send regressions; run five focused suites (30 tests) and `npm run typecheck`.
+- [x] Run full `npm test`: 354 files passed / 111 failed (1,503 tests passed / 218 failed / 6 skipped); most failures require localhost relay/recovery access blocked by the sandbox, with some unrelated existing assertions.
+- [ ] Validate video selection and failed-send retention on a physical Android device; Android compile remains blocked because Gradle cannot establish its local loopback connection.
 
 ## Completed Message Bubble Palette Follow-up
 - [x] Add six curated incoming/outgoing color pairs plus VEIL Default in Appearance, each with a live mini-preview and selected state.
@@ -7,12 +50,74 @@
 - [x] Keep palette preference independent from theme accent, message shape, and font size; persist locally and restore through reset.
 - [x] Verify light/dark contrast thresholds, focused appearance suites (20 tests), and TypeScript.
 - **Visual check**: Live VEIL browser inspection was unavailable; focused renders and CSS token checks were used.
+
 ## Completed Expanded Themes and Wallpapers
 - [x] Add Glacier, Canyon, and Aurora coordinated presets plus two offline wallpaper designs in each Nature, Abstract, and Patterns family.
 - [x] Add local JPEG/PNG/WebP upload, replace, reselect, remove, IndexedDB persistence, WebP normalization, and startup restoration.
 - [x] State plainly that custom photos remain on this device, are not Space-encrypted, and are not uploaded or synced.
 - [x] Run four focused appearance/theme/image/store suites (21 tests) and `npm run typecheck`.
 - **Limitation**: Network access to image hosts and localhost preview is blocked by the environment; additions use CSS designs and were not visually inspected in the live app.
+
+## Completed Attachment Send Retention Follow-up
+- [x] Wait for attachment send setup before clearing selections in both media picker and file preview flows.
+- [x] Keep selected files and show a retry message when send setup fails.
+- [x] Add Phase 135 send-retention regressions; run focused attachment/audio suites and TypeScript.
+- **Audit findings**: Android's recent Files query excludes the audio MediaStore category; Browse all files remains available. Mixed multi-file attachment messages still use the photo/video gallery renderer and need a separate UI follow-up.
+
+## Completed Mobile Chat List Interaction Follow-up
+- [x] Raise the floating new-chat action and account for the Android bottom safe area.
+- [x] Dismiss the Security menu on outside touch and Escape.
+- [x] Switch All, Unread, and Groups filters with horizontal swipes across the conversation list while retaining vertical scrolling and control taps.
+- [x] Add focused sidebar regressions and run adjacent UI suites and TypeScript.
+
+## Completed Composer Input Responsiveness Follow-up
+- [x] Keep the textarea's live value outside React state so each keystroke does not rerender the composer.
+- [x] Preserve send/mic switching, edit prefill, emoji insertion/backspace, and frame-coalesced auto-resizing.
+- [x] Add and run Phase 134 regressions alongside Phase 108 and Phase 102B composer/emoji suites (12 tests); run TypeScript.
+- **Verification**: Focused suites and `npm run typecheck` pass.
+- **Scope**: Composer input/render performance only. No security-sensitive behavior or wire protocol changed.
+
+## Completed Media Bubble UI Follow-up
+- [x] Add a 1px VEIL-border tint to outgoing photo and video previews while excluding sticker art.
+- [x] Reduce photo/video bubbles to a 300px maximum width and height; reduce grouped gallery height on mobile.
+- [x] Verify the Phase 101 media layout suite (8 tests), Phase 40 grouped media suite (2 tests), and TypeScript.
+
+
+## Active Phase: PHASE 133 — MY VAULT, GROUP ENTRY & VIDEO UPLOAD MEMORY
+- [x] Add a My Vault entry point and keep self-addressed text in the active Space's encrypted local store with no relay/cloud-sync send.
+- [x] Reject self-directed contact requests and exclude the active identity from user/group member search.
+- [x] Make group creation reachable from New Chat and allow creating a named creator-only group before inviting members.
+- [x] Read Android recent media in bounded 1 MiB ranges and remove extra plaintext cache retention after encrypted upload preparation.
+- [x] Add focused flow, native media range, media zeroization, and existing encrypted attachment regressions; run focused suites and TypeScript.
+- [ ] Compile Android and validate large video selection/upload under normal and low-memory conditions on physical devices.
+- [ ] Complete independent security review, formal audit, and explicit dual sign-off before deployment.
+- **Verification**: Five focused suites / 19 tests pass; TypeScript and production Vite build pass. Full `npm test`: 346 files passed / 112 failed (1,463 passed / 220 failed / 6 skipped), primarily from sandbox-blocked localhost relay/recovery connections. Android compile and physical device validation remain open.
+- **Scope**: Local-only self-note behavior, group UI discoverability, and native/client media memory lifecycle. No key identity, crypto primitive, attachment wire format, group protocol, or relay behavior changes.
+
+## Active Phase: PHASE 130 — SOCIAL VIDEO PREVIEW LAYOUT & PLAYBACK
+- **Status**: Focused implementation and verification complete; physical Android/WebView playback validation remains open.
+- [x] Replace the initial Load preview prompt with a compact preview state and a provider thumbnail when available.
+- [x] Delay bounded metadata requests until a supported message is within 120px of the viewport; preserve Space-scoped cache cleanup and do not load offscreen messages.
+- [x] Size the video message bubble to its responsive preview/player; give Instagram embeds a taller frame to reduce nested scrolling.
+- [x] Keep video playback behind a Play in VEIL tap and add an optional full-screen viewer.
+- [x] Improve TikTok embed compatibility and validate player errors by exact origin and iframe source; preserve retry and Open original fallback.
+- [x] Add ADR-132 and update the social-video threat model for automatic in-view thumbnail egress.
+- [x] Add focused provider/UI regressions; five suites / 28 tests, TypeScript, and Vite production build pass.
+- [ ] Validate TikTok/Instagram thumbnails, playback, full-screen behavior, and offline/restricted fallbacks in Android WebView on physical devices.
+- [ ] Complete independent security review, formal audit, and explicit dual sign-off before deployment.
+- **Privacy**: In-view previews reveal device IP, timing, and the public post URL to the provider/CDN. No thumbnail bytes are persisted by VEIL.
+- **Scope**: No cryptographic, identity, Space boundary, relay, or message wire protocol changes.
+
+## Active Phase: PHASE 129 — TAP-TO-RECORD VOICE COMPOSER
+- [x] Start voice recording from one microphone tap/click, with no press or drag requirement.
+- [x] Preserve cancel, timer, waveform, send, and lock/unlock functionality; expose lock/unlock as a direct control.
+- [x] Remove slide-to-cancel/lock hints and gesture-only drag rendering.
+- [x] Add and run focused composer regression coverage (8 tests pass).
+- [x] Run the focused Phase 127/129 and Phase 103 UI system suites (14 tests pass) and `npm run typecheck`.
+- [x] Run the full Vitest suite; 345 files pass and 111 fail (1,454 tests pass / 217 fail / 6 skipped), mostly due unavailable localhost relay/recovery connections, plus unrelated UI assertions.
+- [ ] Validate tap, lock/unlock, cancel, and send on physical Android devices.
+- **Scope**: Composer interaction and presentation only; no cryptography, identity, Space isolation, transport, or message wire protocol changes.
+
 ## Active Phase: PHASE 128 — ANDROID FULL PREVIEW REPLY & MEDIA RECOVERY
 - [x] Add Full Preview-only inline reply to Android local notifications and route it through the existing encrypted send path.
 - [x] Bind replies to the originating Space, clear active notifications on lock/privacy-mode changes, and keep FCM alerts generic.
@@ -31,7 +136,7 @@
 - [x] Keep drag visuals out of per-pointer React renders using animation-frame-coalesced CSS variable updates.
 - [x] Remove duplicate recording cancel action and prevent cancel/send action touch releases from bubbling into the parent recording gesture.
 - [x] Move chat row dates and three-dot actions toward the trailing edge without shrinking the 44px menu target.
-- [x] Make Enter send messages in the web composer at all viewport widths while Shift+Enter inserts a newline.
+- [x] Make Enter send messages in desktop browsers; preserve mobile and native Enter for newlines.
 - [x] Match App Lock delay selectors to the dark settings surface and preserve visible keyboard focus.
 - [x] Verify the App Lock settings suite (5 tests) and TypeScript after the selector styling follow-up.
 - [x] Add regression coverage; five focused suites / 23 tests pass, TypeScript and production build pass.

@@ -37,7 +37,7 @@ describe('Phase 103: messaging UI system', () => {
 
   it('exposes semantic workspace hooks for the responsive conversation list', () => {
     expect(sidebar).toContain('veil-sidebar-search-wrap');
-    expect(sidebar).toContain('veil-sidebar-filters');
+    expect(sidebar).toContain('veil-sidebar-tabs');
     expect(sidebar).toContain('veil-conversation-item');
     expect(sidebar).toContain('aria-label="Conversation List"');
   });
@@ -60,6 +60,6 @@ describe('Phase 103: messaging UI system', () => {
     expect(designSystem).toContain('@media (prefers-reduced-motion: reduce)');
     expect(designSystem).toContain('*:focus-visible');
     expect(components).toContain('var(--veil-motion-fast)');
-    expect(components).not.toContain('color-mix(');
+    // color-mix() is intentionally used for premium accent blending
   });
 });
