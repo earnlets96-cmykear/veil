@@ -748,78 +748,39 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Category Chips Bar (Screen 4: All, Unread, Groups) */}
+      {/* Category Tab Bar with Sliding Indicator */}
       {!searchQuery.trim() && (
         <div
-          className="veil-sidebar-filters"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '0.25rem 1rem 0.75rem 1rem',
-            overflowX: 'auto',
-          }}
+          className="veil-sidebar-tabs"
           role="tablist"
+          style={{ position: 'relative' }}
         >
-          <button
-            type="button"
-            className="veil-filter-pill"
-            onClick={() => setActiveChip('all')}
+          {(['all', 'unread', 'group'] as const).map((tab, idx) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeChip === tab}
+              className={`veil-tab-btn ${activeChip === tab ? 'active' : ''}`}
+              onClick={() => setActiveChip(tab)}
+            >
+              {tab === 'all' ? 'All' : tab === 'unread' ? 'Unread' : 'Groups'}
+            </button>
+          ))}
+          {/* Sliding underline indicator */}
+          <div
+            className="veil-tab-indicator"
             style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: activeChip === 'all' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-              backgroundColor: activeChip === 'all' ? '#14b8a6' : '#121824',
-              color: activeChip === 'all' ? '#ffffff' : '#94a3b8',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
+              position: 'absolute',
+              bottom: 0,
+              left: `${(['all', 'unread', 'group'] as const).indexOf(activeChip) * (100 / 3)}%`,
+              width: `${100 / 3}%`,
+              height: '2.5px',
+              borderRadius: '2px 2px 0 0',
+              backgroundColor: 'var(--veil-accent-primary, #14b8a6)',
+              transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
-          >
-            All
-          </button>
-
-          <button
-            type="button"
-            className="veil-filter-pill"
-            onClick={() => setActiveChip('unread')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: activeChip === 'unread' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-              backgroundColor: activeChip === 'unread' ? '#14b8a6' : '#121824',
-              color: activeChip === 'unread' ? '#ffffff' : '#94a3b8',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Unread
-          </button>
-
-          <button
-            type="button"
-            className="veil-filter-pill"
-            onClick={() => setActiveChip('group')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: activeChip === 'group' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-              backgroundColor: activeChip === 'group' ? '#14b8a6' : '#121824',
-              color: activeChip === 'group' ? '#ffffff' : '#94a3b8',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Groups
-          </button>
+          />
         </div>
       )}
 
