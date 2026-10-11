@@ -2,7 +2,7 @@
 
 ## Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
 - Completed encrypted attachment objects now survive retryable message-dispatch failures and are reused without another upload. Cleanup after relay dispatch is best-effort, avoiding false failed bubbles after successful delivery.
-- Verification: focused attachment/outbox and social-video suites pass (34 tests); TypeScript passes. TikTok provider-specific failures still require the exact shared URL and Android playback validation.
+- Verification: focused attachment/outbox and social-video suites pass (34 tests); TypeScript passes. The reported general TikTok failure still needs its Android WebView oEmbed response/error and playback validation.
 
 ## Social Video Player Action Controls — 2026-10-12
 - Refined the player footer into a compact action bar with an external-link icon, fullscreen action, and icon-only close control. Existing actions and behavior are preserved; all controls retain accessible names and touch targets.

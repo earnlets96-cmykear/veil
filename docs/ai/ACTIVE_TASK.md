@@ -4,7 +4,7 @@
 - [x] Preserve completed encrypted uploads in the outbox and reuse their attachment/object IDs when only message delivery needs retrying.
 - [x] Prevent best-effort outbox cleanup after relay dispatch from changing a successful message to failed.
 - [x] Verify attachment/outbox and social-video regressions (34 tests) and TypeScript.
-- [ ] Diagnose the remaining TikTok preview failure against the exact shared URL/provider response; validate playback on Android WebView.
+- [ ] Diagnose the reported general TikTok preview failure using an Android WebView oEmbed network error/response; validate playback on Android WebView.
 - [ ] Obtain independent security review, formal audit, and dual sign-off before deployment under the post-RC security freeze.
 
 ## Completed: Social Video Player Action Controls — 2026-10-12

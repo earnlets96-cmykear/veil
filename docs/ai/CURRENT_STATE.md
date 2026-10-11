@@ -2,7 +2,7 @@
 
 # Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
 - A completed encrypted attachment upload is now recorded as `UPLOADED` in the Space-encrypted outbox. If message dispatch later fails, retry reuses the uploaded object and original attachment identity instead of encrypting and uploading the same bytes again. Post-dispatch outbox cleanup is best-effort so cleanup I/O cannot turn a relayed message into a failed bubble.
-- Verification: focused attachment/outbox and social-video suites pass (34 tests); `npm run typecheck` passes. Physical Android/TikTok playback remains unverified. The exact failing TikTok share URL is still needed to diagnose provider-specific resolution failures.
+- Verification: focused attachment/outbox and social-video suites pass (34 tests); `npm run typecheck` passes. Physical Android/TikTok playback remains unverified. The reported TikTok failure is general; Android WebView's actual oEmbed network error/response is needed to confirm whether provider access is blocked or the response changed.
 - Scope: no cryptographic primitive, Space boundary, E2EE wire format, provider endpoint, relay fetch, or persistent provider-media behavior changed.
 
 ## Social Video Player Action Controls — 2026-10-12
