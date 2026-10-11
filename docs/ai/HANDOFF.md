@@ -1,5 +1,14 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Direct Media Recipient Preflight — 2026-10-12
+- **Status**: Implemented and focused-verified; no deployment authorization implied.
+- **Root cause**: Direct attachment sending started encrypted upload before checking that a recipient Double Ratchet session or prekey bundle was available. The supplied browser error confirms this failure after upload. Text/voice already attempted directory refresh.
+- **Change**: Resolve missing direct-recipient material before upload using a signature/expiry-validated directory profile, exact identity match, verified embedded identity document, and existing contact signing-key pin. Preserve existing contact verification and metadata during refresh. Fail before upload when no trusted profile is available; existing E2EE and attachment wire formats remain untouched.
+- **TikTok**: Supplied browser logs show direct `www.tiktok.com/oembed` requests are CORS-blocked and rate-limited (HTTP 429). ADR-130 disallows arbitrary relay proxying/caching. Any same-origin/native request strategy needs a separate privacy/architecture review and ADR.
+- **Verification**: `npm run typecheck` passes; focused preflight/outbox suites pass (8 tests). Full `npm test`: 363 files passed / 108 failed (1,525 passed / 215 failed / 6 skipped), dominated by unavailable localhost relay/recovery connections, plus unrelated source-contract/UI assertion failures. One focused authenticated-media test could not connect to its localhost recovery server.
+- **Release gates**: Physical Android send/retry and TikTok playback validation, independent security review, formal audit, and explicit dual sign-off remain mandatory under the post-RC security freeze.
+- **Preserve unrelated worktree changes**: deleted `business-card/` content and modified `release/v1.0.0/{manifest.json,checksums.sha256}` were present before this task. Do not stage or revert them. Full test execution created `.veil_persist_regression_temp/` and `.veil_test_sql_recovery_suite/`; remove only after verifying they remain generated test artifacts.
+
 ## Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
 - Confirmed the attachment UI can show a failed message after ciphertext upload completed because later message dispatch or outbox cleanup shared the same failure boundary. The outbox now records `UPLOADED`; retry restores ciphertext as before but reuses the existing attachment/object ID and does not upload again. Cleanup after relay dispatch is best-effort.
 - Verification: 5 attachment/outbox suites / 18 tests and 4 social-video suites / 16 tests pass; `npm run typecheck` passes. No production build was run in this pass.

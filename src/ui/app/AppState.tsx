@@ -99,6 +99,7 @@ import { ConfigManager } from '../../config/appConfig.ts';
 import { AppConfig } from '../../config/types.ts';
 import { PrekeyManager } from '../../ratchet/prekeys.ts';
 import { ConversationManager } from '../../messaging/conversationManager.ts';
+import { resolveMediaRecipientProfile } from '../../messaging/mediaRecipientPreflight.ts';
 import { SpaceMailboxBinding } from '../../network/types.ts';
 import { PrekeyBundle } from '../../ratchet/types.ts';
 import { DirectoryClient } from '../../network/directoryClient.ts';
@@ -2981,9 +2982,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const msgId = options?.retryMessageId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
       const freshContacts = await contactManager.listContacts(activeSession);
-      const targetContact =
+      let targetContact =
         freshContacts.find((c) => c.identityId === conversationId) ||
         contacts.find((c) => c.identityId === conversationId);
+      const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
+
+      // Resolve recipient encryption material before creating upload work. This
+      // prevents a successful ciphertext upload from being stranded when the
+      // direct message cannot be encrypted due to a missing prekey/session.
+      if (!isGroup) {
+        const peerId = targetContact?.identityId || conversationId;
+        const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+        if (!targetContact?.prekeyBundle && !hasActiveRatchet) {
+          const profile = await resolveMediaRecipientProfile(conversationId, targetContact, directoryClient);
+          if (!profile) {
+            throw new Error('Recipient encryption setup is unavailable. Check your connection and retry.');
+          }
+          const refreshedContact: Contact = {
+            ...(targetContact || {
+              identityId: profile.identityId,
+              status: 'ACCEPTED' as const,
+              verificationStatus: 'UNVERIFIED' as const,
+              addedAt: Date.now(),
+            }),
+            identityId: profile.identityId,
+            name: profile.displayName || profile.username,
+            accountUsername: profile.username,
+            signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
+            keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+            fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+            mailboxId: profile.mailboxId,
+            prekeyBundle: profile.prekeyBundle,
+            avatar: profile.avatar || targetContact?.avatar,
+          };
+          await contactManager.updateContact(activeSession, refreshedContact);
+          targetContact = refreshedContact;
+          setContacts((prev) => [...prev.filter((contact) => contact.identityId !== targetContact!.identityId), targetContact!]);
+        }
+      }
 
       const contactAllowSave = targetContact?.metadata?.allowSave !== 'false';
       const contactAllowForward = targetContact?.metadata?.allowForward !== 'false';
@@ -3054,7 +3090,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         targetContact?.name?.trim();
       const recipientAccountId = targetContact?.metadata?.accountId;
       const recipientIdentityId = targetContact?.identityId || conversationId;
-      const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
 
       const keys = new Set([
         conversationId,

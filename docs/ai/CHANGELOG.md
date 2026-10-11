@@ -1,8 +1,14 @@
 # CHANGELOG.md — VEIL Project Changelog
 
+## Direct Media Recipient Preflight — 2026-10-12
+- Resolve and validate missing direct-message recipient key material before attachment encryption/upload. Invalid, expired, mismatched, or key-replaced directory profiles fail closed before upload; existing ratchet and attachment wire formats are unchanged.
+- Added adversarial profile-resolution and upload-order tests. Focused suites (8 tests) and TypeScript pass. Full suite: 363 files passed / 108 failed (1,525 tests passed / 215 failed / 6 skipped); most failures require unavailable localhost relay/recovery services, with unrelated source-contract/UI assertions also failing.
+- TikTok diagnostics from the supplied console confirm direct oEmbed fetches are CORS-blocked and rate-limited (HTTP 429). A same-origin proxy/native fetch needs a separate ADR and privacy review under existing ADR-130 constraints.
+- **Release gate**: Independent security review, formal audit, explicit dual sign-off, and physical Android validation remain required under the post-RC security freeze.
+
 ## Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
 - Completed encrypted attachment objects now survive retryable message-dispatch failures and are reused without another upload. Cleanup after relay dispatch is best-effort, avoiding false failed bubbles after successful delivery.
-- Verification: focused attachment/outbox and social-video suites pass (34 tests); TypeScript passes. The reported general TikTok failure still needs its Android WebView oEmbed response/error and playback validation.
+- Verification: focused attachment/outbox and social-video suites pass (34 tests); TypeScript passes. A later supplied browser log confirms direct TikTok oEmbed requests are CORS-blocked and rate-limited (HTTP 429); Android WebView playback remains unverified.
 
 ## Social Video Player Action Controls — 2026-10-12
 - Refined the player footer into a compact action bar with an external-link icon, fullscreen action, and icon-only close control. Existing actions and behavior are preserved; all controls retain accessible names and touch targets.

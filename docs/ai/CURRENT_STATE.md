@@ -1,8 +1,15 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Direct Media Recipient Preflight — 2026-10-12
+- Direct one-to-one media sends now resolve missing recipient prekeys from a validated signed directory profile before attachment work starts. Profile identity must match the selected contact/conversation; pinned signing keys cannot be replaced; embedded identity documents are verified.
+- If key material cannot be resolved, sending fails before ciphertext upload so the selected media is not expensively uploaded without an encrypted message.
+- Focused preflight/outbox tests pass (8 tests) and TypeScript passes. A broader authenticated media end-to-end test could not connect to its localhost recovery server. Full `npm test`: 363 files passed / 108 failed (1,525 tests passed / 215 failed / 6 skipped); most failures are denied localhost relay/recovery connections, with unrelated source-contract/UI failures also present.
+- User-supplied TikTok console output confirms the direct oEmbed request is CORS-blocked and rate-limited (HTTP 429). ADR-130 forbids relay proxying/caching arbitrary URLs; a persistent fix needs an explicit architecture/privacy decision. Android WebView behavior remains unverified.
+- **Security gate**: ADR-134 and `THREAT_MODEL_MEDIA_RECIPIENT_PREFLIGHT.md` document this post-RC recipient setup change. Independent security review, formal audit, explicit dual sign-off, and physical Android send/retry validation remain mandatory before deployment.
+
 # Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
 - A completed encrypted attachment upload is now recorded as `UPLOADED` in the Space-encrypted outbox. If message dispatch later fails, retry reuses the uploaded object and original attachment identity instead of encrypting and uploading the same bytes again. Post-dispatch outbox cleanup is best-effort so cleanup I/O cannot turn a relayed message into a failed bubble.
-- Verification: focused attachment/outbox and social-video suites pass (34 tests); `npm run typecheck` passes. Physical Android/TikTok playback remains unverified. The reported TikTok failure is general; Android WebView's actual oEmbed network error/response is needed to confirm whether provider access is blocked or the response changed.
+- Verification: focused attachment/outbox and social-video suites pass (34 tests); TypeScript passes. Physical Android/TikTok playback remains unverified. A later supplied browser log confirms direct TikTok oEmbed requests are CORS-blocked and rate-limited (HTTP 429).
 - Scope: no cryptographic primitive, Space boundary, E2EE wire format, provider endpoint, relay fetch, or persistent provider-media behavior changed.
 
 ## Social Video Player Action Controls — 2026-10-12

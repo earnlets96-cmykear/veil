@@ -1,10 +1,18 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## In Progress: Direct Media Recipient Preflight — 2026-10-12
+- [x] Identify the reported post-upload send failure from the supplied browser log: direct media dispatch lacks both an active session and cached recipient prekey.
+- [x] Add signed-profile resolution before upload; verify signature, expiry, exact identity, embedded identity document, and any pinned contact signing key.
+- [x] Add adversarial resolver and pre-upload ordering regressions; focused tests and TypeScript pass.
+- [x] Review full-suite result: 363 files passed / 108 failed (1,525 tests passed / 215 failed / 6 skipped); most failures are unavailable localhost relay/recovery services, with unrelated source-contract/UI assertions also failing.
+- [ ] Obtain independent security review, formal audit, dual sign-off, and physical Android send/retry validation before deployment.
+- **TikTok diagnosis**: supplied console output confirms direct browser oEmbed fetch is blocked by CORS and returns HTTP 429. Existing ADR-130 disallows arbitrary relay fetching/proxying/caching; a durable cross-origin metadata solution needs a separate privacy/architecture decision. Do not deploy or add a proxy under this change.
+
 ## Completed: Uploaded Media Retry and Social Preview Follow-up — 2026-10-12
 - [x] Preserve completed encrypted uploads in the outbox and reuse their attachment/object IDs when only message delivery needs retrying.
 - [x] Prevent best-effort outbox cleanup after relay dispatch from changing a successful message to failed.
 - [x] Verify attachment/outbox and social-video regressions (34 tests) and TypeScript.
-- [ ] Diagnose the reported general TikTok preview failure using an Android WebView oEmbed network error/response; validate playback on Android WebView.
+- [x] Diagnose TikTok metadata request from supplied browser console: CORS blocked, HTTP 429. A same-origin/native strategy requires separate ADR review; physical Android playback remains unverified.
 - [ ] Obtain independent security review, formal audit, and dual sign-off before deployment under the post-RC security freeze.
 
 ## Completed: Social Video Player Action Controls — 2026-10-12

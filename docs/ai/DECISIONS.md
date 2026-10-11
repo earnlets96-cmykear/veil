@@ -1473,6 +1473,20 @@ This document records all architectural decisions made across the VEIL project l
 - **Threat model**: See `docs/ai/THREAT_MODEL_SELF_VAULT_AND_MEDIA.md`. Tests cover local-only self routing, self-request rejection, bounded native video reads, key isolation, and ciphertext behavior.
 - **Release gate**: Because the project is post-RC, do not deploy until Android build/device validation, independent security review, formal security audit, and explicit dual sign-off are complete.
 
+## ADR-134: Preflight Recipient Keys Before Direct Media Upload
+
+- **Date**: 2026-10-12
+- **Status**: Accepted for implementation; independent security review, formal security audit, explicit dual sign-off, and Android validation are required before deployment.
+- **Context**: Direct media messages can finish uploading encrypted attachment bytes and then fail locally because the contact has neither an active Double Ratchet session nor a cached prekey bundle. Text and voice sending already attempt an on-demand directory profile lookup; attachment sending did not, so the expensive upload could never be dispatched.
+- **Decision**:
+  1. Before creating upload work for a direct conversation, reuse the existing session when present or resolve a missing prekey bundle from the existing directory client.
+  2. Accept only a signed profile whose identity matches the selected conversation/contact, whose signature and expiry validate, and whose signing key matches an already-known contact signing key when one is pinned.
+  3. Persist the refreshed bundle through the existing contact manager, then use the existing `encryptAndPackWireMessage` and delivery path. Do not alter cryptographic primitives, ratchet/session transitions, attachment encryption, wire format, relay behavior, or Space partitioning.
+  4. If no trusted usable recipient profile can be resolved, fail before file encryption/upload and preserve the selected files for retry.
+- **Reason**: Avoid uploading ciphertext that cannot be attached to an encrypted message, while preserving the current identity and Double Ratchet trust model.
+- **Threat model**: `docs/ai/THREAT_MODEL_MEDIA_RECIPIENT_PREFLIGHT.md` covers untrusted directory responses, signing-key pinning, identity mismatch, and failure-before-upload behavior.
+- **Release gate**: Add adversarial profile-resolution tests and direct-media preflight regression tests. Because VEIL is post-RC and this touches recipient key/session setup, do not deploy before independent security review, formal audit, explicit dual sign-off, and physical Android send/retry validation.
+
 
 
 
