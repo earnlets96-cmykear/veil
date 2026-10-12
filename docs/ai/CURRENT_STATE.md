@@ -1,5 +1,15 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Media Selection and Send Responsiveness Remediation — 2026-10-12
+- The Share Media picker now owns one ordered selected-attachment record list. URI membership, selected order/count, native file metadata, and display rows derive from this list; active media-category results remain separate.
+- Native Android `content://` selections are represented immediately by metadata tokens and passed into the existing encrypted upload worker. Provider data is read once, in sequential 1 MiB chunks, into one growable buffer at send time; the intermediate `File` and its duplicate full-buffer copy were removed from this path.
+- Outgoing messages become visible and the picker closes before contact/key preflight. They start as `SENDING` with queued attachments, advance into upload only after trusted key setup, and remain as `FAILED` with a retryable status if preflight fails.
+- All/Unread/Groups tab switches share one transition handler. Conversation rows are sorted when conversation data changes, then filtered per tab without re-sorting for each tap/swipe.
+- Focused suites: 54 tests pass across 9 files. `npm run build` passes with existing Vite mixed-import and >500 KB bundle warnings. Full `npm test`: 365 files passed / 108 failed (1,534 passed / 214 failed / 6 skipped); most failures are denied localhost relay/recovery sockets, with unrelated legacy UI/source assertion failures.
+- Synthetic navigation algorithm timing (10,000 conversations, 30 category changes) was 18.98 ms for filter+sort on every change and 4.87 ms for sort-on-data-change plus filtering. This does not measure React commits, browser paints, or Android frame times.
+- Capacitor sync completed but Gradle did not compile the APK: standard and offline/no-daemon builds both stopped before compilation with `Unable to establish loopback connection`. Physical Android file-provider, send/retry, and frame profiling remain unverified.
+- No changes to cryptographic primitives, attachment wire format, identity, Space isolation, relay protocol, or encryption guarantees.
+
 ## In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
 - Native device media uploads (photos, videos, files) now bypass synchronous modal preparation: `MediaPickerModal` dispatches immediately (0ms) into the chat timeline with local thumbnail and size metadata.
 - `uploadWorker` streams native device chunks with active 0%-100% progress reporting in the timeline bubble (0%-30% native device read, 30%-100% encryption and relay upload).

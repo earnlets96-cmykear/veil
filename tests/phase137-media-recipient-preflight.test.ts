@@ -89,16 +89,20 @@ describe('media recipient key preflight', () => {
     expect(directory.getProfileByUsername).toHaveBeenCalledWith(profile.username);
   });
 
-  it('preflights direct recipients before the composer dismisses selections or upload work starts', () => {
+  it('shows the local message before direct-recipient preflight and still preflights before upload work', () => {
     const appState = fs.readFileSync(path.resolve('src/ui/app/AppState.tsx'), 'utf8');
     const sendAttachments = appState.slice(appState.indexOf('const sendAttachments ='), appState.indexOf('const sendAttachment ='));
     const preflight = sendAttachments.indexOf('resolveMediaRecipientProfile(');
     const uploadStarted = sendAttachments.indexOf('options?.onUploadStarted?.()');
     const worker = sendAttachments.indexOf('const uploadWorker = async');
+    const optimisticMessage = sendAttachments.indexOf('setMessages((prev) =>');
 
     expect(preflight).toBeGreaterThanOrEqual(0);
-    expect(preflight).toBeLessThan(uploadStarted);
+    expect(optimisticMessage).toBeGreaterThanOrEqual(0);
+    expect(optimisticMessage).toBeLessThan(uploadStarted);
+    expect(uploadStarted).toBeLessThan(preflight);
     expect(preflight).toBeLessThan(worker);
     expect(sendAttachments).toContain('if (!targetContact?.prekeyBundle && !hasActiveRatchet)');
+    expect(sendAttachments).toContain("state: 'FAILED'");
   });
 });

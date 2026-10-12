@@ -109,4 +109,46 @@ describe('Phase 74: native device media bridge', () => {
       [nativeBytes.length, nativeBytes.length],
     ]);
   });
+
+  it('reads a provider selection into one plaintext buffer without constructing an intermediate File', async () => {
+    const nativeBytes = new Uint8Array([1, 2, 3, 4, 5]);
+    const bridge = NativeDeviceMediaBridge.createForTesting({
+      isNative: () => true,
+      readMediaChunk: async ({ offset }) => {
+        const bytes = nativeBytes.subarray(offset, Math.min(offset + 1024 * 1024, nativeBytes.length));
+        let binary = '';
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return {
+          name: 'provider.bin',
+          mimeType: 'application/octet-stream',
+          sizeBytes: nativeBytes.length,
+          base64Data: btoa(binary),
+          bytesRead: bytes.length,
+          isLast: offset + bytes.length >= nativeBytes.length,
+        };
+      },
+    });
+
+    const result = await bridge.bytesFromUri('content://provider/document/7');
+    expect(result.name).toBe('provider.bin');
+    expect(result.mimeType).toBe('application/octet-stream');
+    expect(result.bytes).toEqual(nativeBytes);
+  });
+
+  it('supports Android providers that cannot report a size before streaming', async () => {
+    const bridge = NativeDeviceMediaBridge.createForTesting({
+      isNative: () => true,
+      readMediaChunk: async ({ offset }) => ({
+        name: 'unknown-size.bin',
+        mimeType: 'application/octet-stream',
+        sizeBytes: 0,
+        base64Data: offset === 0 ? 'AQID' : '',
+        bytesRead: offset === 0 ? 3 : 0,
+        isLast: offset > 0,
+      }),
+    });
+
+    const result = await bridge.bytesFromUri('content://provider/unknown-size');
+    expect(result.bytes).toEqual(new Uint8Array([1, 2, 3]));
+  });
 });

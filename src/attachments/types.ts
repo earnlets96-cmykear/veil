@@ -81,6 +81,7 @@ export interface LocalAttachmentPayload {
   previewUrl?: string; // Local preview only
   localPreviewUrl?: string; // Local preview only
   thumbnailUrl?: string; // Local micro-thumbnail only
+  sourceUri?: string; // Encrypted Space-local provider reference; never included in wire payloads
   state?: AttachmentState;
   error?: string;
   progressPercent?: number;

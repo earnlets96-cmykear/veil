@@ -1,5 +1,13 @@
 # CHANGELOG.md — VEIL Project Changelog
 
+## Media Selection and Send Responsiveness Remediation — 2026-10-12
+- Consolidated picker selection, stable IDs, provider metadata, and visible selected rows into one canonical attachment record list; cancellation and repeated `content://` picks do not corrupt the current selection.
+- Removed pre-send native File materialization. The existing upload worker now reads Android provider chunks once into a single buffer for the existing worker-based encryption/outbox/upload path.
+- Show outgoing media as `SENDING` before slow recipient preflight; retain a visible failed message if preflight cannot complete. No attachment wire format or encryption behavior changed.
+- Reuse a pinned/recent conversation sort across category switches and use the same React transition for taps and swipes.
+- Focused suites pass (54 tests / 9 files); web production build passes. Full suite: 365 files passed / 108 failed (1,534 passed / 214 failed / 6 skipped), primarily because sandbox networking denies local relay/recovery connections. Synthetic selector benchmark is 18.98 ms -> 4.87 ms (10k rows/30 switches), not an Android frame measurement.
+- Capacitor sync passed; standard and offline/no-daemon Gradle builds stopped before compilation with `Unable to establish loopback connection`. Physical device checks remain pending.
+
 ## In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
 - Enabled zero-delay timeline staging for native Android file and video uploads with live stream progress reporting (0%-30% device read, 30%-100% upload), dismissing the picker modal immediately.
 - Refined sidebar horizontal tab swipe to allow gliding over conversation items without triggering unwanted selection clicks.

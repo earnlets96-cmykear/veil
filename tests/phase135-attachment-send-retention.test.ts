@@ -14,7 +14,7 @@ describe('Phase 135: Attachment send selection retention', () => {
     expect(attachmentSendFailureMessage(new Error('Unable to connect to storage at https://private.example'))).not.toContain('private.example');
   });
 
-  it('retains files for source-read errors, then closes only after optimistic upload starts', () => {
+  it('passes native selection tokens to the existing upload pipeline without eager reads', () => {
     const picker = source('../src/ui/components/media/MediaPickerModal.tsx');
     const confirm = picker.slice(picker.indexOf('const handleConfirmSend'), picker.indexOf('const formatFileSize'));
     const appState = source('../src/ui/app/AppState.tsx');
@@ -22,15 +22,19 @@ describe('Phase 135: Attachment send selection retention', () => {
     const optimisticStart = send.indexOf('options?.onUploadStarted?.()');
     const uploadWorkerStart = send.indexOf('// 3. Perform bounded encryption');
 
-    expect(confirm).toContain('await deviceMedia.fileFromUri(uri');
+    expect(confirm).not.toContain('fileFromUri');
     expect(confirm).toContain('onUploadStarted: closeAfterUploadStarts');
-    expect(confirm).toMatch(/const closeAfterUploadStarts = \(\) => \{[\s\S]*?setSelectedFiles\(\[\]\);[\s\S]*?onClose\(\);/);
-    expect(confirm).toContain('setSelectedFiles([])');
+    expect(confirm).toMatch(/const closeAfterUploadStarts = \(\) => \{[\s\S]*?setSelectedAttachments\(\[\]\);[\s\S]*?onClose\(\);/);
+    expect(confirm).toContain('setSelectedAttachments([])');
     expect(confirm).toContain('onClose()');
     expect(optimisticStart).toBeGreaterThan(-1);
     expect(optimisticStart).toBeLessThan(uploadWorkerStart);
     expect(send.slice(0, optimisticStart)).toContain('setMessages((prev) =>');
     expect(picker).toContain('role="alert"');
+    expect(send).toContain('bytesFromUri(deviceUri');
+    expect(send).not.toContain('fileFromUri(deviceUri');
+    expect(send).toContain('sourceUri: String((file as any).deviceUri)');
+    expect(appState).toContain('item.sourceUri && NativeDeviceMediaBridge.getInstance().isNative()');
   });
 
   it('retains staged files until attachment send setup succeeds', () => {
@@ -60,8 +64,10 @@ describe('Phase 135: Attachment send selection retention', () => {
 
     expect(stage).toContain('createSelectionPlaceholder(item)');
     expect(stage).not.toContain('fileFromUri');
-    expect(confirm).toContain('await deviceMedia.fileFromUri(uri,');
+    expect(confirm).not.toContain('fileFromUri');
     expect(confirm).toContain('await onSend(');
+    expect(picker).toContain('selectedAttachmentsRef');
+    expect(picker).toContain('id: `native:${item.uri}`');
   });
 
   it('keeps the media picker out of the broad app context and indexes selections once per render', () => {
@@ -81,6 +87,19 @@ describe('Phase 135: Attachment send selection retention', () => {
 
     expect(load).toContain('const requestId = ++recentRequestIdRef.current');
     expect(load).toContain('if (requestId !== recentRequestIdRef.current) return');
+  });
+
+  it('renders the outgoing message and dismisses the picker before contact or key preflight awaits', () => {
+    const appState = source('../src/ui/app/AppState.tsx');
+    const send = appState.slice(appState.indexOf('const sendAttachments ='), appState.indexOf('const sendAttachment ='));
+    const optimisticMessage = send.indexOf('setMessages((prev) =>');
+    const pickerDismissal = send.indexOf('options?.onUploadStarted?.()');
+    const contactPreflight = send.indexOf('await contactRequestManager.isBlocked');
+
+    expect(optimisticMessage).toBeGreaterThan(-1);
+    expect(pickerDismissal).toBeGreaterThan(optimisticMessage);
+    expect(contactPreflight).toBeGreaterThan(pickerDismissal);
+    expect(send.slice(contactPreflight)).toContain("state: 'FAILED'");
   });
 
   it('keeps the picker send promise pending until background upload reports success or failure', () => {

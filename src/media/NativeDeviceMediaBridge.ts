@@ -170,6 +170,55 @@ export class NativeDeviceMediaBridge {
     return new File(parts as unknown as BlobPart[], metadata.name, { type: metadata.mimeType });
   }
 
+  /** Reads a provider-backed selection once into the single buffer consumed by encryption. */
+  public async bytesFromUri(
+    uri: string,
+    onProgress?: (loadedBytes: number, totalBytes: number) => void
+  ): Promise<{ bytes: Uint8Array; name: string; mimeType: string }> {
+    const chunkSize = 1024 * 1024;
+    let output: Uint8Array | undefined;
+    let metadata: { name: string; mimeType: string; sizeBytes: number } | undefined;
+    let loaded = 0;
+    onProgress?.(0, 0);
+    for (let offset = 0; ; offset += chunkSize) {
+      const response = await this.readMediaChunk(uri, offset, chunkSize);
+      metadata ||= {
+        name: response.name,
+        mimeType: response.mimeType,
+        sizeBytes: response.sizeBytes,
+      };
+      if (!Number.isSafeInteger(metadata.sizeBytes) || metadata.sizeBytes < 0) {
+        throw new Error('Selected media returned invalid metadata');
+      }
+      if (response.base64Data.length > Math.ceil(chunkSize * 4 / 3) + 8) {
+        throw new Error('Selected media returned an invalid chunk');
+      }
+      const bytes = base64ToBytes(response.base64Data);
+      if ((response.bytesRead !== undefined && response.bytesRead !== bytes.length) || bytes.length > chunkSize) {
+        throw new Error('Selected media returned an invalid chunk');
+      }
+      if (!output) output = new Uint8Array(chunkSize);
+      if (loaded + bytes.length > output.length) {
+        const next = new Uint8Array(Math.max(loaded + bytes.length, output.length * 2));
+        next.set(output.subarray(0, loaded));
+        output = next;
+      }
+      output.set(bytes, loaded);
+      loaded += bytes.length;
+      onProgress?.(loaded, metadata.sizeBytes);
+
+      const isLast = response.isLast ?? (metadata.sizeBytes > 0 && loaded >= metadata.sizeBytes);
+      if (isLast) {
+        if (metadata.sizeBytes > 0 && loaded !== metadata.sizeBytes) throw new Error('Selected media ended before all chunks were read');
+        break;
+      }
+      if (bytes.length === 0) throw new Error('Selected media ended before all chunks were read');
+      if (offset > Number.MAX_SAFE_INTEGER - chunkSize) throw new Error('Selected media is too large to read');
+    }
+    if (!metadata || !output) throw new Error('Selected media could not be read');
+    return { bytes: output.subarray(0, loaded), name: metadata.name, mimeType: metadata.mimeType };
+  }
+
   public async pickDocuments(): Promise<DeviceMediaItem[]> {
     if (!this.isNative()) return [];
     NativeDeviceMediaBridge.notifyPickerActive(true);

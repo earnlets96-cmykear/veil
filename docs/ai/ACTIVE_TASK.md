@@ -1,5 +1,16 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Completed: Media Selection and Send Responsiveness Remediation — 2026-10-12
+- [x] Replace the competing selected-file array/URI-set/maps with an ordered attachment-record source of truth; deduplicate native `content://` URIs and preserve the selection when switching categories or cancelling the picker.
+- [x] Display selected attachments independently of the currently discoverable Gallery/Files list, with matching selected count and visible row details.
+- [x] Dispatch lightweight native selection tokens immediately; read provider chunks once into a single growable byte buffer only when the background upload worker begins, without constructing an intermediate `File`.
+- [x] Insert the local outgoing message and dismiss the picker before contact/key preflight; show truthful `SENDING`/`QUEUED` states and retain a visible `FAILED` message if early preflight fails.
+- [x] Reuse the sorted conversation list across All/Unread/Groups changes and route both tap and swipe through a shared transition.
+- [x] Focused regression suites: 9 files / 54 tests pass; TypeScript and production web build pass. Synthetic algorithm timing on 10,000 conversations / 30 tab changes: previous filter+sort each transition 18.98 ms; cached-sort plus filtering 4.87 ms (3.9x faster; not a device UI frame-time measurement).
+- [x] Full `npm test`: 365 files passed / 108 failed (1,534 passed / 214 failed / 6 skipped). Most failures are local relay/recovery requests denied by sandbox networking (`connect EACCES`); unrelated legacy UI/source assertions also fail.
+- [ ] Physical Android file-provider/send/retry and 60 Hz tab interaction profiling remain unverified. Capacitor sync completed, but both standard and offline/no-daemon Gradle builds stopped before compilation with `Unable to establish loopback connection`.
+- **Scope**: Existing E2EE, media encryption, retry/outbox, and wire formats preserved. No crypto/identity protocol changes.
+
 ## Completed: In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
 - [x] Stream native device files and videos directly in chat timeline with immediate optimistic message bubble (0ms staging) and live progress feedback (0%-30% native read, 30%-100% encryption/upload).
 - [x] Dismiss MediaPickerModal immediately upon dispatch instead of blocking the user on a modal progress screen.

@@ -2971,61 +2971,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ) => {
       if (!activeSession || files.length === 0) return;
 
-      // Phase 55 P0-2: Check if recipient is blocked
-      const isBlocked = (await contactRequestManager.isBlocked(activeSession, conversationId)) ||
-        contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
-      if (isBlocked) {
-        throw new Error('Cannot send attachments: this user is blocked. Unblock them to resume messaging.');
-      }
-
       sessionController.recordUserActivity();
       const msgId = options?.retryMessageId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      const freshContacts = await contactManager.listContacts(activeSession);
-      let targetContact =
-        freshContacts.find((c) => c.identityId === conversationId) ||
-        contacts.find((c) => c.identityId === conversationId);
+      let targetContact = contacts.find((c) => c.identityId === conversationId);
       const isGroup = conversationId.startsWith('grp_') || conversations.find((c) => c.id === conversationId)?.type === 'group';
 
-      // Resolve recipient encryption material before creating upload work. This
-      // prevents a successful ciphertext upload from being stranded when the
-      // direct message cannot be encrypted due to a missing prekey/session.
-      if (!isGroup) {
-        const peerId = targetContact?.identityId || conversationId;
-        const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
-        if (!targetContact?.prekeyBundle && !hasActiveRatchet) {
-          const profile = await resolveMediaRecipientProfile(conversationId, targetContact, directoryClient);
-          if (!profile) {
-            throw new Error('Recipient encryption setup is unavailable. Check your connection and retry.');
-          }
-          const refreshedContact: Contact = {
-            ...(targetContact || {
-              identityId: profile.identityId,
-              status: 'ACCEPTED' as const,
-              verificationStatus: 'UNVERIFIED' as const,
-              addedAt: Date.now(),
-            }),
-            identityId: profile.identityId,
-            name: profile.displayName || profile.username,
-            accountUsername: profile.username,
-            signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
-            keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
-            fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
-            mailboxId: profile.mailboxId,
-            prekeyBundle: profile.prekeyBundle,
-            avatar: profile.avatar || targetContact?.avatar,
-          };
-          await contactManager.updateContact(activeSession, refreshedContact);
-          targetContact = refreshedContact;
-          setContacts((prev) => [...prev.filter((contact) => contact.identityId !== targetContact!.identityId), targetContact!]);
-        }
-      }
+      let contactAllowSave = targetContact?.metadata?.allowSave !== 'false';
+      let contactAllowForward = targetContact?.metadata?.allowForward !== 'false';
 
-      const contactAllowSave = targetContact?.metadata?.allowSave !== 'false';
-      const contactAllowForward = targetContact?.metadata?.allowForward !== 'false';
-
-      const allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
-      const allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
+      let allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
+      let allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
 
       const activeReply = resolveReplyReference(
         replyTargetRef.current || replyTarget,
@@ -3039,7 +2995,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const batchGroupId = options?.retryGroupId || (files.length > 1 ? `grp_media_${Date.now()}_${bytesToHex(randomBytes(4))}` : undefined);
 
       // 1. Construct local attachments with immediate RAM preview URLs (bounded concurrency initial states)
-      const initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
+      let initialAttachments: LocalAttachmentPayload[] = files.map((file, idx) => {
         const reusableUpload = options?.retryUploadedAttachments?.[idx];
         const attachmentId = reusableUpload?.attachmentId || `att_${bytesToHex(randomBytes(8))}`;
         const effectiveMime = inferMediaMime(file);
@@ -3075,22 +3031,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           name: file.name,
           sizeBytes: effectiveSize,
           mimeType: effectiveMime,
+          ...((file as any).deviceUri ? { sourceUri: String((file as any).deviceUri) } : {}),
           previewUrl: initialPreviewUrl,
           localPreviewUrl: initialPreviewUrl,
           isSticker,
-          state: reusableUpload?.objectId ? ('SENT' as const) : idx < 2 ? ('UPLOADING' as const) : ('QUEUED' as const),
+          state: reusableUpload?.objectId ? ('SENT' as const) : ('QUEUED' as const),
           allowSave,
           allowForward,
         } as LocalAttachmentPayload;
       });
-      const targetMailboxId = targetContact?.mailboxId || conversationId;
-      const targetUsername =
+      let targetMailboxId = targetContact?.mailboxId || conversationId;
+      let targetUsername =
         targetContact?.accountUsername ||
         (targetContact?.name && !targetContact.name.includes(' ') ? targetContact.name.replace(/^@/, '').trim() : undefined) ||
         (conversationId.startsWith('@') ? conversationId.slice(1).trim() : undefined) ||
         targetContact?.name?.trim();
-      const recipientAccountId = targetContact?.metadata?.accountId;
-      const recipientIdentityId = targetContact?.identityId || conversationId;
+      let recipientAccountId = targetContact?.metadata?.accountId;
+      let recipientIdentityId = targetContact?.identityId || conversationId;
 
       const keys = new Set([
         conversationId,
@@ -3114,7 +3071,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         text: summaryText,
         isOutgoing: true,
         timestamp: Date.now(),
-        status: 'UPLOADING',
+        status: 'SENDING',
         attachment: initialAttachments[0],
         attachments: initialAttachments,
         isSticker: hasSticker,
@@ -3162,6 +3119,84 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       // The composer can dismiss the media picker now that the outgoing message
       // is visible and upload progress continues in the conversation.
       options?.onUploadStarted?.();
+
+      // Resolve local contact data, blocked status, and missing recipient keys only
+      // after the optimistic message is visible. Slow storage/network work must not
+      // hold the picker open or delay acknowledgement of the Send action.
+      try {
+        const isBlocked = (await contactRequestManager.isBlocked(activeSession, conversationId)) ||
+          contacts.some((c) => c.identityId === conversationId && c.status === 'BLOCKED');
+        if (isBlocked) throw new Error('Cannot send attachments: this user is blocked. Unblock them to resume messaging.');
+
+        const freshContacts = await contactManager.listContacts(activeSession);
+        targetContact = freshContacts.find((c) => c.identityId === conversationId) || targetContact;
+        if (!isGroup) {
+          const peerId = targetContact?.identityId || conversationId;
+          const hasActiveRatchet = convManager.hasSession(activeSession, peerId);
+          if (!targetContact?.prekeyBundle && !hasActiveRatchet) {
+            const profile = await resolveMediaRecipientProfile(conversationId, targetContact, directoryClient);
+            if (!profile) throw new Error('Recipient encryption setup is unavailable. Check your connection and retry.');
+            const refreshedContact: Contact = {
+              ...(targetContact || {
+                identityId: profile.identityId,
+                status: 'ACCEPTED' as const,
+                verificationStatus: 'UNVERIFIED' as const,
+                addedAt: Date.now(),
+              }),
+              identityId: profile.identityId,
+              name: profile.displayName || profile.username,
+              accountUsername: profile.username,
+              signingPublicKey: profile.prekeyBundle.identityDocument.signingPublicKey,
+              keyAgreementPublicKey: profile.prekeyBundle.identityDocument.keyAgreementPublicKey,
+              fingerprint: profile.prekeyBundle.identityDocument.fingerprint,
+              mailboxId: profile.mailboxId,
+              prekeyBundle: profile.prekeyBundle,
+              avatar: profile.avatar || targetContact?.avatar,
+            };
+            await contactManager.updateContact(activeSession, refreshedContact);
+            targetContact = refreshedContact;
+            setContacts((prev) => [...prev.filter((contact) => contact.identityId !== targetContact!.identityId), targetContact!]);
+          }
+        }
+        targetMailboxId = targetContact?.mailboxId || conversationId;
+        targetUsername =
+          targetContact?.accountUsername ||
+          (targetContact?.name && !targetContact.name.includes(' ') ? targetContact.name.replace(/^@/, '').trim() : undefined) ||
+          (conversationId.startsWith('@') ? conversationId.slice(1).trim() : undefined) ||
+          targetContact?.name?.trim();
+        recipientAccountId = targetContact?.metadata?.accountId;
+        recipientIdentityId = targetContact?.identityId || conversationId;
+        contactAllowSave = targetContact?.metadata?.allowSave !== 'false';
+        contactAllowForward = targetContact?.metadata?.allowForward !== 'false';
+        allowSave = options?.allowSave !== undefined ? options.allowSave : contactAllowSave;
+        allowForward = options?.allowForward !== undefined ? options.allowForward : contactAllowForward;
+        const updatedAttachments = initialAttachments.map((attachment) => ({ ...attachment, allowSave, allowForward }));
+        initialAttachments = updatedAttachments;
+        setMessages((prev) => {
+          const updated = { ...prev };
+          for (const key of keys) {
+            updated[key] = (prev[key] || []).map((message) => message.id === msgId
+              ? { ...message, attachment: updatedAttachments[0], attachments: updatedAttachments, privacy: { allowSave, allowForward } }
+              : message);
+          }
+          store.setAsync(activeSession, 'veil:ui:messages', updated);
+          return updated;
+        });
+      } catch (preflightError: any) {
+        const reason = preflightError?.message || 'Unable to prepare secure attachment delivery.';
+        const failedAttachments = initialAttachments.map((attachment) => ({ ...attachment, state: 'FAILED' as const, error: reason }));
+        setMessages((prev) => {
+          const updated = { ...prev };
+          for (const key of keys) {
+            updated[key] = (prev[key] || []).map((message) => message.id === msgId
+              ? { ...message, status: 'FAILED', attachment: failedAttachments[0], attachments: failedAttachments }
+              : message);
+          }
+          store.setAsync(activeSession, 'veil:ui:messages', updated);
+          return updated;
+        });
+        return;
+      }
 
       // 3. Perform bounded encryption, cloud upload (MAX CONCURRENCY = 2) and wire dispatch
       await (async () => {
@@ -3223,7 +3258,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const deviceUri = (file as any).deviceUri;
               if (deviceUri && file.size === 0 && NativeDeviceMediaBridge.getInstance().isNative()) {
                 const deviceMedia = NativeDeviceMediaBridge.getInstance();
-                const fileFromDevice = await deviceMedia.fileFromUri(deviceUri, (loadedBytes, totalBytes) => {
+                const deviceRead = await deviceMedia.bytesFromUri(deviceUri, (loadedBytes, totalBytes) => {
                   if (totalBytes > 0) {
                     const percent = Math.min(30, Math.round((loadedBytes / totalBytes) * 30));
                     setUploadProgress((prev) => ({
@@ -3233,7 +3268,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     }));
                   }
                 });
-                fileBytes = new Uint8Array(await fileFromDevice.arrayBuffer());
+                fileBytes = deviceRead.bytes;
               } else {
                 fileBytes = new Uint8Array(await file.arrayBuffer());
               }
@@ -3377,12 +3412,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               });
 
               let localPreview = currentAtt.previewUrl;
-              if (!localPreview && (currentAtt.mimeType.startsWith('image/') || currentAtt.mimeType.startsWith('video/'))) {
+              if (!localPreview && !deviceUri && (currentAtt.mimeType.startsWith('image/') || currentAtt.mimeType.startsWith('video/'))) {
                 localPreview = URL.createObjectURL(file);
               }
 
               let durableThumb: string | undefined = (currentAtt as any).thumbnailUrl;
-              if (!durableThumb && currentAtt.mimeType.startsWith('image/')) {
+              if (!durableThumb && !deviceUri && currentAtt.mimeType.startsWith('image/')) {
                 try {
                   durableThumb = await ThumbnailGenerator.generateImageThumbnail(file, 48);
                 } catch (_tErr) {}
@@ -4280,6 +4315,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               files.push(new File([cached.data as any], item.name, { type: item.mimeType || 'application/octet-stream' }));
             } else if (jobs[index]) {
               files.push(await restoreOutboxFile(activeSession, jobs[index]!));
+            } else if (item.sourceUri && NativeDeviceMediaBridge.getInstance().isNative()) {
+              files.push(NativeDeviceMediaBridge.getInstance().createSelectionPlaceholder({
+                uri: item.sourceUri,
+                name: item.name,
+                mimeType: item.mimeType,
+                sizeBytes: item.sizeBytes,
+                thumbnailDataUrl: item.thumbnailUrl,
+              }));
             } else {
               break;
             }

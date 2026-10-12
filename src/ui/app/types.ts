@@ -53,6 +53,7 @@ export interface UIMessage {
     previewUrl?: string;
     localPreviewUrl?: string;
     thumbnailUrl?: string;
+    sourceUri?: string;
     state?: string;
     error?: string;
     allowSave?: boolean;
@@ -73,6 +74,7 @@ export interface UIMessage {
     previewUrl?: string;
     localPreviewUrl?: string;
     thumbnailUrl?: string;
+    sourceUri?: string;
     state?: string;
     error?: string;
     allowSave?: boolean;

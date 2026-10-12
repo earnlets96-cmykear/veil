@@ -29,6 +29,7 @@ describe('Phase 41: Wire Payload Isolation & Defensive Serializer Boundary', () 
       progressPercent: 45,
       allowSave: true,
       allowForward: false,
+      sourceUri: 'content://com.android.providers.media.documents/document/video%3A42',
     };
 
     const wire = toWireAttachment(localAttachment);
@@ -52,9 +53,11 @@ describe('Phase 41: Wire Payload Isolation & Defensive Serializer Boundary', () 
     expect((wire as any).state).toBeUndefined();
     expect((wire as any).error).toBeUndefined();
     expect((wire as any).progressPercent).toBeUndefined();
+    expect((wire as any).sourceUri).toBeUndefined();
 
     // Stringified wire attachment must not contain 'blob:'
     expect(JSON.stringify(wire).includes('blob:')).toBe(false);
+    expect(JSON.stringify(wire)).not.toContain('content://');
   });
 
   it('assertWireSafe throws if a blob URL or previewUrl accidentally enters wire payload', () => {

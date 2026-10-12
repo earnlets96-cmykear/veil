@@ -358,6 +358,11 @@ export const Sidebar: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingChat, setIsDeletingChat] = useState(false);
 
+  const transitionToTab = useCallback((tab: 'all' | 'unread' | 'group') => {
+    if (activeChip === tab) return;
+    React.startTransition(() => setActiveChip(tab));
+  }, [activeChip]);
+
   const debounceTimerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -414,9 +419,7 @@ export const Sidebar: React.FC = () => {
     const currentIndex = tabs.indexOf(activeChip);
     const nextIndex = Math.max(0, Math.min(tabs.length - 1, currentIndex + (deltaX < 0 ? 1 : -1)));
     if (nextIndex !== currentIndex) {
-      React.startTransition(() => {
-        setActiveChip(tabs[nextIndex]);
-      });
+      transitionToTab(tabs[nextIndex]);
       suppressListClickUntilRef.current = Date.now() + 150;
     }
   };
@@ -458,19 +461,19 @@ export const Sidebar: React.FC = () => {
   }, [searchQuery, searchDirectory]);
 
   // Filter and sort conversations (pinned conversations first, then newest message)
+  const pinnedAndRecentConversations = React.useMemo(() => conversations.slice().sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return (b.timestamp || 0) - (a.timestamp || 0);
+  }), [conversations]);
+
   const filteredConversations = React.useMemo(() => {
-    return conversations
-      .filter((c) => {
+    return pinnedAndRecentConversations.filter((c) => {
         if (activeChip === 'unread') return (c.unreadCount || 0) > 0;
         if (activeChip === 'group') return c.type === 'group';
         return true;
-      })
-      .sort((a, b) => {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return (b.timestamp || 0) - (a.timestamp || 0);
       });
-  }, [conversations, activeChip]);
+  }, [pinnedAndRecentConversations, activeChip]);
 
   const handleSelectConversation = React.useCallback((id: string) => {
     if (Date.now() < suppressListClickUntilRef.current) return;
@@ -769,7 +772,7 @@ export const Sidebar: React.FC = () => {
               role="tab"
               aria-selected={activeChip === tab}
               className={`veil-tab-btn ${activeChip === tab ? 'active' : ''}`}
-              onClick={() => setActiveChip(tab)}
+              onClick={() => transitionToTab(tab)}
             >
               {tab === 'all' ? 'All' : tab === 'unread' ? 'Unread' : 'Groups'}
             </button>
