@@ -1,6 +1,8 @@
 # CHANGELOG.md — VEIL Project Changelog
 
 ## Media Pipeline and UI Responsiveness Investigation — 2026-10-12
+- Fixed relay CORS preflight for Android raw attachment transfers by allowing the two custom request headers used by `CloudClient`; exposed `X-Ciphertext-Hash` so cross-origin WebViews can verify raw downloads.
+- Android DevTools evidence: 2 CORS request issues; repeated inbound decryption failures and “Attachment not found or deleted” are distinct receive/download errors.
 - Fixed Android document-picker handling for providers that report unknown file size (`-1`); uploads now stream to the native reader's EOF signal.
 - Moved native-provider Base64 chunk decoding into the existing media Web Worker when available, avoiding synchronous UI-thread decoding in normal WebViews.
 - Added regression tests. Focused device-bridge/media-worker suites pass (23 tests) and production web build passes. Android device verification and the user’s WebView/Logcat evidence for remaining media-load errors are pending.

@@ -39,6 +39,28 @@ describe('Phase 31: Production Connectivity & Canonical Routing', () => {
     expect(() => ConfigManager.validateConfig(badConfig)).toThrow(/Production config violation/i);
   });
 
+  it('allows the custom headers required by cross-origin raw attachment uploads', async () => {
+    const server = new RelayServer({ port: 0 });
+    const headers = new Map<string, string>();
+    const response: any = {
+      statusCode: 200,
+      setHeader: (name: string, value: string) => headers.set(name.toLowerCase(), value),
+      end: () => undefined,
+    };
+
+    await (server as any).handleHttpRequest(
+      { method: 'OPTIONS', headers: {}, socket: { remoteAddress: '127.0.0.1' } },
+      response
+    );
+
+    expect(response.statusCode).toBe(204);
+    const allowedHeaders = String(headers.get('access-control-allow-headers')).toLowerCase();
+    expect(allowedHeaders).toContain('x-object-id');
+    expect(allowedHeaders).toContain('x-ciphertext-hash');
+    const exposedHeaders = String(headers.get('access-control-expose-headers')).toLowerCase();
+    expect(exposedHeaders).toContain('x-ciphertext-hash');
+  });
+
   it('handles CORS OPTIONS preflight correctly on API endpoints', async () => {
     if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true, force: true });
     fs.mkdirSync(TEST_DIR, { recursive: true });
@@ -60,12 +82,16 @@ describe('Phase 31: Production Connectivity & Canonical Routing', () => {
         headers: {
           Origin: 'https://veil.chat',
           'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'authorization,content-type,x-object-id,x-ciphertext-hash',
         },
       });
 
       expect(optionsRes.status).toBe(204);
       expect(optionsRes.headers.get('access-control-allow-origin')).toBe('*');
       expect(optionsRes.headers.get('access-control-allow-methods')).toContain('POST');
+      const allowedHeaders = optionsRes.headers.get('access-control-allow-headers')?.toLowerCase() || '';
+      expect(allowedHeaders).toContain('x-object-id');
+      expect(allowedHeaders).toContain('x-ciphertext-hash');
     } finally {
       await server.stop();
       if (fs.existsSync(TEST_DIR)) fs.rmSync(TEST_DIR, { recursive: true, force: true });

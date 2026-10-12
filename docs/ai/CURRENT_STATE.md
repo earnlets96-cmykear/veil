@@ -1,6 +1,8 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
 ## Media Pipeline and UI Responsiveness Investigation — 2026-10-12
+- Android DevTools showed CORS preflight failures. The raw attachment client sends `X-Object-Id` and `X-Ciphertext-Hash`; the relay allowlist omitted them. The relay now allows those exact headers and exposes the server-provided ciphertext hash to the cross-origin WebView so download integrity verification can run.
+- Android DevTools also showed repeated inbound `corrupted ciphertext or authentication tag mismatch` failures and `Attachment not found or deleted` media errors. These are receive/download failures; failed inbound envelopes remain queued and are retried by the existing 3-second mailbox sync. They do not establish the raw upload result.
 - Android document providers may report `OpenableColumns.SIZE = -1`. The device bridge now normalizes picker metadata to unknown-size `0` and streams bytes until native EOF; a regression test covers an external audio provider.
 - Native provider Base64 chunks are decoded by the existing media Web Worker when supported, removing the measured synchronous 1 MiB decode loop from the normal WebView UI path. Compatibility fallback remains synchronous if Workers are unavailable or fail.
 - Verification: focused device-bridge and media-worker suites pass (23 tests); production web build passes. The build reports existing dynamic-import and large-chunk warnings.

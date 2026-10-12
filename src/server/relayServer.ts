@@ -173,7 +173,12 @@ export class RelayServer {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-telegram-bot-token');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, x-telegram-bot-token, X-Object-Id, X-Ciphertext-Hash'
+    );
+    // Cross-origin WebViews must be able to read the server-computed integrity hash.
+    res.setHeader('Access-Control-Expose-Headers', 'X-Ciphertext-Hash, X-Attachment-Id');
 
     if (req.method === 'OPTIONS') {
       res.statusCode = 204;
