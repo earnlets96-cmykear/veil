@@ -1,5 +1,15 @@
 # CHANGELOG.md — VEIL Project Changelog
 
+## FCM Push Notification Relay Configuration — 2026-10-12
+- Created local `.env` with `FCM_PROJECT_ID=chat-veil-app` and Firebase service account credentials; `.env` is gitignored.
+- Added `relay:push` npm script using Node 24 native `--env-file` to start the relay with FCM push enabled. No dotenv dependency added.
+- Verified push sender initializes, relay starts, and push delivery test suite passes (8 tests).
+
+## Sidebar Touch Gesture Refinements — 2026-10-12
+- Refined swipe thresholds (aspect ratio 1.25→1.2, distance 50→45px), shortened click suppression (700→150ms), made swipe move non-blocking, wrapped tab switch in `React.startTransition`.
+- Removed `content-visibility`/`contain` from message rows and conversation items, removed `scroll-behavior: smooth`, added pinch-zoom and menu z-index elevation.
+- Updated phase134 test assertions; 20 tests pass across 3 suites. TypeScript passes.
+
 ## Direct Media Recipient Preflight — 2026-10-12
 - Resolve and validate missing direct-message recipient key material before attachment encryption/upload. Invalid, expired, mismatched, or key-replaced directory profiles fail closed before upload; existing ratchet and attachment wire formats are unchanged.
 - Added adversarial profile-resolution and upload-order tests. Focused suites (8 tests) and TypeScript pass. Full suite: 363 files passed / 108 failed (1,525 tests passed / 215 failed / 6 skipped); most failures require unavailable localhost relay/recovery services, with unrelated source-contract/UI assertions also failing.

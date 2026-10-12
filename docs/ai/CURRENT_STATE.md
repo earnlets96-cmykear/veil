@@ -1,5 +1,18 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## FCM Push Notification Relay Configuration — 2026-10-12
+- Firebase service account key for project `chat-veil-app` loads successfully via `createFirebasePushSenderFromEnvironment`. Local `.env` (gitignored) provides `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_JSON`.
+- Added `relay:push` npm script using Node 24 native `--env-file=.env`. The existing `relay` script remains unchanged for environments without push.
+- Relay starts with push sender wired; push delivery test suite passes (8 tests); TypeScript passes. Production deployment requires setting the two env vars on Render.
+- **Scope**: Relay startup credential wiring only; no cryptographic, identity, Space, or message protocol changes.
+
+## Sidebar Touch Gesture Refinements — 2026-10-12
+- Refined swipe detection thresholds (aspect ratio 1.25→1.2, minimum distance 50→45px) and shortened the post-swipe click suppression window (700→150ms) to prevent taps from being swallowed after tab switches.
+- Made `handleTabSwipeMove` non-blocking, wrapped `setActiveChip` in `React.startTransition`, added `pinch-zoom` to conversation list `touchAction`, and elevated z-index on open conversation row menus.
+- Removed `content-visibility`/`contain` from `.veil-msg-row` and `.veil-conversation-item` (caused rendering artifacts and blank rows in Android WebView) and `scroll-behavior: smooth` from the conversation list (conflicted with programmatic scroll restoration).
+- Verification: 20 tests pass across sidebar, app-lock, and UI system suites; TypeScript passes.
+- **Scope**: UI/CSS gesture and containment tuning only; no crypto, identity, or protocol changes.
+
 ## Direct Media Recipient Preflight — 2026-10-12
 - Direct one-to-one media sends now resolve missing recipient prekeys from a validated signed directory profile before attachment work starts. Profile identity must match the selected contact/conversation; pinned signing keys cannot be replaced; embedded identity documents are verified.
 - If key material cannot be resolved, sending fails before ciphertext upload so the selected media is not expensively uploaded without an encrypted message.

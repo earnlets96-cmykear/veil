@@ -1,5 +1,27 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Completed: FCM Push Notification Relay Configuration — 2026-10-12
+- [x] Verify Firebase service account key (`chat-veil-app-722ba1f14ce0.json`) loads as `FCM_SERVICE_ACCOUNT_JSON` and `createFirebasePushSenderFromEnvironment` returns `CONFIGURED`.
+- [x] Create `.env` (already gitignored) with `FCM_PROJECT_ID=chat-veil-app` and the service account JSON.
+- [x] Add `relay:push` npm script using Node 24 native `--env-file=.env` (no dotenv dependency).
+- [x] Verify relay server starts with push sender wired: health check returns ok, `handlePushToken` registration and `dispatchBackgroundPush` dispatch chains are present.
+- [x] Run push delivery test suite (8 tests) — all pass.
+- [ ] Deploy to production relay (Render) with `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_JSON` environment variables.
+- [ ] Enable Background Alerts in VEIL Settings on a physical Android device and verify end-to-end notification delivery.
+- **Scope**: Relay startup and credential wiring only; no cryptographic, identity, or message protocol changes.
+
+## Completed: Sidebar Touch Gesture Refinements — 2026-10-12
+- [x] Reduce swipe aspect-ratio threshold (1.25→1.2) and distance (50→45px) for more responsive gestures.
+- [x] Shorten click suppression window (700→150ms) to prevent tap blocking after tab swipe.
+- [x] Make `handleTabSwipeMove` non-blocking (remove `preventDefault`).
+- [x] Wrap tab switch in `React.startTransition` for smoother rendering.
+- [x] Add `pinch-zoom` to conversation list `touchAction`.
+- [x] Elevate z-index on open conversation menus to prevent clipping.
+- [x] Remove `content-visibility`/`contain` from `.veil-msg-row` and `.veil-conversation-item` (caused rendering artifacts on Android WebView).
+- [x] Remove `scroll-behavior: smooth` from conversation list (conflicted with programmatic scroll restoration).
+- [x] Update phase134 test assertions to match refined thresholds; 20 tests pass across 3 suites.
+- **Scope**: UI/CSS gesture tuning only; no crypto, identity, or protocol changes.
+
 ## In Progress: Direct Media Recipient Preflight — 2026-10-12
 - [x] Identify the reported post-upload send failure from the supplied browser log: direct media dispatch lacks both an active session and cached recipient prekey.
 - [x] Add signed-profile resolution before upload; verify signature, expiry, exact identity, embedded identity document, and any pinned contact signing key.
