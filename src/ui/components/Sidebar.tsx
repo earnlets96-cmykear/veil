@@ -387,10 +387,13 @@ export const Sidebar: React.FC = () => {
     }
 
     const target = event.target instanceof Element ? event.target : null;
+    const rawControl = target?.closest('button, a, input, textarea, select, [role="button"], [role="slider"]');
+    const isListItem = Boolean(target?.closest('.veil-conversation-select, .veil-conversation-item'));
+    const isActualButton = Boolean(target?.closest('button, a, input, textarea, select, [role="slider"]'));
     tabSwipeStartRef.current = {
       x: event.touches[0].clientX,
       y: event.touches[0].clientY,
-      startedOnControl: Boolean(target?.closest('button, a, input, textarea, select, [role="button"], [role="slider"]')),
+      startedOnControl: Boolean(rawControl && (!isListItem || isActualButton)),
     };
   };
 
@@ -470,7 +473,10 @@ export const Sidebar: React.FC = () => {
   }, [conversations, activeChip]);
 
   const handleSelectConversation = React.useCallback((id: string) => {
-    selectConversation(id);
+    if (Date.now() < suppressListClickUntilRef.current) return;
+    React.startTransition(() => {
+      selectConversation(id);
+    });
   }, [selectConversation]);
 
   const handleTogglePin = React.useCallback((id: string, isPinned?: boolean) => {

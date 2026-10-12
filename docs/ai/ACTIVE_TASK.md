@@ -1,5 +1,16 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## Completed: In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
+- [x] Stream native device files and videos directly in chat timeline with immediate optimistic message bubble (0ms staging) and live progress feedback (0%-30% native read, 30%-100% encryption/upload).
+- [x] Dismiss MediaPickerModal immediately upon dispatch instead of blocking the user on a modal progress screen.
+- [x] Allow horizontal swipe across conversation list items while retaining vertical scrolling and preventing false-positive click dispatch upon finger lift.
+- [x] Wrap conversation selection in `React.startTransition` and reduce initial message window from 60 to 30 with incremental load-on-scroll.
+- [x] Guard auto-mark-as-read effect to prevent unnecessary re-render loops and redundant network sync.
+- [x] Pass unit test suites (phase134 touch, phase135 attachment retention, phase86 share media, phase74 device media bridge, phase58 two-client UI acceptance).
+- [x] Compile production web bundle and sync Capacitor Android assets.
+- [x] Assemble Android debug APK (`app-debug.apk`, 10.2 MB).
+- **Scope**: Native device streaming pipeline and UI gesture/render optimization only; no crypto, identity, or protocol changes.
+
 ## Completed: FCM Push Notification Relay Configuration — 2026-10-12
 - [x] Verify Firebase service account key (`chat-veil-app-722ba1f14ce0.json`) loads as `FCM_SERVICE_ACCOUNT_JSON` and `createFirebasePushSenderFromEnvironment` returns `CONFIGURED`.
 - [x] Create `.env` (already gitignored) with `FCM_PROJECT_ID=chat-veil-app` and the service account JSON.

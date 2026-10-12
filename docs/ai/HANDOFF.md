@@ -1,5 +1,21 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
+- **Status**: Implemented, verified with focused unit tests, web bundle built, Capacitor synced, and Android debug APK assembled.
+- **Root cause**:
+  1. Horizontal swipe gesture on sidebar tabs was blocked when finger touched conversation items because item containers had button-like roles. When the finger was lifted, the click event fired and selected the conversation.
+  2. Opening a conversation froze due to synchronous heavy message list rendering (60 messages default), plus uncontrolled re-render loops in conversation auto-read receipts.
+  3. Video and file uploads on native Android blocked the user inside a "Preparing..." modal until the whole file was read chunk-by-chunk into memory.
+- **Change**:
+  1. Refined swipe touch handler in `Sidebar.tsx` to allow gliding over conversation items, guarded against false clicks after swipe, and wrapped selection in `React.startTransition`.
+  2. Reduced initial message window in `ConversationView.tsx` from 60 to 30 with dynamic increment on scroll, and guarded auto-mark-as-read to only run when unreadCount > 0.
+  3. Staged native media attachments immediately in `AppState.tsx` with local thumbnail and size metadata (0ms staging), closing `MediaPickerModal` immediately. Moved device chunk reading into `uploadWorker` with 0%-100% active timeline progress reporting.
+- **Verification**:
+  - `phase134` (touch navigation), `phase135` (attachment retention), `phase86` (share media redesign), `phase74` (device media bridge), and `phase58` (UI acceptance) pass.
+  - Production bundle compiled (`npm run build`).
+  - Capacitor synced (`npx cap sync android`).
+  - Android debug APK assembled (`app-debug.apk`, 10.2 MB).
+
 ## Direct Media Recipient Preflight — 2026-10-12
 - **Status**: Implemented and focused-verified; no deployment authorization implied.
 - **Root cause**: Direct attachment sending started encrypted upload before checking that a recipient Double Ratchet session or prekey bundle was available. The supplied browser error confirms this failure after upload. Text/voice already attempted directory refresh.

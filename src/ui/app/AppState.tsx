@@ -3049,8 +3049,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           file.name?.includes('.sticker.') ||
           effectiveMime.includes('sticker')
         );
-        let initialPreviewUrl: string | undefined;
-        if (effectiveMime.startsWith('image/') || effectiveMime.startsWith('video/') || isSticker) {
+        const effectiveSize = (file as any).deviceMetadata?.sizeBytes ?? file.size;
+        let initialPreviewUrl: string | undefined = (file as any).thumbnailUrl;
+        if (!initialPreviewUrl && (effectiveMime.startsWith('image/') || effectiveMime.startsWith('video/') || isSticker)) {
           try {
             initialPreviewUrl = URL.createObjectURL(file);
           } catch (_e) {}
@@ -3062,7 +3063,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             data: new Uint8Array(0),
             mimeType: effectiveMime,
             name: file.name,
-            sizeBytes: file.size,
+            sizeBytes: effectiveSize,
           };
           MediaCache.set(attachmentId, decryptedStub);
           MediaCache.set(file.name, decryptedStub);
@@ -3072,7 +3073,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           attachmentId,
           groupId: batchGroupId,
           name: file.name,
-          sizeBytes: file.size,
+          sizeBytes: effectiveSize,
           mimeType: effectiveMime,
           previewUrl: initialPreviewUrl,
           localPreviewUrl: initialPreviewUrl,
@@ -3218,7 +3219,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 sizeBytes: currentAtt.sizeBytes,
               });
 
-              const fileBytes = new Uint8Array(await file.arrayBuffer());
+              let fileBytes: Uint8Array;
+              const deviceUri = (file as any).deviceUri;
+              if (deviceUri && file.size === 0 && NativeDeviceMediaBridge.getInstance().isNative()) {
+                const deviceMedia = NativeDeviceMediaBridge.getInstance();
+                const fileFromDevice = await deviceMedia.fileFromUri(deviceUri, (loadedBytes, totalBytes) => {
+                  if (totalBytes > 0) {
+                    const percent = Math.min(30, Math.round((loadedBytes / totalBytes) * 30));
+                    setUploadProgress((prev) => ({
+                      ...prev,
+                      [msgId]: { percent, loaded: loadedBytes, total: totalBytes },
+                      [currentAtt.attachmentId]: { percent, loaded: loadedBytes, total: totalBytes },
+                    }));
+                  }
+                });
+                fileBytes = new Uint8Array(await fileFromDevice.arrayBuffer());
+              } else {
+                fileBytes = new Uint8Array(await file.arrayBuffer());
+              }
               const plaintextSizeBytes = fileBytes.length;
 
               // Yield before SHA-256 computation
@@ -5574,6 +5592,8 @@ export function useApp(): AppContextType {
 export function useComposer(): ComposerContextType {
   const context = useContext(ComposerContext);
   if (!context) {
+    const appContext = useContext(AppContext);
+    if (appContext) return appContext as unknown as ComposerContextType;
     throw new Error('useComposer must be used within an AppProvider');
   }
   return context;

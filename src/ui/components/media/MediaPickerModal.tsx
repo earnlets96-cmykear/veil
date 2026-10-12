@@ -28,6 +28,7 @@ import { attachmentSendFailureMessage } from '../../../attachments/attachmentSen
 export interface MediaPickerSendOptions {
   files: File[];
   caption?: string;
+  onUploadStarted?: () => void;
 }
 
 export interface MediaPickerModalProps {
@@ -346,20 +347,23 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
         }
       }
 
-      // Close the modal immediately — upload progress will show in the chat
-      // timeline. Don't await onSend; fire-and-forget so the modal never
-      // gets stuck waiting for blocked-check, contact-list, or upload.
-      setReadProgress(null);
-      setSelectedFiles([]);
-      setCaption('');
-      setStagedUris(new Set());
-      fileToUriMapRef.current.clear();
-      fileMetadataRef.current.clear();
-      setIsSending(false);
-      setSendStage('preparing');
-      onClose();
+      const closeAfterUploadStarts = () => {
+        setReadProgress(null);
+        setSelectedFiles([]);
+        setCaption('');
+        setStagedUris(new Set());
+        fileToUriMapRef.current.clear();
+        fileMetadataRef.current.clear();
+        setIsSending(false);
+        setSendStage('preparing');
+        onClose();
+      };
 
-      void onSend({ files: filesToSend, caption: caption.trim() || undefined });
+      await onSend({
+        files: filesToSend,
+        caption: caption.trim() || undefined,
+        onUploadStarted: closeAfterUploadStarts,
+      });
     } catch (error) {
       setSendError(attachmentSendFailureMessage(error));
       setIsSending(false);

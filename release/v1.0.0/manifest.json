@@ -1,44 +1,44 @@
 {
   "releaseVersion": "1.0.0",
-  "generatedAt": "2026-10-10T22:10:00.703Z",
+  "generatedAt": "2026-10-12T11:29:11.227Z",
   "nodeVersion": "v24.13.0",
   "platform": "win32",
   "totalArtifacts": 18,
   "artifacts": [
     {
-      "path": "dist/assets/AccountsAndSpacesModal-DdzABvTO.js",
+      "path": "dist/assets/AccountsAndSpacesModal-mWohpds-.js",
       "sizeBytes": 17200,
-      "sha256": "2d1be2cbdc059fd9b9ff08a23df2e671a1e63d82860d77adbb9f596c3eb7163f"
+      "sha256": "28d5e956ff4b6aaa069013f1ea50eb6cf37cba801a7d1ac066fa5dcda32ce033"
     },
     {
-      "path": "dist/assets/AppLockSetupModal-C0E9s3g5.js",
+      "path": "dist/assets/AppLockSetupModal-CH0CVVK0.js",
       "sizeBytes": 8534,
-      "sha256": "56ed248c16ce2f59964e1465c1d50a83866b61e674df35945ff2b643b0ea2e34"
+      "sha256": "0e01b380932ef84cd740bbaad4922f9aa966c45093bc3f8e049b29a44c65c1d6"
     },
     {
-      "path": "dist/assets/AvatarCropModal-Bfq2NrwZ.js",
+      "path": "dist/assets/AvatarCropModal-BjaUOsik.js",
       "sizeBytes": 8027,
-      "sha256": "b4916470c230c90290af9bbb4bceb8d0162873448b4b682253747d189b08271b"
+      "sha256": "e102db88dc5968223a8c17eae0bfc7684f78eef5f0d3ba1c7681b639be84eb6a"
     },
     {
-      "path": "dist/assets/ContactDetailsModal-BhFP_CJ-.js",
+      "path": "dist/assets/ContactDetailsModal-Cy8UHXlj.js",
       "sizeBytes": 9524,
-      "sha256": "f5744cfc55da519d93984f85b7ea3d79b93c01177a15748cf36d3a5db192f4ad"
+      "sha256": "5de7e26df4a1e24d1af43461436c34362264aa43d055b986c8cbd0d0daf3347f"
     },
     {
-      "path": "dist/assets/GroupDetailsModal-kO33_VGM.js",
+      "path": "dist/assets/GroupDetailsModal-uRibKHg7.js",
       "sizeBytes": 10243,
-      "sha256": "71975c20f99fa0313df3ed38fc17657f525728e14103c947b86488a51b4810e7"
+      "sha256": "31e3a0c9d618429600b0fb465731d62663635c75dd8d9fe6d25ebadafee00d11"
     },
     {
-      "path": "dist/assets/index-Blqigd5g.js",
-      "sizeBytes": 926421,
-      "sha256": "1ebf40c000210213340160d11e94a56b373af667b0b65d7f85cc5e79e5d2f1c7"
+      "path": "dist/assets/index-Cq4YZqJ_.css",
+      "sizeBytes": 171264,
+      "sha256": "d62d1a6caadffecdc2062450d1c1318c945423e5c7273cc66fea0b2ecba4e829"
     },
     {
-      "path": "dist/assets/index-DTApCaWC.css",
-      "sizeBytes": 169165,
-      "sha256": "026f82e64da8dc965efe65daa0742b1b3c4291f817e4b0bc30366a5f353a76ba"
+      "path": "dist/assets/index-DaZSwXIL.js",
+      "sizeBytes": 931163,
+      "sha256": "1f921d743e152940f853ea943c9bb2aa52f364f0ffb650a487cdf7e73f43c9de"
     },
     {
       "path": "dist/assets/kdfWorker-JzPGF_x9.js",
@@ -51,49 +51,49 @@
       "sha256": "feef8d2e6427f06f724d2469bf2f91d77395abd49c759e31bb15cee62449156e"
     },
     {
-      "path": "dist/assets/NewChatModal-DTtU57aN.js",
+      "path": "dist/assets/NewChatModal-Db9PcQFL.js",
       "sizeBytes": 11251,
-      "sha256": "203dce9e2a04eb2d9f3bca5b0d1d893a041cafb498a3e04ce6f1172c0cc8cafe"
+      "sha256": "9e5ff3703f783634a71ab282f4ae853b97815ed2986d35e6a5bd3575509f06b5"
     },
     {
-      "path": "dist/assets/NewGroupModal-BqcIXhtQ.js",
+      "path": "dist/assets/NewGroupModal-Ds14VxQF.js",
       "sizeBytes": 8914,
-      "sha256": "9115ee56d19dce8e3144476ed281054d980d35421e8090215015f8b2c4cc0ca8"
+      "sha256": "d134336f495a8c309d2f507a88b656f6f271a9872da7a7c83043c22ccc60820b"
     },
     {
-      "path": "dist/assets/ProfileModal-D6jIpsjc.js",
+      "path": "dist/assets/ProfileModal-D110uEjX.js",
       "sizeBytes": 32185,
-      "sha256": "4a7bbb0e5e7322584bf72b0b1d22cb9e64f4662edf19401664059152a1e176c8"
+      "sha256": "10418989d37f017f128a8c1c1749290a71038ee17439ede181ff822327fda41c"
     },
     {
-      "path": "dist/assets/SettingsModal-C9QbLMjs.js",
+      "path": "dist/assets/SettingsModal-E7-j5uSG.js",
       "sizeBytes": 57059,
-      "sha256": "dd99fdd0ff6510fe1c5bc85c94c3e3bf881522a39aaa209a29cfd76f9e2c02e1"
+      "sha256": "5ff3e4cff57cf434caaff73df4443b84e9a4b573b6c66d865b8c248927fb6d7c"
     },
     {
-      "path": "dist/assets/SocialVideoShareDialog-8-qYOaZS.js",
+      "path": "dist/assets/SocialVideoShareDialog-DK_E9Pc-.js",
       "sizeBytes": 2194,
-      "sha256": "18537e125aa0eef6b5d6524b6b180892915b2439d8ed97833cffdc8a6637cd57"
+      "sha256": "d9fece0e1255838d87b4c82af43393080ab5e07058d19b776b563a9ef376afda"
     },
     {
-      "path": "dist/assets/web-CUop9Raa.js",
-      "sizeBytes": 8736,
-      "sha256": "0fbc872220647b38abb91dd611e8de760442073f6b0cd49c94b902e87af5826a"
-    },
-    {
-      "path": "dist/assets/web-DiQW2toH.js",
+      "path": "dist/assets/web-cIufZTNg.js",
       "sizeBytes": 362,
-      "sha256": "b1d73bc038775e3012a3a6e260c73c8d4a4b3c15850cd7ddf37e6aec9c5895f0"
+      "sha256": "2648ab0e0a62f057497e0e312c4069e053c79c10ca24de87424eab15237a40fb"
     },
     {
-      "path": "dist/assets/web-uM0-VKIv.js",
+      "path": "dist/assets/web-Guyz4fkB.js",
+      "sizeBytes": 8736,
+      "sha256": "293d16c2e9fedbe250a636cfc76ddb667820cbe7e97a4944a146a9330319af4a"
+    },
+    {
+      "path": "dist/assets/web-XCIievy8.js",
       "sizeBytes": 843,
-      "sha256": "8058c0f2b3b70e2f6e3dc26c1ccbb953b6e0453d4885374caec3082b564b8ef9"
+      "sha256": "e36076ad7faa3e1492d5e959af15a92376ea5c62788b2df5a88dd246c5975c3a"
     },
     {
       "path": "dist/index.html",
       "sizeBytes": 986,
-      "sha256": "1391f90922b3c85840fc2707f4bfc887442100c720c26395c9a59ba4c6038dc3"
+      "sha256": "0fcc15e3d5af619ea02c2747504b4112a732202cd4f7cfccc54cca18c4971242"
     }
   ]
 }

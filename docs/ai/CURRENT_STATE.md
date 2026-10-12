@@ -1,5 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
+- Native device media uploads (photos, videos, files) now bypass synchronous modal preparation: `MediaPickerModal` dispatches immediately (0ms) into the chat timeline with local thumbnail and size metadata.
+- `uploadWorker` streams native device chunks with active 0%-100% progress reporting in the timeline bubble (0%-30% native device read, 30%-100% encryption and relay upload).
+- Horizontal swipe across sidebar conversation items is enabled without blocking list scrolling or triggering unintended conversation clicks upon finger release.
+- Conversation opening freeze mitigated by transitioning selection state in `React.startTransition`, reducing initial rendered message window from 60 to 30, and eliminating re-render loops in conversation read receipts.
+- Verification: unit tests pass (phase134 touch, phase135 attachment retention, phase86 share media, phase74 device media bridge, phase58 two-client UI acceptance); production web bundle compiled; Capacitor synced; debug APK assembled successfully (`app-debug.apk`, 10.2 MB).
+- **Scope**: Native device streaming and UI responsiveness optimizations only; no crypto, identity, or protocol changes.
+
 ## FCM Push Notification Relay Configuration — 2026-10-12
 - Firebase service account key for project `chat-veil-app` loads successfully via `createFirebasePushSenderFromEnvironment`. Local `.env` (gitignored) provides `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_JSON`.
 - Added `relay:push` npm script using Node 24 native `--env-file=.env`. The existing `relay` script remains unchanged for environments without push.

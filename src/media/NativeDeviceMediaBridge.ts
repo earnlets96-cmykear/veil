@@ -106,7 +106,11 @@ export class NativeDeviceMediaBridge {
 
   /** Creates a zero-byte selection token; file bytes are read only when Send is pressed. */
   public createSelectionPlaceholder(item: DeviceMediaItem): File {
-    return new File([], item.name, { type: item.mimeType });
+    const file = new File([], item.name, { type: item.mimeType });
+    (file as any).deviceUri = item.uri;
+    (file as any).thumbnailUrl = item.thumbnailDataUrl;
+    (file as any).deviceMetadata = item;
+    return file;
   }
 
   /**

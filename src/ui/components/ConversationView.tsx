@@ -1154,7 +1154,7 @@ export const ConversationView: React.FC = () => {
   }, [activeConversation, activeMessages]);
 
   // Incremental timeline windowing for smooth rendering of large conversations
-  const INITIAL_MESSAGE_WINDOW = 60;
+  const INITIAL_MESSAGE_WINDOW = 30;
   const WINDOW_INCREMENT = 30;
   const [renderedCount, setRenderedCount] = useState<number>(INITIAL_MESSAGE_WINDOW);
 
@@ -1273,12 +1273,12 @@ export const ConversationView: React.FC = () => {
   useEffect(() => {
     if (activeChatId) {
       const hasUnread = (activeConversation && activeConversation.unreadCount > 0) || false;
-      const hasInbound = activeMessages.some((m) => !m.isOutgoing);
-      if (hasUnread || hasInbound) {
+
+      if (hasUnread) {
         markConversationAsRead(activeChatId);
       }
     }
-  }, [activeChatId, activeConversation?.unreadCount, activeMessages.length, markConversationAsRead]);
+  }, [activeChatId, activeConversation?.unreadCount, markConversationAsRead]);
 
   // Handle Jump-to-message with automatic window expansion
   const handleJumpToMessage = useCallback((targetMsgId: string) => {

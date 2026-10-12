@@ -1,5 +1,11 @@
 # CHANGELOG.md — VEIL Project Changelog
 
+## In-Timeline Device Media Streaming & Chat Responsiveness — 2026-10-12
+- Enabled zero-delay timeline staging for native Android file and video uploads with live stream progress reporting (0%-30% device read, 30%-100% upload), dismissing the picker modal immediately.
+- Refined sidebar horizontal tab swipe to allow gliding over conversation items without triggering unwanted selection clicks.
+- Reduced initial conversation render window to 30 messages with load-on-scroll and optimized read-receipt dispatch to eliminate conversation opening freezes.
+- Rebuilt production bundle, synced Capacitor Android assets, and verified clean Gradle APK compilation (`app-debug.apk`, 10.2 MB).
+
 ## FCM Push Notification Relay Configuration — 2026-10-12
 - Created local `.env` with `FCM_PROJECT_ID=chat-veil-app` and Firebase service account credentials; `.env` is gitignored.
 - Added `relay:push` npm script using Node 24 native `--env-file` to start the relay with FCM push enabled. No dotenv dependency added.
