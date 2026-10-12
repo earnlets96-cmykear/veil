@@ -12,6 +12,7 @@
     "verify:release": "npm test && npm run build && node scripts/release-build.mjs",
     "preview": "vite preview",
     "relay": "node --import tsx/esm src/server/cli.ts",
+    "relay:push": "node --env-file=.env --import tsx/esm src/server/cli.ts",
     "start": "node --import tsx/esm src/server/cli.ts",
     "start:server": "node --import tsx/esm src/server/cli.ts",
     "tunnel": "node scripts/free-tunnel.mjs",
