@@ -5501,8 +5501,7 @@ img.veil-message-sticker-img {
 }
 
 .veil-msg-row {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 80px;
+  position: relative;
 }
 
 /* Premium appearance studio */

@@ -679,7 +679,6 @@ body {
   padding: 0.5rem;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  scroll-behavior: smooth;
 }
 
 .veil-conversation-item {
@@ -692,9 +691,6 @@ body {
   transition: background-color var(--veil-duration-fast) var(--veil-easing-standard);
   user-select: none;
   min-height: var(--veil-conv-item-height, 56px);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 68px;
-  contain: layout style paint;
 }
 
 .veil-conversation-item:hover {

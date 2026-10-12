@@ -186,6 +186,7 @@ const SidebarConversationItem = React.memo<SidebarConversationItemProps>(({
         padding: '0.25rem 0.4rem 0.25rem 0.25rem',
         borderRadius: '16px',
         position: 'relative',
+        zIndex: menuOpen ? 50 : 1,
         marginBottom: '4px',
         backgroundColor: isSelected ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
         border: isSelected ? '1px solid rgba(20, 184, 166, 0.25)' : '1px solid transparent',
@@ -393,15 +394,8 @@ export const Sidebar: React.FC = () => {
     };
   };
 
-  const handleTabSwipeMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    const start = tabSwipeStartRef.current;
-    if (!start || start.startedOnControl || event.touches.length !== 1 || searchQuery.trim()) return;
-
-    const deltaX = event.touches[0].clientX - start.x;
-    const deltaY = event.touches[0].clientY - start.y;
-    if (Math.abs(deltaX) > 12 && Math.abs(deltaX) > Math.abs(deltaY) * 1.25) {
-      event.preventDefault();
-    }
+  const handleTabSwipeMove = (_event: React.TouchEvent<HTMLDivElement>) => {
+    // Non-blocking gesture tracking
   };
 
   const handleTabSwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -411,14 +405,16 @@ export const Sidebar: React.FC = () => {
 
     const deltaX = event.changedTouches[0].clientX - start.x;
     const deltaY = event.changedTouches[0].clientY - start.y;
-    if (Math.abs(deltaX) < 50 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
 
     const tabs = ['all', 'unread', 'group'] as const;
     const currentIndex = tabs.indexOf(activeChip);
     const nextIndex = Math.max(0, Math.min(tabs.length - 1, currentIndex + (deltaX < 0 ? 1 : -1)));
     if (nextIndex !== currentIndex) {
-      setActiveChip(tabs[nextIndex]);
-      suppressListClickUntilRef.current = Date.now() + 700;
+      React.startTransition(() => {
+        setActiveChip(tabs[nextIndex]);
+      });
+      suppressListClickUntilRef.current = Date.now() + 150;
     }
   };
 
@@ -812,7 +808,7 @@ export const Sidebar: React.FC = () => {
         style={{
           flex: 1,
           overflowY: 'auto',
-          touchAction: 'pan-y',
+          touchAction: 'pan-y pinch-zoom',
           padding: '0 0.5rem',
         }}
       >

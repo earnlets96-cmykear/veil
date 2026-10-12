@@ -9,13 +9,13 @@ describe('Sidebar touch navigation and quick lock menu', () => {
     expect(sidebar).toContain("const tabs = ['all', 'unread', 'group'] as const");
     expect(sidebar).toContain('onTouchStart={handleTabSwipeStart}');
     expect(sidebar).toContain('onTouchEnd={handleTabSwipeEnd}');
-    expect(sidebar).toContain('Math.abs(deltaX) < Math.abs(deltaY) * 1.25');
+    expect(sidebar).toContain('Math.abs(deltaX) < Math.abs(deltaY) * 1.2');
   });
 
   it('keeps swipe gestures from replacing taps on interactive list controls', () => {
     expect(sidebar).toContain("target?.closest('button, a, input, textarea, select, [role=\"button\"], [role=\"slider\"]')");
     expect(sidebar).toContain('onClickCapture={(event) => {');
-    expect(sidebar).toContain('suppressListClickUntilRef.current = Date.now() + 700');
+    expect(sidebar).toContain('suppressListClickUntilRef.current = Date.now() + 150');
   });
 
   it('dismisses the quick lock menu on outside interaction and Escape', () => {
