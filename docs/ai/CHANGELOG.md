@@ -1,5 +1,11 @@
 # CHANGELOG.md — VEIL Project Changelog
 
+## Media Pipeline and UI Responsiveness Investigation — 2026-10-12
+- Fixed Android document-picker handling for providers that report unknown file size (`-1`); uploads now stream to the native reader's EOF signal.
+- Moved native-provider Base64 chunk decoding into the existing media Web Worker when available, avoiding synchronous UI-thread decoding in normal WebViews.
+- Added regression tests. Focused device-bridge/media-worker suites pass (23 tests) and production web build passes. Android device verification and the user’s WebView/Logcat evidence for remaining media-load errors are pending.
+- Full suite: 366 files passed / 107 failed; 1,539 passed / 213 failed / 6 skipped, primarily blocked loopback relay/recovery integration tests plus unrelated source/UI contract failures.
+
 ## Media Selection and Send Responsiveness Remediation — 2026-10-12
 - Consolidated picker selection, stable IDs, provider metadata, and visible selected rows into one canonical attachment record list; cancellation and repeated `content://` picks do not corrupt the current selection.
 - Removed pre-send native File materialization. The existing upload worker now reads Android provider chunks once into a single buffer for the existing worker-based encryption/outbox/upload path.

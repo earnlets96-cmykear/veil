@@ -1,5 +1,13 @@
 # HANDOFF.md — AI Agent Session Handoff
 
+## Media Pipeline and UI Responsiveness Investigation — 2026-10-12
+- **Implemented**: Android picker `-1` sizes normalize to zero/unknown and byte reading continues until EOF. Native Base64 chunks decode through `MediaWorkerPool` when Web Workers are available; synchronous fallback is retained for unsupported WebViews.
+- **Changed files**: `src/media/NativeDeviceMediaBridge.ts`, `src/attachments/mediaWorkerPool.ts`, `src/attachments/mediaWorker.ts`; regression tests in `tests/phase74-device-media-bridge.test.ts` and `tests/phase102c-media-worker.test.tsx`.
+- **Verification**: focused tests 23/23 pass; `npm run build` passes (existing mixed dynamic/static import and >500 KB bundle warnings). Full `npm test -- --run`: 366 files passed / 107 failed; 1,539 passed / 213 failed / 6 skipped. Most integration failures cannot connect to loopback relay/recovery endpoints; unrelated source/UI contract failures are also present.
+- **Evidence limit**: the previous 1 MiB JS Base64 loop measured 16.13 ms average on local Node, not Android. No Android Logcat/HTTP response evidence has arrived yet, so remote “Media couldn't load,” audio completion, and real device tab/frame behavior are not confirmed fixed.
+- **Next**: inspect the user's promised redacted Android logs for request URL/host, HTTP status or WebView error, and correlated VEIL media errors. Keep credentials, tokens, and plaintext out of logs. Diagnose the observed media fetch before altering retry/cache/network behavior.
+- **Working tree caution**: do not stage unrelated modified release assets or generated `.veil_*` test directories; preserve them.
+
 ## Media Selection and Send Responsiveness Remediation — 2026-10-12
 - **Status**: Implementation and focused tests complete; web production build passes. Android web assets synced; Gradle compile did not start because standard and offline/no-daemon invocations failed to establish a loopback connection. No physical Android verification.
 - **Root causes found**: Picker selection was split between a `File[]`, a captured-closure URI `Set`, and two Maps; SAF document results were not represented in the active recent-media listing. Picker Send read every native URI into a File before `sendAttachments` created its optimistic message, and the upload worker then copied that File into a second full byte buffer. `sendAttachments` also awaited block/contact/directory key lookups before displaying a local outgoing message. Tab changes filtered and sorted the full list each time; tapping and swiping used separate update paths.

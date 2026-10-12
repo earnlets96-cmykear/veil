@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { MediaWorkerPool } from '../src/attachments/mediaWorkerPool.ts';
 import { NativeDeviceMediaBridge } from '../src/media/NativeDeviceMediaBridge.ts';
 
 describe('Phase 74: native device media bridge', () => {
@@ -33,6 +34,19 @@ describe('Phase 74: native device media bridge', () => {
       items: [{ uri: 'content://media/42', name: 'photo.jpg', mimeType: 'image/jpeg', sizeBytes: 123 }],
       nextCursor: 'next',
     });
+  });
+
+  it('normalizes an unknown size reported by the Android system file picker', async () => {
+    const bridge = NativeDeviceMediaBridge.createForTesting({
+      isNative: () => true,
+      pickDocuments: async () => ({
+        items: [{ uri: 'content://provider/audio', name: 'voice.m4a', mimeType: 'audio/mp4', sizeBytes: -1 }],
+      }),
+    });
+
+    await expect(bridge.pickDocuments()).resolves.toEqual([
+      { uri: 'content://provider/audio', name: 'voice.m4a', mimeType: 'audio/mp4', sizeBytes: 0 },
+    ]);
   });
 
   it('converts a user-selected native URI into an in-memory File only when explicitly staged', async () => {
@@ -135,6 +149,28 @@ describe('Phase 74: native device media bridge', () => {
     expect(result.bytes).toEqual(nativeBytes);
   });
 
+  it('routes Android provider chunk decoding through the media worker', async () => {
+    const pool = MediaWorkerPool.getInstance();
+    const decode = vi.spyOn(pool, 'decodeBase64').mockResolvedValue(new Uint8Array([4, 3, 2, 1]));
+    const bridge = NativeDeviceMediaBridge.createForTesting({
+      isNative: () => true,
+      readMediaChunk: async () => ({
+        name: 'audio.m4a',
+        mimeType: 'audio/mp4',
+        sizeBytes: 4,
+        base64Data: 'BAMCAQ==',
+        bytesRead: 4,
+        isLast: true,
+      }),
+    });
+
+    const result = await bridge.bytesFromUri('content://provider/audio');
+
+    expect(decode).toHaveBeenCalledWith('BAMCAQ==');
+    expect(result.bytes).toEqual(new Uint8Array([4, 3, 2, 1]));
+    decode.mockRestore();
+  });
+
   it('supports Android providers that cannot report a size before streaming', async () => {
     const bridge = NativeDeviceMediaBridge.createForTesting({
       isNative: () => true,
@@ -150,5 +186,30 @@ describe('Phase 74: native device media bridge', () => {
 
     const result = await bridge.bytesFromUri('content://provider/unknown-size');
     expect(result.bytes).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it('treats a negative provider size as unknown and reads the complete audio file', async () => {
+    const nativeBytes = new Uint8Array([9, 8, 7, 6]);
+    const bridge = NativeDeviceMediaBridge.createForTesting({
+      isNative: () => true,
+      readMediaChunk: async ({ offset }) => {
+        const bytes = nativeBytes.subarray(offset, Math.min(offset + 1024 * 1024, nativeBytes.length));
+        let binary = '';
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        return {
+          name: 'external-audio.m4a',
+          mimeType: 'audio/mp4',
+          sizeBytes: -1,
+          base64Data: btoa(binary),
+          bytesRead: bytes.length,
+          isLast: offset + bytes.length >= nativeBytes.length,
+        };
+      },
+    });
+
+    const result = await bridge.bytesFromUri('content://provider/document/audio-unknown-size');
+    expect(result.name).toBe('external-audio.m4a');
+    expect(result.mimeType).toBe('audio/mp4');
+    expect(result.bytes).toEqual(nativeBytes);
   });
 });

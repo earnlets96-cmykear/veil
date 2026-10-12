@@ -56,6 +56,37 @@ describe('VEIL Phase 102C: Media Crypto Worker & Non-Blocking Performance', () =
     expect(executeSpy).toHaveBeenCalledWith('CHUNK_AND_ENCRYPT', expect.any(Object), expect.any(Array));
   });
 
+  it('decodes native provider Base64 chunks in the media worker when workers are available', async () => {
+    let workerPostedMessage: any = null;
+    class MockWorker {
+      public onmessage: ((e: MessageEvent) => void) | null = null;
+      public onerror: ((e: ErrorEvent) => void) | null = null;
+
+      public postMessage(msg: any) {
+        workerPostedMessage = msg;
+        const decoded = Uint8Array.from(atob(msg.payload.base64Data), (char) => char.charCodeAt(0));
+        setTimeout(() => this.onmessage?.({
+          data: { type: 'SUCCESS', requestId: msg.requestId, result: decoded.buffer },
+        } as MessageEvent), 0);
+      }
+
+      public terminate() {}
+    }
+
+    const origWorker = (globalThis as any).Worker;
+    (globalThis as any).Worker = MockWorker;
+    try {
+      MediaWorkerPool.getInstance().terminate();
+      const decoded = await MediaWorkerPool.getInstance().decodeBase64('AQIDBA==');
+
+      expect(workerPostedMessage.type).toBe('BASE64_TO_BYTES');
+      expect(decoded).toEqual(new Uint8Array([1, 2, 3, 4]));
+    } finally {
+      (globalThis as any).Worker = origWorker;
+      MediaWorkerPool.getInstance().terminate();
+    }
+  });
+
   it('uses the synchronous compatibility path when Web Workers are unavailable', async () => {
     const smallPayload = randomBytes(32 * 1024); // 32 KiB < 128 KiB
     const pool = MediaWorkerPool.getInstance();

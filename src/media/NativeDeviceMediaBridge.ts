@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { base64ToBytes } from '../crypto/utils.ts';
+import { MediaWorkerPool } from '../attachments/mediaWorkerPool.ts';
 
 export type DeviceMediaPermissionStatus = 'granted' | 'limited' | 'denied' | 'prompt' | 'unavailable';
 export type DeviceMediaType = 'image' | 'video' | 'file';
@@ -104,6 +104,17 @@ export class NativeDeviceMediaBridge {
     return typeof result.thumbnailDataUrl === 'string' ? result.thumbnailDataUrl : undefined;
   }
 
+  private normalizePickedItems(items: DeviceMediaItem[] | undefined): DeviceMediaItem[] {
+    return (items || []).map((item) => ({
+      uri: String(item.uri),
+      name: String(item.name || 'media'),
+      mimeType: String(item.mimeType || 'application/octet-stream'),
+      // Android document providers use -1 when OpenableColumns.SIZE is unknown.
+      sizeBytes: Math.max(0, Number(item.sizeBytes) || 0),
+      thumbnailDataUrl: item.thumbnailDataUrl,
+    }));
+  }
+
   /** Creates a zero-byte selection token; file bytes are read only when Send is pressed. */
   public createSelectionPlaceholder(item: DeviceMediaItem): File {
     const file = new File([], item.name, { type: item.mimeType });
@@ -153,7 +164,7 @@ export class NativeDeviceMediaBridge {
       if (response.base64Data.length > Math.ceil(chunkSize * 4 / 3) + 8) {
         throw new Error('Selected media returned an invalid chunk');
       }
-      const bytes = base64ToBytes(response.base64Data);
+      const bytes = await MediaWorkerPool.getInstance().decodeBase64(response.base64Data);
       if (response.bytesRead !== undefined && response.bytesRead !== bytes.length) {
         throw new Error('Selected media returned an invalid chunk');
       }
@@ -182,18 +193,20 @@ export class NativeDeviceMediaBridge {
     onProgress?.(0, 0);
     for (let offset = 0; ; offset += chunkSize) {
       const response = await this.readMediaChunk(uri, offset, chunkSize);
+      if (!Number.isSafeInteger(response.sizeBytes) || response.sizeBytes < -1) {
+        throw new Error('Selected media returned invalid metadata');
+      }
       metadata ||= {
         name: response.name,
         mimeType: response.mimeType,
-        sizeBytes: response.sizeBytes,
+        // Android providers commonly use -1 for an unknown OpenableColumns.SIZE.
+        // Treat it like zero and stream until the native reader reports EOF.
+        sizeBytes: Math.max(0, response.sizeBytes),
       };
-      if (!Number.isSafeInteger(metadata.sizeBytes) || metadata.sizeBytes < 0) {
-        throw new Error('Selected media returned invalid metadata');
-      }
       if (response.base64Data.length > Math.ceil(chunkSize * 4 / 3) + 8) {
         throw new Error('Selected media returned an invalid chunk');
       }
-      const bytes = base64ToBytes(response.base64Data);
+      const bytes = await MediaWorkerPool.getInstance().decodeBase64(response.base64Data);
       if ((response.bytesRead !== undefined && response.bytesRead !== bytes.length) || bytes.length > chunkSize) {
         throw new Error('Selected media returned an invalid chunk');
       }
@@ -224,7 +237,7 @@ export class NativeDeviceMediaBridge {
     NativeDeviceMediaBridge.notifyPickerActive(true);
     try {
       const pick = this.adapter?.pickDocuments || NativeDeviceMedia.pickDocuments;
-      return (await pick()).items || [];
+      return this.normalizePickedItems((await pick()).items);
     } finally {
       NativeDeviceMediaBridge.notifyPickerActive(false);
     }
@@ -235,7 +248,7 @@ export class NativeDeviceMediaBridge {
     NativeDeviceMediaBridge.notifyPickerActive(true);
     try {
       const capture = this.adapter?.captureMedia || NativeDeviceMedia.captureMedia;
-      return (await capture()).items || [];
+      return this.normalizePickedItems((await capture()).items);
     } finally {
       NativeDeviceMediaBridge.notifyPickerActive(false);
     }

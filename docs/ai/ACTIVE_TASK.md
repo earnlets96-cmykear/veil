@@ -1,5 +1,15 @@
 # ACTIVE_TASK.md — Active Work Tracker
 
+## In Progress: Media Pipeline and UI Responsiveness Investigation — 2026-10-12
+- [x] Normalize Android picker sizes when providers return `-1`; stream provider data through EOF instead of rejecting unknown size.
+- [x] Move Base64 decoding of Android provider chunks to the existing media Web Worker where supported; preserve compatibility fallback.
+- [x] Add regression coverage for unknown picker/read sizes and worker decoding; focused device-bridge and worker suites pass (23 tests); production web build passes.
+- [x] Full repository suite completed: 366 files passed / 107 failed; 1,539 tests passed / 213 failed / 6 skipped (1,758 total). Failures are dominated by blocked localhost relay/recovery endpoints; unrelated source/UI contract failures also exist.
+- [ ] Inspect user-provided redacted Android WebView/Logcat `MEDIA_ERROR` and HTTP logs to identify the remaining remote media load failure.
+- [ ] Validate actual picker/audio upload and tab-switch frame behavior on Android. The recording alone does not establish the failed request/status or whether the audio upload completed.
+- **Current evidence**: 1 MiB Base64 decode loop averaged 16.13 ms over 10 local Node runs. This indicates avoidable main-thread work in the prior path, not device-level proof of the reported freeze.
+- **Scope**: no change to media encryption, attachment wire format, E2EE, identity, Space isolation, or relay protocol.
+
 ## Completed: Media Selection and Send Responsiveness Remediation — 2026-10-12
 - [x] Replace the competing selected-file array/URI-set/maps with an ordered attachment-record source of truth; deduplicate native `content://` URIs and preserve the selection when switching categories or cancelling the picker.
 - [x] Display selected attachments independently of the currently discoverable Gallery/Files list, with matching selected count and visible row details.

@@ -6,6 +6,8 @@
  * manages execution timeouts, and provides automatic recovery and non-browser fallback.
  */
 
+import { base64ToBytes } from '../crypto/utils.ts';
+
 export interface MediaWorkerProgress {
   chunkIndex: number;
   totalChunks: number;
@@ -151,6 +153,18 @@ export class MediaWorkerPool {
     });
 
     return { requestId, promise };
+  }
+
+  /** Decode native bridge Base64 payloads off the UI thread when Web Workers are available. */
+  public async decodeBase64(base64Data: string): Promise<Uint8Array> {
+    if (!this.isWorkerSupported()) return base64ToBytes(base64Data);
+    try {
+      const { promise } = this.execute<ArrayBuffer>('BASE64_TO_BYTES', { base64Data });
+      return new Uint8Array(await promise);
+    } catch (_workerError) {
+      // Keep attachment sending available in WebViews whose worker cannot initialize.
+      return base64ToBytes(base64Data);
+    }
   }
 
   /**

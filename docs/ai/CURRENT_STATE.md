@@ -1,5 +1,13 @@
 # CURRENT_STATE.md — Verified Phase & System Status
 
+## Media Pipeline and UI Responsiveness Investigation — 2026-10-12
+- Android document providers may report `OpenableColumns.SIZE = -1`. The device bridge now normalizes picker metadata to unknown-size `0` and streams bytes until native EOF; a regression test covers an external audio provider.
+- Native provider Base64 chunks are decoded by the existing media Web Worker when supported, removing the measured synchronous 1 MiB decode loop from the normal WebView UI path. Compatibility fallback remains synchronous if Workers are unavailable or fail.
+- Verification: focused device-bridge and media-worker suites pass (23 tests); production web build passes. The build reports existing dynamic-import and large-chunk warnings.
+- Full `npm test -- --run`: 366 files passed / 107 failed; 1,539 tests passed / 213 failed / 6 skipped. Most integration failures could not connect to localhost relay/recovery endpoints; the suite also includes unrelated existing source/UI contract failures.
+- A local Node microbenchmark of the old 1 MiB Base64 decode loop measured 16.13 ms average across 10 runs; this is not a physical Android frame-time result. Android Logcat/WebView network logs and device tab/frame profiling are still needed to explain remote “Media couldn't load” failures and verify audio/tab behavior.
+- No attachment wire format, cryptography, identity, Space isolation, or relay protocol changes.
+
 ## Media Selection and Send Responsiveness Remediation — 2026-10-12
 - The Share Media picker now owns one ordered selected-attachment record list. URI membership, selected order/count, native file metadata, and display rows derive from this list; active media-category results remain separate.
 - Native Android `content://` selections are represented immediately by metadata tokens and passed into the existing encrypted upload worker. Provider data is read once, in sequential 1 MiB chunks, into one growable buffer at send time; the intermediate `File` and its duplicate full-buffer copy were removed from this path.

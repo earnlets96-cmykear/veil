@@ -256,6 +256,20 @@ self.onmessage = async (event: MessageEvent) => {
         break;
       }
 
+      case 'BASE64_TO_BYTES': {
+        const { base64Data } = payload;
+        const decoded = base64ToBytes(base64Data);
+        (self as any).postMessage(
+          {
+            type: 'SUCCESS',
+            requestId,
+            result: decoded.buffer,
+          },
+          [decoded.buffer]
+        );
+        break;
+      }
+
       default:
         throw new Error(`Unknown worker operation: ${type}`);
     }
